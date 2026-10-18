@@ -16,7 +16,7 @@ const whatsappFaqData = [
   {
     id: 'payment',
     keywords: ['payment', 'pay', 'fee', 'escrow', 'money', 'cost', 'price', 'charge', 'transaction', 'secure', 'safe'],
-    answer: 'RentalHub uses a secure escrow system for all transactions. Your payment is held safely until you confirm satisfaction with the service or property. This protects both tenants and landlords throughout the rental process.',
+    answer: 'Amana RentalHub NG uses a secure escrow system for all transactions. Your payment is held safely until you confirm satisfaction with the service or property. This protects both tenants and landlords throughout the rental process.',
     link: null,
     linkText: null,
   },

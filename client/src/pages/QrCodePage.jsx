@@ -62,7 +62,7 @@ const QrCodePage = () => {
                   />
                 </div>
                 <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-primary-600 text-white text-[10px] font-bold px-3 py-1 rounded-full whitespace-nowrap shadow-md print:bg-white print:text-gray-800 print:border print:border-gray-400 print:shadow-none">
-                  RENTALHUB NG
+                  Amana RentalHub NG
                 </div>
               </div>
             </div>

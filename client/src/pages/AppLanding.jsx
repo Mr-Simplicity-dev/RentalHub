@@ -190,7 +190,7 @@ const AppLanding = () => {
                 <div className="w-72 h-72 lg:w-96 lg:h-96 bg-gradient-to-br from-yellow-400/20 to-green-400/20 rounded-3xl -rotate-3 relative z-10 border border-white/20 flex items-center justify-center backdrop-blur-sm">
                   <img
                     src="/rentalhub-mark.svg"
-                    alt="RentalHub NG"
+                    alt="Amana RentalHub NG"
                     className="w-48 h-48 lg:w-64 lg:h-64 drop-shadow-2xl"
                   />
                 </div>

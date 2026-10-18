@@ -18,9 +18,9 @@ const initialManualForm = {
 };
 
 const initialBroadcastForm = {
-  title: 'RentalHub NG lawyer recruitment',
+  title: 'Amana RentalHub NG lawyer recruitment',
   message:
-    'We are currently recruiting lawyers to serve on the RentalHub NG lawyer program. Apply from your lawyer dashboard if you want to be reviewed for approval.',
+    'We are currently recruiting lawyers to serve on the Amana RentalHub NG lawyer program. Apply from your lawyer dashboard if you want to be reviewed for approval.',
 };
 
 const statusBadgeClass = {

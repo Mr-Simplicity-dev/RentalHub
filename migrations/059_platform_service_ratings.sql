@@ -1,4 +1,4 @@
--- Verified RentalHub NG service ratings and live public fly-ins.
+-- Verified Amana RentalHub NG service ratings and live public fly-ins.
 
 CREATE TABLE IF NOT EXISTS platform_rating_settings (
   id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),

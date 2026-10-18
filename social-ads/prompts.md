@@ -1,7 +1,7 @@
-# RentalHub NG — Social Ad Concepts (approved direction)
+# Amana RentalHub NG — Social Ad Concepts (approved direction)
 
 Website: rentalhub.com.ng · Support: support@rentalhub.com.ng
-Wordmark: “RentalHub NG”. Logo: `client/public/rentalhub-mark.svg`.
+Wordmark: “Amana RentalHub NG”. Logo: `client/public/rentalhub-mark.svg`.
 
 | # | Concept | Layout / mood | Palette | Headline copy (short) |
 |---|---------|---------------|---------|------------------------|

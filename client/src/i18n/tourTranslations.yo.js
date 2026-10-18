@@ -136,7 +136,7 @@ const tourYoTranslations = {
       eyebrow: 'Olùtọ́sọ́nà àtòjọ ìṣàkóso rẹ',
       resume_title: 'Tẹ̀ síwájú níbi tí o dákẹ́',
       returning_title: 'Káàbọ̀ sí RentalHub',
-      new_title: 'Káàbọ̀ sí RentalHub NG',
+      new_title: 'Káàbọ̀ sí Amana RentalHub NG',
       resume_description: 'Wọ́n ti fipamọ́ ìlọsíwájú rẹ. Tẹ̀ síwájú láti ìgbésẹ̀ tó gbẹ̀yìn tí o wò, tàbí kí o tun bẹ̀rẹ̀ lọ́jọ́ mìíràn láti àlàyé ara rẹ.',
       returning_description: 'Ṣe àtúnmúráyá kíákíá kí o sì tun rí àwọn àkóónú tó ṣe pàtàkì jùlọ fún àkàánù rẹ.',
       new_description: 'Jẹ́ kí a fi àwọn àkóónú tó wúlò jùlọ fún àkàánù rẹ hàn ọ́ pẹ̀lú ìrìn-àjò kúkúrú tó dá lórí ọ̀rọ̀.',

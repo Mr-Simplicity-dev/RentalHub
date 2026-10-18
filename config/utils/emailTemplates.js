@@ -1,6 +1,6 @@
 const baseUrl = process.env.BASE_URL || 'https://rentalhub.com.ng';
 
-const responsiveWrapper = (content, { title = 'RentalHub NG', previewText = '', unsubscribeUrl = '' } = {}) => `
+const responsiveWrapper = (content, { title = 'Amana RentalHub NG', previewText = '', unsubscribeUrl = '' } = {}) => `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -56,7 +56,7 @@ const responsiveWrapper = (content, { title = 'RentalHub NG', previewText = '', 
                 <tr>
                   <td align="center" style="padding:10px 0;">
                     <a href="${baseUrl}" target="_blank" style="text-decoration:none;">
-                      <img src="${baseUrl}/logo.png" alt="RentalHub NG" width="180" height="auto" style="display:block;max-width:180px;height:auto;border:0;">
+                      <img src="${baseUrl}/logo.png" alt="Amana RentalHub NG" width="180" height="auto" style="display:block;max-width:180px;height:auto;border:0;">
                     </a>
                   </td>
                 </tr>
@@ -86,7 +86,7 @@ const responsiveWrapper = (content, { title = 'RentalHub NG', previewText = '', 
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center" style="padding:0 20px 12px 20px;font-size:12px;line-height:1.5;color:#94a3b8;">
-                    &copy; ${new Date().getFullYear()} RentalHub NG. All rights reserved.
+                    &copy; ${new Date().getFullYear()} Amana RentalHub NG. All rights reserved.
                   </td>
                 </tr>
                 <tr>
@@ -103,7 +103,7 @@ const responsiveWrapper = (content, { title = 'RentalHub NG', previewText = '', 
                 ` : ''}
                 <tr>
                   <td align="center" style="padding:0 20px 20px 20px;font-size:11px;line-height:1.5;color:#cbd5e1;">
-                    RentalHub NG, Nigeria
+                    Amana RentalHub NG, Nigeria
                   </td>
                 </tr>
               </table>
@@ -378,13 +378,13 @@ const buildEmail = ({ template, data, unsubscribeToken }) => {
     : '';
 
   let content = '';
-  let title = 'RentalHub NG';
+  let title = 'Amana RentalHub NG';
   let previewText = '';
 
   switch (template) {
     case 'newsletter':
       title = data.title || 'RentalHub Newsletter';
-      previewText = data.previewText || 'Latest updates from RentalHub NG';
+      previewText = data.previewText || 'Latest updates from Amana RentalHub NG';
       content = newsletterContent(data);
       break;
     case 'promo':
@@ -404,7 +404,7 @@ const buildEmail = ({ template, data, unsubscribeToken }) => {
       break;
     default:
       content = data.body || '';
-      title = data.title || 'RentalHub NG';
+      title = data.title || 'Amana RentalHub NG';
   }
 
   return responsiveWrapper(content, { title, previewText, unsubscribeUrl });

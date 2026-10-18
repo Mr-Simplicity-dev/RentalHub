@@ -39,8 +39,8 @@
     "sponsored": "Mgbasa ozi akwụ ụgwọ",
     "default_cta": "Pịa iji mepee",
     "share_ad": "Kekọrịta mgbasa ozi",
-    "default_share_title": "Mgbasa ozi akwụ ụgwọ nke RentalHub NG",
-    "share_text": "Lelee onyinye akwụ ụgwọ a na RentalHub NG: {{title}}",
+    "default_share_title": "Mgbasa ozi akwụ ụgwọ nke Amana RentalHub NG",
+    "share_text": "Lelee onyinye akwụ ụgwọ a na Amana RentalHub NG: {{title}}",
     "share_device": "Kekọrịta site na ngwaọrụ",
     "copy_link": "Detuo njikọ mgbasa ozi",
     "link_copied": "Edetuola njikọ mgbasa ozi",
@@ -69,7 +69,7 @@
     "submit_failed": "Iziga ntụle dara",
     "dismiss_notification": "Mefuo ọkwa ntụle",
     "star_rating": "ntụle kpakpando {{count}}",
-    "flyin_message": "{{name}} nyere RentalHub NG ntụle kpakpando {{stars}} mgbe ha {{context}}.",
+    "flyin_message": "{{name}} nyere Amana RentalHub NG ntụle kpakpando {{stars}} mgbe ha {{context}}.",
     "verified_in": "Ahụmahụ enyocharala na {{location}}",
     "this_service": "ọrụ a",
     "contexts": {
@@ -82,31 +82,31 @@
       "virtual_tour": "mechara nlele ụlọ site n'ịntanetị",
       "dispute_support": "jiri nkwado esemokwu",
       "admin_support": "nwetara nkwado nchịkwa",
-      "platform": "jiri RentalHub NG"
+      "platform": "jiri Amana RentalHub NG"
     },
     "prompt_titles": {
-      "property_secured": "Tụlee ahụmahụ mgbazinye gị na RentalHub NG",
+      "property_secured": "Tụlee ahụmahụ mgbazinye gị na Amana RentalHub NG",
       "property_listed": "Tụlee ahụmahụ idepụta ụlọ gị",
       "property_rented": "Tụlee ahụmahụ mgbazinye gara nke ọma gị",
-      "legal_support": "Tụlee nkwado iwu nke RentalHub NG",
-      "fumigation_cleaning": "Tụlee nkwado ịwụsị ọgwụ ụmụ ahụhụ / ihicha nke RentalHub NG",
-      "transportation": "Tụlee nkwado ụgbọ njem nke RentalHub NG",
-      "virtual_tour": "Tụlee nlele ụlọ gị na RentalHub NG",
-      "dispute_support": "Tụlee nkwado esemokwu nke RentalHub NG",
-      "admin_support": "Tụlee nkwado RentalHub NG",
-      "platform": "Tụlee RentalHub NG"
+      "legal_support": "Tụlee nkwado iwu nke Amana RentalHub NG",
+      "fumigation_cleaning": "Tụlee nkwado ịwụsị ọgwụ ụmụ ahụhụ / ihicha nke Amana RentalHub NG",
+      "transportation": "Tụlee nkwado ụgbọ njem nke Amana RentalHub NG",
+      "virtual_tour": "Tụlee nlele ụlọ gị na Amana RentalHub NG",
+      "dispute_support": "Tụlee nkwado esemokwu nke Amana RentalHub NG",
+      "admin_support": "Tụlee nkwado Amana RentalHub NG",
+      "platform": "Tụlee Amana RentalHub NG"
     },
     "prompt_details": {
-      "property_secured": "I nwetara {{source}} site na RentalHub NG.",
-      "property_listed": "I depụtara {{source}} na RentalHub NG.",
-      "property_rented": "E gbaziri {{source}} site na RentalHub NG.",
+      "property_secured": "I nwetara {{source}} site na Amana RentalHub NG.",
+      "property_listed": "I depụtara {{source}} na Amana RentalHub NG.",
+      "property_rented": "E gbaziri {{source}} site na Amana RentalHub NG.",
       "legal_support": "Gwa anyị otú ahụmahụ nkwado iwu si nyere gị aka.",
       "fumigation_cleaning": "Gwa anyị otú ọrụ gị si gaa.",
       "transportation": "Gwa anyị otú nkwado ụgbọ njem gị si gaa.",
       "virtual_tour": "Gwa anyị otú nlele ụlọ ahụ si nyere gị aka.",
       "dispute_support": "Gwa anyị otú nkwado esemokwu si nyere gị aka.",
       "admin_support": "Gwa anyị otú nkwado si nyere gị aka.",
-      "platform": "Gwa anyị banyere ahụmahụ gị na RentalHub NG."
+      "platform": "Gwa anyị banyere ahụmahụ gị na Amana RentalHub NG."
     }
   },
   "home": {
@@ -144,13 +144,13 @@
     "close_app_prompt": "Mechie ọkwa nbudata ngwa",
     "download_app_cta": "Nweta Ngwa Mkpanaka RentalHub",
     "share_app": "Kekọrịta RentalHub",
-    "share_app_text": "Lelee RentalHub NG, ikpo a pụrụ ịtụkwasị obi maka ụlọ na Naịjirịa:",
+    "share_app_text": "Lelee Amana RentalHub NG, ikpo a pụrụ ịtụkwasị obi maka ụlọ na Naịjirịa:",
     "legal_support_link": "Ị chọrọ enyemaka iwu? Nchekwa Nkwado Iwu na-enye gị ohere ịnweta ndị ọka iwu tozuru etozu n'ógbè gị.",
     "property_request_link": "Ị chọtaghị ụdị ụlọ masịrị gị? Zinye arịrịọ na ibe ụlọ.",
     "use_lawyers": "Nchekwa Nkwado Iwu",
     "verify_dispute_evidence": "Nyochaa Ihe Akaebe Esemokwu",
     "submit_request": "Zinye Arịrịọ",
-    "whatsapp_message": "Ndewo RentalHub NG, achọrọ m enyemaka ịchọta ụlọ.",
+    "whatsapp_message": "Ndewo Amana RentalHub NG, achọrọ m enyemaka ịchọta ụlọ.",
     "whatsapp_greeting": "Ndewo! Ị chọrọ enyemaka ịchọta ụlọ?",
     "chat_with_us": "Kparịta ụka na anyị na WhatsApp"
   },
@@ -278,7 +278,7 @@
     "qa_apps_landlord": "Arịrịọ",
     "qa_apps_landlord_desc": "Nyochaa arịrịọ ndị gbaziri ụlọ",
     "survey_reminder_title": "Mecha nyocha nyocha RentalHub gị",
-    "survey_reminder_body": "Azịza gị na-enyere anyị aka imeziwanye RentalHub NG. Ọ na-ewe ihe dị ka nkeji 10 ọzọ — ị nwere ike mechaa n'oge ọ bụla.",
+    "survey_reminder_body": "Azịza gị na-enyere anyị aka imeziwanye Amana RentalHub NG. Ọ na-ewe ihe dị ka nkeji 10 ọzọ — ị nwere ike mechaa n'oge ọ bụla.",
     "survey_continue": "Gaa n'ihu na Nyocha"
   },
   "profile": {
@@ -634,15 +634,15 @@
   "about_us": {
     "hero": {
       "title_before": "Gbasara ",
-      "title_highlight": "RentalHub NG",
+      "title_highlight": "Amana RentalHub NG",
       "subtitle": "Ikpo teknụzụ a pụrụ ịtụkwasị obi maka ihe onwunwe na Naịjirịa — na-ejikọ ndị na-agbaziri ụlọ, ndị nwe ụlọ, ndị ọrụ na ndị ọka iwu n'ofe steeti 36 niile na Federal Capital Territory.",
       "cta_browse": "Chọgharịa Ụlọ",
-      "cta_join": "Sonye RentalHub NG"
+      "cta_join": "Sonye Amana RentalHub NG"
     },
     "mission": {
       "section_label": "Ebumnobi Anyị",
       "heading": "Ịgbanwe Ọdịdị Mgbazinye Naịjirịa",
-      "paragraph_1": "Na RentalHub NG, anyị kwenyere na onye ọ bụla kwesịrị ịnweta ahụmahụ dị nchebe, nke doro anya, na nke na-adịghị egbu mgbu mgbe ọ na-achọ ụlọ. Ebumnobi anyị bụ iwepụ ihe mgbochi, aghụghọ na mkpasu iwe na ahịa mgbazinye Naịjirịa.",
+      "paragraph_1": "Na Amana RentalHub NG, anyị kwenyere na onye ọ bụla kwesịrị ịnweta ahụmahụ dị nchebe, nke doro anya, na nke na-adịghị egbu mgbu mgbe ọ na-achọ ụlọ. Ebumnobi anyị bụ iwepụ ihe mgbochi, aghụghọ na mkpasu iwe na ahịa mgbazinye Naịjirịa.",
       "paragraph_2": "Site n'ijikọta teknụzụ na usoro nyocha nkwenye siri ike, nkwado iwu, na mkpuchi mba niile, anyị na-eme ka ndị na-agbaziri ụlọ nwee ike ịchọta ụlọ enyocharala ma mee ka ndị nwe ụlọ jikọọ na ndị gbaziri ụlọ tozuru etozu — ha niile n'otu ikpo a pụrụ ịtụkwasị obi.",
       "badge_verified": "Ụlọ enyocharala",
       "badge_secure": "Ịkwụ ụgwọ dị nchebe",
@@ -654,7 +654,7 @@
     "journey": {
       "section_label": "Njem Anyị",
       "heading": "Site n'Ochicho gaa N'Ozugbo",
-      "subtitle": "Ikpo ọ bụla dị ukwuu na-amalite site n'echiche dị mfe. Nke a bụ akụkọ otú RentalHub NG si too site n'echiche ghọọ ahịa ụlọ a pụrụ ịtụkwasị obi na Naịjirịa."
+      "subtitle": "Ikpo ọ bụla dị ukwuu na-amalite site n'echiche dị mfe. Nke a bụ akụkọ otú Amana RentalHub NG si too site n'echiche ghọọ ahịa ụlọ a pụrụ ịtụkwasị obi na Naịjirịa."
     },
     "values": {
       "section_label": "Ihe Anyị Na-Eguzo",
@@ -663,7 +663,7 @@
     },
     "different": {
       "section_label": "Ihe Mere Ị Ji Ahọrọ Anyị",
-      "heading": "Ihe Na-Eme Ka RentalHub NG Dị Iche",
+      "heading": "Ihe Na-Eme Ka Amana RentalHub NG Dị Iche",
       "subtitle": "Anyị anaghị edepụta ụlọ naanị — anyị na-arụ ikpo na-agụnye ihe niile maka azụmahịa ụlọ dị nchebe ma doro anya.",
       "ecosystem": {
         "title": "Ikpo Enyocharala",
@@ -688,7 +688,7 @@
       "subtitle": "Ndị ọkachamara nwere ịnụ ọkụ n'obi na-agba mbọ ịgbanwe ahụmahụ ụlọ Naịjirịa.",
       "member_1": {
         "role": "Onye Ntọala & CEO",
-        "bio": "Site n'afọ 15+ n'ime azụmahịa ụlọ na teknụzụ, Zubair na-edu RentalHub NG n'ọchịchọ ịgbanwe ohere ụlọ na Naịjirịa."
+        "bio": "Site n'afọ 15+ n'ime azụmahịa ụlọ na teknụzụ, Zubair na-edu Amana RentalHub NG n'ọchịchọ ịgbanwe ohere ụlọ na Naịjirịa."
       },
       "member_2": {
         "role": "Onye Isi Ọrụ",
@@ -696,7 +696,7 @@
       },
       "member_3": {
         "role": "Onye Isi Teknụzụ",
-        "bio": "Emeka na-emepụta ikpo RentalHub NG, na-ebute ihe ọhụrụ na teknụzụ ụlọ, nyocha nkwenye dijitalụ na azụmahịa dị nchebe."
+        "bio": "Emeka na-emepụta ikpo Amana RentalHub NG, na-ebute ihe ọhụrụ na teknụzụ ụlọ, nyocha nkwenye dijitalụ na azụmahịa dị nchebe."
       },
       "member_4": {
         "role": "Onye Isi Ọrụ Iwu",
@@ -704,7 +704,7 @@
       }
     },
     "milestone": {
-      "year_2020": "E hiwere RentalHub NG n'ọchịchọ ịgbanwe ahịa mgbazinye Naịjirịa.",
+      "year_2020": "E hiwere Amana RentalHub NG n'ọchịchọ ịgbanwe ahịa mgbazinye Naịjirịa.",
       "year_2021": "Weputara usoro idepụta ụlọ iji nabata ndị nwe ụlọ n'ofe Lagos na Abuja.",
       "year_2022": "Gbasaa na steeti 36 niile + FCT; webata nyocha nkwenye njirimara.",
       "year_2023": "Wepụtara ọrụ nkwado iwu, idozi esemokwu na ahịa ịwụsị ọgwụ ụmụ ahụhụ / ihicha.",
@@ -745,7 +745,7 @@
     },
     "cta": {
       "heading": "Ị Dị Njikere Ịchọta Ụlọ Gị Zuru Oke?",
-      "subtitle": "Sonye n'ime ndị Naịjirịa 50,000+ na-atụkwasị obi na RentalHub NG maka mkpa ụlọ ha. Chọgharịa ụlọ enyocharala, jikọọ na ndị nwe ụlọ a pụrụ ịtụkwasị obi, ma nwee obi jụụ.",
+      "subtitle": "Sonye n'ime ndị Naịjirịa 50,000+ na-atụkwasị obi na Amana RentalHub NG maka mkpa ụlọ ha. Chọgharịa ụlọ enyocharala, jikọọ na ndị nwe ụlọ a pụrụ ịtụkwasị obi, ma nwee obi jụụ.",
       "browse": "Chọgharịa Ụlọ",
       "create_account": "Mepụta Akaụntụ"
     },
@@ -818,7 +818,7 @@
   },
   "list_property": {
     "hero": {
-      "title": "Depụta Ụlọ Gị Na RentalHub NG",
+      "title": "Depụta Ụlọ Gị Na Amana RentalHub NG",
       "subtitle": "Rute puku ndị gbaziri ụlọ enyocharala n'ofe Naịjirịa. Depụta ụlọ gị n'ime nkeji ma bido ịnata arịrịọ tozuru etozu site n'aka ndị gbaziri ụlọ ziri ezi.",
       "list_now": "Depụta Ụlọ Gị Ugbu a",
       "view_pricing": "Lelee Atụmatụ Ego"
@@ -842,7 +842,7 @@
     },
     "benefits": {
       "badge": "Ihe Mere Ị Ji Depụta Na Anyị",
-      "title": "Uru Idepụta Na RentalHub NG",
+      "title": "Uru Idepụta Na Amana RentalHub NG",
       "subtitle": "Puku ndị nwe ụlọ na ndị ọrụ atụkwasịworo anyị obi. Nke a bụ ihe kpatara ya."
     },
     "step_1": {
@@ -923,7 +923,7 @@
     },
     "testimonial_1": {
       "role": "Onye Nwe Ụlọ, Lagos",
-      "text": "Edepụtara m ụlọ m nwere ime ụlọ ndina atọ na RentalHub NG ma nwee onye gbaziri ụlọ tozuru etozu n'ime otu izu. Usoro nyocha nkwenye nyere m obi ike."
+      "text": "Edepụtara m ụlọ m nwere ime ụlọ ndina atọ na Amana RentalHub NG ma nwee onye gbaziri ụlọ tozuru etozu n'ime otu izu. Usoro nyocha nkwenye nyere m obi ike."
     },
     "testimonial_2": {
       "role": "Onye Ọrụ Ụlọ, Abuja",
@@ -934,7 +934,7 @@
       "text": "Ihe nkwado iwu ahụ gbanwere egwuregwu. E doziri m esemokwu ọsọ ọsọ na-enweghị nrụgide a na-ahụkarị."
     },
     "faq_1": {
-      "q": "Ònye nwere ike ịdepụta ụlọ na RentalHub NG?",
+      "q": "Ònye nwere ike ịdepụta ụlọ na Amana RentalHub NG?",
       "a": "Ndị nwe ụlọ enyocharala na ndị ọrụ debanyere aha nwere ike ịdepụta ụlọ. Ị kwesịrị imezue nyocha nkwenye njirimara ma nata nkwado tupu ị depụta."
     },
     "faq_2": {
@@ -947,7 +947,7 @@
     },
     "faq_4": {
       "q": "Enwere m ike ịdepụta ụlọ n'ọtụtụ steeti?",
-      "a": "Ee! RentalHub NG na-ekpuchi steeti 36 niile + FCT. Ị nwere ike ịdepụta ụlọ ebe ọ bụla na Naịjirịa n'agbanyeghị ọnọdụ gị."
+      "a": "Ee! Amana RentalHub NG na-ekpuchi steeti 36 niile + FCT. Ị nwere ike ịdepụta ụlọ ebe ọ bụla na Naịjirịa n'agbanyeghị ọnọdụ gị."
     },
     "faq_5": {
       "q": "Olee otú m ga-esi nata ego?",
@@ -974,7 +974,7 @@
     },
     "cta": {
       "title": "Ị Dị Njikere Iji Depụta Ụlọ Gị?",
-      "subtitle": "Sonye n'ime ndị nwe ụlọ na ndị ọrụ 5,000+ na-eji RentalHub NG ịchọta ndị gbaziri ụlọ tozuru etozu. Depụta ụlọ gị taa ma bido ịnata arịrịọ.",
+      "subtitle": "Sonye n'ime ndị nwe ụlọ na ndị ọrụ 5,000+ na-eji Amana RentalHub NG ịchọta ndị gbaziri ụlọ tozuru etozu. Depụta ụlọ gị taa ma bido ịnata arịrịọ.",
       "list_now": "Depụta Ụlọ Gị Ugbu a",
       "create_account": "Mepụta Akaụntụ Efu"
     },
@@ -991,7 +991,7 @@
   "faq": {
     "hero_title_before": "Ajụjụ A Na-Ajụkarị ",
     "hero_title_highlight": "Ajụjụ",
-    "hero_desc": "Ihe niile ị chọrọ ịma gbasara RentalHub NG. Chọta azịza nke ajụjụ ndị a na-ajụkarị banyere idepụta ụlọ, ịchọta ụlọ mgbazinye, nyocha nkwenye, ego na ihe ndị ọzọ.",
+    "hero_desc": "Ihe niile ị chọrọ ịma gbasara Amana RentalHub NG. Chọta azịza nke ajụjụ ndị a na-ajụkarị banyere idepụta ụlọ, ịchọta ụlọ mgbazinye, nyocha nkwenye, ego na ihe ndị ọzọ.",
     "hero_cta_create": "Mepụta Akaụntụ Efu",
     "hero_cta_contact": "Kpọtụrụ Nkwado",
     "stats_properties_listed": "Ụlọ Edepụtara",
@@ -1046,9 +1046,9 @@
   },
   "how_it_works": {
     "hero_title_before": "Otú ",
-    "hero_title_highlight": "RentalHub NG",
+    "hero_title_highlight": "Amana RentalHub NG",
     "hero_title_after": " Si Arụ Ọrụ",
-    "hero_desc": "Ma ọ bụ na ị na-achọ ụlọ ọzọ ma ọ bụ na-edepụta ụlọ maka mgbazinye, RentalHub NG na-eme ka usoro ahụ dị mfe, dị nchebe ma doro anya.",
+    "hero_desc": "Ma ọ bụ na ị na-achọ ụlọ ọzọ ma ọ bụ na-edepụta ụlọ maka mgbazinye, Amana RentalHub NG na-eme ka usoro ahụ dị mfe, dị nchebe ma doro anya.",
     "hero_cta_browse": "Chọgharịa Ụlọ",
     "hero_cta_list": "Depụta Ụlọ Gị",
     "overview_badge": "Nchịkọta Ngwa",
@@ -1063,7 +1063,7 @@
     "walkthrough_connect_desc": "Rịọ, kparịta ụka ma mechie azụmahịa gị n'obi ike.",
     "tenants_badge": "Maka Ndị Gbaziri Ụlọ",
     "tenants_heading": "Chọta Ụlọ Gị Zuru Oke",
-    "tenants_desc": "Site na ọchụchọ ruo ịbata n'ụlọ, otú a ka ndị gbaziri ụlọ si achọta ụlọ ọzọ ha na RentalHub NG.",
+    "tenants_desc": "Site na ọchụchọ ruo ịbata n'ụlọ, otú a ka ndị gbaziri ụlọ si achọta ụlọ ọzọ ha na Amana RentalHub NG.",
     "tenants_step_1_title": "Mepụta Akaụntụ Gị",
     "tenants_step_1_desc": "Deba aha dịka onye gbaziri ụlọ ma mezue nyocha nkwenye njirimara gị site na NIN. Nke a na-eme ka obodo dị nchebe maka onye ọ bụla.",
     "tenants_step_1_hl_1": "Ndebanye aha efu",
@@ -1085,10 +1085,10 @@
     "tenants_step_4_hl_2": "Ozi n'ime ngwa",
     "tenants_step_4_hl_3": "Nkwado ịbata n'ụlọ",
     "tenants_cta": "Bido Dịka Onye Gbaziri Ụlọ",
-    "divider_label": "Ma ndị gbaziri ụlọ ma ndị nwe ụlọ na-eji RentalHub NG",
+    "divider_label": "Ma ndị gbaziri ụlọ ma ndị nwe ụlọ na-eji Amana RentalHub NG",
     "landlords_badge": "Maka Ndị Nwe Ụlọ & Ndị Ọrụ",
     "landlords_heading": "Depụta & Jikwaa Ụlọ",
-    "landlords_desc": "Site na ndebanye aha ruo njikọ onye gbaziri ụlọ, otú a ka ndị nwe ụlọ si enwe ihe ịga nke ọma na RentalHub NG.",
+    "landlords_desc": "Site na ndebanye aha ruo njikọ onye gbaziri ụlọ, otú a ka ndị nwe ụlọ si enwe ihe ịga nke ọma na Amana RentalHub NG.",
     "landlords_step_1_title": "Deba Aha & Nyochaa",
     "landlords_step_1_desc": "Mepụta akaụntụ onye nwe ụlọ ma ọ bụ onye ọrụ ma mezue nyocha nkwenye nkọwa onwe ka i bido idepụta ụlọ gị.",
     "landlords_step_1_hl_1": "Ndebanye aha ngwa",
@@ -1112,7 +1112,7 @@
     "landlords_cta": "Bido Idepụta Ụlọ Gị",
     "features_badge": "Ihe Dị N'ikpo",
     "features_heading": "Ihe Na-Eme Ka Ikpo Ahụ Rụọ Ọrụ",
-    "features_desc": "Ihe ndị a na-ahụ na mmekọrịta ọ bụla na RentalHub NG dị nchebe ma bụrụ nke a pụrụ ịtụkwasị obi.",
+    "features_desc": "Ihe ndị a na-ahụ na mmekọrịta ọ bụla na Amana RentalHub NG dị nchebe ma bụrụ nke a pụrụ ịtụkwasị obi.",
     "features_verification_title": "Nyocha Nkwenye Njirimara",
     "features_verification_desc": "Onye ọ bụla — onye gbaziri ụlọ, onye nwe ụlọ na onye ọrụ — na-agafe nyocha nkwenye njirimara NIN maka ikpo a pụrụ ịtụkwasị obi.",
     "features_secure_title": "Azụmahịa Dị Nchebe",
@@ -1123,9 +1123,9 @@
     "features_ratings_desc": "Ọkwa doro anya na ntụle enyocharala na-enyere ndị gbaziri ụlọ na ndị nwe ụlọ aka ime mkpebi ziri ezi.",
     "faq_badge": "Ajụjụ",
     "faq_heading": "Ajụjụ Ndị A Na-Ajụkarị",
-    "faq_desc": "Ihe niile ị chọrọ ịma banyere iji RentalHub NG.",
+    "faq_desc": "Ihe niile ị chọrọ ịma banyere iji Amana RentalHub NG.",
     "cta_heading": "Ị Dị Njikere Ịbido?",
-    "cta_desc": "Sonye n'ime puku ndị Naịjirịa na-eji RentalHub NG ịchọta ụlọ na idepụta ụlọ. Njem gị na-amalite ebe a.",
+    "cta_desc": "Sonye n'ime puku ndị Naịjirịa na-eji Amana RentalHub NG ịchọta ụlọ na idepụta ụlọ. Njem gị na-amalite ebe a.",
     "cta_create": "Mepụta Akaụntụ Efu",
     "cta_browse": "Chọgharịa Ụlọ",
     "contact_heading": "Ị Ka Nwere Ajụjụ?",
@@ -1149,7 +1149,7 @@
     "plan_free_subtitle": "Zuru oke maka ịnwale",
     "plan_free_price": "₦0",
     "plan_free_period": "kwa mbipụta",
-    "plan_free_desc": "Bido na mbipụta bụla ma lee ihe RentalHub NG nwere.",
+    "plan_free_desc": "Bido na mbipụta bụla ma lee ihe Amana RentalHub NG nwere.",
     "plan_free_feat_1": "Depụta ụlọ 1",
     "plan_free_feat_2": "Nkọwa ụlọ bụla",
     "plan_free_feat_3": "Ruo foto 3",
@@ -1224,7 +1224,7 @@
     "faq_heading": "Ajụjụ Ndị A Na-Ajụkarị",
     "faq_desc": "Ihe niile ị chọrọ ịma banyere ego na ịgba ụgwọ anyị.",
     "cta_heading": "Bido Idepụta N'efu Taa",
-    "cta_desc": "Ọ dịghị kaadị kredit achọrọ. Ọ dịghị ihe ize ndụ. Sonye n'ime puku ndị nwe ụlọ na-atụkwasị obi na RentalHub NG iji jikọọ ha na ndị gbaziri ụlọ tozuru etozu.",
+    "cta_desc": "Ọ dịghị kaadị kredit achọrọ. Ọ dịghị ihe ize ndụ. Sonye n'ime puku ndị nwe ụlọ na-atụkwasị obi na Amana RentalHub NG iji jikọọ ha na ndị gbaziri ụlọ tozuru etozu.",
     "cta_create": "Mepụta Akaụntụ Efu",
     "cta_list": "Depụta Ụlọ Gị",
     "contact_heading": "Ajụjụ Banyere Ego?",
@@ -1235,7 +1235,7 @@
   "landlord_guide": {
     "hero_title_before": "Ntuziaka ",
     "hero_title_highlight": "Onye Nwe Ụlọ",
-    "hero_desc": "Ihe niile ị chọrọ ịma gbasara idepụta, ijikwa na ịgbazinye ụlọ gị nke ọma na RentalHub NG — site na nkwadebe ruo mgbe onye gbaziri ụlọ batara.",
+    "hero_desc": "Ihe niile ị chọrọ ịma gbasara idepụta, ijikwa na ịgbazinye ụlọ gị nke ọma na Amana RentalHub NG — site na nkwadebe ruo mgbe onye gbaziri ụlọ batara.",
     "hero_cta_list": "Depụta Ụlọ Gị",
     "hero_cta_pricing": "Lelee Atụmatụ Ego",
     "stats_properties_listed": "Ụlọ Edepụtara",
@@ -1258,7 +1258,7 @@
     "prep_step_2_item_3": "Tụlee ịkpọ onye na-ese foto ọkachamara",
     "prep_step_2_item_4": "Hazie ụlọ ka ọ saa mbara ma dị mma",
     "prep_step_3_title": "Nyochaa Njirimara Gị",
-    "prep_step_3_desc": "Mezue nyocha nkwenye onye nwe ụlọ gị site na RentalHub NG. Nke a na-ewuli ntụkwasị obi na ndị chọrọ ịgbazite ma na-abawanye ịpụta ìhè mbipụta gị.",
+    "prep_step_3_desc": "Mezue nyocha nkwenye onye nwe ụlọ gị site na Amana RentalHub NG. Nke a na-ewuli ntụkwasị obi na ndị chọrọ ịgbazite ma na-abawanye ịpụta ìhè mbipụta gị.",
     "prep_step_3_item_1": "Zinye akwụkwọ njirimara gọọmentị dị mma",
     "prep_step_3_item_2": "Mezue nyocha nkwenye NIN",
     "prep_step_3_item_3": "Nye ihe akaebe ịnwe ụlọ",
@@ -1308,9 +1308,9 @@
     "protip_1_title": "Mmetụta Mbụ Dị Mkpa",
     "protip_1_desc": "Foto mbụ na mbipụta gị kacha mkpa. Họrọ foto na-egbuke egbuke ma ahaziri nke ọma.",
     "protip_2_title": "Nyochaa Ndị Gbaziri Ụlọ Nke Ọma",
-    "protip_2_desc": "Jiri ngwaọrụ nyocha nkwenye RentalHub NG gosi njirimara ndị gbaziri ụlọ tupu ị nara arịrịọ.",
+    "protip_2_desc": "Jiri ngwaọrụ nyocha nkwenye Amana RentalHub NG gosi njirimara ndị gbaziri ụlọ tupu ị nara arịrịọ.",
     "protip_3_title": "Jiri Nkwekọrịta Dị Nchebe",
-    "protip_3_desc": "Jiri nkwekọrịta mgbazinye ndị ọka iwu nyochara mgbe niile. RentalHub NG na-enye ohere ịnweta ndebiri iwu.",
+    "protip_3_desc": "Jiri nkwekọrịta mgbazinye ndị ọka iwu nyochara mgbe niile. Amana RentalHub NG na-enye ohere ịnweta ndebiri iwu.",
     "protip_4_title": "Soro Ọrụ Gị",
     "protip_4_desc": "Jiri ogwe njikwa onye nwe ụlọ gị soro nlele, ajụjụ na ọnụego arịrịọ.",
     "protip_5_title": "Wulite Mmekọrịta Ndị Gbaziri Ụlọ",
@@ -1334,9 +1334,9 @@
     "mistake_4_fix": "Hazie ọkwa ma gbalịa ịza ajụjụ niile n'ime awa 24.",
     "faq_badge": "Ajụjụ",
     "faq_heading": "Ajụjụ Ndị A Na-Ajụkarị",
-    "faq_desc": "Ihe niile ị chọrọ ịma banyere idepụta na RentalHub NG.",
+    "faq_desc": "Ihe niile ị chọrọ ịma banyere idepụta na Amana RentalHub NG.",
     "cta_heading": "Ị Dị Njikere Idepụta Ụlọ Gị?",
-    "cta_desc": "Sonye n'ime ndị nwe ụlọ 5,000+ na-aga nke ọma na RentalHub NG. Depụta ụlọ gị taa ma bido jikọọ na ndị gbaziri ụlọ tozuru etozu n'ofe Naịjirịa.",
+    "cta_desc": "Sonye n'ime ndị nwe ụlọ 5,000+ na-aga nke ọma na Amana RentalHub NG. Depụta ụlọ gị taa ma bido jikọọ na ndị gbaziri ụlọ tozuru etozu n'ofe Naịjirịa.",
     "cta_list": "Depụta Ụlọ Gị Ugbu a",
     "cta_create": "Mepụta Akaụntụ Efu",
     "contact_heading": "Ị Chọrọ Enyemaka Na Mbipụta Gị?",
@@ -1346,7 +1346,7 @@
   },
   "accept_agent_invite": {
     "title": "Rụọ Ọrụ Ohere Onye Ọrụ",
-    "subtitle": "Mezue nkọwa gị ka i bido inyere onye nwe ụlọ aka ijikwa mbipụta na ọrụ ụlọ ndị ọzọ anabatara na RentalHub NG.",
+    "subtitle": "Mezue nkọwa gị ka i bido inyere onye nwe ụlọ aka ijikwa mbipụta na ọrụ ụlọ ndị ọzọ anabatara na Amana RentalHub NG.",
     "heading": "Nabata Ọkpụkpọ Òkù Onye Ọrụ",
     "desc": "Mepụta paswọọdụ gị ma rụọ ọrụ ogwe njikwa onye ọrụ gị.",
     "full_name_placeholder": "Aha zuru ezu",
@@ -1371,14 +1371,14 @@
     "password_mismatch": "Paswọọdụ ndị ahụ edoghị aka",
     "success": "Emechaala ọrụ ohere onye ọrụ nke ọma",
     "error": "Ịrụ ọrụ ohere onye ọrụ dara",
-    "alt_logo": "RentalHub NG"
+    "alt_logo": "Amana RentalHub NG"
   },
   "accept_lawyer_invite": {
     "title": "Nchekwa Ohere Iwu",
     "subtitle": "A kpọrọ gị òkù ịbịara dịka onye ọka iwu. Rụọ ọrụ akaụntụ gị ka i bido ijikwa ikpe na esemokwu nke ọma.",
     "trusted": "Ndị nwe ụlọ, ndị gbaziri ụlọ na ndị ọkachamara iwu tụkwasịrị obi.",
     "activate_heading": "Rụọ Ọrụ Ohere Onye Ọka Iwu N'ikpo",
-    "activate_sub": "Mepụta paswọọdụ gị ma mezue nkọwa onwe onye ọka iwu RentalHub NG gị",
+    "activate_sub": "Mepụta paswọọdụ gị ma mezue nkọwa onwe onye ọka iwu Amana RentalHub NG gị",
     "activate_sub_alt": "Mezue nkọwa nkọwa onwe onye ọka iwu gị",
     "lawyer_details": "Nkọwa Onye Ọka Iwu",
     "full_name_placeholder": "Aha zuru ezu",
@@ -1458,7 +1458,7 @@
     "invalid_otp": "OTP ezighị ezi - biko gbalịa ọzọ",
     "platform_error": "Njehie na ahazi ọkpụkpọ òkù onye ọka iwu ikpo",
     "generic_error": "Njehie na ahazi ọkpụkpọ òkù onye ọka iwu",
-    "alt_logo": "RentalHub NG",
+    "alt_logo": "Amana RentalHub NG",
     "brand_text": "Rental Hub NG"
   },
   "verify_email": {
@@ -1761,7 +1761,7 @@
     "verified_listing": "mbipụta enyocharala",
     "plural_suffix": "s",
     "load_failed": "Ibudata ndekọ Naịjirịa dara",
-    "subtitle": "Chọgharịa ụlọ mgbazinye site na steeti, LGA na mpaghara ndị dị mkpa, nke ndepụta RentalHub NG kwadoro.",
+    "subtitle": "Chọgharịa ụlọ mgbazinye site na steeti, LGA na mpaghara ndị dị mkpa, nke ndepụta Amana RentalHub NG kwadoro.",
     "lgas_count": "{{count}} Ọchịchị Obodo"
   },
   "dispute_details": {
@@ -2837,7 +2837,7 @@
     "outgoing_label": "Na-apụ: ",
     "incoming_label": "Na-abata: ",
     "review_note": "Ihe ndetu nyocha: ",
-    "program_title": "Mmemme Onye Ọka Iwu RentalHub NG",
+    "program_title": "Mmemme Onye Ọka Iwu Amana RentalHub NG",
     "program_desc": "Rịọ site na ogwe njikwa gị ma soro ọganihu nyocha site n'otu usoro dị n'azụ adịlarị.",
     "no_broadcast": "Enweghị mgbasa ozi ịkpọbata na-arụ ọrụ",
     "recruitment_closed": "Emechiri ịkpọbata ugbu a. Ọnọdụ arịrịọ gị dị ka ọ dị.",
@@ -2850,7 +2850,7 @@
     "already_approved": "Anabatalarị",
     "application_pending": "Arịrịọ Na-Echere",
     "apply_submitting": "Na-eziga...",
-    "apply_btn": "Rịọ Iji Rụọ Ọrụ Na RentalHub NG",
+    "apply_btn": "Rịọ Iji Rụọ Ọrụ Na Amana RentalHub NG",
     "authorized_properties": "Ụlọ Enyere Ikike",
     "authorized_desc": "Họrọ ụlọ ka ebe ọrụ esemokwu gị lekwasịrị anya.",
     "no_authorized": "Enweghị ụlọ enyere ikike.",
@@ -3040,7 +3040,7 @@
       "eyebrow": "Onye nduzi ogwe njikwa gị",
       "resume_title": "Gaa n'ihu ebe ị kwụsịrị",
       "returning_title": "Nnọọ ọzọ na RentalHub",
-      "new_title": "Nnọọ na RentalHub NG",
+      "new_title": "Nnọọ na Amana RentalHub NG",
       "resume_description": "Echekwala ọganihu gị. Gaa n'ihu site na nkeji ikpeazụ ị lere, ma ọ bụ bido ọzọ site na nkọwa onwe gị.",
       "returning_description": "Were ntakịrị oge cheta ma chọtaghachi njikwa ndị kacha mkpa maka akaụntụ gị.",
       "new_description": "Ka anyị gosi gị njikwa ndị kacha baa uru maka akaụntụ gị na njem nlele dị mkpirikpi, e lekwasịrị anya.",
@@ -3396,22 +3396,22 @@
     "modal_landlord": "Akaụntụ Onye Nwe Ụlọ",
     "modal_landlord_desc": "Ịmepụta akaụntụ onye nwe ụlọ chọrọ ụgwọ ndebanye aha otu oge nke",
     "modal_optional": "Ọrụ Nhọrọ",
-    "modal_optional_desc": "Tinye ọkàiwu RentalHub NG maka",
-    "modal_optional_desc_2": "Tinye onye nnọchi anya RentalHub NG maka",
+    "modal_optional_desc": "Tinye ọkàiwu Amana RentalHub NG maka",
+    "modal_optional_desc_2": "Tinye onye nnọchi anya Amana RentalHub NG maka",
     "modal_footnote": "Ndị otu anyị na-enyocha ụgwọ ma ha nwere ike gbanwee. Gaa n'ihu ịhọrọ ụdị akaụntụ gị ma hụ ego ziri ezi maka ebe gị.",
     "modal_diaspora": "Akaụntụ Mba ọzọ (Onye mba ọzọ)",
     "modal_diaspora_desc": "Ọ̀mepụta akaụntụ dị ka onye mba ọzọ chọrọ ego ndebanye aha mba ọzọ otu ugboro site na",
     "modal_diaspora_ngn": "A ga-ana gị ụgwọ ego naira ya (ugbu a ≈",
     "modal_diaspora_vary": "Ego ahụ dabere na steeti Naijiria ịchọrọ ịgbazite ụlọ — steeti ndị nwere mineral na-akwụ ụgwọ dị ọlè.",
     "modal_diaspora_optional": "Ọrụ nhọrọ mba ọzọ —",
-    "modal_diaspora_lawyer": "Tinye onye ọkaiwu RentalHub NG maka",
-    "modal_diaspora_agent": "Tinye onye nnọchiteanya RentalHub NG maka",
+    "modal_diaspora_lawyer": "Tinye onye ọkaiwu Amana RentalHub NG maka",
+    "modal_diaspora_agent": "Tinye onye nnọchiteanya Amana RentalHub NG maka",
     "modal_approx": "≈",
     "disabled_diaspora": "Ndebanye aha mba ọzọ anaghị arụ ọọ ugbu a. Nwaa ọzọ ma emechaa.",
     "modal_skip": "Wụpụ",
     "modal_understand": "Aghọtara m",
-    "logo_alt": "Akara RentalHub NG",
-    "left_panel_title": "Nnọọ na RentalHub NG",
+    "logo_alt": "Akara Amana RentalHub NG",
+    "left_panel_title": "Nnọọ na Amana RentalHub NG",
     "left_panel_desc": "Mepụta akaụntụ gị iji chọgharịa ụlọ ndị enyochara, kpọtụrụ ndị nwe ụlọ a tụkwasịrị obi, na ịnweta nkwado iwu n'akụkụ niile nke Naịjịrịa.",
     "left_panel_footer": "Ụlọ enyochara na steeti 36 niile + FCT",
     "already_account": "Ị nweelarị akaụntụ?",
@@ -3443,9 +3443,9 @@
     "referral_placeholder": "Tinye koodu ịkpọbata",
     "referral_hint": "Tinye koodu ịkpọbata ma ọ bụrụ na onye ọ bụla kpọrọ gị.",
     "lawyer_email": "Email ọkàiwu gị",
-    "lawyer_using_rentalhub": "Na-eji ọkàiwu RentalHub NG",
+    "lawyer_using_rentalhub": "Na-eji ọkàiwu Amana RentalHub NG",
     "lawyer_placeholder": "Tinye email ọkàiwu gị",
-    "lawyer_checkbox_label": "Achọrọ m iji ọkàiwu RentalHub NG",
+    "lawyer_checkbox_label": "Achọrọ m iji ọkàiwu Amana RentalHub NG",
     "lawyer_checkbox_desc": "A ga-ekenye gị ọkàiwu a nyochara iji nyere gị aka (ụgwọ dị).",
     "agent_heading": "Tinye Onye Nnọchi Anya",
     "agent_desc": "Nhọrọ: nye nkọwa onye nnọchi anya gị ka o nwee ike jikwaa ụlọ gị.",
@@ -3456,10 +3456,10 @@
     "agent_email_placeholder": "Tinye email onye nnọchi anya",
     "agent_phone": "Ekwentị Onye Nnọchi Anya",
     "agent_phone_placeholder": "Tinye ekwentị onye nnọchi anya",
-    "use_rentalhub_agents": "Jiri onye nnọchi anya RentalHub NG",
+    "use_rentalhub_agents": "Jiri onye nnọchi anya Amana RentalHub NG",
     "rentalhub_agent_desc": "Onye nnọchi anya a nyochara ga-ejikwa ụlọ gị maka {{fee}}.",
     "use_our_agents": "Jiri ndị nnọchi anya anyị",
-    "agent_auto_assigned": "A ga-ekenye onye nnọchi anya RentalHub NG na akaụntụ gị na akpaghị aka.",
+    "agent_auto_assigned": "A ga-ekenye onye nnọchi anya Amana RentalHub NG na akaụntụ gị na akpaghị aka.",
     "select_location_agent_fee": "Họrọ ebe gị iji kwenye ego onye nnọchi anya ziri ezi.",
     "back": "Laghachi",
     "step_3_title": "Nkwenye na Ebe",
@@ -3487,8 +3487,8 @@
     "payment_summary": "Nchịkọta Ịkwụ Ụgwọ",
     "tenant_account_creation": "Ịmepụta akaụntụ onye mgbazinye",
     "landlord_account_creation": "Ịmepụta akaụntụ onye nwe ụlọ",
-    "rentalhub_lawyer_access": "Ohere ọkàiwu RentalHub NG",
-    "rentalhub_agent_access": "Ohere onye nnọchi anya RentalHub NG",
+    "rentalhub_lawyer_access": "Ohere ọkàiwu Amana RentalHub NG",
+    "rentalhub_agent_access": "Ohere onye nnọchi anya Amana RentalHub NG",
     "total_due": "Ngụkọta E Ji",
     "select_location_exact_fee": "Họrọ steeti na ọchịchị ime obodo gị iji hụ ụgwọ ziri ezi.",
     "password": "Okwuntughe",
@@ -3511,7 +3511,7 @@
     "location_preview_fallback": "Enweghị ihe dabara adabara na {{lga}}, {{state}}. Na-egosi ụlọ dị nso kama.",
     "the_selected_state": "steeti ahọpụtara",
     "location_preview_error": "Enweghị ike ibunye nleba anya ụlọ maka ebe a.",
-    "registration_success": "Ndebanye aha gara nke ọma! Nnọọ na RentalHub NG.",
+    "registration_success": "Ndebanye aha gara nke ọma! Nnọọ na Amana RentalHub NG.",
     "registration_failed": "Ndebanye aha dara. Biko nwaa ọzọ.",
     "otp_before": "Nyocha Nchekwa",
     "otp_title": "Nyochaa ekwentị gị",
@@ -4370,7 +4370,7 @@
   },
   "property_share": {
     "fallback_title": "Mbipụta ụlọ",
-    "text": "Lelee ụlọ a na RentalHub NG: {{title}}",
+    "text": "Lelee ụlọ a na Amana RentalHub NG: {{title}}",
     "header": "Kekọrịta Mbipụta",
     "copy_success": "Edetuola njikọ ụlọ",
     "copy_error": "Enweghị ike ịdetuo njikọ ụlọ ugbu a",
@@ -4556,7 +4556,7 @@
     "continue_existing": "Gaa n'ihu na nyocha e bidoro",
     "contact_no_email_agent": "Onye na-aza ajụjụ a enweghị email",
     "contact_no_email_public": "Enweghị m email ugbu a",
-    "title": "Nyocha Nnyocha RentalHub NG",
+    "title": "Nyocha Nnyocha Amana RentalHub NG",
     "part_a_title": "Ajụjụ ole na ole dị ngwa tupu ị gaa n'ihu",
     "part_a_sub": "Akụkụ mbụ a na-ewe ihe dị ka nkeji 2. Enwere ike mechaa ndị ọzọ ma emechaa.",
     "part_b_sub": "Ngalaba {{section}} · Ajụjụ {{q}} n'ime {{total}}",
@@ -4625,7 +4625,7 @@
     "gate_start": "Malite Nyocha",
     "gate_skip": "Mafere",
     "gate_google_hint": "Ị nwere ike iji Google banye iji chekwaa azịza gị na akpaghị aka",
-    "title": "Nyocha Ọha na Eze RentalHub NG",
+    "title": "Nyocha Ọha na Eze Amana RentalHub NG",
     "subtitle": "Nyere anyị aka imeziwanye usoro mgbazinye ụlọ na Naịjirịa",
     "choose": "Họrọ ọrụ gị",
     "tenant": "Abụ m Onye Mgbazinye",

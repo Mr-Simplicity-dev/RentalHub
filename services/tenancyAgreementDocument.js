@@ -46,7 +46,7 @@ const renderAgreementDocument = (doc, { agreement, parties, terms, jurisdiction,
   const width = right - left;
 
   // Header
-  doc.fontSize(10).fillColor('#64748b').text('RENTALHUB NG', { align: 'center', characterSpacing: 2 });
+  doc.fontSize(10).fillColor('#64748b').text('Amana RentalHub NG', { align: 'center', characterSpacing: 2 });
   doc.moveDown(0.3);
   doc.fontSize(20).fillColor('#0f172a').text('RESIDENTIAL TENANCY AGREEMENT', { align: 'center' });
   doc.moveDown(0.5);

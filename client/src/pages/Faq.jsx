@@ -78,29 +78,29 @@ const categories = [
 const faqData = {
   general: [
     {
-      q: 'What is RentalHub NG?',
-      a: 'RentalHub NG is Nigeria\'s most trusted property technology platform. We connect tenants, landlords, agents, and legal professionals across all 36 states and the Federal Capital Territory. Our platform offers verified property listings, identity verification, legal support, dispute resolution, and additional services like fumigation/cleaning and transportation.',
+      q: 'What is Amana RentalHub NG?',
+      a: 'Amana RentalHub NG is Nigeria\'s most trusted property technology platform. We connect tenants, landlords, agents, and legal professionals across all 36 states and the Federal Capital Territory. Our platform offers verified property listings, identity verification, legal support, dispute resolution, and additional services like fumigation/cleaning and transportation.',
     },
     {
-      q: 'Is RentalHub NG free to use?',
+      q: 'Is Amana RentalHub NG free to use?',
       a: 'Yes! Browsing properties and creating an account is completely free. Tenants can search and view listings at no cost. Landlords can start with a Free plan to list 1 property. Paid plans (Basic ₦5,000/year, Premium ₦15,000/year) unlock additional features and enhanced visibility.',
     },
     {
-      q: 'How does RentalHub NG ensure trust and safety?',
+      q: 'How does Amana RentalHub NG ensure trust and safety?',
       a: 'Every user — tenant, landlord, and agent — undergoes NIN-linked identity verification. Properties are reviewed before listing approval. We also provide legal support, evidence verification, and structured dispute resolution to protect all parties on the platform.',
     },
     {
-      q: 'Which states does RentalHub NG cover?',
-      a: 'RentalHub NG covers all 36 states in Nigeria plus the Federal Capital Territory (FCT), Abuja. You can find properties and list in any state regardless of your location.',
+      q: 'Which states does Amana RentalHub NG cover?',
+      a: 'Amana RentalHub NG covers all 36 states in Nigeria plus the Federal Capital Territory (FCT), Abuja. You can find properties and list in any state regardless of your location.',
     },
     {
       q: 'Is there a mobile app available?',
-      a: 'Yes! RentalHub NG offers a mobile app for both Android and iOS devices. You can search properties, send messages, manage listings, and access all platform features on the go.',
+      a: 'Yes! Amana RentalHub NG offers a mobile app for both Android and iOS devices. You can search properties, send messages, manage listings, and access all platform features on the go.',
     },
   ],
   tenants: [
     {
-      q: 'How do I find a property on RentalHub NG?',
+      q: 'How do I find a property on Amana RentalHub NG?',
       a: 'Simply create a free account, complete your identity verification, and start searching. Use filters to narrow down by location, property type, budget, and more. Browse through thousands of verified properties across all 36 states + FCT.',
     },
     {
@@ -117,7 +117,7 @@ const faqData = {
     },
     {
       q: 'How do I know if a property listing is genuine?',
-      a: 'Every property on RentalHub NG goes through a verification process before approval. Landlords are identity-verified, and listings are reviewed for accuracy. Look for the verified badge on listings for added confidence.',
+      a: 'Every property on Amana RentalHub NG goes through a verification process before approval. Landlords are identity-verified, and listings are reviewed for accuracy. Look for the verified badge on listings for added confidence.',
     },
     {
       q: 'Can I schedule property viewings through the platform?',
@@ -126,7 +126,7 @@ const faqData = {
   ],
   landlords: [
     {
-      q: 'How do I become a verified landlord on RentalHub NG?',
+      q: 'How do I become a verified landlord on Amana RentalHub NG?',
       a: 'Register as a landlord, complete your profile with valid identification (NIN, passport, or driver\'s license), provide proof of property ownership, and submit for verification. Our team typically verifies within 24-48 hours.',
     },
     {
@@ -208,15 +208,15 @@ const faqData = {
   ],
   legal: [
     {
-      q: 'What legal support does RentalHub NG offer?',
-      a: 'RentalHub NG provides access to qualified lawyers, evidence verification tools, and structured dispute resolution processes. Premium plan users get direct legal support access.',
+      q: 'What legal support does Amana RentalHub NG offer?',
+      a: 'Amana RentalHub NG provides access to qualified lawyers, evidence verification tools, and structured dispute resolution processes. Premium plan users get direct legal support access.',
     },
     {
       q: 'How are disputes resolved on the platform?',
-      a: 'RentalHub NG offers a structured dispute resolution process. You can submit evidence through our platform, request legal support, and our admin team will help mediate between parties to find a fair resolution.',
+      a: 'Amana RentalHub NG offers a structured dispute resolution process. You can submit evidence through our platform, request legal support, and our admin team will help mediate between parties to find a fair resolution.',
     },
     {
-      q: 'Does RentalHub NG provide tenancy agreements?',
+      q: 'Does Amana RentalHub NG provide tenancy agreements?',
       a: 'Yes! We provide access to legally reviewed tenancy agreement templates. For customized contracts, Premium users can access lawyer support to ensure all agreements comply with Nigerian tenancy laws.',
     },
     {
@@ -230,7 +230,7 @@ const faqData = {
   ],
   account: [
     {
-      q: 'How do I create an account on RentalHub NG?',
+      q: 'How do I create an account on Amana RentalHub NG?',
       a: 'Click "Sign Up" or "Create Account", choose your account type (Tenant, Landlord, or Agent), fill in your details, and verify your email address. Then complete identity verification to unlock full platform access.',
     },
     {
@@ -250,7 +250,7 @@ const faqData = {
       a: 'To delete your account, please contact our support team. We will process your request within 48 hours. Note that deleting your account will remove all your listings and data from the platform.',
     },
     {
-      q: 'Can I use RentalHub NG as both a tenant and landlord?',
+      q: 'Can I use Amana RentalHub NG as both a tenant and landlord?',
       a: 'Yes, you can have separate accounts if you want to both list properties and search as a tenant. Each account type has its own dashboard and features. Just use different email addresses for each account.',
     },
   ],
@@ -358,8 +358,8 @@ const Faq = () => {
               </Link>
               <ShareButton
                 section="FAQ"
-                title="RentalHub NG — Frequently Asked Questions"
-                description="Everything you need to know about RentalHub NG. Find answers about property listings, rentals, verification, pricing, and more."
+                title="Amana RentalHub NG — Frequently Asked Questions"
+                description="Everything you need to know about Amana RentalHub NG. Find answers about property listings, rentals, verification, pricing, and more."
                 t={t}
               />
             </div>
@@ -383,8 +383,8 @@ const Faq = () => {
                 <div className="text-primary-200 text-sm md:text-base font-medium mb-2">{t(`faq.stats_${stat.id}`)}</div>
                 <ShareButton
                   section={t(`faq.stats_${stat.id}`)}
-                  title={`RentalHub NG — ${stat.value} ${t(`faq.stats_${stat.id}`)}`}
-                  description={`RentalHub NG has ${stat.value} ${t(`faq.stats_${stat.id}`).toLowerCase()}.`}
+                  title={`Amana RentalHub NG — ${stat.value} ${t(`faq.stats_${stat.id}`)}`}
+                  description={`Amana RentalHub NG has ${stat.value} ${t(`faq.stats_${stat.id}`).toLowerCase()}.`}
                   t={t}
                 />
               </div>
@@ -485,8 +485,8 @@ const Faq = () => {
                 </div>
                 <ShareButton
                   section={currentCategoryLabel}
-                  title={`RentalHub NG FAQ — ${currentCategoryLabel}`}
-                  description={`Frequently asked questions about ${currentCategoryLabel.toLowerCase()} on RentalHub NG.`}
+                  title={`Amana RentalHub NG FAQ — ${currentCategoryLabel}`}
+                  description={`Frequently asked questions about ${currentCategoryLabel.toLowerCase()} on Amana RentalHub NG.`}
                   t={t}
                 />
               </div>
@@ -616,8 +616,8 @@ const Faq = () => {
               </Link>
               <ShareButton
                 section="Call to Action"
-                title="Need Help? Contact RentalHub NG Support"
-                description="Our support team is ready to help. Contact RentalHub NG at support@rentalhub.com.ng or call +234 803 060 1238."
+                title="Need Help? Contact Amana RentalHub NG Support"
+                description="Our support team is ready to help. Contact Amana RentalHub NG at support@rentalhub.com.ng or call +234 803 060 1238."
                 t={t}
               />
             </div>
@@ -640,8 +640,8 @@ const Faq = () => {
             <div className="flex justify-center mb-10">
               <ShareButton
                 section="Contact"
-                title="Contact RentalHub NG Support"
-                description="Have questions about RentalHub NG? Contact us at support@rentalhub.com.ng or call +234 803 060 1238."
+                title="Contact Amana RentalHub NG Support"
+                description="Have questions about Amana RentalHub NG? Contact us at support@rentalhub.com.ng or call +234 803 060 1238."
                 t={t}
               />
             </div>

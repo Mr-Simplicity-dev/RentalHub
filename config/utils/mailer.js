@@ -1,7 +1,7 @@
 const logger = require('./logger');
 const { Resend } = require('resend');
 
-const FROM = process.env.EMAIL_FROM || 'RentalHub NG <support@rentalhub.com.ng>';
+const FROM = process.env.EMAIL_FROM || 'Amana RentalHub NG <support@rentalhub.com.ng>';
 const REPLY_TO = process.env.EMAIL_REPLY_TO || undefined;
 const EMAIL_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS || 12000);
 const resend = process.env.RESEND_API_KEY

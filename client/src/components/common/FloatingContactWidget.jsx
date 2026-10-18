@@ -759,7 +759,7 @@ const FloatingContactWidget = () => {
         )}
         <FaHeadset size={16} />
         <div>
-          <p className="text-sm font-semibold">{t('messages.widget.support_title', 'RentalHub Support')}</p>
+          <p className="text-sm font-semibold">{t('messages.widget.support_title', 'Amana RentalHub NGSupport')}</p>
           <p className="text-[10px] text-indigo-200">{t('messages.widget.reply_minutes', 'We typically reply within minutes')}</p>
         </div>
       </div>
@@ -802,7 +802,7 @@ const FloatingContactWidget = () => {
             ref={widgetRef}
             role="dialog"
             aria-modal="true"
-            aria-label={t('messages.widget.support_title', 'RentalHub Support')}
+            aria-label={t('messages.widget.support_title', 'Amana RentalHub NG Support')}
             initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={prefersReducedMotion ? undefined : { opacity: 0, y: 20 }}

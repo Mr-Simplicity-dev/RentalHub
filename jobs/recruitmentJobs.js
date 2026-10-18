@@ -164,7 +164,7 @@ const emailClosedCycleDocuments = async (cycle) => {
 
   await sendEmail({
     to: RECRUITMENT_EMAIL,
-    subject: `RentalHub NG Recruitment Cycle Closed - ${cycle.title || cycle.id}`,
+    subject: `Amana RentalHub NG Recruitment Cycle Closed - ${cycle.title || cycle.id}`,
     html: `
       <p>The recruitment cycle <strong>${cycle.title || cycle.id}</strong> has closed.</p>
       <p>Applicants exported: <strong>${applications.rows.length}</strong>.</p>

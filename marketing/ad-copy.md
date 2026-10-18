@@ -166,7 +166,7 @@ Facebook and Instagram ads both run through **Meta Ads Manager** (they are owned
 
 ### Step 6: Create the Ad
 1. Under **Ad Name**, type something like "RentalHub Download Ad"
-2. Under **Identity**, connect your Facebook Page (create one called "RentalHub NG" if you don't have one)
+2. Under **Identity**, connect your Facebook Page (create one called "Amana RentalHub NG" if you don't have one)
 3. Under **Ad Setup**, choose **"Single image"**
 4. Upload the `og-preview.png` image (your yellow banner)
 5. Under **Primary Text**, copy and paste this from the ad copy section above:

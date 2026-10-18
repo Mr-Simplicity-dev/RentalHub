@@ -1,4 +1,4 @@
--- Tenant-paid RentalHub NG property inspection requests.
+-- Tenant-paid Amana RentalHub NG property inspection requests.
 
 DO $$
 DECLARE

@@ -1,6 +1,6 @@
-# RentalHub NG premium advert source
+# Amana RentalHub NG premium advert source
 
-A self-contained, vertical 30-second advert for RentalHub NG. It speaks plainly to Nigerian renters without making unverified claims such as “verified listings,” “zero agency fee,” or “instant approval.”
+A self-contained, vertical 30-second advert for Amana RentalHub NG. It speaks plainly to Nigerian renters without making unverified claims such as “verified listings,” “zero agency fee,” or “instant approval.”
 
 ## Story
 
@@ -9,7 +9,7 @@ A self-contained, vertical 30-second advert for RentalHub NG. It speaks plainly 
 | 0–7s | House hunting should not feel like guesswork. | Premium navy opening and search prompt |
 | 7–15s | Search homes. Make your move. | Stylised RentalHub property-search interface |
 | 15–23s | Less stress. More clarity. | Three concise benefits |
-| 23–30s | Find it with RentalHub NG. | Clean CTA and deliberate final hold |
+| 23–30s | Find it with Amana RentalHub NG. | Clean CTA and deliberate final hold |
 
 ## Render instructions
 

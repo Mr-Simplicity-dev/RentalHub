@@ -27,7 +27,7 @@ const CONTEXT_LABELS = {
   virtual_tour: 'completed a virtual tour',
   dispute_support: 'used dispute support',
   admin_support: 'received admin support',
-  platform: 'used RentalHub NG',
+  platform: 'used Amana RentalHub NG',
 };
 
 let platformRatingSchemaReady = false;
@@ -252,7 +252,7 @@ const buildPublicRating = (row, settings) => {
     id: row.id,
     stars: Number(row.stars),
     rating_context: row.rating_context,
-    context_label: CONTEXT_LABELS[row.rating_context] || 'used RentalHub NG',
+    context_label: CONTEXT_LABELS[row.rating_context] || 'used Amana RentalHub NG',
     display_name: displayName,
     initials: initials(row.full_name),
     location,
@@ -355,8 +355,8 @@ const getEligibleOpportunities = async (user, { limit = 6 } = {}) => {
           row,
           'property_secured',
           'application',
-          'Rate your RentalHub NG rental experience',
-          row.source_title ? `You secured ${row.source_title}.` : 'You secured a property through RentalHub NG.'
+          'Rate your Amana RentalHub NG rental experience',
+          row.source_title ? `You secured ${row.source_title}.` : 'You secured a property through Amana RentalHub NG.'
         )
       );
     });
@@ -389,7 +389,7 @@ const getEligibleOpportunities = async (user, { limit = 6 } = {}) => {
           'property_listed',
           'property',
           'Rate your property listing experience',
-          row.source_title ? `You listed ${row.source_title}.` : 'You listed a property on RentalHub NG.'
+          row.source_title ? `You listed ${row.source_title}.` : 'You listed a property on Amana RentalHub NG.'
         )
       );
     });
@@ -422,7 +422,7 @@ const getEligibleOpportunities = async (user, { limit = 6 } = {}) => {
             'property_rented',
             'application',
             'Rate your successful rental experience',
-            row.source_title ? `${row.source_title} was rented through RentalHub NG.` : 'Your property was rented through RentalHub NG.'
+            row.source_title ? `${row.source_title} was rented through Amana RentalHub NG.` : 'Your property was rented through Amana RentalHub NG.'
           )
         );
       });
@@ -453,7 +453,7 @@ const getEligibleOpportunities = async (user, { limit = 6 } = {}) => {
 
     rows.forEach((row) => {
       opportunities.push(
-        mapOpportunity(row, 'transportation', 'transportation_booking', 'Rate RentalHub NG transportation support', 'Tell us how your transportation support went.')
+        mapOpportunity(row, 'transportation', 'transportation_booking', 'Rate Amana RentalHub NG transportation support', 'Tell us how your transportation support went.')
       );
     });
   }
@@ -482,7 +482,7 @@ const getEligibleOpportunities = async (user, { limit = 6 } = {}) => {
 
     rows.forEach((row) => {
       opportunities.push(
-        mapOpportunity(row, 'fumigation_cleaning', 'fumigation_booking', 'Rate RentalHub NG fumigation/cleaning support', 'Tell us how your service experience went.')
+        mapOpportunity(row, 'fumigation_cleaning', 'fumigation_booking', 'Rate Amana RentalHub NG fumigation/cleaning support', 'Tell us how your service experience went.')
       );
     });
   }
@@ -511,7 +511,7 @@ const getEligibleOpportunities = async (user, { limit = 6 } = {}) => {
 
     rows.forEach((row) => {
       opportunities.push(
-        mapOpportunity(row, 'virtual_tour', 'call_session', 'Rate your RentalHub NG virtual tour', 'Tell us how the virtual property tour helped you.')
+        mapOpportunity(row, 'virtual_tour', 'call_session', 'Rate your Amana RentalHub NG virtual tour', 'Tell us how the virtual property tour helped you.')
       );
     });
   }
@@ -519,7 +519,7 @@ const getEligibleOpportunities = async (user, { limit = 6 } = {}) => {
   if (await tableExists('legal_authorizations')) {
     const rows = await runOpportunityQuery(
       `SELECT la.id::text AS source_ref,
-              COALESCE(p.title, 'RentalHub NG legal support') AS source_title,
+              COALESCE(p.title, 'Amana RentalHub NG legal support') AS source_title,
               p.state_id, s.state_name, p.lga_name, p.city
        FROM legal_authorizations la
        LEFT JOIN properties p ON p.id = la.property_id
@@ -540,7 +540,7 @@ const getEligibleOpportunities = async (user, { limit = 6 } = {}) => {
 
     rows.forEach((row) => {
       opportunities.push(
-        mapOpportunity(row, 'legal_support', 'legal_authorization', 'Rate RentalHub NG legal support', 'Tell us how the legal support experience helped you.')
+        mapOpportunity(row, 'legal_support', 'legal_authorization', 'Rate Amana RentalHub NG legal support', 'Tell us how the legal support experience helped you.')
       );
     });
   }
@@ -602,7 +602,7 @@ exports.submitRating = async (req, res) => {
     if (!opportunity) {
       return res.status(403).json({
         success: false,
-        message: 'This rating is only available after a verified RentalHub NG service or successful action.',
+        message: 'This rating is only available after a verified Amana RentalHub NG service or successful action.',
       });
     }
 

@@ -46,16 +46,16 @@ const faqs = [
     a: 'Identity verification is usually processed within 24–48 hours after you submit your NIN and passport photograph. Some cases may take longer if additional checks are needed.',
   },
   {
-    q: 'Can I use RentalHub NG as both a tenant and landlord?',
+    q: 'Can I use Amana RentalHub NG as both a tenant and landlord?',
     a: 'Yes, you can have separate accounts if you want to both list properties and search as a tenant. Each account type has its own dashboard and features.',
   },
   {
     q: 'Is there a mobile app available?',
-    a: 'Yes, RentalHub NG offers a mobile app for both Android and iOS devices. You can search properties, send messages, and manage listings on the go.',
+    a: 'Yes, Amana RentalHub NG offers a mobile app for both Android and iOS devices. You can search properties, send messages, and manage listings on the go.',
   },
   {
     q: 'How are disputes resolved?',
-    a: 'RentalHub NG provides a structured dispute resolution process. You can submit evidence, request legal support, and our admin team will help mediate.',
+    a: 'Amana RentalHub NG provides a structured dispute resolution process. You can submit evidence, request legal support, and our admin team will help mediate.',
   },
   {
     q: 'What payment methods are accepted?',
@@ -63,7 +63,7 @@ const faqs = [
   },
   {
     q: 'Can I list properties in multiple states?',
-    a: 'Absolutely! RentalHub NG covers all 36 states + FCT. You can list properties anywhere in Nigeria from your single landlord dashboard.',
+    a: 'Absolutely! Amana RentalHub NG covers all 36 states + FCT. You can list properties anywhere in Nigeria from your single landlord dashboard.',
   },
 ];
 

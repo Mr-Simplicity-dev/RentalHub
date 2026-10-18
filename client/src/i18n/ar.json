@@ -39,8 +39,8 @@
     "sponsored": "مُموَّل",
     "default_cta": "انقر للفتح",
     "share_ad": "مشاركة الإعلان",
-    "default_share_title": "إعلان ممول من RentalHub NG",
-    "share_text": "اطلع على هذا العرض الممول على RentalHub NG: {{title}}",
+    "default_share_title": "إعلان ممول من Amana Amana RentalHub NG",
+    "share_text": "اطلع على هذا العرض الممول على Amana Amana RentalHub NG: {{title}}",
     "share_device": "مشاركة عبر الجهاز",
     "copy_link": "نسخ رابط الإعلان",
     "link_copied": "تم نسخ رابط الإعلان",
@@ -69,7 +69,7 @@
     "submit_failed": "فشل إرسال التقييم",
     "dismiss_notification": "تجاهل إشعار التقييم",
     "star_rating": "تقييم {{count}} نجوم",
-    "flyin_message": "قيّم {{name}} RentalHub NG بـ{{stars}} نجوم بعد أن {{context}}.",
+    "flyin_message": "قيّم {{name}} Amana Amana RentalHub NG بـ{{stars}} نجوم بعد أن {{context}}.",
     "verified_in": "تجربة موثقة في {{location}}",
     "this_service": "هذه الخدمة",
     "contexts": {
@@ -82,31 +82,31 @@
       "virtual_tour": "أكمل جولة افتراضية",
       "dispute_support": "استخدم دعم النزاعات",
       "admin_support": "تلقى دعم المشرف",
-      "platform": "استخدم RentalHub NG"
+      "platform": "استخدم Amana Amana RentalHub NG"
     },
     "prompt_titles": {
-      "property_secured": "قيّم تجربة إيجارك على RentalHub NG",
+      "property_secured": "قيّم تجربة إيجارك على Amana Amana RentalHub NG",
       "property_listed": "قيّم تجربة إدراج عقارك",
       "property_rented": "قيّم تجربة إيجارك الناجحة",
-      "legal_support": "قيّم الدعم القانوني لـ RentalHub NG",
-      "fumigation_cleaning": "قيّم دعم التعقيم/التنظيف لـ RentalHub NG",
-      "transportation": "قيّم الدعم في النقل لـ RentalHub NG",
-      "virtual_tour": "قيّم جولتك الافتراضية على RentalHub NG",
-      "dispute_support": "قيّم دعم النزاعات لـ RentalHub NG",
-      "admin_support": "قيّم دعم RentalHub NG",
-      "platform": "قيّم RentalHub NG"
+      "legal_support": "قيّم الدعم القانوني لـ Amana Amana RentalHub NG",
+      "fumigation_cleaning": "قيّم دعم التعقيم/التنظيف لـ Amana Amana RentalHub NG",
+      "transportation": "قيّم الدعم في النقل لـ Amana Amana RentalHub NG",
+      "virtual_tour": "قيّم جولتك الافتراضية على Amana Amana RentalHub NG",
+      "dispute_support": "قيّم دعم النزاعات لـ Amana Amana RentalHub NG",
+      "admin_support": "قيّم دعم Amana Amana RentalHub NG",
+      "platform": "قيّم Amana Amana RentalHub NG"
     },
     "prompt_details": {
-      "property_secured": "حصلت على {{source}} عبر RentalHub NG.",
-      "property_listed": "أدرجت {{source}} على RentalHub NG.",
-      "property_rented": "تم إيجار {{source}} عبر RentalHub NG.",
+      "property_secured": "حصلت على {{source}} عبر Amana Amana RentalHub NG.",
+      "property_listed": "أدرجت {{source}} على Amana Amana RentalHub NG.",
+      "property_rented": "تم إيجار {{source}} عبر Amana Amana RentalHub NG.",
       "legal_support": "أخبرنا كيف ساعدتك تجربة الدعم القانوني.",
       "fumigation_cleaning": "أخبرنا كيف سارت تجربة خدمتك.",
       "transportation": "أخبرنا كيف سار دعم النقل.",
       "virtual_tour": "أخبرنا كيف ساعدتك الجولة الافتراضية للعقار.",
       "dispute_support": "أخبرنا كيف ساعدك دعم النزاعات.",
       "admin_support": "أخبرنا كيف ساعدك الدعم.",
-      "platform": "أخبرنا عن تجربتك مع RentalHub NG."
+      "platform": "أخبرنا عن تجربتك مع Amana Amana RentalHub NG."
     }
   },
   "home": {
@@ -137,20 +137,20 @@
     "cta_text": "انضم إلى آلاف النيجيريين الذين وجدوا إيجارهم المثالي",
     "get_started": "ابدأ الآن",
     "browse": "تصفح العقارات",
-    "app_prompt_title": "انقر هنا للحصول على تطبيق RentalHub للجوال",
+    "app_prompt_title": "انقر هنا للحصول على تطبيق Amana RentalHub للجوال",
     "app_prompt_text": "تنبيهات بحث أسرع ومحادثات فورية وتحديثات للقضايا مباشرة على هاتفك.",
     "download_android": "تحميل أندرويد",
     "download_iphone": "تحميل آيفون",
     "close_app_prompt": "إغلاق إشعار تحميل التطبيق",
-    "download_app_cta": "احصل على تطبيق RentalHub للجوال",
-    "share_app": "مشاركة RentalHub",
-    "share_app_text": "اطلع على RentalHub — منصة العقارات الموثوقة في نيجيريا:",
+    "download_app_cta": "احصل على تطبيق Amana RentalHub للجوال",
+    "share_app": "مشاركة Amana RentalHub",
+    "share_app_text": "اطلع على Amana RentalHub — منصة العقارات الموثوقة في نيجيريا:",
     "legal_support_link": "تحتاج مساعدة قانونية؟ تمنحك تغطية الحماية القانونية الوصول إلى محامين مؤهلين في منطقتك.",
     "property_request_link": "لا تجد نوع العقار الذي تفضله؟ أرسل طلبًا من صفحة العقارات.",
     "use_lawyers": "تغطية الحماية القانونية",
     "verify_dispute_evidence": "التحقق من أدلة النزاع",
     "submit_request": "إرسال الطلب",
-    "whatsapp_message": "مرحبًا RentalHub NG، أحتاج مساعدة في العثور على منزل.",
+    "whatsapp_message": "مرحبًا Amana Amana RentalHub NG، أحتاج مساعدة في العثور على منزل.",
     "whatsapp_greeting": "مرحبًا! هل تحتاج مساعدة في العثور على منزل؟",
     "chat_with_us": "تواصل معنا عبر واتساب"
   },
@@ -272,8 +272,8 @@
     "qa_my_props_desc": "أدر إدراجاتك",
     "qa_apps_landlord": "الطلبات",
     "qa_apps_landlord_desc": "راجع طلبات المستأجرين",
-    "survey_reminder_title": "أكمل استبيان أبحاث RentalHub",
-    "survey_reminder_body": "تساعدنا إجاباتك على تحسين RentalHub NG. يستغرق الأمر حوالي 10 دقائق أخرى — يمكنك الإكمال في أي وقت.",
+    "survey_reminder_title": "أكمل استبيان أبحاث Amana RentalHub",
+    "survey_reminder_body": "تساعدنا إجاباتك على تحسين Amana Amana RentalHub NG. يستغرق الأمر حوالي 10 دقائق أخرى — يمكنك الإكمال في أي وقت.",
     "survey_continue": "متابعة الاستبيان"
   },
   "profile": {
@@ -537,9 +537,9 @@
       "rejected": "مرفوض"
     },
     "whatsapp": {
-      "title": "مساعد RentalHub",
+      "title": "مساعد Amana RentalHub",
       "subtitle": "رد آلي • بوت الأسئلة الشائعة",
-      "bot_greeting": "مرحبا! أنا المساعد الافتراضي لـ RentalHub. كيف يمكنني مساعدتك اليوم؟",
+      "bot_greeting": "مرحبا! أنا المساعد الافتراضي لـ Amana RentalHub. كيف يمكنني مساعدتك اليوم؟",
       "greeting_bubble": "هل لديك أسئلة؟ أنا هنا للمساعدة!",
       "open": "فتح مساعد WhatsApp",
       "close": "إغلاق",
@@ -562,7 +562,7 @@
       "youre_welcome": "العفو! سعيد بتقديم المساعدة."
     },
     "widget": {
-      "support_title": "دعم RentalHub",
+      "support_title": "دعم Amana RentalHub",
       "reply_minutes": "نرد عادةً خلال دقائق",
       "close": "إغلاق",
       "back": "رجوع",
@@ -629,15 +629,15 @@
   "about_us": {
     "hero": {
       "title_before": "About ",
-      "title_highlight": "RentalHub NG",
+      "title_highlight": "Amana Amana RentalHub NG",
       "subtitle": "Nigeria's most trusted property technology platform — connecting tenants, landlords, agents, and legal professionals across all 36 states and the Federal Capital Territory.",
       "cta_browse": "Browse Properties",
-      "cta_join": "Join RentalHub NG"
+      "cta_join": "Join Amana Amana RentalHub NG"
     },
     "mission": {
       "section_label": "Our Mission",
       "heading": "Transforming Nigeria's Rental Landscape",
-      "paragraph_1": "At RentalHub NG, we believe everyone deserves a safe, transparent, and hassle-free experience when finding a home. Our mission is to eliminate the friction, fraud, and frustration from the Nigerian rental market.",
+      "paragraph_1": "At Amana Amana RentalHub NG, we believe everyone deserves a safe, transparent, and hassle-free experience when finding a home. Our mission is to eliminate the friction, fraud, and frustration from the Nigerian rental market.",
       "paragraph_2": "By combining technology with rigorous verification processes, legal support, and nationwide coverage, we empower tenants to find verified properties and landlords to connect with qualified tenants — all in one trusted ecosystem.",
       "badge_verified": "Verified properties",
       "badge_secure": "Secure payments",
@@ -649,7 +649,7 @@
     "journey": {
       "section_label": "Our Journey",
       "heading": "From Vision to Reality",
-      "subtitle": "Every great platform starts with a simple idea. Here is the story of how RentalHub NG grew from a vision into Nigeria's most trusted property marketplace."
+      "subtitle": "Every great platform starts with a simple idea. Here is the story of how Amana RentalHub NG grew from a vision into Nigeria's most trusted property marketplace."
     },
     "values": {
       "section_label": "What We Stand For",
@@ -658,7 +658,7 @@
     },
     "different": {
       "section_label": "Why Choose Us",
-      "heading": "What Makes RentalHub NG Different",
+      "heading": "What Makes Amana Amana RentalHub NG Different",
       "subtitle": "We don't just list properties — we build an end-to-end ecosystem for secure, transparent property transactions.",
       "ecosystem": {
         "title": "Verified Ecosystem",
@@ -683,7 +683,7 @@
       "subtitle": "Passionate professionals dedicated to transforming the Nigerian property experience.",
       "member_1": {
         "role": "Founder & CEO",
-        "bio": "With over 15 years in real estate and technology, Zubair leads RentalHub NG with a vision to revolutionize property access in Nigeria."
+        "bio": "With over 15 years in real estate and technology, Zubair leads Amana RentalHub NG with a vision to revolutionize property access in Nigeria."
       },
       "member_2": {
         "role": "Chief Operating Officer",
@@ -691,7 +691,7 @@
       },
       "member_3": {
         "role": "Chief Technology Officer",
-        "bio": "Emeka architects the RentalHub NG platform, driving innovation in property tech, digital verification, and secure transactions."
+        "bio": "Emeka architects the Amana Amana RentalHub NG platform, driving innovation in property tech, digital verification, and secure transactions."
       },
       "member_4": {
         "role": "Head of Legal Services",
@@ -699,7 +699,7 @@
       }
     },
     "milestone": {
-      "year_2020": "RentalHub NG was founded with a vision to transform the Nigerian rental market.",
+      "year_2020": "Amana Amana RentalHub NG was founded with a vision to transform the Nigerian rental market.",
       "year_2021": "Launched property listing framework to onboard landlords across Lagos and Abuja.",
       "year_2022": "Expanded to all 36 states + FCT; introduced identity verification.",
       "year_2023": "Launched legal support services, dispute resolution, and fumigation/cleaning marketplace.",
@@ -740,7 +740,7 @@
     },
     "cta": {
       "heading": "Ready to Find Your Perfect Home?",
-      "subtitle": "Join over 50,000 Nigerians who trust RentalHub NG for their property needs. Browse verified properties, connect with trusted landlords, and enjoy peace of mind.",
+      "subtitle": "Join over 50,000 Nigerians who trust Amana Amana RentalHub NG for their property needs. Browse verified properties, connect with trusted landlords, and enjoy peace of mind.",
       "browse": "Browse Properties",
       "create_account": "Create Account"
     },
@@ -779,7 +779,7 @@
   },
   "install_prompt": {
     "eyebrow": "تطبيق أندرويد",
-    "title": "ثبّت تطبيق RentalHub",
+    "title": "ثبّت تطبيق Amana RentalHub",
     "subtitle": "احصل على تجربة التطبيق الأصلي الكاملة على جهازك.",
     "install": "تثبيت",
     "downloading": "بدء التنزيل…",
@@ -799,7 +799,7 @@
     "features_heading": "Everything in the app",
     "apk_heading": "APK direct download",
     "apk_desc": "Download the APK and install it manually on your Android device.",
-    "apk_download_button": "Download RentalHub.apk",
+    "apk_download_button": "Download Amana RentalHub.apk",
     "download_android": "Download for Android",
     "download_ios": "iOS (Coming Soon)"
   },
@@ -813,7 +813,7 @@
   },
   "list_property": {
     "hero": {
-      "title": "List Your Property on RentalHub NG",
+      "title": "List Your Property on Amana Amana RentalHub NG",
       "subtitle": "Reach thousands of verified tenants across Nigeria. List your property in minutes and start receiving qualified applications from genuine tenants.",
       "list_now": "List Your Property Now",
       "view_pricing": "View Pricing Plans"
@@ -837,7 +837,7 @@
     },
     "benefits": {
       "badge": "Why List With Us",
-      "title": "Benefits of Listing on RentalHub NG",
+      "title": "Benefits of Listing on Amana Amana RentalHub NG",
       "subtitle": "Thousands of landlords and agents already trust us. Here is why."
     },
     "step_1": {
@@ -918,7 +918,7 @@
     },
     "testimonial_1": {
       "role": "Landlord, Lagos",
-      "text": "I listed my three-bedroom flat on RentalHub NG and had a qualified tenant within a week. The verification process gave me confidence."
+      "text": "I listed my three-bedroom flat on Amana Amana RentalHub NG and had a qualified tenant within a week. The verification process gave me confidence."
     },
     "testimonial_2": {
       "role": "Property Agent, Abuja",
@@ -929,7 +929,7 @@
       "text": "The legal support feature is a game-changer. I had a dispute resolved quickly without the usual stress."
     },
     "faq_1": {
-      "q": "Who can list properties on RentalHub NG?",
+      "q": "Who can list properties on  Amana Amana RentalHub NG?",
       "a": "Verified landlords and registered agents can list properties. You need to complete identity verification and be approved before listing."
     },
     "faq_2": {
@@ -942,7 +942,7 @@
     },
     "faq_4": {
       "q": "Can I list properties in multiple states?",
-      "a": "Yes! RentalHub NG covers all 36 states + FCT. You can list properties anywhere in Nigeria regardless of your location."
+      "a": "Yes! Amana Amana RentalHub NG covers all 36 states + FCT. You can list properties anywhere in Nigeria regardless of your location."
     },
     "faq_5": {
       "q": "How do I get paid?",
@@ -969,7 +969,7 @@
     },
     "cta": {
       "title": "Ready to List Your Property?",
-      "subtitle": "Join over 5,000 landlords and agents already using RentalHub NG to find qualified tenants. List your property today and start receiving applications.",
+      "subtitle": "Join over 5,000 landlords and agents already using Amana Amana RentalHub NG to find qualified tenants. List your property today and start receiving applications.",
       "list_now": "List Your Property Now",
       "create_account": "Create Free Account"
     },
@@ -986,7 +986,7 @@
   "faq": {
     "hero_title_before": "Frequently Asked ",
     "hero_title_highlight": "Questions",
-    "hero_desc": "Everything you need to know about RentalHub NG. Find answers to common questions about listing properties, finding rentals, verification, pricing, and more.",
+    "hero_desc": "Everything you need to know about Amana Amana RentalHub NG. Find answers to common questions about listing properties, finding rentals, verification, pricing, and more.",
     "hero_cta_create": "Create Free Account",
     "hero_cta_contact": "Contact Support",
     "stats_properties_listed": "Properties Listed",
@@ -1041,9 +1041,9 @@
   },
   "how_it_works": {
     "hero_title_before": "How ",
-    "hero_title_highlight": "RentalHub NG",
+    "hero_title_highlight": "Amana Amana RentalHub NG",
     "hero_title_after": " Works",
-    "hero_desc": "Whether you are looking for your next home or listing a property for rent, RentalHub NG makes the process simple, secure, and transparent.",
+    "hero_desc": "Whether you are looking for your next home or listing a property for rent, Amana Amana RentalHub NG makes the process simple, secure, and transparent.",
     "hero_cta_browse": "Browse Properties",
     "hero_cta_list": "List Your Property",
     "overview_badge": "Quick Overview",
@@ -1058,7 +1058,7 @@
     "walkthrough_connect_desc": "Apply, chat, and close your deal with confidence.",
     "tenants_badge": "For Tenants",
     "tenants_heading": "Find Your Perfect Home",
-    "tenants_desc": "From search to move-in, here is how tenants find their next home on RentalHub NG.",
+    "tenants_desc": "From search to move-in, here is how tenants find their next home on Amana Amana RentalHub NG.",
     "tenants_step_1_title": "Create Your Account",
     "tenants_step_1_desc": "Sign up as a tenant and complete your identity verification using your NIN. This ensures a safe community for everyone.",
     "tenants_step_1_hl_1": "Free registration",
@@ -1080,10 +1080,10 @@
     "tenants_step_4_hl_2": "In-app messaging",
     "tenants_step_4_hl_3": "Move-in support",
     "tenants_cta": "Get Started as a Tenant",
-    "divider_label": "Both tenants and landlords use RentalHub NG",
+    "divider_label": "Both tenants and landlords use Amana Amana RentalHub NG",
     "landlords_badge": "For Landlords & Agents",
     "landlords_heading": "List & Manage Properties",
-    "landlords_desc": "From registration to tenant connection, here is how landlords succeed on RentalHub NG.",
+    "landlords_desc": "From registration to tenant connection, here is how landlords succeed on Amana Amana RentalHub NG.",
     "landlords_step_1_title": "Register & Verify",
     "landlords_step_1_desc": "Create a landlord or agent account and complete profile verification to start listing your properties.",
     "landlords_step_1_hl_1": "Quick registration",
@@ -1107,7 +1107,7 @@
     "landlords_cta": "Start Listing Your Property",
     "features_badge": "Platform Features",
     "features_heading": "What Makes the Platform Work",
-    "features_desc": "These features ensure every interaction on RentalHub NG is safe and trustworthy.",
+    "features_desc": "These features ensure every interaction on Amana Amana RentalHub NG is safe and trustworthy.",
     "features_verification_title": "Identity Verification",
     "features_verification_desc": "Every user — tenant, landlord, and agent — goes through NIN-linked identity verification for a trusted ecosystem.",
     "features_secure_title": "Secure Transactions",
@@ -1118,9 +1118,9 @@
     "features_ratings_desc": "Transparent ratings and verified reviews help tenants and landlords make informed decisions.",
     "faq_badge": "FAQ",
     "faq_heading": "Frequently Asked Questions",
-    "faq_desc": "Everything you need to know about using RentalHub NG.",
+    "faq_desc": "Everything you need to know about using Amana Amana RentalHub NG.",
     "cta_heading": "Ready to Get Started?",
-    "cta_desc": "Join thousands of Nigerians using RentalHub NG to find homes and list properties. Your journey starts here.",
+    "cta_desc": "Join thousands of Nigerians using Amana Amana RentalHub NG to find homes and list properties. Your journey starts here.",
     "cta_create": "Create Free Account",
     "cta_browse": "Browse Properties",
     "contact_heading": "Still Have Questions?",
@@ -1144,7 +1144,7 @@
     "plan_free_subtitle": "Perfect for trying out",
     "plan_free_price": "?0",
     "plan_free_period": "per listing",
-    "plan_free_desc": "Get started with a basic listing and see what RentalHub NG has to offer.",
+    "plan_free_desc": "Get started with a basic listing and see what Amana Amana RentalHub NG has to offer.",
     "plan_free_feat_1": "List 1 property",
     "plan_free_feat_2": "Basic property details",
     "plan_free_feat_3": "Up to 3 photos",
@@ -1219,7 +1219,7 @@
     "faq_heading": "Frequently Asked Questions",
     "faq_desc": "Everything you need to know about our pricing and billing.",
     "cta_heading": "Start Listing for Free Today",
-    "cta_desc": "No credit card required. No risk. Join thousands of landlords who trust RentalHub NG to connect them with verified, quality tenants.",
+    "cta_desc": "No credit card required. No risk. Join thousands of landlords who trust Amana Amana RentalHub NG to connect them with verified, quality tenants.",
     "cta_create": "Create Free Account",
     "cta_list": "List Your Property",
     "contact_heading": "Questions About Pricing?",
@@ -1230,7 +1230,7 @@
   "landlord_guide": {
     "hero_title_before": "Landlord ",
     "hero_title_highlight": "Guide",
-    "hero_desc": "Everything you need to know about listing, managing, and renting your properties successfully on RentalHub NG — from preparation to tenant move-in.",
+    "hero_desc": "Everything you need to know about listing, managing, and renting your properties successfully on Amana Amana RentalHub NG — from preparation to tenant move-in.",
     "hero_cta_list": "List Your Property",
     "hero_cta_pricing": "View Pricing Plans",
     "stats_properties_listed": "Properties Listed",
@@ -1253,7 +1253,7 @@
     "prep_step_2_item_3": "Consider professional photography",
     "prep_step_2_item_4": "Stage rooms to look spacious and inviting",
     "prep_step_3_title": "Verify Your Identity",
-    "prep_step_3_desc": "Complete your landlord verification through RentalHub NG. This builds trust with potential tenants and increases your listing visibility.",
+    "prep_step_3_desc": "Complete your landlord verification through Amana Amana RentalHub NG. This builds trust with potential tenants and increases your listing visibility.",
     "prep_step_3_item_1": "Submit valid government ID",
     "prep_step_3_item_2": "Complete NIN verification",
     "prep_step_3_item_3": "Provide proof of property ownership",
@@ -1303,9 +1303,9 @@
     "protip_1_title": "First Impressions Matter",
     "protip_1_desc": "The first photo in your listing is the most important. Choose a bright, well-composed hero shot.",
     "protip_2_title": "Screen Tenants Thoroughly",
-    "protip_2_desc": "Use RentalHub NG verification tools to confirm tenant identities before accepting applications.",
+    "protip_2_desc": "Use Amana Amana RentalHub NG verification tools to confirm tenant identities before accepting applications.",
     "protip_3_title": "Use Secure Contracts",
-    "protip_3_desc": "Always use legally reviewed tenancy agreements. RentalHub NG provides access to legal templates.",
+    "protip_3_desc": "Always use legally reviewed tenancy agreements. Amana Amana RentalHub NG provides access to legal templates.",
     "protip_4_title": "Monitor Your Performance",
     "protip_4_desc": "Use your landlord dashboard to track views, inquiries, and application rates.",
     "protip_5_title": "Build Tenant Relationships",
@@ -1329,9 +1329,9 @@
     "mistake_4_fix": "Set up notifications and aim to respond to all inquiries within 24 hours.",
     "faq_badge": "FAQ",
     "faq_heading": "Frequently Asked Questions",
-    "faq_desc": "Everything you need to know about listing on RentalHub NG.",
+    "faq_desc": "Everything you need to know about listing on Amana Amana RentalHub NG.",
     "cta_heading": "Ready to List Your Property?",
-    "cta_desc": "Join over 5,000 successful landlords on RentalHub NG. List your property today and start connecting with verified, qualified tenants across Nigeria.",
+    "cta_desc": "Join over 5,000 successful landlords on Amana Amana RentalHub NG. List your property today and start connecting with verified, qualified tenants across Nigeria.",
     "cta_list": "List Your Property Now",
     "cta_create": "Create Free Account",
     "contact_heading": "Need Help With Your Listing?",
@@ -1341,7 +1341,7 @@
   },
   "accept_agent_invite": {
     "title": "Activate Agent Access",
-    "subtitle": "Complete your details to start helping a landlord manage listings and other approved property tasks on RentalHub NG.",
+    "subtitle": "Complete your details to start helping a landlord manage listings and other approved property tasks on Amana Amana RentalHub NG.",
     "heading": "Accept Agent Invite",
     "desc": "Create your password and activate your agent dashboard.",
     "full_name_placeholder": "Full name",
@@ -1366,14 +1366,14 @@
     "password_mismatch": "Passwords do not match",
     "success": "Agent access activated successfully",
     "error": "Failed to activate agent access",
-    "alt_logo": "RentalHub NG"
+    "alt_logo": "Amana Amana RentalHub NG"
   },
   "accept_lawyer_invite": {
     "title": "Secure Legal Access",
     "subtitle": "You've been invited to join as a lawyer. Activate your account to start managing legal cases and disputes seamlessly.",
     "trusted": "Trusted by landlords, tenants, and legal professionals.",
     "activate_heading": "Activate Platform Lawyer Access",
-    "activate_sub": "Create your password and complete your RentalHub NG lawyer profile",
+    "activate_sub": "Create your password and complete your Amana Amana RentalHub NG lawyer profile",
     "activate_sub_alt": "Complete your lawyer profile details",
     "lawyer_details": "Lawyer Details",
     "full_name_placeholder": "Full name",
@@ -1453,8 +1453,8 @@
     "invalid_otp": "Invalid OTP - please try again",
     "platform_error": "Error processing platform lawyer invite",
     "generic_error": "Error processing lawyer invite",
-    "alt_logo": "RentalHub NG",
-    "brand_text": "Rental Hub NG"
+    "alt_logo": "Amana Amana RentalHub NG",
+    "brand_text": "Amana Rental Hub NG"
   },
   "verify_email": {
     "verifying": "جارٍ التحقق من بريدك الإلكتروني…",
@@ -1756,7 +1756,7 @@
     "verified_listing": "verified listing",
     "plural_suffix": "s",
     "load_failed": "Failed to load Nigeria directory",
-    "subtitle": "تصفح العقارات المتاحة للإيجار حسب الولاية والمنطقة المحلية والمناطق ذات الأولوية، بدعم من إعلانات RentalHub NG الموثقة.",
+    "subtitle": "تصفح العقارات المتاحة للإيجار حسب الولاية والمنطقة المحلية والمناطق ذات الأولوية، بدعم من إعلانات Amana RentalHub NG الموثقة.",
     "lgas_count": "{{count}} منطقة حكم محلي"
   },
   "dispute_details": {
@@ -2832,7 +2832,7 @@
     "outgoing_label": "Outgoing: ",
     "incoming_label": "Incoming: ",
     "review_note": "Review note: ",
-    "program_title": "RentalHub NG Lawyer Program",
+    "program_title": "Amana RentalHub NG Lawyer Program",
     "program_desc": "Apply from your dashboard and track review progress using the same backend flow already in place.",
     "no_broadcast": "No active recruitment broadcast",
     "recruitment_closed": "Recruitment is currently closed. Your existing application status is still preserved.",
@@ -2845,7 +2845,7 @@
     "already_approved": "Already Approved",
     "application_pending": "Application Pending",
     "apply_submitting": "Submitting...",
-    "apply_btn": "Apply To Serve On RentalHub NG",
+    "apply_btn": "Apply To Serve On Amana RentalHub NG",
     "authorized_properties": "Authorized Properties",
     "authorized_desc": "Select a property to keep your dispute workspace focused.",
     "no_authorized": "No authorized properties available.",
@@ -3007,22 +3007,22 @@
     "modal_landlord": "حساب مالك",
     "modal_landlord_desc": "يتطلب إنشاء حساب مالك رسوم تسجيل لمرة واحدة بقيمة",
     "modal_optional": "خدمات اختيارية",
-    "modal_optional_desc": "أضف محامي RentalHub NG مقابل",
-    "modal_optional_desc_2": "أضف وكيل RentalHub NG مقابل",
+    "modal_optional_desc": "أضف محامي Amana RentalHub NG مقابل",
+    "modal_optional_desc_2": "أضف وكيل Amana RentalHub NG مقابل",
     "modal_footnote": "تتم مراجعة الرسوم من قبل فريقنا وقد تتغير. تابع لاختيار نوع حسابك ورؤية المبلغ الدقيق لموقعك.",
     "modal_diaspora": "حساب المغتربين (أجنبي)",
     "modal_diaspora_desc": "يتطلب إنشاء حساب كأجنبي رسوم مغتربين لمرة واحدة تبدأ من",
     "modal_diaspora_ngn": "سيتم خصم المبلغ بالنايرا (ما يعادل حالياً ≈",
     "modal_diaspora_vary": "يعتمد المبلغ الدقيق على الولاية النيجيرية التي ترغب في الاستئجار فيها — الولايات الغنية بالمعادن تحمل رسوماً أعلى.",
     "modal_diaspora_optional": "الخدمات الإضافية للمغتربين —",
-    "modal_diaspora_lawyer": "إضافة محامي RentalHub NG بمبلغ",
-    "modal_diaspora_agent": "إضافة وكيل RentalHub NG بمبلغ",
+    "modal_diaspora_lawyer": "إضافة محامي Amana RentalHub NG بمبلغ",
+    "modal_diaspora_agent": "إضافة وكيل Amana RentalHub NG بمبلغ",
     "modal_approx": "≈",
     "disabled_diaspora": "تسجيل المغتربين معطل حالياً. يرجى المحاولة لاحقاً.",
     "modal_skip": "تخطي",
     "modal_understand": "فهمت",
-    "logo_alt": "شعار RentalHub NG",
-    "left_panel_title": "مرحبًا بك في RentalHub NG",
+    "logo_alt": "شعار Amana RentalHub NG",
+    "left_panel_title": "مرحبًا بك في Amana RentalHub NG",
     "left_panel_desc": "أنشئ حسابك لتصفح العقارات الموثقة والتواصل مع الملاك الموثوقين والحصول على دعم قانوني في جميع أنحاء نيجيريا.",
     "left_panel_footer": "عقارات موثقة في جميع الولايات الـ36 + العاصمة",
     "already_account": "لديك حساب بالفعل؟",
@@ -3054,9 +3054,9 @@
     "referral_placeholder": "أدخل رمز الإحالة",
     "referral_hint": "أدخل رمز إحالة إذا تمت دعوتك من قبل شخص ما.",
     "lawyer_email": "البريد الإلكتروني لمحاميك",
-    "lawyer_using_rentalhub": "استخدام محامي RentalHub NG",
+    "lawyer_using_rentalhub": "استخدام محامي Amana RentalHub NG",
     "lawyer_placeholder": "أدخل البريد الإلكتروني لمحاميك",
-    "lawyer_checkbox_label": "أريد استخدام محامي RentalHub NG",
+    "lawyer_checkbox_label": "أريد استخدام محامي Amana RentalHub NG",
     "lawyer_checkbox_desc": "سيتم تعيين محامٍ موثوق لمساعدتك (تسري رسوم).",
     "agent_heading": "إضافة وكيل",
     "agent_desc": "قدّم تفاصيل وكيلك اختياريًا حتى يتمكن من إدارة عقاراتك.",
@@ -3067,10 +3067,10 @@
     "agent_email_placeholder": "أدخل البريد الإلكتروني للوكيل",
     "agent_phone": "هاتف الوكيل",
     "agent_phone_placeholder": "أدخل هاتف الوكيل",
-    "use_rentalhub_agents": "استخدام وكيل RentalHub NG",
+    "use_rentalhub_agents": "استخدام وكيل Amana RentalHub NG",
     "rentalhub_agent_desc": "سيدير وكيل موثوق عقاراتك مقابل {{fee}}.",
     "use_our_agents": "استخدام وكلائنا",
-    "agent_auto_assigned": "سيتم تعيين وكيل RentalHub NG تلقائيًا لحسابك.",
+    "agent_auto_assigned": "سيتم تعيين وكيل Amana RentalHub NG تلقائيًا لحسابك.",
     "select_location_agent_fee": "اختر موقعك لتأكيد رسوم الوكيل الدقيقة.",
     "back": "رجوع",
     "step_3_title": "التحقق والموقع",
@@ -3098,8 +3098,8 @@
     "payment_summary": "ملخص الدفع",
     "tenant_account_creation": "إنشاء حساب المستأجر",
     "landlord_account_creation": "إنشاء حساب المالك",
-    "rentalhub_lawyer_access": "الوصول إلى محامي RentalHub NG",
-    "rentalhub_agent_access": "الوصول إلى وكيل RentalHub NG",
+    "rentalhub_lawyer_access": "الوصول إلى محامي Amana RentalHub NG",
+    "rentalhub_agent_access": "الوصول إلى وكيل Amana RentalHub NG",
     "total_due": "الإجمالي المستحق",
     "select_location_exact_fee": "اختر ولايتك ومنطقة حكومتك المحلية لرؤية الرسوم الدقيقة.",
     "password": "كلمة المرور",
@@ -3122,7 +3122,7 @@
     "location_preview_fallback": "لا توجد نتائج مطابقة تمامًا في {{lga}}، {{state}}. عرض العقارات القريبة بدلاً من ذلك.",
     "the_selected_state": "الولاية المحددة",
     "location_preview_error": "تعذّر تحميل معاينة العقارات لهذا الموقع.",
-    "registration_success": "تم التسجيل بنجاح! مرحبًا بك في RentalHub NG.",
+    "registration_success": "تم التسجيل بنجاح! مرحبًا بك في Amana RentalHub NG.",
     "registration_failed": "فشل التسجيل. يرجى المحاولة مرة أخرى.",
     "prembly_verify_complete": "اكتمل التحقق من الهوية بنجاح.",
     "prembly_verify": "تم التحقق من الهوية بنجاح!",
@@ -4115,7 +4115,7 @@
   },
   "property_share": {
     "fallback_title": "إدراج عقار",
-    "text": "اطلع على هذا العقار على RentalHub NG: {{title}}",
+    "text": "اطلع على هذا العقار على Amana RentalHub NG: {{title}}",
     "header": "مشاركة الإدراج",
     "copy_success": "تم نسخ رابط العقار",
     "copy_error": "تعذّر نسخ رابط العقار الآن",
@@ -4277,7 +4277,7 @@
     "cancel": "إلغاء"
   },
   "survey": {
-    "title": "استبيان أبحاث RentalHub NG",
+    "title": "استبيان أبحاث Amana RentalHub NG",
     "part_a_title": "بضعة أسئلة سريعة قبل المتابعة",
     "part_a_sub": "يستغرق هذا القسم الأول حوالي دقيقتين. يمكن إكمال الباقي لاحقاً.",
     "part_b_sub": "القسم {{section}} · السؤال {{q}} من {{total}}",
@@ -4332,7 +4332,7 @@
     "continue_existing": "متابعة الاستبيان الحالي"
   },
   "public_survey": {
-    "title": "استبيان الجمهور العام لـ RentalHub NG",
+    "title": "استبيان الجمهور العام لـ Amana RentalHub NG",
     "subtitle": "ساعدنا في رسم مستقبل الإيجار في نيجيريا",
     "choose": "اختر صفتك",
     "agent_choose": "اختر صفة المستجيب",

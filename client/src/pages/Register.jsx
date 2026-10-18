@@ -12,8 +12,8 @@ import { setAuthSession } from '../services/authStorage';
 import { getStoredUtm } from '../hooks/useUtmParams';
 import { useTranslation } from 'react-i18next';
 
-const LAWYER_ACCESS_FEE = 2000; // Fee for using RentalHub NG lawyers during registration
-const AGENT_ACCESS_FEE = 5000; // Fee for using RentalHub NG agents during registration
+const LAWYER_ACCESS_FEE = 2000; // Fee for using Amana RentalHub NG lawyers during registration
+const AGENT_ACCESS_FEE = 5000; // Fee for using Amana RentalHub NG agents during registration
 const TENANT_REGISTRATION_FEE = 3000;
 const LANDLORD_REGISTRATION_FEE = 5000;
 const DIASPORA_BASE_FEE_USD = 12.85; // Fallback until the server provides the live setting
@@ -1441,7 +1441,7 @@ return (
         </div>
         <div className="flex flex-col items-center leading-none">
           <span className="amana-mark amana-mark--on-dark text-2xl">Amana</span>
-          <span className="text-lg font-bold text-white">RentalHub NG</span>
+          <span className="text-lg font-bold text-white">Amana RentalHub NG</span>
         </div>
         <h1 className="max-w-md text-4xl font-extrabold leading-tight tracking-tight">{t('register.left_panel_title')}</h1>
         <p className="max-w-md text-lg text-primary-100">

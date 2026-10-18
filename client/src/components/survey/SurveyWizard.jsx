@@ -487,7 +487,7 @@ export default function SurveyWizard({
     return (
       <div className="mt-6 space-y-4">
         <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
-          {t('survey.contact_intro', 'Tell us how to reach you (optional for the survey itself, but very helpful). We only use these details to contact you about RentalHub NG — never for anything else.')}
+          {t('survey.contact_intro', 'Tell us how to reach you (optional for the survey itself, but very helpful). We only use these details to contact you about Amana RentalHub NG — never for anything else.')}
         </div>
         <label className="block text-sm">
           <span className="mb-1 block font-medium text-gray-700">{t('survey.contact_name', 'Full name *')}</span>
@@ -734,7 +734,7 @@ export default function SurveyWizard({
 
   const exitLabel = mode === 'partA'
     ? t('survey.part_a_title', 'A few quick questions before you continue')
-    : t('survey.title', 'RentalHub NG Research Survey');
+    : t('survey.title', 'Amana RentalHub NG Research Survey');
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-6">

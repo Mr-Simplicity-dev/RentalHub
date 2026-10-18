@@ -36,7 +36,7 @@
 
 ### 2. Facebook Banner (Carousel/Story)
 - **Dimensions:** 1080 × 1080 px
-- **Text:** "RentalHub NG"
+- **Text:** "Amana RentalHub NG"
 - **Subtext:** "Rent with Confidence"
 - **CTA:** "Get the App"
 - **Image:** Happy family outside a house
@@ -73,7 +73,7 @@
 ### 6. TikTok Banner (Thumbnail)
 - **Dimensions:** 1080 × 1920 px
 - **Text:** "This App Will Change How You Rent"
-- **Subtext:** "RentalHub NG"
+- **Subtext:** "Amana RentalHub NG"
 - **CTA:** None (text only)
 - **Image:** Person looking shocked/surprised at phone
 - **Colors:** Bright yellow background, dark text
@@ -108,7 +108,7 @@
 
 ### 10. General/Promotional Banner
 - **Dimensions:** 1200 × 628 px
-- **Text:** "RentalHub NG — Nigeria's Trusted Rental Platform"
+- **Text:** "Amana RentalHub NG — Nigeria's Trusted Rental Platform"
 - **Subtext:** "Find. Verify. Pay. Move In."
 - **CTA:** "rentalhub.com.ng/download"
 - **Image:** Modern Nigerian home exterior

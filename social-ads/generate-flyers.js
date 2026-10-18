@@ -2,7 +2,7 @@
 //
 // One source of truth for the Amana-branded social flyers. It reuses the ten
 // concept designs in generate.js (each already renders the "Amana" house mark
-// above "RentalHub NG") and maps them to their marketing campaign names.
+// above "Amana RentalHub NG") and maps them to their marketing campaign names.
 //
 //   node generate-flyers.js            -> flyers/svg/*.svg
 //   powershell -File render-flyers.ps1 -> flyers/png/*.png

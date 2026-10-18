@@ -6,7 +6,7 @@ fs.mkdirSync(OUT, { recursive: true });
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const accentLast = (h) => h.replace(/(\S+)(\s*)$/, '<span class="accent">$1</span>$2');
-const LOGO = '<img class="logo" src="../../client/public/rentalhub-mark.svg" alt="RentalHub NG">';
+const LOGO = '<img class="logo" src="../../client/public/rentalhub-mark.svg" alt="Amana RentalHub NG">';
 const BRAND = `<div class="brand"><span class="amana">Amana</span><span class="name">RentalHub <span>NG</span></span></div>`;
 const FOOTER = '<div class="footer">rentalhub.com.ng&nbsp;&nbsp;&bull;&nbsp;&nbsp;support@rentalhub.com.ng</div>';
 const tick = (p) => `<span class="tick"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" style="stroke:${p.onAccent}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
@@ -156,7 +156,7 @@ for (let k = 0; k < 48; k++) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RentalHub NG - ${mode.key} / ${arr} / ${pal.name}</title>
+<title>Amana RentalHub NG - ${mode.key} / ${arr} / ${pal.name}</title>
 <!-- layout=${mode.key} arrangement=${arr} palette=${pal.name} theme="${c.h}". Swap --photo in :root to change the image. -->
 <style>${baseCss(pal)}${mode.css}
 </style>
@@ -177,7 +177,7 @@ const index = `<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RentalHub NG - Template Library (50)</title>
+<title>Amana RentalHub NG - Template Library (50)</title>
 <style>
 *{margin:0;box-sizing:border-box}
 body{background:#0d0f14;color:#e7ebf3;font-family:Arial,Helvetica,sans-serif;padding:28px}
@@ -193,7 +193,7 @@ a.card em{display:block;color:#5f6b7d;font-size:11px;font-style:normal;margin-to
 </style>
 </head>
 <body>
-<h1>RentalHub NG - Template Library</h1>
+<h1>Amana RentalHub NG - Template Library</h1>
 <p class="note">${files.length} templates - 48 unique layout compositions (12 image placements x 4 arrangements) + the 2 rail templates. Each has unique copy.</p>
 <h2>rail (done)</h2><div class="grid">${railItems.map((f) => `<a class="card" href="${f.name}"><b>${f.name}</b><span>${f.palette}</span><em>${f.theme}</em></a>`).join('')}</div>
 ${byLayout.filter((g) => g.key !== 'rail').map((g) => `<h2>${g.key}</h2><div class="grid">${g.items.map((f) => `<a class="card" href="${f.name}"><b>${f.name}</b><span>${f.palette}</span><em>${f.theme}</em></a>`).join('')}</div>`).join('')}

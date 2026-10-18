@@ -508,7 +508,7 @@ router.get('/receipt-pdf/:paymentId',
       // Header: logo + Amana wordmark + company name + contact
       try { doc.image(logoPath, 50, 46, { width: 56, height: 56 }); } catch (e) {}
       doc.font('AmanaScript').fontSize(21).fillColor('#6e1b2b').text('Amana', 122, 50, { width: 200 });
-      doc.font('Helvetica-Bold').fontSize(19).fillColor('#0f172a').text('RentalHub NG', 122, 74, { width: 230 });
+      doc.font('Helvetica-Bold').fontSize(19).fillColor('#0f172a').text('Amana RentalHub NG', 122, 74, { width: 230 });
       doc.font('Helvetica').fontSize(8).fillColor('#64748b').text('rentalhub.com.ng   •   support@rentalhub.com.ng', 122, 98, { width: 260 });
 
       doc.moveTo(50, 126).lineTo(545, 126).strokeColor('#e2e8f0').lineWidth(1).stroke();
@@ -568,7 +568,7 @@ router.get('/receipt-pdf/:paymentId',
 
       // Footer
       doc.moveDown(3);
-      doc.font('Helvetica').fontSize(9).fillColor('#94a3b8').text('Thank you for using Amana RentalHub NG.', { align: 'center' });
+      doc.font('Helvetica').fontSize(9).fillColor('#94a3b8').text('Thank you for using Amana Amana RentalHub NG.', { align: 'center' });
       doc.moveDown(0.2);
       doc.fontSize(8).fillColor('#cbd5e1').text('This is a computer-generated receipt and does not require a signature.', { align: 'center' });
 
@@ -625,7 +625,7 @@ router.get('/savings-receipt.pdf',
       );
       doc.pipe(res);
 
-      doc.fontSize(20).text('RentalHub NG', { align: 'center' });
+      doc.fontSize(20).text('Amana RentalHub NG', { align: 'center' });
       doc.moveDown(0.2);
       doc.fontSize(11).fillColor('#64748b').text('Rent Savings Contribution Receipt', { align: 'center' });
       doc.fontSize(11).fillColor('#0f172a').text(`RCPT-SAV-${String(contributionId).padStart(6, '0')}`, { align: 'center' });
@@ -665,7 +665,7 @@ router.get('/savings-receipt.pdf',
       doc.fillColor('#0f172a').text('Amount Saved', 50, doc.y);
       doc.text(`₦${net.toLocaleString()}`, 400, doc.y - 14, { width: 150, align: 'right' });
       doc.moveDown(2);
-      doc.fontSize(9).fillColor('#94a3b8').text('Thank you for saving with RentalHub NG.', { align: 'center' });
+      doc.fontSize(9).fillColor('#94a3b8').text('Thank you for saving with Amana RentalHub NG.', { align: 'center' });
 
       doc.end();
     } catch (error) {
@@ -746,7 +746,7 @@ router.get('/commission-statement.pdf',
       res.setHeader('Content-Disposition', `attachment; filename="commission-statement-${userId}.pdf"`);
       doc.pipe(res);
 
-      doc.fontSize(20).text('RentalHub NG', { align: 'center' });
+      doc.fontSize(20).text('Amana RentalHub NG', { align: 'center' });
       doc.moveDown(0.2);
       doc.fontSize(11).fillColor('#64748b').text('Commission Earnings Statement', { align: 'center' });
       doc.fontSize(10).fillColor('#0f172a').text(req.user.full_name || req.user.email, { align: 'center' });
@@ -793,7 +793,7 @@ router.get('/commission-statement.pdf',
       doc.text('Statement Total', 50, doc.y);
       doc.text(`₦${(totals.earned + totals.pending + totals.paid).toLocaleString()}`, 430, doc.y - 14, { width: 115, align: 'right' });
       doc.moveDown(2);
-      doc.fontSize(9).fillColor('#94a3b8').text('Thank you for using RentalHub NG.', { align: 'center' });
+      doc.fontSize(9).fillColor('#94a3b8').text('Thank you for using Amana RentalHub NG.', { align: 'center' });
 
       doc.end();
     } catch (error) {

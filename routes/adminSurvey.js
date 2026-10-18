@@ -66,7 +66,7 @@ router.get('/export.pdf', async (req, res) => {
     );
     doc.pipe(res);
 
-    doc.fontSize(20).text('RentalHub NG', { align: 'center' });
+    doc.fontSize(20).text('Amana RentalHub NG', { align: 'center' });
     doc.moveDown(0.2);
     doc.fontSize(13).text(
       `${type === 'landlord' ? 'Landlord' : 'Tenant'} Survey Analysis Report`,
@@ -136,7 +136,7 @@ router.get('/export.pdf', async (req, res) => {
     }
 
     doc.moveDown(1);
-    doc.fontSize(9).fillColor('#94a3b8').text('Thank you for using RentalHub NG.', { align: 'center' });
+    doc.fontSize(9).fillColor('#94a3b8').text('Thank you for using Amana RentalHub NG.', { align: 'center' });
     doc.end();
   } catch (error) {
     req.logger.error('Survey PDF export error:', error);

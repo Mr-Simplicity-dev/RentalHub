@@ -136,7 +136,7 @@ const PlatformAgentsTab = () => {
         <h3 className="mb-1 font-semibold">Manual Agent Entry</h3>
         <p className="mb-4 text-sm text-gray-500">
           Add an agent directly to the platform agent directory. Agents listed here can be automatically
-          assigned to landlords who opt in for RentalHub NG agents during registration.
+          assigned to landlords who opt in for Amana RentalHub NG agents during registration.
         </p>
 
         <form onSubmit={createManualEntry}>
@@ -320,7 +320,7 @@ const PlatformAgentsTab = () => {
         <h3 className="mb-4 font-semibold">About Platform Agents</h3>
         <div className="text-sm text-gray-600 space-y-2">
           <p>
-            <strong>What are platform agents?</strong> These are agents registered with the RentalHub NG platform
+            <strong>What are platform agents?</strong> These are agents registered with the Amana RentalHub NG platform
             who can be automatically assigned to landlords during registration.
           </p>
           <p>
@@ -328,11 +328,11 @@ const PlatformAgentsTab = () => {
             If an agent already has a user account (user_type = 'agent'), their user profile details will be used.
           </p>
           <p>
-            <strong>Registration entries:</strong> When a landlord opts in for "Use RentalHub NG agents" during
+            <strong>Registration entries:</strong> When a landlord opts in for "Use Amana RentalHub NG agents" during
             registration, an entry is automatically created here and linked to the assigned agent user.
           </p>
           <p>
-            <strong>Agent access fee (₦5,000):</strong> When a landlord uses RentalHub NG agents, a one-time
+            <strong>Agent access fee (₦5,000):</strong> When a landlord uses Amana RentalHub NG agents, a one-time
             ₦5,000 fee is charged. ₦2,800 goes to the assigned agent, ₦500 to the landlord's lawyer (if any),
             ₦800 to the super admin, ₦100 to the state admin, and the remainder to the super admin.
           </p>

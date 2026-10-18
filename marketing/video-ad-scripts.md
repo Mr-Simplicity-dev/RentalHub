@@ -42,7 +42,7 @@ These are simple: text appears on screen with music. No people, no cartoons. Jus
 | 3-7 sec | "Step 1: Search verified listings" | Dark | Slide up |
 | 7-11 sec | "Step 2: Read real tenant reviews" | Dark | Slide up |
 | 11-15 sec | "Step 3: Pay securely through the app" | Dark | Slide up |
-| 15-18 sec | "RentalHub NG" | Blue (#0284c7) | Zoom in |
+| 15-18 sec | "Amana RentalHub NG" | Blue (#0284c7) | Zoom in |
 | 18-20 sec | "rentalhub.com.ng/download" | Blue | Fade in |
 
 **Music:** Calm, building instrumental
@@ -60,7 +60,7 @@ These are simple: text appears on screen with music. No people, no cartoons. Jus
 | 2-4 sec | "To Abuja" | Dark gradient | Fade in |
 | 4-6 sec | "To Rivers" | Dark gradient | Fade in |
 | 6-8 sec | "36 STATES." | Yellow (#eab308) | Bold zoom |
-| 8-10 sec | "RentalHub NG — Download Free" | Blue | Slide up |
+| 8-10 sec | "Amana RentalHub NG — Download Free" | Blue | Slide up |
 
 **Music:** Upbeat Afrobeats instrumental
 **Voiceover:** None
@@ -144,7 +144,7 @@ Cartoon characters act out a scene while a voiceover explains. These are great f
 | 0-5 sec | Woman opens RentalHub on phone | "Search verified properties by location, price, and type." | "Step 1: Search" |
 | 5-10 sec | She reads reviews, sees 5-star ratings | "Read honest reviews from real tenants." | "Step 2: Verify" |
 | 10-15 sec | She taps "Pay" in the app, gets receipt | "Pay rent and deposits securely through the app." | "Step 3: Pay" |
-| 15-20 sec | She moves into apartment, opens door | "Move in. Simple." / "RentalHub NG — Download Free" | "rentalhub.com.ng/download" |
+| 15-20 sec | She moves into apartment, opens door | "Move in. Simple." / "Amana RentalHub NG — Download Free" | "rentalhub.com.ng/download" |
 
 **Music:** Upbeat, modern, clean
 

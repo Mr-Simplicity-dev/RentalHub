@@ -95,7 +95,7 @@ const sendPushToUser = async (userId, notification = {}) => {
   const messages = tokenResult.rows.map(({ expo_push_token: to }) => ({
     to,
     sound: 'default',
-    title: String(notification.title || 'RentalHub NG').slice(0, 255),
+    title: String(notification.title || 'Amana RentalHub NG').slice(0, 255),
     body: String(notification.body || '').slice(0, 1000),
     data: notification.data || {},
     channelId: notification.channelId || 'messages',
@@ -202,7 +202,7 @@ const sendPushToAll = async (notification = {}, filters = {}) => {
   const messages = tokens.map((to) => ({
     to,
     sound: 'default',
-    title: String(notification.title || 'RentalHub NG').slice(0, 255),
+    title: String(notification.title || 'Amana RentalHub NG').slice(0, 255),
     body: String(notification.body || '').slice(0, 1000),
     data: notification.data || {},
     channelId: notification.channelId || 'general',

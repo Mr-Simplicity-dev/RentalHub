@@ -219,13 +219,13 @@ const Login = () => {
 
         {/* LOGO */}
         <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/20 bg-white/10 shadow-xl backdrop-blur-xl">
-          <img src="/rentalhub-mark.svg" alt="RentalHub NG" className="h-12 w-12 rounded-xl object-contain shadow-sm" />
+          <img src="/rentalhub-mark.svg" alt="Amana RentalHub NG" className="h-12 w-12 rounded-xl object-contain shadow-sm" />
         </div>
 
         {/* BRAND */}
         <div className="flex flex-col items-center leading-none">
           <span className="amana-mark amana-mark--on-dark text-2xl">Amana</span>
-          <span className="text-lg font-bold text-white">RentalHub NG</span>
+          <span className="text-lg font-bold text-white">Amana RentalHub NG</span>
         </div>
 
         {/* TITLE */}

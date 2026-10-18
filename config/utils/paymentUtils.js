@@ -85,7 +85,7 @@ const sendTenantTenancyExpiredEmail = async (tenancy) => {
 
   await sendEmail({
     to: tenancy.tenant_email,
-    subject: `Your tenancy has expired - ${tenancy.property_title || 'RentalHub NG'}`,
+    subject: `Your tenancy has expired - ${tenancy.property_title || 'Amana RentalHub NG'}`,
     html: `
       <div style="font-family: sans-serif; line-height: 1.6;">
         <h2>Tenancy Expiry Reminder</h2>
@@ -115,7 +115,7 @@ const sendLandlordTenancyExpiredEmail = async (tenancy) => {
 
   await sendEmail({
     to: tenancy.landlord_email,
-    subject: `Tenant tenancy expired - ${tenancy.property_title || 'RentalHub NG'}`,
+    subject: `Tenant tenancy expired - ${tenancy.property_title || 'Amana RentalHub NG'}`,
     html: `
       <div style="font-family: sans-serif; line-height: 1.6;">
         <h2>Tenant Tenancy Expired</h2>

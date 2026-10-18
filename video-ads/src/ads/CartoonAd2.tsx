@@ -16,7 +16,7 @@ const CartoonAd2: React.FC = () => {
         <TextSlide text="Pay rent and deposits securely through the app." fontSize={48} bgColor="#0f172a" animation="slideUp" />
       </Sequence>
       <Sequence from={15 * fps} durationInFrames={5 * fps}>
-        <TextSlide text="RentalHub NG — Download Free" fontSize={56} bgColor="#0284c7" animation="zoomIn" color="#eab308" />
+        <TextSlide text="Amana RentalHub NG — Download Free" fontSize={56} bgColor="#0284c7" animation="zoomIn" color="#eab308" />
       </Sequence>
     </AbsoluteFill>
   );

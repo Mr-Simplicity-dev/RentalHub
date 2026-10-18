@@ -1,6 +1,6 @@
-# RentalHub NG — One-Page Overview
+# Amana RentalHub NG — One-Page Overview
 
-**RentalHub NG** is a Nigerian end-to-end rental platform that moves the entire
+**Amana RentalHub NG** is a Nigerian end-to-end rental platform that moves the entire
 rental lifecycle — search, verification, tenancy, rent, disputes, and property
 services — from the streets and paper into one trusted online marketplace.
 

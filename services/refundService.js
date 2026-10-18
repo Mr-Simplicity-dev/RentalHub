@@ -1097,7 +1097,7 @@ exports.rejectRefundRequest = async (req, res) => {
         const tenant = tenantRes.rows[0];
         await sendEmailSafely({
           to: tenant.email,
-          subject: `Refund Request #${refundId} Update - RentalHub NG`,
+          subject: `Refund Request #${refundId} Update - Amana RentalHub NG`,
           html: `
             <div style="font-family: sans-serif; line-height: 1.6; max-width: 560px; margin: 0 auto; color: #111827;">
               <h3 style="color: #991b1b; margin-top: 0;">Refund Request Declined</h3>

@@ -30,7 +30,7 @@ const ShareButton = ({ section, title, description }) => {
 };
 
 const milestones = [
-  { year: '2020', event: 'RentalHub NG was founded with a vision to transform the Nigerian rental market.' },
+  { year: '2020', event: 'Amana RentalHub NG was founded with a vision to transform the Nigerian rental market.' },
   { year: '2021', event: 'Launched property listing framework to ackwonledge onboarding landlords across Lagos and Abuja by creating a platform.' },
   { year: '2022', event: 'Expanded the framework to all 36 states + FCT; introduced identity verification for landlords and tenants.' },
   { year: '2023', event: 'Launched legal framework support services, dispute resolution, and fumigation/cleaning marketplace.' },
@@ -145,7 +145,7 @@ const AboutUs = () => {
               </Link>
               <ShareButton
                 section="About Us"
-                title="RentalHub NG — Nigeria's Most Trusted Property Platform"
+                title="Amana RentalHub NG — Nigeria's Most Trusted Property Platform"
                 description="Nigeria's most trusted property technology platform — connecting tenants, landlords, agents, and legal professionals across all 36 states and the Federal Capital Territory."
               />
             </div>
@@ -172,8 +172,8 @@ const AboutUs = () => {
                 </h2>
                 <ShareButton
                   section="Our Mission"
-                  title="RentalHub NG Mission — Transforming Nigeria's Rental Landscape"
-                  description="At RentalHub NG, we believe everyone deserves a safe, transparent, and hassle-free experience when finding a home."
+                  title="Amana RentalHub NG Mission — Transforming Nigeria's Rental Landscape"
+                  description="At Amana RentalHub NG, we believe everyone deserves a safe, transparent, and hassle-free experience when finding a home."
                 />
               </div>
               <p className="text-gray-600 leading-relaxed mb-4">
@@ -228,8 +228,8 @@ const AboutUs = () => {
                 <div className="text-primary-200 text-sm md:text-base font-medium mb-2">{stat.label}</div>
                 <ShareButton
                   section={stat.label}
-                  title={`RentalHub NG — ${stat.value} ${stat.label}`}
-                  description={`RentalHub NG has ${stat.value} ${stat.label.toLowerCase()}. Join Nigeria's most trusted property platform.`}
+                  title={`Amana RentalHub NG — ${stat.value} ${stat.label}`}
+                  description={`Amana RentalHub NG has ${stat.value} ${stat.label.toLowerCase()}. Join Nigeria's most trusted property platform.`}
                 />
               </div>
             ))}
@@ -248,8 +248,8 @@ const AboutUs = () => {
               </h2>
               <ShareButton
                 section="Our Journey"
-                title="RentalHub NG Journey — From Vision to Reality"
-                description="See how RentalHub NG grew from a vision into Nigeria's most trusted property marketplace since 2020."
+                title="Amana RentalHub NG Journey — From Vision to Reality"
+                description="See how Amana RentalHub NG grew from a vision into Nigeria's most trusted property marketplace since 2020."
               />
             </div>
             <p className="text-gray-600">
@@ -283,8 +283,8 @@ const AboutUs = () => {
                   <p className="text-gray-700 text-base leading-relaxed mb-3">{milestone.event}</p>
                   <ShareButton
                     section={`Milestone ${milestone.year}`}
-                    title={`RentalHub NG in ${milestone.year}: ${milestone.event}`}
-                    description={`${milestone.event} — Part of the RentalHub NG journey.`}
+                    title={`Amana RentalHub NG in ${milestone.year}: ${milestone.event}`}
+                    description={`${milestone.event} — Part of the Amana RentalHub NG journey.`}
                   />
                 </div>
               </div>
@@ -304,8 +304,8 @@ const AboutUs = () => {
               </h2>
               <ShareButton
                 section="Our Core Values"
-                title="RentalHub NG Core Values"
-                description="Trust, transparency, community, nationwide reach, integrity, and innovation — the principles guiding RentalHub NG."
+                title="Amana RentalHub NG Core Values"
+                description="Trust, transparency, community, nationwide reach, integrity, and innovation — the principles guiding Amana RentalHub NG."
               />
             </div>
             <p className="text-gray-600">
@@ -325,7 +325,7 @@ const AboutUs = () => {
                   </div>
                   <ShareButton
                     section={value.title}
-                    title={`RentalHub NG — ${value.title}`}
+                    title={`Amana RentalHub NG — ${value.title}`}
                     description={value.desc}
                   />
                 </div>
@@ -348,8 +348,8 @@ const AboutUs = () => {
               </h2>
               <ShareButton
                 section="Why Choose Us"
-                title="Why Choose RentalHub NG"
-                description="Verified ecosystem, legal support, full-service marketplace, and nationwide coverage — see what makes RentalHub NG different."
+                title="Why Choose Amana RentalHub NG"
+                description="Verified ecosystem, legal support, full-service marketplace, and nationwide coverage — see what makes Amana RentalHub NG different."
               />
             </div>
             <p className="text-gray-600">
@@ -367,7 +367,7 @@ const AboutUs = () => {
                   <h3 className="text-lg font-bold text-gray-900 mb-2">{t('about_us.different.ecosystem.title')}</h3>
                   <ShareButton
                     section="Verified Ecosystem"
-                    title="RentalHub NG — Verified Ecosystem"
+                    title="Amana RentalHub NG — Verified Ecosystem"
                     description="Every landlord, tenant, and property goes through identity verification. Our superb verification system ensures only genuine participants on the platform."
                   />
                 </div>
@@ -386,7 +386,7 @@ const AboutUs = () => {
                   <h3 className="text-lg font-bold text-gray-900 mb-2">{t('about_us.different.legal.title')}</h3>
                   <ShareButton
                     section="Legal Support"
-                    title="RentalHub NG — Legal Support & Dispute Resolution"
+                    title="Amana RentalHub NG — Legal Support & Dispute Resolution"
                     description="Access to qualified lawyers, evidence verification, and structured dispute resolution processes to protect all parties."
                   />
                 </div>
@@ -405,7 +405,7 @@ const AboutUs = () => {
                   <h3 className="text-lg font-bold text-gray-900 mb-2">{t('about_us.different.marketplace.title')}</h3>
                   <ShareButton
                     section="Full-Service Marketplace"
-                    title="RentalHub NG — Full-Service Marketplace"
+                    title="Amana RentalHub NG — Full-Service Marketplace"
                     description="Beyond rentals, we offer fumigation/cleaning services, transportation support, and virtual property tours — all in one platform."
                   />
                 </div>
@@ -424,7 +424,7 @@ const AboutUs = () => {
                   <h3 className="text-lg font-bold text-gray-900 mb-2">{t('about_us.different.coverage.title')}</h3>
                   <ShareButton
                     section="Nationwide Coverage"
-                    title="RentalHub NG — Nationwide Coverage"
+                    title="Amana RentalHub NG — Nationwide Coverage"
                     description="From Lagos to Maiduguri, Calabar to Sokoto — our platform serves all 36 states and the FCT with localized admin support."
                   />
                 </div>
@@ -448,8 +448,8 @@ const AboutUs = () => {
               </h2>
               <ShareButton
                 section="Leadership Team"
-                title="RentalHub NG Leadership Team"
-                description="Meet the passionate professionals dedicated to transforming the Nigerian property experience at RentalHub NG."
+                title="Amana RentalHub NG Leadership Team"
+                description="Meet the passionate professionals dedicated to transforming the Nigerian property experience at Amana RentalHub NG."
               />
             </div>
             <p className="text-gray-600">
@@ -466,8 +466,8 @@ const AboutUs = () => {
                 <div className="absolute top-3 right-3">
                   <ShareButton
                     section={member.name}
-                    title={`RentalHub NG — ${member.name}, ${member.role}`}
-                    description={`${member.bio} Learn more about the RentalHub NG leadership team.`}
+                    title={`Amana RentalHub NG — ${member.name}, ${member.role}`}
+                    description={`${member.bio} Learn more about the Amana RentalHub NG leadership team.`}
                   />
                 </div>
                 <div className="w-20 h-20 mx-auto mb-5 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white text-2xl font-bold shadow-md group-hover:scale-110 transition-transform duration-300">
@@ -509,8 +509,8 @@ const AboutUs = () => {
               </Link>
               <ShareButton
                 section="Call to Action"
-                title="Join 50,000+ Nigerians on RentalHub NG"
-                description="Find your perfect home on RentalHub NG — Nigeria's most trusted property platform with verified properties across all 36 states + FCT."
+                title="Join 50,000+ Nigerians on Amana RentalHub NG"
+                description="Find your perfect home on Amana RentalHub NG — Nigeria's most trusted property platform with verified properties across all 36 states + FCT."
               />
             </div>
           </div>
@@ -530,8 +530,8 @@ const AboutUs = () => {
             <div className="flex justify-center mb-10">
               <ShareButton
                 section="Contact"
-                title="Contact RentalHub NG"
-                description="Have questions, feedback, or partnership ideas? Contact RentalHub NG at support@rentalhub.com.ng or call +234 803 060 1238."
+                title="Contact Amana RentalHub NG"
+                description="Have questions, feedback, or partnership ideas? Contact Amana RentalHub NG at support@rentalhub.com.ng or call +234 803 060 1238."
               />
             </div>
             <div className="grid md:grid-cols-2 gap-8 max-w-2xl mx-auto">

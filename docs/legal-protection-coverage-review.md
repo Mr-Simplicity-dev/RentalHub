@@ -158,7 +158,7 @@ no lawyer assignment.
 - Drop "Coverage", "Advisory", "assigned lawyer".
 - Use neutral terms: "Dispute Support", "Legal Directory", "Evidence Vault",
   "Documentation".
-- Add a clear disclaimer: *"RentalHub NG is not a law firm and does not provide legal
+- Add a clear disclaimer: *"Amana RentalHub NG is not a law firm and does not provide legal
   advice."*
 
 ### On the owner's proposal (in-house department)
@@ -213,7 +213,7 @@ no lawyer assignment.
 ## 10. Questions to ask the lawyer (MUST be answered in writing)
 
 **Practice & structure**
-1. May an in-house legal department of a technology company (RentalHub NG) act for the
+1. May an in-house legal department of a technology company (Amana RentalHub NG) act for the
    company's **users** (tenants/landlords) in their disputes, or may it act only for the
    company itself?
 2. If users need representation, must the lawyers practise through a **separate,
@@ -246,7 +246,7 @@ no lawyer assignment.
 **Unauthorized practice & disclaimers**
 11. Which current claims ("advisory", "document reviews", "coverage") risk unauthorized
     practice of law, and what must be removed/reworded?
-12. What disclaimer(s) must appear (e.g. "RentalHub NG is not a law firm and does not
+12. What disclaimer(s) must appear (e.g. "Amana RentalHub NG is not a law firm and does not
     provide legal advice"), and where?
 13. Are there confidentiality/conflict rules we must design for when logging user disputes
     and evidence on the platform?

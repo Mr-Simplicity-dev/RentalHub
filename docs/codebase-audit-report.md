@@ -1,4 +1,4 @@
-# RentalHub NG — Codebase Audit Report
+# Amana RentalHub NG — Codebase Audit Report
 
 **Date:** 2026-09-21
 **Repo:** `Mr-Simplicity-dev/RentalHub`

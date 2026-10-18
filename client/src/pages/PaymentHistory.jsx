@@ -359,11 +359,11 @@ const PaymentHistory = () => {
               <div className="border-b border-gray-200 pb-4 text-center">
                 <img
                   src="/rentalhub-mark.svg"
-                  alt="Amana RentalHub NG"
+                  alt="Amana Amana RentalHub NG"
                   className="mx-auto h-10 w-10 rounded-xl object-contain"
                 />
                 <div className="amana-mark mt-1 text-lg">Amana</div>
-                <h2 className="text-lg font-bold text-gray-900">RentalHub NG</h2>
+                <h2 className="text-lg font-bold text-gray-900">Amana RentalHub NG</h2>
                 <p className="text-xs text-gray-500">{t('wallet.receipt')}</p>
                 <p className="mt-1 text-xs font-semibold text-gray-700">
                   {formatReceiptNumber(selectedReceipt)}
@@ -479,7 +479,7 @@ const PaymentHistory = () => {
                 )}
               </div>
               <div className="mt-6 border-t border-gray-200 pt-4 text-center text-xs text-gray-400">
-                Thank you for using RentalHub NG.
+                Thank you for using Amana RentalHub NG.
               </div>
             </div>
             <div className="flex justify-end gap-2 border-t border-gray-100 p-4 print:hidden">

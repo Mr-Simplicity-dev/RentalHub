@@ -588,7 +588,7 @@ const TransportationBooking = () => {
                     {t('transportation_booking.contact_support')}
                   </p>
                   <div className="text-sm">
-                    <p className="text-gray-700">📞 +234 800 123 4567</p>
+                    <p className="text-gray-700">📞 +234 80 3060 1238</p>
                     <p className="text-gray-700">✉️ transport@rentalhub.com</p>
                   </div>
                 </div>

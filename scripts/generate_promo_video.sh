@@ -18,7 +18,7 @@ ffmpeg -y \
     [0:v]
       drawbox=x=0:y=0:w=1080:h=1920:color=#061b3a:t=fill,
       drawbox=x=40:y=40:w=1000:h=1840:color=#ffc928@0.2:t=4,
-      drawtext=fontfile='$FONT':text='RENTALHUB NG':fontsize=42:fontcolor=#ffc928:x=(w-text_w)/2:y=120:enable='between(t,0,15)',
+      drawtext=fontfile='$FONT':text='Amana RentalHub NG':fontsize=42:fontcolor=#ffc928:x=(w-text_w)/2:y=120:enable='between(t,0,15)',
       drawbox=x=80:y=500:w=920:h=460:color=#dc2626@0.9:t=fill:enable='between(t,0.3,3.5)',
       drawtext=fontfile='$FONT':text='STOP PAYING':fontsize=64:fontcolor=#ffffff:x=(w-text_w)/2:y=580:enable='between(t,0.4,3.5)',
       drawtext=fontfile='$FONT':text='FAKE AGENTS':fontsize=76:fontcolor=#ffdd00:x=(w-text_w)/2:y=680:enable='between(t,0.7,3.5)',
@@ -30,7 +30,7 @@ ffmpeg -y \
       drawtext=fontfile='$FONT':text='Across Lagos, Abuja and 36 States':fontsize=38:fontcolor=#e0f2fe:x=(w-text_w)/2:y=790:enable='between(t,4.9,7.5)',
       drawbox=x=90:y=460:w=900:h=600:color=#0a2145@0.95:t=fill:enable='between(t,7.7,11.5)',
       drawbox=x=90:y=460:w=900:h=600:color=#ffc928@0.4:t=3:enable='between(t,7.7,11.5)',
-      drawtext=fontfile='$FONT':text='WHY RENTALHUB NG?':fontsize=42:fontcolor=#ffc928:x=(w-text_w)/2:y=510:enable='between(t,7.8,11.5)',
+      drawtext=fontfile='$FONT':text='WHY Amana RentalHub NG?':fontsize=42:fontcolor=#ffc928:x=(w-text_w)/2:y=510:enable='between(t,7.8,11.5)',
       drawtext=fontfile='$FONT':text='+ Zero Ghost Listings':fontsize=44:fontcolor=#ffffff:x=140:y=610:enable='between(t,8.1,11.5)',
       drawtext=fontfile='$FONT':text='+ Verified Inspections':fontsize=44:fontcolor=#ffffff:x=140:y=710:enable='between(t,8.5,11.5)',
       drawtext=fontfile='$FONT':text='+ Secure In-App Payment':fontsize=44:fontcolor=#ffffff:x=140:y=810:enable='between(t,8.9,11.5)',
@@ -38,7 +38,7 @@ ffmpeg -y \
       drawbox=x=80:y=430:w=920:h=700:color=#0284c7@0.95:t=fill:enable='between(t,11.7,15)',
       drawtext=fontfile='$FONT':text='FIND YOUR NEXT HOME':fontsize=60:fontcolor=#ffffff:x=(w-text_w)/2:y=510:enable='between(t,11.8,15)',
       drawtext=fontfile='$FONT':text='TODAY':fontsize=66:fontcolor=#ffc928:x=(w-text_w)/2:y=600:enable='between(t,12.1,15)',
-      drawtext=fontfile='$FONT':text='Download RentalHub NG':fontsize=46:fontcolor=#ffffff:x=(w-text_w)/2:y=730:enable='between(t,12.4,15)',
+      drawtext=fontfile='$FONT':text='Download Amana RentalHub NG':fontsize=46:fontcolor=#ffffff:x=(w-text_w)/2:y=730:enable='between(t,12.4,15)',
       drawtext=fontfile='$FONT':text='Available on Web, iOS and Android':fontsize=38:fontcolor=#e0f2fe:x=(w-text_w)/2:y=820:enable='between(t,12.7,15)',
       drawbox=x=160:y=920:w=760:h=120:color=#ffc928:t=fill:enable='between(t,13.0,15)',
       drawtext=fontfile='$FONT':text='rentalhub.com.ng':fontsize=50:fontcolor=#061b3a:x=(w-text_w)/2:y=955:enable='between(t,13.0,15)'

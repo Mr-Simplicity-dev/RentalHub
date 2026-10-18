@@ -3,7 +3,7 @@
 Feature: a rent calculator that helps tenants understand their **monthly payment** for a
 listing, plan for the **move-in lump sum**, and (optionally) work from **monthly income**
 to an affordable rent. Available on the web (public page, tenant dashboard, property
-listings) and in the RentalHub NG mobile apps (single React Native codebase → iOS + Android).
+listings) and in the Amana RentalHub NG mobile apps (single React Native codebase → iOS + Android).
 
 > All product decisions below were confirmed with the product owner. This file is the
 > source of truth; tick items off as they land.

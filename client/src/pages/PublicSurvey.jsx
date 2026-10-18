@@ -307,7 +307,7 @@ const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
   }, [locationState, locationBlockReason]);
 
   useEffect(() => {
-    document.title = 'RentalHub NG Survey';
+    document.title = 'Amana RentalHub NG Survey';
 
     const savedType = localStorage.getItem(TYPE_KEY);
     const hasResume = Boolean(localStorage.getItem(RESUME_KEY));
@@ -863,7 +863,7 @@ const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
       <div className="mx-auto w-full max-w-xl px-4">
         <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
           <h1 className="text-2xl font-bold text-gray-900">
-            {t('public_survey.title', 'RentalHub NG Research Survey')}
+            {t('public_survey.title', 'Amana RentalHub NG Research Survey')}
           </h1>
           <p className="mt-2 text-sm text-gray-600">
             {t('public_survey.subtitle', 'Help us understand how Nigerians find and pay for rental homes. Your answers are anonymous and used only for research. Estimated time: 15–20 minutes.')}

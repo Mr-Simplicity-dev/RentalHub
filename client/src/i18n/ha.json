@@ -39,8 +39,8 @@
     "sponsored": "Tallace-tallace",
     "default_cta": "Danna don buɗewa",
     "share_ad": "Raba talla",
-    "default_share_title": "Tallar RentalHub NG",
-    "share_text": "Duba wannan tayin a kan RentalHub NG: {{title}}",
+    "default_share_title": "Tallar Amana RentalHub NG",
+    "share_text": "Duba wannan tayin a kan Amana RentalHub NG: {{title}}",
     "share_device": "Raba ta na'urar",
     "copy_link": "Kwafi hanyar talla",
     "link_copied": "An kwafi hanyar talla",
@@ -69,7 +69,7 @@
     "submit_failed": "An kasa aika kima",
     "dismiss_notification": "Rufe sanarwar kima",
     "star_rating": "Kima na tauraro {{count}}",
-    "flyin_message": "{{name}} ya kimi RentalHub NG da taurari {{stars}} bayan ya {{context}}.",
+    "flyin_message": "{{name}} ya kimi Amana RentalHub NG da taurari {{stars}} bayan ya {{context}}.",
     "verified_in": "Ƙwarewa da aka tabbatar a {{location}}",
     "this_service": "wannan sabis ɗin",
     "contexts": {
@@ -82,31 +82,31 @@
       "virtual_tour": "ya kammala yawon gida na kama-da-wane",
       "dispute_support": "ya yi amfani da tallafin rigima",
       "admin_support": "ya sami tallafin admin",
-      "platform": "ya yi amfani da RentalHub NG"
+      "platform": "ya yi amfani da Amana RentalHub NG"
     },
     "prompt_titles": {
-      "property_secured": "Kimi ƙwarewar hayar RentalHub NG ɗinka",
+      "property_secured": "Kimi ƙwarewar hayar Amana RentalHub NG ɗinka",
       "property_listed": "Kimi ƙwarewar jera gida ɗinka",
       "property_rented": "Kimi ƙwarewar hayar da aka yi nasara",
-      "legal_support": "Kimi tallafin shari'a na RentalHub NG",
-      "fumigation_cleaning": "Kimi tallafin fumigation/tsaftacewa na RentalHub NG",
-      "transportation": "Kimi tallafin sufuri na RentalHub NG",
-      "virtual_tour": "Kimi yawon gida na kama-da-wane na RentalHub NG",
-      "dispute_support": "Kimi tallafin rigima na RentalHub NG",
-      "admin_support": "Kimi tallafin RentalHub NG",
-      "platform": "Kimi RentalHub NG"
+      "legal_support": "Kimi tallafin shari'a na Amana RentalHub NG",
+      "fumigation_cleaning": "Kimi tallafin fumigation/tsaftacewa na Amana RentalHub NG",
+      "transportation": "Kimi tallafin sufuri na Amana RentalHub NG",
+      "virtual_tour": "Kimi yawon gida na kama-da-wane na Amana RentalHub NG",
+      "dispute_support": "Kimi tallafin rigima na Amana RentalHub NG",
+      "admin_support": "Kimi tallafin Amana RentalHub NG",
+      "platform": "Kimi Amana RentalHub NG"
     },
     "prompt_details": {
-      "property_secured": "Kun sami {{source}} ta hanyar RentalHub NG.",
-      "property_listed": "Kun jera {{source}} a kan RentalHub NG.",
-      "property_rented": "An ba da {{source}} haya ta hanyar RentalHub NG.",
+      "property_secured": "Kun sami {{source}} ta hanyar Amana RentalHub NG.",
+      "property_listed": "Kun jera {{source}} a kan Amana RentalHub NG.",
+      "property_rented": "An ba da {{source}} haya ta hanyar Amana RentalHub NG.",
       "legal_support": "Faɗa mana yadda ƙwarewar tallafin shari'a ya taimake ka.",
       "fumigation_cleaning": "Faɗa mana yadda sabis ɗinka ya gudana.",
       "transportation": "Faɗa mana yadda tallafin sufuri ya taimake ka.",
       "virtual_tour": "Faɗa mana yadda yawon gida na kama-da-wane ya taimake ka.",
       "dispute_support": "Faɗa mana yadda tallafin rigima ya taimake ka.",
       "admin_support": "Faɗa mana yadda tallafi ya taimake ka.",
-      "platform": "Faɗa mana game da ƙwarewar RentalHub NG ɗinka."
+      "platform": "Faɗa mana game da ƙwarewar Amana RentalHub NG ɗinka."
     }
   },
   "home": {
@@ -144,13 +144,13 @@
     "close_app_prompt": "Rufe sanarwar zazzage app",
     "download_app_cta": "Samu Wayar RentalHub",
     "share_app": "Raba RentalHub",
-    "share_app_text": "Duba RentalHub NG dandalin amintacce na gidaje na Najeriya:",
+    "share_app_text": "Duba Amana RentalHub NG dandalin amintacce na gidaje na Najeriya:",
     "legal_support_link": "Kuna buƙatar taimakon shari'a? Kariyar Shari'a tana ba ku damar samun ƙwararrun lauyoyi a yankinku.",
     "property_request_link": "Ba za ku sami nau'in gidan da kuke so ba? Aika buƙata a shafin gidaje.",
     "use_lawyers": "Kariyar Shari'a",
     "verify_dispute_evidence": "Tabbatar da Shaidar Rigima",
     "submit_request": "Aika Buƙata",
-    "whatsapp_message": "Sannu RentalHub NG, ina buƙatar taimako don neman gida.",
+    "whatsapp_message": "Sannu Amana RentalHub NG, ina buƙatar taimako don neman gida.",
     "whatsapp_greeting": "Sannu! Kuna buƙatar taimako don neman gida?",
     "chat_with_us": "Mu yi hira a WhatsApp"
   },
@@ -278,7 +278,7 @@
     "qa_apps_landlord": "Aikace-aikace",
     "qa_apps_landlord_desc": "Duba aikace-aikacen masu haya",
     "survey_reminder_title": "Kammala binciken binciken RentalHub",
-    "survey_reminder_body": "Amsoshinku na taimaka mana inganta RentalHub NG. Zai ɗauki kusan minti 10 — kuna iya gamawa a kowane lokaci.",
+    "survey_reminder_body": "Amsoshinku na taimaka mana inganta Amana RentalHub NG. Zai ɗauki kusan minti 10 — kuna iya gamawa a kowane lokaci.",
     "survey_continue": "Ci gaba da Bincike"
   },
   "profile": {
@@ -634,15 +634,15 @@
   "about_us": {
     "hero": {
       "title_before": "Game da ",
-      "title_highlight": "RentalHub NG",
+      "title_highlight": "Amana RentalHub NG",
       "subtitle": "Dandalin fasaha na gidaje da aka fi amincewa da shi a Najeriya — haɗa masu haya, masu gida, wakilai, da ƙwararrun shari'a a duk jihohi 36 da Babban Birnin Tarayya.",
       "cta_browse": "Bincika Gidaje",
-      "cta_join": "Shiga RentalHub NG"
+      "cta_join": "Shiga Amana RentalHub NG"
     },
     "mission": {
       "section_label": "Manufarmu",
       "heading": "Sauya Yanayin Haya a Najeriya",
-      "paragraph_1": "A RentalHub NG, mun gaskata cewa kowa ya cancanci ƙwarewa mai aminci, bayyananne, da marar wahala lokacin neman gida. Manufarmu ita ce mu kawar da ƙulli, zamba, da takaici daga kasuwar haya ta Najeriya.",
+      "paragraph_1": "A Amana RentalHub NG, mun gaskata cewa kowa ya cancanci ƙwarewa mai aminci, bayyananne, da marar wahala lokacin neman gida. Manufarmu ita ce mu kawar da ƙulli, zamba, da takaici daga kasuwar haya ta Najeriya.",
       "paragraph_2": "Ta hanyar haɗa fasaha tare da tsauraran tsarin tabbatarwa, tallafin shari'a, da ɗaukar ƙasa baki ɗaya, muna ƙarfafa masu haya su sami gidaje da aka tabbatar da kuma masu gida su haɗu da masu haya da suka cancanta — duka a cikin amintaccen tsarin duniya ɗaya.",
       "badge_verified": "Gidajen da aka tabbatar",
       "badge_secure": "Amintaccen biyan kuɗi",
@@ -654,7 +654,7 @@
     "journey": {
       "section_label": "Tafiyarmu",
       "heading": "Daga Hangen Nesa zuwa Gaskiya",
-      "subtitle": "Kowane babban dandali yana farawa da ra'ayi mai sauƙi. Ga labarin yadda RentalHub NG ya girma daga hangen nesa zuwa kasuwar gidaje da aka fi amincewa da ita a Najeriya."
+      "subtitle": "Kowane babban dandali yana farawa da ra'ayi mai sauƙi. Ga labarin yadda Amana RentalHub NG ya girma daga hangen nesa zuwa kasuwar gidaje da aka fi amincewa da ita a Najeriya."
     },
     "values": {
       "section_label": "Abin Da Muka Tsaya A Kansa",
@@ -663,7 +663,7 @@
     },
     "different": {
       "section_label": "Me Yasa Ka Zaɓe Mu",
-      "heading": "Me Ya Sa RentalHub NG Ya Sha Bamban",
+      "heading": "Me Ya Sa Amana RentalHub NG Ya Sha Bamban",
       "subtitle": "Ba mu kawai jera gidaje ba — muna gina tsarin duniya gabaɗaya don amintaccen, bayyanannen cinikin gidaje.",
       "ecosystem": {
         "title": "Tsarin Tabbatarwa",
@@ -688,7 +688,7 @@
       "subtitle": "Ƙwararrun masu himma da suka sadaukar da kai don sauya ƙwarewar gidaje ta Najeriya.",
       "member_1": {
         "role": "Wanda Ya Kafa & Shugaba",
-        "bio": "Tare da fiye da shekaru 15 a cikin gidaje da fasaha, Zubair yana jagorantar RentalHub NG da hangen nesa na juyar da samun damar gidaje a Najeriya."
+        "bio": "Tare da fiye da shekaru 15 a cikin gidaje da fasaha, Zubair yana jagorantar Amana RentalHub NG da hangen nesa na juyar da samun damar gidaje a Najeriya."
       },
       "member_2": {
         "role": "Babban Jami'in Gudanarwa",
@@ -696,7 +696,7 @@
       },
       "member_3": {
         "role": "Babban Jami'in Fasaha",
-        "bio": "Emeka shi ne wanda ya tsara dandalin RentalHub NG, yana kawo sabbin abubuwa a fasahar gidaje, tabbatar da dijital, da amintaccen ciniki."
+        "bio": "Emeka shi ne wanda ya tsara dandalin Amana RentalHub NG, yana kawo sabbin abubuwa a fasahar gidaje, tabbatar da dijital, da amintaccen ciniki."
       },
       "member_4": {
         "role": "Shugaban Sabis na Shari'a",
@@ -704,7 +704,7 @@
       }
     },
     "milestone": {
-      "year_2020": "An kafa RentalHub NG da hangen nesa na sauya kasuwar haya ta Najeriya.",
+      "year_2020": "An kafa Amana RentalHub NG da hangen nesa na sauya kasuwar haya ta Najeriya.",
       "year_2021": "An ƙaddamar da tsarin jera gidaje don shigar da masu gida a duk faɗin Lagos da Abuja.",
       "year_2022": "An faɗaɗa zuwa duk jihohi 36 + FCT; an gabatar da tabbatar da ainihi.",
       "year_2023": "An ƙaddamar da sabis na tallafin shari'a, warware rigima, da kasuwar fumigation/tsaftacewa.",
@@ -745,7 +745,7 @@
     },
     "cta": {
       "heading": "Kuna Shirye Don Neman Gidanku Mai Kyau?",
-      "subtitle": "Shiga fiye da 'yan Najeriya 50,000 da suka amince da RentalHub NG don buƙatun gidaje. Bincika gidaje da aka tabbatar, haɗu da masu gida da aka amince, kuma ku ji daɗin natsuwar hankali.",
+      "subtitle": "Shiga fiye da 'yan Najeriya 50,000 da suka amince da Amana RentalHub NG don buƙatun gidaje. Bincika gidaje da aka tabbatar, haɗu da masu gida da aka amince, kuma ku ji daɗin natsuwar hankali.",
       "browse": "Bincika Gidaje",
       "create_account": "Ƙirƙiri Asusu"
     },
@@ -818,7 +818,7 @@
   },
   "list_property": {
     "hero": {
-      "title": "Jera Gidan Ka a RentalHub NG",
+      "title": "Jera Gidan Ka a Amana RentalHub NG",
       "subtitle": "Kai zuwa dubban masu haya da aka tabbatar a duk faɗin Najeriya. Jera gidanka cikin mintuna kaɗan kuma ka fara karɓar aikace-aikacen da suka cancanta daga masu haya na gaskiya.",
       "list_now": "Jera Gidan Ka Yanzu",
       "view_pricing": "Duba Tsare-tsaren Farashi"
@@ -842,7 +842,7 @@
     },
     "benefits": {
       "badge": "Me Yasa Ka Jera Tare da Mu",
-      "title": "Amfanin Jera a RentalHub NG",
+      "title": "Amfanin Jera a Amana RentalHub NG",
       "subtitle": "Dubban masu gida da wakilai sun riga sun amince da mu. Ga dalili."
     },
     "step_1": {
@@ -923,7 +923,7 @@
     },
     "testimonial_1": {
       "role": "Mai Gida, Lagos",
-      "text": "Na jera flat ɗina na ƙananan ɗakuna uku a RentalHub NG kuma na sami mai haya da ya cancanta cikin mako guda. Tsarin tabbatarwa ya ba ni kwarin gwiwa."
+      "text": "Na jera flat ɗina na ƙananan ɗakuna uku a Amana RentalHub NG kuma na sami mai haya da ya cancanta cikin mako guda. Tsarin tabbatarwa ya ba ni kwarin gwiwa."
     },
     "testimonial_2": {
       "role": "Wakilin Gidaje, Abuja",
@@ -934,7 +934,7 @@
       "text": "Fasalin tallafin shari'a ya sauya komai. Na sami warware rigima cikin sauri ba tare da damuwar da aka saba ba."
     },
     "faq_1": {
-      "q": "Wanene zai iya jera gidaje a RentalHub NG?",
+      "q": "Wanene zai iya jera gidaje a Amana RentalHub NG?",
       "a": "Masu gida da aka tabbatar da wakilai masu rijista za su iya jera gidaje. Kuna buƙatar kammala tabbatar da ainihi kuma a amince muku kafin jeri."
     },
     "faq_2": {
@@ -947,7 +947,7 @@
     },
     "faq_4": {
       "q": "Zan iya jera gidaje a jihohi da yawa?",
-      "a": "E! RentalHub NG yana ɗaukar duk jihohi 36 + FCT. Kuna iya jera gidaje a ko'ina a Najeriya ba tare da la'akari da wurinku ba."
+      "a": "E! Amana RentalHub NG yana ɗaukar duk jihohi 36 + FCT. Kuna iya jera gidaje a ko'ina a Najeriya ba tare da la'akari da wurinku ba."
     },
     "faq_5": {
       "q": "Ta yaya zan sami kuɗi?",
@@ -974,7 +974,7 @@
     },
     "cta": {
       "title": "Kuna Shirye Don Jera Gidanku?",
-      "subtitle": "Shiga fiye da masu gida da wakilai 5,000 da ke amfani da RentalHub NG don nemo masu haya da suka cancanta. Jera gidanka yau kuma ka fara karɓar aikace-aikace.",
+      "subtitle": "Shiga fiye da masu gida da wakilai 5,000 da ke amfani da Amana RentalHub NG don nemo masu haya da suka cancanta. Jera gidanka yau kuma ka fara karɓar aikace-aikace.",
       "list_now": "Jera Gidan Ka Yanzu",
       "create_account": "Ƙirƙiri Asusu Kyauta"
     },
@@ -991,7 +991,7 @@
   "faq": {
     "hero_title_before": "Tambayoyin Da Aka Yi ",
     "hero_title_highlight": "Yawa",
-    "hero_desc": "Komai da kuke buƙatar sani game da RentalHub NG. Nemi amsoshi ga tambayoyin yau da kullun game da jera gidaje, neman hayar, tabbatarwa, farashi, da ƙari.",
+    "hero_desc": "Komai da kuke buƙatar sani game da Amana RentalHub NG. Nemi amsoshi ga tambayoyin yau da kullun game da jera gidaje, neman hayar, tabbatarwa, farashi, da ƙari.",
     "hero_cta_create": "Ƙirƙiri Asusu Kyauta",
     "hero_cta_contact": "Tuntuɓi Tallafi",
     "stats_properties_listed": "Gidajen Da Aka Jera",
@@ -1046,9 +1046,9 @@
   },
   "how_it_works": {
     "hero_title_before": "Yadda ",
-    "hero_title_highlight": "RentalHub NG",
+    "hero_title_highlight": "Amana RentalHub NG",
     "hero_title_after": " Ke Aiki",
-    "hero_desc": "Ko kuna neman gidanku na gaba ko jera gida don haya, RentalHub NG yana sauƙaƙa tsarin, amintacce, da bayyananne.",
+    "hero_desc": "Ko kuna neman gidanku na gaba ko jera gida don haya, Amana RentalHub NG yana sauƙaƙa tsarin, amintacce, da bayyananne.",
     "hero_cta_browse": "Bincika Gidaje",
     "hero_cta_list": "Jera Gidan Ka",
     "overview_badge": "Bayani Mai Sauri",
@@ -1063,7 +1063,7 @@
     "walkthrough_connect_desc": "Nema, yi hira, kuma ka kammala yarjejeniyarka da kwarin gwiwa.",
     "tenants_badge": "Na Masu Haya",
     "tenants_heading": "Nemo Gidanka Mai Kyau",
-    "tenants_desc": "Daga bincike zuwa shigowa, ga yadda masu haya ke neman gidansu na gaba a RentalHub NG.",
+    "tenants_desc": "Daga bincike zuwa shigowa, ga yadda masu haya ke neman gidansu na gaba a Amana RentalHub NG.",
     "tenants_step_1_title": "Ƙirƙiri Asusunka",
     "tenants_step_1_desc": "Yi rajista a matsayin mai haya kuma ka kammala tabbatar da ainihinka ta amfani da NIN ɗinka. Wannan yana tabbatar da al'umma mai aminci ga kowa.",
     "tenants_step_1_hl_1": "Rajista kyauta",
@@ -1085,10 +1085,10 @@
     "tenants_step_4_hl_2": "Saƙo a cikin app",
     "tenants_step_4_hl_3": "Tallafin shigowa",
     "tenants_cta": "Fara a Matsayin Mai Haya",
-    "divider_label": "Duka masu haya da masu gida suna amfani da RentalHub NG",
+    "divider_label": "Duka masu haya da masu gida suna amfani da Amana RentalHub NG",
     "landlords_badge": "Na Masu Gida & Wakilai",
     "landlords_heading": "Jera & Sarrafa Gidaje",
-    "landlords_desc": "Daga rajista zuwa haɗuwa da masu haya, ga yadda masu gida ke samun nasara a RentalHub NG.",
+    "landlords_desc": "Daga rajista zuwa haɗuwa da masu haya, ga yadda masu gida ke samun nasara a Amana RentalHub NG.",
     "landlords_step_1_title": "Yi Rajista & Tabbatar",
     "landlords_step_1_desc": "Ƙirƙiri asusun mai gida ko wakili kuma ka kammala tabbatar da bayanan kai don fara jera gidajenka.",
     "landlords_step_1_hl_1": "Rajista cikin sauri",
@@ -1112,7 +1112,7 @@
     "landlords_cta": "Fara Jera Gidan Ka",
     "features_badge": "Fasalolin Dandali",
     "features_heading": "Abin Da Ke Sa Dandalin Yin Aiki",
-    "features_desc": "Waɗannan fasaloli suna tabbatar da cewa kowane hulɗa a RentalHub NG yana da aminci da gaskiya.",
+    "features_desc": "Waɗannan fasaloli suna tabbatar da cewa kowane hulɗa a Amana RentalHub NG yana da aminci da gaskiya.",
     "features_verification_title": "Tabbatar da Ainihi",
     "features_verification_desc": "Kowane mai amfani — mai haya, mai gida, da wakili — yana wucewa ta tabbatar da ainihi da ke da alaƙa da NIN don amintaccen tsarin duniya.",
     "features_secure_title": "Amintaccen Ciniki",
@@ -1123,9 +1123,9 @@
     "features_ratings_desc": "Kima bayyananne da sharhi da aka tabbatar suna taimaka wa masu haya da masu gida su yanke shawara mai wayo.",
     "faq_badge": "Tambayoyi",
     "faq_heading": "Tambayoyin Da Aka Yi Yawa",
-    "faq_desc": "Komai da kuke buƙatar sani game da amfani da RentalHub NG.",
+    "faq_desc": "Komai da kuke buƙatar sani game da amfani da Amana RentalHub NG.",
     "cta_heading": "Kuna Shirye Don Farawa?",
-    "cta_desc": "Shiga dubban 'yan Najeriya da ke amfani da RentalHub NG don nemo gidaje da jera gidaje. Tafiyarku tana farawa a nan.",
+    "cta_desc": "Shiga dubban 'yan Najeriya da ke amfani da Amana RentalHub NG don nemo gidaje da jera gidaje. Tafiyarku tana farawa a nan.",
     "cta_create": "Ƙirƙiri Asusu Kyauta",
     "cta_browse": "Bincika Gidaje",
     "contact_heading": "Har Yanzu Kuna Da Tambayoyi?",
@@ -1149,7 +1149,7 @@
     "plan_free_subtitle": "Cikakke don gwadawa",
     "plan_free_price": "₦0",
     "plan_free_period": "kowace jerin",
-    "plan_free_desc": "Fara da jerin na asali kuma ka ga abin da RentalHub NG ke bayarwa.",
+    "plan_free_desc": "Fara da jerin na asali kuma ka ga abin da Amana RentalHub NG ke bayarwa.",
     "plan_free_feat_1": "Jera gida 1",
     "plan_free_feat_2": "Bayanan gida na asali",
     "plan_free_feat_3": "Har zuwa hotuna 3",
@@ -1224,7 +1224,7 @@
     "faq_heading": "Tambayoyin Da Aka Yi Yawa",
     "faq_desc": "Komai da kuke buƙatar sani game da farashinmu da biyan kuɗi.",
     "cta_heading": "Fara Jeri Kyauta A Yau",
-    "cta_desc": "Ba a buƙatar katin banki. Babu haɗari. Shiga dubban masu gida da suka amince da RentalHub NG don haɗa su da masu haya da aka tabbatar, masu inganci.",
+    "cta_desc": "Ba a buƙatar katin banki. Babu haɗari. Shiga dubban masu gida da suka amince da Amana RentalHub NG don haɗa su da masu haya da aka tabbatar, masu inganci.",
     "cta_create": "Ƙirƙiri Asusu Kyauta",
     "cta_list": "Jera Gidan Ka",
     "contact_heading": "Tambayoyi Game Da Farashi?",
@@ -1235,7 +1235,7 @@
   "landlord_guide": {
     "hero_title_before": "Jagoran ",
     "hero_title_highlight": "Mai Gida",
-    "hero_desc": "Komai da kuke buƙatar sani game da jera, sarrafa, da ba da gidajenku haya cikin nasara a RentalHub NG — daga shirye-shirye zuwa shigar mai haya.",
+    "hero_desc": "Komai da kuke buƙatar sani game da jera, sarrafa, da ba da gidajenku haya cikin nasara a Amana RentalHub NG — daga shirye-shirye zuwa shigar mai haya.",
     "hero_cta_list": "Jera Gidan Ka",
     "hero_cta_pricing": "Duba Tsare-tsaren Farashi",
     "stats_properties_listed": "Gidajen Da Aka Jera",
@@ -1258,7 +1258,7 @@
     "prep_step_2_item_3": "Yi la'akari da ɗaukar hoton ƙwararru",
     "prep_step_2_item_4": "Shirya ɗakuna don su yi kama da faɗi da karɓuwa",
     "prep_step_3_title": "Tabbatar Da Ainihinka",
-    "prep_step_3_desc": "Kammala tabbatar da mai gidanka ta RentalHub NG. Wannan yana gina amincewa da masu haya masu zuwa kuma yana ƙara ganin jerin gidajenka.",
+    "prep_step_3_desc": "Kammala tabbatar da mai gidanka ta Amana RentalHub NG. Wannan yana gina amincewa da masu haya masu zuwa kuma yana ƙara ganin jerin gidajenka.",
     "prep_step_3_item_1": "Aika ingantaccen ID na gwamnati",
     "prep_step_3_item_2": "Kammala tabbatar da NIN",
     "prep_step_3_item_3": "Bayar da shaidar mallakar gida",
@@ -1308,9 +1308,9 @@
     "protip_1_title": "Ra'ayi Na Farko Yana Da Muhimmanci",
     "protip_1_desc": "Hoto na farko a jerin gidanka shine mafi muhimmanci. Zaɓi hoton haske mai kyau na ƙwararru.",
     "protip_2_title": "Duba Masu Haya Sosai",
-    "protip_2_desc": "Yi amfani da kayan aikin tabbatarwa na RentalHub NG don tabbatar da ainihin masu haya kafin karɓar aikace-aikace.",
+    "protip_2_desc": "Yi amfani da kayan aikin tabbatarwa na Amana RentalHub NG don tabbatar da ainihin masu haya kafin karɓar aikace-aikace.",
     "protip_3_title": "Yi Amfani Da Kwangiloli Masu Aminci",
-    "protip_3_desc": "Koyaushe yi amfani da yarjejeniyoyin haya da aka bita a shari'a. RentalHub NG yana ba da damar samun samfuran shari'a.",
+    "protip_3_desc": "Koyaushe yi amfani da yarjejeniyoyin haya da aka bita a shari'a. Amana RentalHub NG yana ba da damar samun samfuran shari'a.",
     "protip_4_title": "Bibiyi Ayyukanka",
     "protip_4_desc": "Yi amfani da allon aikin mai gidanka don bibiyi kallo, tambayoyi, da ƙimar aikace-aikace.",
     "protip_5_title": "Gina Dangantaka Da Masu Haya",
@@ -1334,9 +1334,9 @@
     "mistake_4_fix": "Saita sanarwa kuma yi ƙoƙarin amsa duk tambayoyi cikin sa'o'i 24.",
     "faq_badge": "Tambayoyi",
     "faq_heading": "Tambayoyin Da Aka Yi Yawa",
-    "faq_desc": "Komai da kuke buƙatar sani game da jeri a RentalHub NG.",
+    "faq_desc": "Komai da kuke buƙatar sani game da jeri a Amana RentalHub NG.",
     "cta_heading": "Kuna Shirye Don Jera Gidanku?",
-    "cta_desc": "Shiga fiye da masu gida 5,000 masu nasara a RentalHub NG. Jera gidanka yau kuma ka fara haɗuwa da masu haya da aka tabbatar, masu cancanta a duk faɗin Najeriya.",
+    "cta_desc": "Shiga fiye da masu gida 5,000 masu nasara a Amana RentalHub NG. Jera gidanka yau kuma ka fara haɗuwa da masu haya da aka tabbatar, masu cancanta a duk faɗin Najeriya.",
     "cta_list": "Jera Gidan Ka Yanzu",
     "cta_create": "Ƙirƙiri Asusu Kyauta",
     "contact_heading": "Kuna Bukƙatar Taimako Da Jerin Gidanku?",
@@ -1346,7 +1346,7 @@
   },
   "accept_agent_invite": {
     "title": "Kunna Damar Wakili",
-    "subtitle": "Cika bayananka don fara taimaka wa mai gida sarrafa jerin gidaje da sauran ayyukan gidaje da aka amince da su a RentalHub NG.",
+    "subtitle": "Cika bayananka don fara taimaka wa mai gida sarrafa jerin gidaje da sauran ayyukan gidaje da aka amince da su a Amana RentalHub NG.",
     "heading": "Karɓi Gayyatar Wakili",
     "desc": "Ƙirƙiri kalmar sirrinka kuma ka kunna allon aikin wakilinka.",
     "full_name_placeholder": "Cikakken suna",
@@ -1371,14 +1371,14 @@
     "password_mismatch": "Kalmar sirri ba ta dace ba",
     "success": "An kunna damar wakili cikin nasara",
     "error": "An kasa kunna damar wakili",
-    "alt_logo": "RentalHub NG"
+    "alt_logo": "Amana RentalHub NG"
   },
   "accept_lawyer_invite": {
     "title": "Amintaccen Damar Shari'a",
     "subtitle": "An gayyace ka don shiga a matsayin lauya. Kunna asusunka don fara sarrafa shari'o'i da rigima cikin sauƙi.",
     "trusted": "Masu gida, masu haya, da ƙwararrun shari'a sun amince da mu.",
     "activate_heading": "Kunna Damar Lauyan Dandali",
-    "activate_sub": "Ƙirƙiri kalmar sirrinka kuma ka kammala bayanan lauyan RentalHub NG ɗinka",
+    "activate_sub": "Ƙirƙiri kalmar sirrinka kuma ka kammala bayanan lauyan Amana RentalHub NG ɗinka",
     "activate_sub_alt": "Cika cikakkun bayanan lauyanka",
     "lawyer_details": "Bayanan Lauya",
     "full_name_placeholder": "Cikakken suna",
@@ -1458,7 +1458,7 @@
     "invalid_otp": "OTP mara inganci - da fatan za a sake gwadawa",
     "platform_error": "Kuskure yayin sarrafa gayyatar lauyan dandali",
     "generic_error": "Kuskure yayin sarrafa gayyatar lauya",
-    "alt_logo": "RentalHub NG",
+    "alt_logo": "Amana RentalHub NG",
     "brand_text": "Rental Hub NG"
   },
   "verify_email": {
@@ -1761,7 +1761,7 @@
     "verified_listing": "jerin da aka tabbatar",
     "plural_suffix": "s",
     "load_failed": "An kasa lodawa kundayen adireshin Najeriya",
-    "subtitle": "Bincika gidajen haya ta jiha, ƙaramar hukuma da yankuna masu mahimmanci, tare da ingantattun jerin sunayen RentalHub NG.",
+    "subtitle": "Bincika gidajen haya ta jiha, ƙaramar hukuma da yankuna masu mahimmanci, tare da ingantattun jerin sunayen Amana RentalHub NG.",
     "lgas_count": "{{count}} Ƙananan Hukumomi"
   },
   "dispute_details": {
@@ -2837,7 +2837,7 @@
     "outgoing_label": "Mai Fita: ",
     "incoming_label": "Mai Shiga: ",
     "review_note": "Bayanin dubawa: ",
-    "program_title": "Shirin Lauyan RentalHub NG",
+    "program_title": "Shirin Lauyan Amana RentalHub NG",
     "program_desc": "Nema daga allon aikinka kuma ka bibiyi ci gaban dubawa ta amfani da tsarin baya wanda ya riga ya wanzu.",
     "no_broadcast": "Babu sanarwar daukan ma'aikata mai aiki",
     "recruitment_closed": "Daukan ma'aikata ya rufe a halin yanzu. Matsayin aikace-aikacenka da ya wanzu har yanzu yana nan.",
@@ -2850,7 +2850,7 @@
     "already_approved": "An Rigaya An Amince",
     "application_pending": "Aikace-aikacen Yana Jiran Aiki",
     "apply_submitting": "Ana aikawa...",
-    "apply_btn": "Nema Don Yin Hidima A RentalHub NG",
+    "apply_btn": "Nema Don Yin Hidima A Amana RentalHub NG",
     "authorized_properties": "Gidajen Da Aka Ba Da Izini",
     "authorized_desc": "Zaɓi gida don riƙe wurin aikin rigimarka da aka mayar da hankali.",
     "no_authorized": "Babu gidajen da aka ba da izini.",
@@ -3040,7 +3040,7 @@
       "eyebrow": "Jagoran allon aikin ka na sirri",
       "resume_title": "Ci gaba daga inda ka tsaya",
       "returning_title": "Barka da dawowa RentalHub",
-      "new_title": "Barka da zuwa RentalHub NG",
+      "new_title": "Barka da zuwa Amana RentalHub NG",
       "resume_description": "An adana ci gabanka. Ci gaba daga matakin da ka gani na ƙarshe, ko sake farawa daga bayanan kai daga baya.",
       "returning_description": "Ɗauki saurin sabunta tunani ka sake gano ikon da suka fi muhimmanci ga asusunka.",
       "new_description": "Bari mu nuna maka mafi amfani ikon ga asusunka da gajeriyar jagora mai mai da hankali.",
@@ -3396,22 +3396,22 @@
     "modal_landlord": "Asusun Mai Gida",
     "modal_landlord_desc": "Ƙirƙirar asusun mai gida na buƙatar kuɗin rijista na lokaci ɗaya na",
     "modal_optional": "Ayyuka na Zaɓi",
-    "modal_optional_desc": "Ƙara lauya na RentalHub NG don",
-    "modal_optional_desc_2": "Ƙara wakili na RentalHub NG don",
+    "modal_optional_desc": "Ƙara lauya na Amana RentalHub NG don",
+    "modal_optional_desc_2": "Ƙara wakili na Amana RentalHub NG don",
     "modal_footnote": "Kwafin ana duba su da ƙungiyarmu kuma suna iya canzawa. Ci gaba don zaɓar nau'in asusunku da ganin ainihin adadin na wurinku.",
     "modal_diaspora": "Asusin ƙetare (Baƙo)",
     "modal_diaspora_desc": "Ƙirƙirar asusun a matsayin baƙo yana buƙatar kuɗin rajista na ƙetare sau ɗaya daga",
     "modal_diaspora_ngn": "Za a caje ku da daidai na Naira (kusan",
     "modal_diaspora_vary": "Madaidaicin kuɗin ya dogara da jihar Najeriya da kake son yin haya — jihohin ma’adinai suna da farashi mai yawa.",
     "modal_diaspora_optional": "Ayyukan zaɛa na ƙetare —",
-    "modal_diaspora_lawyer": "Ɔara lauya na RentalHub NG akan",
-    "modal_diaspora_agent": "Ɔara wakili na RentalHub NG akan",
+    "modal_diaspora_lawyer": "Ɔara lauya na Amana RentalHub NG akan",
+    "modal_diaspora_agent": "Ɔara wakili na Amana RentalHub NG akan",
     "modal_approx": "≈",
     "disabled_diaspora": "Rijistar ƙetare a yanzu an kashe shi. Ka sake gwadawa daga baya.",
     "modal_skip": "Tsallake",
     "modal_understand": "Na Fahimta",
-    "logo_alt": "Tambarin RentalHub NG",
-    "left_panel_title": "Barka da zuwa RentalHub NG",
+    "logo_alt": "Tambarin Amana RentalHub NG",
+    "left_panel_title": "Barka da zuwa Amana RentalHub NG",
     "left_panel_desc": "Ƙirƙiri asusunka don bincika ingantattun kadarori, saduwa da amintattun masu gida, da samun tallafin shari'a a duk faɗin Najeriya.",
     "left_panel_footer": "Ingantattun kadarori a duk jihohi 36 + FCT",
     "already_account": "Kuna da asusu?",
@@ -3443,9 +3443,9 @@
     "referral_placeholder": "Shigar da lambar gayyata",
     "referral_hint": "Shigar da lambar gayyata idan wani ya gayyace ku.",
     "lawyer_email": "Imel ɗin lauyanku",
-    "lawyer_using_rentalhub": "Ana amfani da lauyan RentalHub NG",
+    "lawyer_using_rentalhub": "Ana amfani da lauyan Amana RentalHub NG",
     "lawyer_placeholder": "Shigar da imel ɗin lauyanku",
-    "lawyer_checkbox_label": "Ina so in yi amfani da lauyan RentalHub NG",
+    "lawyer_checkbox_label": "Ina so in yi amfani da lauyan Amana RentalHub NG",
     "lawyer_checkbox_desc": "Za a ba ku ingantaccen lauya don taimaka muku (ana biyan kuɗi).",
     "agent_heading": "Ƙara Wakili",
     "agent_desc": "Na zaɓi, bayar da bayanan wakilinku domin ya sarrafa kadarorinku.",
@@ -3456,10 +3456,10 @@
     "agent_email_placeholder": "Shigar da imel ɗin wakili",
     "agent_phone": "Lambar Waya ta Wakili",
     "agent_phone_placeholder": "Shigar da lambar wayar wakili",
-    "use_rentalhub_agents": "Yi amfani da wakilin RentalHub NG",
+    "use_rentalhub_agents": "Yi amfani da wakilin Amana RentalHub NG",
     "rentalhub_agent_desc": "Ingantaccen wakili zai sarrafa kadarorinku akan {{fee}}.",
     "use_our_agents": "Yi amfani da wakilanmu",
-    "agent_auto_assigned": "Za a ba ku wakilin RentalHub NG ta atomatik a asusunka.",
+    "agent_auto_assigned": "Za a ba ku wakilin Amana RentalHub NG ta atomatik a asusunka.",
     "select_location_agent_fee": "Zaɓi wurinku don tabbatar da ainihin kuɗin wakili.",
     "back": "Baya",
     "step_3_title": "Tabbatarwa da Wuri",
@@ -3487,8 +3487,8 @@
     "payment_summary": "Taƙaitaccen Biya",
     "tenant_account_creation": "Ƙirƙirar asusun mai haya",
     "landlord_account_creation": "Ƙirƙirar asusun mai gida",
-    "rentalhub_lawyer_access": "Samun damar lauyan RentalHub NG",
-    "rentalhub_agent_access": "Samun damar wakilin RentalHub NG",
+    "rentalhub_lawyer_access": "Samun damar lauyan Amana RentalHub NG",
+    "rentalhub_agent_access": "Samun damar wakilin Amana RentalHub NG",
     "total_due": "Jimillar da ake biya",
     "select_location_exact_fee": "Zaɓi jiharku da karamar hukuma don ganin ainihin kuɗin.",
     "password": "Kalmar Sirri",
@@ -3511,7 +3511,7 @@
     "location_preview_fallback": "Babu daidaitaccen sakamako a {{lga}}, {{state}}. Ana nuna kadarori na kusa maimakon.",
     "the_selected_state": "jihar da aka zaɓa",
     "location_preview_error": "An kasa loda samfoti na kadarori na wannan wuri.",
-    "registration_success": "Rijista ta yi nasara! Barka da zuwa RentalHub NG.",
+    "registration_success": "Rijista ta yi nasara! Barka da zuwa Amana RentalHub NG.",
     "registration_failed": "Rijista ta kasa. Da fatan za a sake gwadawa.",
     "otp_before": "Dubin tsaro",
     "otp_title": "Tabbatar da wayarka",
@@ -4370,7 +4370,7 @@
   },
   "property_share": {
     "fallback_title": "Jerin gida",
-    "text": "Duba wannan gida a kan RentalHub NG: {{title}}",
+    "text": "Duba wannan gida a kan Amana RentalHub NG: {{title}}",
     "header": "Raba Jerin",
     "copy_success": "An kwafi hanyar gidan",
     "copy_error": "Ba a iya kwafin hanyar gidan a yanzu ba",
@@ -4556,7 +4556,7 @@
     "continue_existing": "Ci gaba da binciken da aka fara",
     "contact_no_email_agent": "Wannan mai amsa bashi da imel",
     "contact_no_email_public": "Ba ni da imel a halin yanzu",
-    "title": "Binciken Bincike na RentalHub NG",
+    "title": "Binciken Bincike na Amana RentalHub NG",
     "part_a_title": "Wasu ƴan tambayoyi kafin ku ci gaba",
     "part_a_sub": "Wannan ɓangare na farko yana ɗaukar kusan mintuna 2. Za a iya gama sauran daga baya.",
     "part_b_sub": "Sashe {{section}} · Tambaya {{q}} cikin {{total}}",
@@ -4625,7 +4625,7 @@
     "gate_start": "Fara Bincike",
     "gate_skip": "Tsallake",
     "gate_google_hint": "Za a iya shiga da Google don ajiye amsoshi kai tsaye",
-    "title": "Binciken Jama'a na RentalHub NG",
+    "title": "Binciken Jama'a na Amana RentalHub NG",
     "subtitle": "Taimaka mana inganta tsarin gidajen haya a Najeriya",
     "choose": "Zaɓi matsayinku",
     "tenant": "Ni Mai Haya Ne",

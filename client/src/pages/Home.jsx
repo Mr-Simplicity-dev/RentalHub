@@ -541,7 +541,7 @@ const Home = () => {
               <ShareMenu
                 url={shareAppUrl}
                 text={shareAppText}
-                title="RentalHub NG"
+                title="Amana RentalHub NG"
                 buttonLabel={t('home.share_app')}
                 buttonClassName="inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-white px-8 py-3 font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:bg-green-600 hover:shadow-lg sm:w-auto"
                 headerLabel={`Share ${t('home.share_app')}`}

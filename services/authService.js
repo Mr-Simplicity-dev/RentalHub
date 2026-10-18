@@ -1328,7 +1328,7 @@ const assignAgentRoundRobin = async ({ landlordUserId, stateId, lgaName }) => {
     await sendNotification(
       selectedAgent.id,
       'New Landlord Assignment',
-      `You have been assigned a new landlord (ID: ${landlordUserId}) from your area as a RentalHub NG platform agent. Please check your dashboard for details.`,
+      `You have been assigned a new landlord (ID: ${landlordUserId}) from your area as a Amana RentalHub NG platform agent. Please check your dashboard for details.`,
       'agent_assignment',
       landlordUserId,
       'landlord'

@@ -1939,7 +1939,7 @@ exports.initializePropertyInspectionPayment = async (req, res) => {
     if (!applicationResult.rows.length) {
       return res.status(404).json({
         success: false,
-        message: 'Apply for the property first before requesting RentalHub NG inspection',
+        message: 'Apply for the property first before requesting Amana RentalHub NG inspection',
       });
     }
 
@@ -2999,7 +2999,7 @@ async function notifyRentPayment(paymentId, event) {
         await sendEmail({
           to: email,
           subject: `RentalHub rent payment #${row.id}`,
-          html: `<p>${message}</p><p>— RentalHub NG</p>`,
+          html: `<p>${message}</p><p>— Amana RentalHub NG</p>`,
         }).catch((error) => logger.error(`Rent payment email failed: ${error.message}`));
       }
       if (phone) {
@@ -4835,7 +4835,7 @@ async function handleFailedPayment(data, webhookLogger) {
           const reason = data?.gateway_response || data?.message || 'Transaction could not be completed by your bank/card issuer.';
           await sendEmail({
             to: user.email,
-            subject: 'Payment Failed - RentalHub NG',
+            subject: 'Payment Failed - Amana RentalHub NG',
             html: `
               <div style="font-family: sans-serif; line-height: 1.6; max-width: 560px; margin: 0 auto; color: #111827;">
                 <h3 style="color: #dc2626; margin-top: 0;">Payment Not Completed</h3>
@@ -4875,7 +4875,7 @@ async function handleFailedPayment(data, webhookLogger) {
           email: row.email,
           fullName: row.full_name,
           reference,
-          subject: 'Your Registration Payment Failed — Resume on RentalHub NG',
+          subject: 'Your Registration Payment Failed — Resume on Amana RentalHub NG',
           message:
             'We could not complete your registration payment (this may happen during a network/bank interruption). Nothing was charged to your card or account.',
         });

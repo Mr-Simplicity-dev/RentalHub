@@ -1,4 +1,4 @@
-# RentalHub NG account-creation campaign
+# Amana RentalHub NG account-creation campaign
 
 This folder contains the approved creative direction for two separate, 25-second vertical adverts.
 

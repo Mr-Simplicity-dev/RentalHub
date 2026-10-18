@@ -21,7 +21,7 @@ const TextAd2: React.FC = () => {
         <TextSlide text="Step 3: Pay securely through the app" fontSize={60} bgColor={BG} animation="slideUp" />
       </Sequence>
       <Sequence from={15 * fps} durationInFrames={3 * fps}>
-        <TextSlide text="RentalHub NG" fontSize={90} bgColor={BLUE} animation="zoomIn" color="#eab308" />
+        <TextSlide text="Amana RentalHub NG" fontSize={90} bgColor={BLUE} animation="zoomIn" color="#eab308" />
       </Sequence>
       <Sequence from={18 * fps} durationInFrames={2 * fps}>
         <TextSlide text="rentalhub.com.ng/download" fontSize={40} bgColor={BLUE} animation="fade" fontWeight={600} />

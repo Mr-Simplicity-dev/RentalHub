@@ -2262,7 +2262,7 @@ export default function Careers() {
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-500">Platform CV Template</p>
                 <h2 className="mt-1 text-xl font-black text-slate-900">Generate formatted CV PDF</h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  Complete the fields below and RentalHub NG will attach the generated PDF as your CV document.
+                  Complete the fields below and Amana RentalHub NG will attach the generated PDF as your CV document.
                 </p>
               </div>
               <button
@@ -2326,7 +2326,7 @@ export default function Careers() {
           transition={{ duration: 0.5 }}
           className="mb-8 rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 p-6 text-white shadow-elevated-lg sm:p-8"
         >
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-300">RentalHub NG Careers</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-300">Amana RentalHub NG Careers</p>
           <h1 className="mt-3 text-3xl font-black sm:text-4xl">Recruitment Portal</h1>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300">
             Fill in your details below to apply. Pay the Application Access Fee, unlock your document upload with the access code, and track your application from draft to final decision.

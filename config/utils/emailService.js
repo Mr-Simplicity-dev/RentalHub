@@ -86,12 +86,12 @@ exports.sendPaymentReceiptEmail = async ({
 
     await sendEmail({
       to: email,
-      subject: `Payment Receipt ${receiptNumber} - Amana RentalHub NG`,
+      subject: `Payment Receipt ${receiptNumber} - Amana Amana RentalHub NG`,
       html: `
         <div style="font-family: Arial, Helvetica, sans-serif; line-height: 1.6; max-width: 560px; margin: 0 auto; color:#334155;">
           <div style="text-align:center; padding-bottom:16px; border-bottom:2px solid #0284c7;">
             <div style="font-family:'Segoe Script','Brush Script MT',cursive; font-size:26px; color:#6e1b2b;">Amana</div>
-            <h2 style="margin:0 0 2px; color:#0f172a;">RentalHub NG</h2>
+            <h2 style="margin:0 0 2px; color:#0f172a;">Amana RentalHub NG</h2>
             <p style="margin:0; color:#64748b; font-size:12px;">rentalhub.com.ng &nbsp;•&nbsp; support@rentalhub.com.ng</p>
             <p style="margin:10px 0 0; color:#64748b;">Official Payment Receipt</p>
             <p style="margin:6px 0 0; font-weight:600; color:#0f172a;">${esc(receiptNumber)}</p>
@@ -122,7 +122,7 @@ exports.sendPaymentReceiptEmail = async ({
           </table>
           ${quoteHtml}
           <p style="padding-top:16px; font-size:12px; color:#94a3b8; text-align:center;">
-            Thank you for using Amana RentalHub NG. You can view and print this receipt from your Payment History.
+            Thank you for using Amana Amana RentalHub NG. You can view and print this receipt from your Payment History.
           </p>
           <p style="font-size:10px; color:#cbd5e1; text-align:center; margin-top:4px;">
             This is a computer-generated receipt and does not require a signature.
@@ -142,7 +142,7 @@ exports.sendCompleteRegistrationEmail = async ({
   email,
   fullName,
   reference,
-  subject = 'Complete Your RentalHub NG Registration',
+  subject = 'Complete Your Amana RentalHub NG Registration',
   message = 'Your registration payment did not complete. Please finish your payment to activate your account.',
 }) => {
   const resumeUrl = `${FRONTEND_URL}/register?registration_ref=${encodeURIComponent(reference)}`;
@@ -153,7 +153,7 @@ exports.sendCompleteRegistrationEmail = async ({
       html: `
         <div style="font-family: sans-serif; line-height: 1.6; max-width: 560px; margin: 0 auto;">
           <div style="text-align:center; padding-bottom:16px; border-bottom:2px solid #0284c7;">
-            <h2 style="margin:0; color:#0f172a;">RentalHub NG</h2>
+            <h2 style="margin:0; color:#0f172a;">Amana RentalHub NG</h2>
             <p style="margin:4px 0 0; color:#64748b;">${esc(subject)}</p>
           </div>
           <div style="padding:16px 0; font-size:14px; color:#334155;">
@@ -197,7 +197,7 @@ exports.sendSavingsReceiptEmail = async ({
       html: `
         <div style="font-family: sans-serif; line-height: 1.6; max-width: 560px; margin: 0 auto;">
           <div style="text-align:center; padding-bottom:16px; border-bottom:2px solid #059669;">
-            <h2 style="margin:0; color:#0f172a;">RentalHub NG</h2>
+            <h2 style="margin:0; color:#0f172a;">Amana RentalHub NG</h2>
             <p style="margin:4px 0 0; color:#64748b;">Rent Savings Contribution Receipt</p>
           </div>
           <div style="padding:16px 0; font-size:14px; color:#334155;">
@@ -285,16 +285,16 @@ exports.sendPlatformLawyerInviteEmail = async ({
   email,
   inviteUrl,
   expiresInHours = 72,
-  assignedByName = 'RentalHub NG',
+  assignedByName = 'Amana RentalHub NG',
 }) => {
   try {
     await sendEmail({
       to: email,
-      subject: 'RentalHub NG Lawyer Invitation',
+      subject: 'Amana RentalHub NG Lawyer Invitation',
       html: `
         <div style="font-family: sans-serif; line-height: 1.6;">
-          <h2>You have been selected to serve as a RentalHub NG lawyer</h2>
-          <p><strong>${assignedByName}</strong> added you to the RentalHub NG lawyer program.</p>
+          <h2>You have been selected to serve as a Amana RentalHub NG lawyer</h2>
+          <p><strong>${assignedByName}</strong> added you to the Amana RentalHub NG lawyer program.</p>
           <p>Use the button below to create your password, activate your lawyer account, and complete your profile.</p>
           <p>
             <a href="${inviteUrl}" style="background:#0284c7;color:#fff;padding:12px 18px;border-radius:6px;text-decoration:none;">
@@ -322,11 +322,11 @@ exports.sendAgentInviteEmail = async ({
   try {
     await sendEmail({
       to: email,
-      subject: 'RentalHub NG Agent Invitation',
+      subject: 'Amana RentalHub NG Agent Invitation',
       html: `
         <div style="font-family: sans-serif; line-height: 1.6;">
           <h2>You have been invited to help manage a landlord account</h2>
-          <p><strong>${landlordName}</strong> invited you to serve as their agent on RentalHub NG.</p>
+          <p><strong>${landlordName}</strong> invited you to serve as their agent on Amana RentalHub NG.</p>
           <p>${agentName ? `${agentName}, use the button below to create your password and activate your agent access.` : 'Use the button below to create your password and activate your agent access.'}</p>
           <p>
             <a href="${inviteUrl}" style="background:#0284c7;color:#fff;padding:12px 18px;border-radius:6px;text-decoration:none;">
@@ -353,11 +353,11 @@ exports.sendAgentAssignmentNoticeEmail = async ({
   try {
     await sendEmail({
       to: email,
-      subject: 'RentalHub NG Agent Assignment Updated',
+      subject: 'Amana RentalHub NG Agent Assignment Updated',
       html: `
         <div style="font-family: sans-serif; line-height: 1.6;">
           <h2>Your agent assignment is active</h2>
-          <p><strong>${inviterName || landlordName}</strong> assigned you to support <strong>${landlordName}</strong> on RentalHub NG.</p>
+          <p><strong>${inviterName || landlordName}</strong> assigned you to support <strong>${landlordName}</strong> on Amana RentalHub NG.</p>
           <p>You can now sign in and start helping with approved landlord operations.</p>
           <p>
             <a href="${dashboardUrl}" style="background:#0284c7;color:#fff;padding:12px 18px;border-radius:6px;text-decoration:none;">

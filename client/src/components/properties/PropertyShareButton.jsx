@@ -17,7 +17,7 @@ const PropertyShareButton = ({ property, detailLink, className = '' }) => {
   const shareTitle = locationLabel
     ? `${property?.title} in ${locationLabel}`
     : property?.title || t('property_share.fallback_title', 'Property listing');
-  const shareText = t('property_share.text', 'Check out this property on RentalHub NG: {{title}}', { title: shareTitle });
+  const shareText = t('property_share.text', 'Check out this property on Amana RentalHub NG: {{title}}', { title: shareTitle });
 
   return (
     <ShareMenu

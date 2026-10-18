@@ -1,6 +1,6 @@
 # RentalHub Mobile: Audit, Parity Gap & Compilation Report
 
-This document records the full diagnostic findings across API parity, security vulnerabilities, and build configuration between the RentalHub NG Web/Backend platform and the `RentalHubMobile` (APK / React Native) client repository (`https://github.com/Mr-Simplicity-dev/RentalHubApp.git`).
+This document records the full diagnostic findings across API parity, security vulnerabilities, and build configuration between the Amana RentalHub NG Web/Backend platform and the `RentalHubMobile` (APK / React Native) client repository (`https://github.com/Mr-Simplicity-dev/RentalHubApp.git`).
 
 ---
 

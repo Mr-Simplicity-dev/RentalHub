@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const { sendEmail } = require('../config/utils/mailer');
 const { buildEmail } = require('../config/utils/emailTemplates');
 
-const EMAIL_FROM = process.env.EMAIL_FROM || 'RentalHub NG <support@rentalhub.com.ng>';
+const EMAIL_FROM = process.env.EMAIL_FROM || 'Amana RentalHub NG <support@rentalhub.com.ng>';
 const BASE_URL = process.env.BASE_URL || 'https://rentalhub.com.ng';
 const BATCH_SIZE = 50;
 

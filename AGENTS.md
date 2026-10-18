@@ -1,6 +1,6 @@
 # AGENTS.md — Working Rules for AI Agents
 
-RentalHub NG: Express backend (CommonJS, `server.js`) + React client (CRA)
+Amana RentalHub NG: Express backend (CommonJS, `server.js`) + React client (CRA)
 in `client/`. This repo is actively worked on by multiple sessions at once —
 treat the git history as shared and never run destructive git commands
 (`git reset --hard`, force pushes) unless explicitly asked.

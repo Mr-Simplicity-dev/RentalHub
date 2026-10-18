@@ -7,7 +7,7 @@
 | Time | Real screen / visual | Caption | Voice-over |
 | --- | --- | --- | --- |
 | 0–3s | Premium navy brand opener, then Android phone with the real welcome/register screen | Ready to list your property? | Ready to list your property? |
-| 3–7s | Real role-choice screen; Landlord is selected | Start as a Landlord | Create a Landlord account with RentalHub NG. |
+| 3–7s | Real role-choice screen; Landlord is selected | Start as a Landlord | Create a Landlord account with Amana RentalHub NG. |
 | 7–13s | Real registration form with Adam Hawa demo details; hide password, NIN, payment, and any optional third-party information | Set up your account | Set up your account with your correct details. |
 | 13–18s | Real landlord dashboard or property-listing start screen with a sample property only | Start your property journey | Start your property journey in one clear place. |
 | 18–21s | Same feature in a web-browser frame | On mobile and web | Use RentalHub on mobile or on the web. |

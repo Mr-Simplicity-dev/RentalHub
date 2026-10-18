@@ -510,7 +510,7 @@ T.push(q('T6.8', 'T6', 'B', 'multi', 'What would you need before making such a p
 ], { analysis: 'adoption' }));
 
 // ── T7 Concept test ───────────────────────────────────────────────────────
-T.push(q('T7.1', 'T7', 'B', 'single', 'Before today, had you heard of RentalHub NG with the website rentalhub.com.ng?', [
+T.push(q('T7.1', 'T7', 'B', 'single', 'Before today, had you heard of Amana RentalHub NG with the website rentalhub.com.ng?', [
   ['yes', 'Yes'],
   ['no', 'No'],
   ['not_sure', 'Not sure'],
@@ -541,7 +541,7 @@ T.push(q('T7.2', 'T7', 'B', 'single', 'Based only on the description above, how 
   T.push(q(key, 'T7', 'B', 'likert', text, SCALE_1_5, { ...LIKERT_IMPORTANCE, analysis: 'feature' }));
 });
 
-T.push(q('T7.15', 'T7', 'B', 'rank', 'Which THREE functions above would most influence you to try RentalHub NG? Write the numbers:', null, {
+T.push(q('T7.15', 'T7', 'B', 'rank', 'Which THREE functions above would most influence you to try Amana RentalHub NG? Write the numbers:', null, {
   maxPicks: 3,
   analysis: 'feature',
   rankSource: ['T7.3', 'T7.4', 'T7.5', 'T7.6', 'T7.7', 'T7.8', 'T7.9', 'T7.10', 'T7.11', 'T7.12', 'T7.13', 'T7.14'],
@@ -552,7 +552,7 @@ T.push(q('T7.16', 'T7', 'B', 'text', 'Which functions would you probably never u
 T.push(q('T7.17', 'T7', 'B', 'text', 'What important rental problem is missing from the concept?', null, { analysis: 'open' }));
 
 // ── T8 Adoption, trust and willingness to pay ─────────────────────────────
-T.push(q('T8.1', 'T8', 'B', 'single', 'If RentalHub NG had suitable verified listings in your area today, how likely would you be to create an account?', [
+T.push(q('T8.1', 'T8', 'B', 'single', 'If Amana RentalHub NG had suitable verified listings in your area today, how likely would you be to create an account?', [
   ['definitely', 'Definitely would'],
   ['probably', 'Probably would'],
   ['not_sure', 'Not sure'],
@@ -560,7 +560,7 @@ T.push(q('T8.1', 'T8', 'B', 'single', 'If RentalHub NG had suitable verified lis
   ['definitely_not', 'Definitely would not'],
 ], { analysis: 'adoption' }));
 
-T.push(q('T8.2', 'T8', 'B', 'single', 'How likely would you be to use RentalHub NG as your FIRST place to search for your next home?', [
+T.push(q('T8.2', 'T8', 'B', 'single', 'How likely would you be to use Amana RentalHub NG as your FIRST place to search for your next home?', [
   ['very', 'Very likely'],
   ['likely', 'Likely'],
   ['unsure', 'Unsure'],
@@ -568,7 +568,7 @@ T.push(q('T8.2', 'T8', 'B', 'single', 'How likely would you be to use RentalHub 
   ['very_unlikely', 'Very unlikely'],
 ], { analysis: 'adoption' }));
 
-T.push(q('T8.3', 'T8', 'B', 'single', 'Would you still use agents outside RentalHub NG?', [
+T.push(q('T8.3', 'T8', 'B', 'single', 'Would you still use agents outside Amana RentalHub NG?', [
   ['yes', 'Yes, definitely'],
   ['probably', 'Probably'],
   ['only_if', 'Only if I cannot find a property'],
@@ -576,13 +576,13 @@ T.push(q('T8.3', 'T8', 'B', 'single', 'Would you still use agents outside Rental
   ['no', 'No'],
 ], { analysis: 'adoption' }));
 
-T.push(q('T8.4', 'T8', 'B', 'single', 'Would you invite a landlord/agent to use RentalHub NG if the property you wanted was not listed there?', [
+T.push(q('T8.4', 'T8', 'B', 'single', 'Would you invite a landlord/agent to use Amana RentalHub NG if the property you wanted was not listed there?', [
   ['yes', 'Yes'],
   ['maybe', 'Maybe'],
   ['no', 'No'],
 ], { analysis: 'adoption' }));
 
-T.push(q('T8.5', 'T8', 'B', 'multi', 'What would stop you from using RentalHub NG? Select all that apply.', [
+T.push(q('T8.5', 'T8', 'B', 'multi', 'What would stop you from using Amana RentalHub NG? Select all that apply.', [
   ['few_listings', 'Too few listings'],
   ['trust_agents', 'I trust offline agents more'],
   ['intrusive', 'Verification feels intrusive'],
@@ -637,8 +637,8 @@ T.push(q('T9.2', 'T9', 'B', 'text', 'What is the most unfair or wasteful cost yo
 T.push(q('T9.3', 'T9', 'B', 'text', 'What is one thing agents do that you most want changed?', null, { analysis: 'open' }));
 T.push(q('T9.4', 'T9', 'B', 'text', 'What is one thing landlords do that you most want changed?', null, { analysis: 'open' }));
 T.push(q('T9.5', 'T9', 'B', 'text', 'What should a rental platform do to earn your trust before you pay anyone through it?', null, { analysis: 'open' }));
-T.push(q('T9.6', 'T9', 'B', 'text', 'What should RentalHub NG NEVER do?', null, { analysis: 'open' }));
+T.push(q('T9.6', 'T9', 'B', 'text', 'What should Amana RentalHub NG NEVER do?', null, { analysis: 'open' }));
 T.push(q('T9.7', 'T9', 'B', 'text', 'If you could redesign renting in Nigeria, what would you change first?', null, { analysis: 'open' }));
-T.push(q('T9.8', 'T9', 'B', 'text', 'Any other comment you want the RentalHub NG team to hear?', null, { analysis: 'open' }));
+T.push(q('T9.8', 'T9', 'B', 'text', 'Any other comment you want the Amana RentalHub NG team to hear?', null, { analysis: 'open' }));
 
 module.exports = { type: 'tenant', sections: ['T0', 'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9'], questions: T };

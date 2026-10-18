@@ -229,8 +229,8 @@ const LandlordGuide = () => {
               </Link>
               <ShareButton
                 section="Landlord Guide"
-                title="RentalHub NG — Landlord Guide: Tips for Successful Property Listing"
-                description="Everything you need to know about listing, managing, and renting your properties successfully on RentalHub NG."
+                title="Amana RentalHub NG — Landlord Guide: Tips for Successful Property Listing"
+                description="Everything you need to know about listing, managing, and renting your properties successfully on Amana RentalHub NG."
               />
             </div>
           </div>
@@ -252,8 +252,8 @@ const LandlordGuide = () => {
                 <div className="text-primary-200 text-sm md:text-base font-medium mb-2">{stat.label}</div>
                 <ShareButton
                   section={stat.label}
-                  title={`RentalHub NG — ${stat.value} ${stat.label}`}
-                  description={`RentalHub NG has ${stat.value} ${stat.label}. Join thousands of successful landlords.`}
+                  title={`Amana RentalHub NG — ${stat.value} ${stat.label}`}
+                  description={`Amana RentalHub NG has ${stat.value} ${stat.label}. Join thousands of successful landlords.`}
                 />
               </div>
             ))}
@@ -271,8 +271,8 @@ const LandlordGuide = () => {
               </h2>
               <ShareButton
                 section="Getting Started"
-                title="RentalHub NG — How to Prepare Your Property Listing"
-                description="Follow these 4 simple steps to prepare, verify, and publish your property listing on RentalHub NG."
+                title="Amana RentalHub NG — How to Prepare Your Property Listing"
+                description="Follow these 4 simple steps to prepare, verify, and publish your property listing on Amana RentalHub NG."
               />
             </div>
             <p className="text-gray-600">
@@ -313,7 +313,7 @@ const LandlordGuide = () => {
                 <div className="shrink-0">
                   <ShareButton
                     section={`Step ${step.step}`}
-                    title={`RentalHub NG — ${step.title}`}
+                    title={`Amana RentalHub NG — ${step.title}`}
                     description={step.desc}
                   />
                 </div>
@@ -333,7 +333,7 @@ const LandlordGuide = () => {
               </h2>
               <ShareButton
                 section="Best Practices"
-                title="RentalHub NG — Best Practices for Property Listing Success"
+                title="Amana RentalHub NG — Best Practices for Property Listing Success"
                 description="Proven tips and best practices to create compelling listings and attract quality tenants faster."
               />
             </div>
@@ -354,7 +354,7 @@ const LandlordGuide = () => {
                   </div>
                   <ShareButton
                     section={item.title}
-                    title={`RentalHub NG — ${item.title}`}
+                    title={`Amana RentalHub NG — ${item.title}`}
                     description={item.desc}
                   />
                 </div>
@@ -384,7 +384,7 @@ const LandlordGuide = () => {
               </h2>
               <ShareButton
                 section="Pro Tips"
-                title="RentalHub NG — Expert Advice for Landlords"
+                title="Amana RentalHub NG — Expert Advice for Landlords"
                 description="Professional tips on first impressions, tenant screening, contracts, and building successful landlord-tenant relationships."
               />
             </div>
@@ -405,7 +405,7 @@ const LandlordGuide = () => {
                   </div>
                   <ShareButton
                     section={tip.title}
-                    title={`RentalHub NG — ${tip.title}`}
+                    title={`Amana RentalHub NG — ${tip.title}`}
                     description={tip.desc}
                   />
                 </div>
@@ -427,7 +427,7 @@ const LandlordGuide = () => {
               </h2>
               <ShareButton
                 section="Common Mistakes"
-                title="RentalHub NG — Common Landlord Mistakes to Avoid"
+                title="Amana RentalHub NG — Common Landlord Mistakes to Avoid"
                 description="Learn from common listing mistakes including poor photos, incomplete information, overpricing, and slow response times."
               />
             </div>
@@ -472,8 +472,8 @@ const LandlordGuide = () => {
               </h2>
               <ShareButton
                 section="FAQ"
-                title="Landlord Guide FAQ — RentalHub NG"
-                description="Answers to common questions about listing and managing properties on RentalHub NG."
+                title="Landlord Guide FAQ — Amana RentalHub NG"
+                description="Answers to common questions about listing and managing properties on Amana RentalHub NG."
               />
             </div>
             <p className="text-gray-600">
@@ -538,8 +538,8 @@ const LandlordGuide = () => {
               </Link>
               <ShareButton
                 section="Call to Action"
-                title="List Your Property on RentalHub NG Today"
-                description="Join over 5,000 successful landlords on RentalHub NG. List your property and find verified tenants."
+                title="List Your Property on Amana RentalHub NG Today"
+                description="Join over 5,000 successful landlords on Amana RentalHub NG. List your property and find verified tenants."
               />
             </div>
           </div>
@@ -558,8 +558,8 @@ const LandlordGuide = () => {
             <div className="flex justify-center mb-10">
               <ShareButton
                 section="Contact"
-                title="Contact RentalHub NG Landlord Support"
-                description="Need help with your property listing? Contact RentalHub NG at support@rentalhub.com.ng or call +234 803 060 1238."
+                title="Contact Amana RentalHub NG Landlord Support"
+                description="Need help with your property listing? Contact Amana RentalHub NG at support@rentalhub.com.ng or call +234 803 060 1238."
               />
             </div>
             <div className="grid md:grid-cols-2 gap-8 max-w-2xl mx-auto">

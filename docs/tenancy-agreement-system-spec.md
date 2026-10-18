@@ -1,4 +1,4 @@
-# RentalHub NG — Landlord/Tenant Tenancy Agreement & Electronic Execution System
+# Amana RentalHub NG — Landlord/Tenant Tenancy Agreement & Electronic Execution System
 
 **Status:** Specification captured for future implementation. NOT yet built.
 **Captured:** 2026-09-21
@@ -120,7 +120,7 @@ Maintain full version history.
 
 ## 11. PDF / document presentation
 
-Professional document. Header: **RENTALHUB NG** / **RESIDENTIAL TENANCY
+Professional document. Header: **Amana RentalHub NG** / **RESIDENTIAL TENANCY
 AGREEMENT**. Include Agreement ID, Property, Landlord, Tenant, Jurisdiction,
 Tenancy period, then all applicable clauses. At the end: LANDLORD (Signed, Name,
 Date/time, Signature event reference), TENANT (same), and WITNESS if required.

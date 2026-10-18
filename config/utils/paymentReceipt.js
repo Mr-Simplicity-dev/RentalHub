@@ -184,11 +184,11 @@ const sendPayoutReceiptEmail = async ({
 
     await sendEmail({
       to: email,
-      subject: `Payout Receipt ${payoutNumber} - RentalHub NG`,
+      subject: `Payout Receipt ${payoutNumber} - Amana RentalHub NG`,
       html: `
         <div style="font-family: sans-serif; line-height: 1.6; max-width: 560px; margin: 0 auto;">
           <div style="text-align:center; padding-bottom:16px; border-bottom:2px solid #0284c7;">
-            <h2 style="margin:0; color:#0f172a;">RentalHub NG</h2>
+            <h2 style="margin:0; color:#0f172a;">Amana RentalHub NG</h2>
             <p style="margin:4px 0 0; color:#64748b;">Official Payout Receipt</p>
             <p style="margin:6px 0 0; font-weight:600; color:#0f172a;">${esc(payoutNumber)}</p>
           </div>
@@ -225,7 +225,7 @@ const sendPayoutReceiptEmail = async ({
             <strong>Total Paid Out:</strong> ${esc(formatNgn(amount))}
           </div>`}
           <p style="padding-top:16px; font-size:12px; color:#94a3b8; text-align:center;">
-            Thank you for using RentalHub NG.
+            Thank you for using Amana RentalHub NG.
           </p>
         </div>
       `,

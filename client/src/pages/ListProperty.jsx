@@ -276,8 +276,8 @@ const ListProperty = () => {
                 <div className="text-primary-200 text-sm md:text-base font-medium mb-2">{stat.label}</div>
                 <ShareButton
                   section={stat.label}
-                  title={`RentalHub NG — ${stat.value} ${stat.label}`}
-                  description={`RentalHub NG has ${stat.value} ${stat.label.toLowerCase()}. List your property and reach verified tenants today.`}
+                  title={`Amana RentalHub NG — ${stat.value} ${stat.label}`}
+                  description={`Amana RentalHub NG has ${stat.value} ${stat.label.toLowerCase()}. List your property and reach verified tenants today.`}
                 />
               </div>
             ))}
@@ -356,7 +356,7 @@ const ListProperty = () => {
                   </div>
                   <ShareButton
                     section={benefit.title}
-                    title={`RentalHub NG — ${benefit.title}`}
+                    title={`Amana RentalHub NG — ${benefit.title}`}
                     description={benefit.desc}
                   />
                 </div>

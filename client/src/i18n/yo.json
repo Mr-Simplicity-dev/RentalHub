@@ -39,8 +39,8 @@
     "sponsored": "Tí wọ́n gbà owó fún",
     "default_cta": "Tẹ láti ṣí",
     "share_ad": "Pín ìpolówó",
-    "default_share_title": "Ìpolówó tí wọ́n gbà owó fún lórí RentalHub NG",
-    "share_text": "Ṣàgbéwò ànfàní tí wọ́n gbà owó fún yìí lórí RentalHub NG: {{title}}",
+    "default_share_title": "Ìpolówó tí wọ́n gbà owó fún lórí Amana RentalHub NG",
+    "share_text": "Ṣàgbéwò ànfàní tí wọ́n gbà owó fún yìí lórí Amana RentalHub NG: {{title}}",
     "share_device": "Pín nípasẹ̀ ẹ̀rọ rẹ",
     "copy_link": "Da ọ̀rọ̀ àsopọ̀ ìpolówó kọ",
     "link_copied": "Wọ́n ti da ọ̀rọ̀ àsopọ̀ ìpolówó kọ",
@@ -69,7 +69,7 @@
     "submit_failed": "Ìdìwọ̀n rẹ kò ṣeé fi sílẹ̀",
     "dismiss_notification": "Pa ìkìlọ̀ ìdìwọ̀n kọ",
     "star_rating": "Ìdìwọ̀n ìràwọ̀ {{count}}",
-    "flyin_message": "{{name}} ṣe ìdìwọ̀n RentalHub NG pẹ̀lú àtúnyẹ̀wò ìràwọ̀ {{stars}} lẹ́yìn tí wọ́n {{context}}.",
+    "flyin_message": "{{name}} ṣe ìdìwọ̀n Amana RentalHub NG pẹ̀lú àtúnyẹ̀wò ìràwọ̀ {{stars}} lẹ́yìn tí wọ́n {{context}}.",
     "verified_in": "Ìrírí tí a fọwọ́ sí ní {{location}}",
     "this_service": "iṣẹ́ yìí",
     "contexts": {
@@ -82,31 +82,31 @@
       "virtual_tour": "parí ìrìn-àjò afẹ̀fẹ́",
       "dispute_support": "lo ìrànwọ́ àríyànjiyàn",
       "admin_support": "gba ìrànwọ́ alákòóso",
-      "platform": "lo RentalHub NG"
+      "platform": "lo Amana RentalHub NG"
     },
     "prompt_titles": {
-      "property_secured": "Ṣe ìdìwọ̀n ìrírí yíyá ilé rẹ lórí RentalHub NG",
+      "property_secured": "Ṣe ìdìwọ̀n ìrírí yíyá ilé rẹ lórí Amana RentalHub NG",
       "property_listed": "Ṣe ìdìwọ̀n ìrírí kíkọ ohun-inì rẹ sílẹ̀",
       "property_rented": "Ṣe ìdìwọ̀n ìrírí yíyá tó jáyọ rẹ",
-      "legal_support": "Ṣe ìdìwọ̀n ìrànwọ́ òfin RentalHub NG",
-      "fumigation_cleaning": "Ṣe ìdìwọ̀n ìrànwọ́ ìwẹ̀ ìmọ́tótó RentalHub NG",
-      "transportation": "Ṣe ìdìwọ̀n ìrànwọ́ ọ̀nà gbígbé RentalHub NG",
-      "virtual_tour": "Ṣe ìdìwọ̀n ìrìn-àjò afẹ̀fẹ́ RentalHub NG rẹ",
-      "dispute_support": "Ṣe ìdìwọ̀n ìrànwọ́ àríyànjiyàn RentalHub NG",
-      "admin_support": "Ṣe ìdìwọ̀n ìrànwọ́ RentalHub NG",
-      "platform": "Ṣe ìdìwọ̀n RentalHub NG"
+      "legal_support": "Ṣe ìdìwọ̀n ìrànwọ́ òfin Amana RentalHub NG",
+      "fumigation_cleaning": "Ṣe ìdìwọ̀n ìrànwọ́ ìwẹ̀ ìmọ́tótó Amana RentalHub NG",
+      "transportation": "Ṣe ìdìwọ̀n ìrànwọ́ ọ̀nà gbígbé Amana RentalHub NG",
+      "virtual_tour": "Ṣe ìdìwọ̀n ìrìn-àjò afẹ̀fẹ́ Amana RentalHub NG rẹ",
+      "dispute_support": "Ṣe ìdìwọ̀n ìrànwọ́ àríyànjiyàn Amana RentalHub NG",
+      "admin_support": "Ṣe ìdìwọ̀n ìrànwọ́ Amana RentalHub NG",
+      "platform": "Ṣe ìdìwọ̀n Amana RentalHub NG"
     },
     "prompt_details": {
-      "property_secured": "O ti ṣètò {{source}} nípasẹ̀ RentalHub NG.",
-      "property_listed": "O ti kọ {{source}} sílẹ̀ lórí RentalHub NG.",
-      "property_rented": "Wọ́n yá {{source}} nípasẹ̀ RentalHub NG.",
+      "property_secured": "O ti ṣètò {{source}} nípasẹ̀ Amana RentalHub NG.",
+      "property_listed": "O ti kọ {{source}} sílẹ̀ lórí Amana RentalHub NG.",
+      "property_rented": "Wọ́n yá {{source}} nípasẹ̀ Amana RentalHub NG.",
       "legal_support": "Sọ fún wa bí ìrànwọ́ òfin ṣe ràn ọ́ lọ́wọ́.",
       "fumigation_cleaning": "Sọ fún wa bí ìrírí iṣẹ́ rẹ ṣe lọ.",
       "transportation": "Sọ fún wa bí ìrànwọ́ ọ̀nà gbígbé ṣe lọ.",
       "virtual_tour": "Sọ fún wa bí ìrìn-àjò afẹ̀fẹ́ ohun-inì ṣe ràn ọ́ lọ́wọ́.",
       "dispute_support": "Sọ fún wa bí ìrànwọ́ àríyànjiyàn ṣe ràn ọ́ lọ́wọ́.",
       "admin_support": "Sọ fún wa bí ìrànwọ́ ṣe ràn ọ́ lọ́wọ́.",
-      "platform": "Sọ fún wa nípa ìrírí RentalHub NG rẹ."
+      "platform": "Sọ fún wa nípa ìrírí Amana RentalHub NG rẹ."
     }
   },
   "home": {
@@ -150,7 +150,7 @@
     "use_lawyers": "Ìbòòrùn Ààbò Òfin",
     "verify_dispute_evidence": "Múdájú Ẹ̀rí Àríyànjiyàn",
     "submit_request": "Fi Ìbéèrè Sílẹ̀",
-    "whatsapp_message": "Báwo ni RentalHub NG, mo nílò ìrànlọ́wọ́ láti wá ilé.",
+    "whatsapp_message": "Báwo ni Amana RentalHub NG, mo nílò ìrànlọ́wọ́ láti wá ilé.",
     "whatsapp_greeting": "Báwo ni! Ṣé o nílò ìrànlọ́wọ́ láti wá ilé?",
     "chat_with_us": "Bá wa sọ̀rọ̀ lórí WhatsApp"
   },
@@ -278,7 +278,7 @@
     "qa_apps_landlord": "Àwọn Ìbéèrè",
     "qa_apps_landlord_desc": "Tun ṣe àyẹ̀wò àwọn ìbéèrè agbátẹ́rù",
     "survey_reminder_title": "Pari iwadi iwadi RentalHub rẹ",
-    "survey_reminder_body": "Awọn idahun rẹ n ran wa lọwọ lati mu RentalHub NG dara si. Yoo gba to iṣẹju 10 diẹ sii — o le pari nigbakugba.",
+    "survey_reminder_body": "Awọn idahun rẹ n ran wa lọwọ lati mu Amana RentalHub NG dara si. Yoo gba to iṣẹju 10 diẹ sii — o le pari nigbakugba.",
     "survey_continue": "Tẹsiwaju Iwadi"
   },
   "profile": {
@@ -634,15 +634,15 @@
   "about_us": {
     "hero": {
       "title_before": "Nípa ",
-      "title_highlight": "RentalHub NG",
+      "title_highlight": "Amana RentalHub NG",
       "subtitle": "Pẹ̀pẹ̀lẹ̀ ìmọ̀-ẹ̀rọ ohun-inì tó gbẹ́kẹ̀lé jùlọ ní Nàìjíríà tó ń ṣopọ̀ àwọn ẹni tó ń yá ilé, onílé, aṣojú, àti àwọn amọ̀fin káàkiri gbogbo ìpínlẹ̀ 36 àti Ilẹ̀ Olú-ìlú Àpapọ̀.",
       "cta_browse": "Wo Àwọn Ohun-Inì",
-      "cta_join": "Dara Pọ̀ Mọ́ RentalHub NG"
+      "cta_join": "Dara Pọ̀ Mọ́ Amana RentalHub NG"
     },
     "mission": {
       "section_label": "Ìdí Wa",
       "heading": "Yíyí Ìpèlú Yíyá Ilé Ní Nàìjíríà Padà",
-      "paragraph_1": "Ní RentalHub NG, a gbàgbọ́ pé ẹnikẹ́ni yẹ kí ó ní ìrírí ààbò, tó ṣe kedere, àti tí kò ní wàhálà nígbà tí wọ́n ń wá ilé. Ìdí wa ni láti yọ ìdènà, jíjẹ́lẹ́ẹ̀tà, àti ìbínú kúrò nínú ọjà yíyá ilé ní Nàìjíríà.",
+      "paragraph_1": "Ní Amana RentalHub NG, a gbàgbọ́ pé ẹnikẹ́ni yẹ kí ó ní ìrírí ààbò, tó ṣe kedere, àti tí kò ní wàhálà nígbà tí wọ́n ń wá ilé. Ìdí wa ni láti yọ ìdènà, jíjẹ́lẹ́ẹ̀tà, àti ìbínú kúrò nínú ọjà yíyá ilé ní Nàìjíríà.",
       "paragraph_2": "Nípa dídapọ̀ ìmọ̀-ẹ̀rọ pẹ̀lú àwọn ìlànà ìmúdájú tó le koko, ìrànwọ́ òfin, àti ìbòpọ̀ káàkiri orílẹ̀-èdè, a gba àwọn ẹni tó ń yá ilé lọ́wọ́ láti rí àwọn ohun-inì tí a fọwọ́ sí, àti àwọn onílé láti bá àwọn ẹni tó ń yá ilé tó yẹ sopọ̀ — gbogbo rẹ̀ nínú ètò ẹ̀mí ìgbẹ́kẹ̀lé kan.",
       "badge_verified": "Àwọn ohun-inì tí a fọwọ́ sí",
       "badge_secure": "Àwọn sísanwó ààbò",
@@ -654,7 +654,7 @@
     "journey": {
       "section_label": "Ìrìn-Àjò Wa",
       "heading": "Láti Ìrànlọ́wọ́ Sí Òtítọ́",
-      "subtitle": "Gbogbo pẹ̀pẹ̀lẹ̀ ńlá bẹ̀rẹ̀ pẹ̀lú èrò rírọrùn kan. Èyí ni ìtàn bí RentalHub NG ṣe dàgbà láti inú ìrànlọ́wọ́ sí ọjà ohun-inì tó gbẹ́kẹ̀lé jùlọ ní Nàìjíríà."
+      "subtitle": "Gbogbo pẹ̀pẹ̀lẹ̀ ńlá bẹ̀rẹ̀ pẹ̀lú èrò rírọrùn kan. Èyí ni ìtàn bí Amana RentalHub NG ṣe dàgbà láti inú ìrànlọ́wọ́ sí ọjà ohun-inì tó gbẹ́kẹ̀lé jùlọ ní Nàìjíríà."
     },
     "values": {
       "section_label": "Ohun Tí A Dúró Fún",
@@ -663,7 +663,7 @@
     },
     "different": {
       "section_label": "Ìdí Tí Wọ́n Fi Yan Wa",
-      "heading": "Ohun Tí Ó Sọ RentalHub NG Yàtọ̀",
+      "heading": "Ohun Tí Ó Sọ Amana RentalHub NG Yàtọ̀",
       "subtitle": "A kì í kan kọ àwọn ohun-inì sílẹ̀ — a kọ́ ètò ẹ̀mí tó pé kúlẹ̀kúlẹ̀ fún àwọn ìgbéṣe ohun-inì tó ṣààbò àti tó ṣe kedere.",
       "ecosystem": {
         "title": "Ètò Ẹ̀mí Tí A Fọwọ́ Sí",
@@ -688,7 +688,7 @@
       "subtitle": "Àwọn ọjọgbọ́n tí wọ́n ní ìtara láti yí ìrírí ohun-inì Nàìjíríà padà.",
       "member_1": {
         "role": "Olùdásílẹ̀ & CEO",
-        "bio": "Pẹ̀lú ọdún 15+ nínú ohun-inì àti ìmọ̀-ẹ̀rọ, Zubair ń darí RentalHub NG pẹ̀lú ìrànlọ́wọ́ láti yí ààyè ohun-inì ní Nàìjíríà padà."
+        "bio": "Pẹ̀lú ọdún 15+ nínú ohun-inì àti ìmọ̀-ẹ̀rọ, Zubair ń darí Amana RentalHub NG pẹ̀lú ìrànlọ́wọ́ láti yí ààyè ohun-inì ní Nàìjíríà padà."
       },
       "member_2": {
         "role": "Ọ̀gá Àwọn Ìṣẹ̀dá (COO)",
@@ -696,7 +696,7 @@
       },
       "member_3": {
         "role": "Ọ̀gá Ìmọ̀-Ẹ̀rọ (CTO)",
-        "bio": "Emeka ni ó kọ́ pẹ̀pẹ̀lẹ̀ RentalHub NG, tó ń darí ìmújáde ìmọ̀-ẹ̀rọ nínú ohun-inì, ìmúdájú oní nọ́ńbà, àti àwọn ìgbéṣe ààbò."
+        "bio": "Emeka ni ó kọ́ pẹ̀pẹ̀lẹ̀ Amana RentalHub NG, tó ń darí ìmújáde ìmọ̀-ẹ̀rọ nínú ohun-inì, ìmúdájú oní nọ́ńbà, àti àwọn ìgbéṣe ààbò."
       },
       "member_4": {
         "role": "Olórí Ẹ̀ka Òfin",
@@ -704,7 +704,7 @@
       }
     },
     "milestone": {
-      "year_2020": "Wọ́n dá RentalHub NG sílẹ̀ pẹ̀lú ìrànlọ́wọ́ láti yí ọjà yíyá ilé Nàìjíríà padà.",
+      "year_2020": "Wọ́n dá Amana RentalHub NG sílẹ̀ pẹ̀lú ìrànlọ́wọ́ láti yí ọjà yíyá ilé Nàìjíríà padà.",
       "year_2021": "Wọ́n bẹ̀rẹ̀ ètò kíkọ ohun-inì sílẹ̀ láti gba àwọn onílé wọlé ní Èkó àti Abuja.",
       "year_2022": "Wọ́n gbòòrò sí gbogbo ìpínlẹ̀ 36 + FCT; wọ́n sì bẹ̀rẹ̀ ìmúdájú ẹni.",
       "year_2023": "Wọ́n bẹ̀rẹ̀ àwọn iṣẹ́ ìrànwọ́ òfin, ìpinnu àríyànjiyàn, àti ọjà ìwẹ̀ ìmọ́tótó.",
@@ -745,7 +745,7 @@
     },
     "cta": {
       "heading": "Ṣé O Ṣetán Láti Wá Ilé Tó Bá Ẹ Mu?",
-      "subtitle": "Dara pọ̀ mọ́ àwọn ọmọ Nàìjíríà 50,000+ tí wọ́n gbẹ́kẹ̀lé RentalHub NG fún àwọn ohun-inì wọn. Wo àwọn ohun-inì tí a fọwọ́ sí, bá àwọn onílé tó gbẹ́kẹ̀lé sopọ̀, kí o sì gbádùn àlàáfíà ọkàn.",
+      "subtitle": "Dara pọ̀ mọ́ àwọn ọmọ Nàìjíríà 50,000+ tí wọ́n gbẹ́kẹ̀lé Amana RentalHub NG fún àwọn ohun-inì wọn. Wo àwọn ohun-inì tí a fọwọ́ sí, bá àwọn onílé tó gbẹ́kẹ̀lé sopọ̀, kí o sì gbádùn àlàáfíà ọkàn.",
       "browse": "Wo Àwọn Ohun-Inì",
       "create_account": "Dá Àkàánù"
     },
@@ -818,7 +818,7 @@
   },
   "list_property": {
     "hero": {
-      "title": "Kọ Ohun-Inì Rẹ Sílẹ̀ Lórí RentalHub NG",
+      "title": "Kọ Ohun-Inì Rẹ Sílẹ̀ Lórí Amana RentalHub NG",
       "subtitle": "Dé ọ̀dọ̀ ẹgbẹẹgbẹ̀rún àwọn ẹni tó ń yá ilé tí a fọwọ́ sí káàkiri Nàìjíríà. Kọ ohun-inì rẹ sílẹ̀ láàárín ìṣẹ́jú díẹ̀ kí o sì bẹ̀rẹ̀ síí gba àwọn ìbéèrè tó tó láti ọ̀dọ̀ àwọn ẹni tó ń yá ilé gidi.",
       "list_now": "Kọ Ohun-Inì Rẹ Sílẹ̀ Ní Báyìí",
       "view_pricing": "Wo Àwọn Ètò Iyebíye"
@@ -842,7 +842,7 @@
     },
     "benefits": {
       "badge": "Ìdí Tí Wọ́n Fi Ń Kọ Sílẹ̀ Pẹ̀lú Wa",
-      "title": "Àwọn Ànfàní Kíkọ Sílẹ̀ Lórí RentalHub NG",
+      "title": "Àwọn Ànfàní Kíkọ Sílẹ̀ Lórí Amana RentalHub NG",
       "subtitle": "Ẹgbẹẹgbẹ̀rún àwọn onílé àti aṣojú ti gbẹ́kẹ̀lé wa. Èyí ni ìdí."
     },
     "step_1": {
@@ -923,7 +923,7 @@
     },
     "testimonial_1": {
       "role": "Onílé, Èkó",
-      "text": "Mo kọ flat yàrá mẹ́ta mi sílẹ̀ lórí RentalHub NG, mo sì rí ẹni tó ń yá ilé tó tó láàárín ọ̀sẹ̀ kan. Ìlànà ìmúdájú náà fún mi ní ìgboyà."
+      "text": "Mo kọ flat yàrá mẹ́ta mi sílẹ̀ lórí Amana RentalHub NG, mo sì rí ẹni tó ń yá ilé tó tó láàárín ọ̀sẹ̀ kan. Ìlànà ìmúdájú náà fún mi ní ìgboyà."
     },
     "testimonial_2": {
       "role": "Aṣojú Ohun-Inì, Abuja",
@@ -934,7 +934,7 @@
       "text": "Ẹ̀ya ìrànwọ́ òfin náà yí eré padà. Wọ́n yanjú àríyànjiyàn kan fún mi kíákíá láìsí wàhálà tó wọ́pọ̀."
     },
     "faq_1": {
-      "q": "Ta ni ó lè kọ àwọn ohun-inì sílẹ̀ lórí RentalHub NG?",
+      "q": "Ta ni ó lè kọ àwọn ohun-inì sílẹ̀ lórí Amana RentalHub NG?",
       "a": "Àwọn onílé tí a fọwọ́ sí àti àwọn aṣojú tí wọ́n forúkọ sílẹ̀ ni ó lè kọ àwọn ohun-inì sílẹ̀. O gbọ́dọ̀ parí ìmúdájú ẹni kí wọ́n tó fọwọ́ sí ọ kí o tó kọ sílẹ̀."
     },
     "faq_2": {
@@ -947,7 +947,7 @@
     },
     "faq_4": {
       "q": "Ṣé mo lè kọ àwọn ohun-inì sílẹ̀ ní àwọn ìpínlẹ̀ púpọ̀?",
-      "a": "Bẹ́ẹ̀ ni! RentalHub NG bò gbogbo ìpínlẹ̀ 36 + FCT. O lè kọ àwọn ohun-inì sílẹ̀ ní ibikíbi ní Nàìjíríà láìka ibi tí o wà sí."
+      "a": "Bẹ́ẹ̀ ni! Amana RentalHub NG bò gbogbo ìpínlẹ̀ 36 + FCT. O lè kọ àwọn ohun-inì sílẹ̀ ní ibikíbi ní Nàìjíríà láìka ibi tí o wà sí."
     },
     "faq_5": {
       "q": "Báwo ni mo ṣe ń gba owó?",
@@ -974,7 +974,7 @@
     },
     "cta": {
       "title": "Ṣé O Ṣetán Láti Kọ Ohun-Inì Rẹ Sílẹ̀?",
-      "subtitle": "Dara pọ̀ mọ́ àwọn onílé àti aṣojú 5,000+ tí wọ́n ń lo RentalHub NG láti wá àwọn ẹni tó ń yá ilé tó yẹ. Kọ ohun-inì rẹ sílẹ̀ lónìí kí o sì bẹ̀rẹ̀ síí gba àwọn ìbéèrè.",
+      "subtitle": "Dara pọ̀ mọ́ àwọn onílé àti aṣojú 5,000+ tí wọ́n ń lo Amana RentalHub NG láti wá àwọn ẹni tó ń yá ilé tó yẹ. Kọ ohun-inì rẹ sílẹ̀ lónìí kí o sì bẹ̀rẹ̀ síí gba àwọn ìbéèrè.",
       "list_now": "Kọ Ohun-Inì Rẹ Sílẹ̀ Ní Báyìí",
       "create_account": "Dá Àkàánù Ọ̀fẹ́"
     },
@@ -991,7 +991,7 @@
   "faq": {
     "hero_title_before": "Àwọn Ìbéèrè Tí ",
     "hero_title_highlight": "Wọ́n Ń Béèrè Lọ́pọ̀lọpọ̀",
-    "hero_desc": "Gbogbo ohun tó o nílò láti mọ̀ nípa RentalHub NG. Rí àwọn ìdáhùn sí àwọn ìbéèrè tó wọ́pọ̀ nípa kíkọ àwọn ohun-inì sílẹ̀, wíwá àwọn ilé yíyá, ìmúdájú, iyebíye, àti bẹ́ẹ̀ bẹ́ẹ̀ lọ.",
+    "hero_desc": "Gbogbo ohun tó o nílò láti mọ̀ nípa Amana RentalHub NG. Rí àwọn ìdáhùn sí àwọn ìbéèrè tó wọ́pọ̀ nípa kíkọ àwọn ohun-inì sílẹ̀, wíwá àwọn ilé yíyá, ìmúdájú, iyebíye, àti bẹ́ẹ̀ bẹ́ẹ̀ lọ.",
     "hero_cta_create": "Dá Àkàánù Ọ̀fẹ́",
     "hero_cta_contact": "Kàn Sí Ìrànwọ́",
     "stats_properties_listed": "Àwọn Ohun-Inì Tí A Kọ Sílẹ̀",
@@ -1046,9 +1046,9 @@
   },
   "how_it_works": {
     "hero_title_before": "Bí ",
-    "hero_title_highlight": "RentalHub NG",
+    "hero_title_highlight": "Amana RentalHub NG",
     "hero_title_after": " Ṣe Ń Ṣiṣẹ́",
-    "hero_desc": "Bóyá o ń wá ilé rẹ tó kàn tàbí o ń kọ ohun-inì yíyá sílẹ̀, RentalHub NG máa ń sọ ìlànà náà di rírọrùn, ààbò, àti kíkedere.",
+    "hero_desc": "Bóyá o ń wá ilé rẹ tó kàn tàbí o ń kọ ohun-inì yíyá sílẹ̀, Amana RentalHub NG máa ń sọ ìlànà náà di rírọrùn, ààbò, àti kíkedere.",
     "hero_cta_browse": "Wo Àwọn Ohun-Inì",
     "hero_cta_list": "Kọ Ohun-Inì Rẹ Sílẹ̀",
     "overview_badge": "Àkópọ̀ Kíákíá",
@@ -1063,7 +1063,7 @@
     "walkthrough_connect_desc": "Béèrè, sọ̀rọ̀, kí o sì pa àdéhùn rẹ pẹ̀lú ìgboyà.",
     "tenants_badge": "Fún Àwọn Ẹni Tó Ń Yá Ilé",
     "tenants_heading": "Wá Ilé Tó Bá Ẹ Mu",
-    "tenants_desc": "Láti wíwá sí gbígbé sínú, èyí ni bí àwọn ẹni tó ń yá ilé ṣe ń wá ilé tó kàn wọn lórí RentalHub NG.",
+    "tenants_desc": "Láti wíwá sí gbígbé sínú, èyí ni bí àwọn ẹni tó ń yá ilé ṣe ń wá ilé tó kàn wọn lórí Amana RentalHub NG.",
     "tenants_step_1_title": "Dá Àkàánù Rẹ",
     "tenants_step_1_desc": "Forúkọ sílẹ̀ gẹ́gẹ́ bí ẹni tó ń yá ilé kí o sì parí ìmúdájú ẹni rẹ pẹ̀lú NIN rẹ. Èyí ń rí i dájú pé àwùjọ ààbò wà fún gbogbo ènìyàn.",
     "tenants_step_1_hl_1": "Ìforúkọ sílẹ̀ ọ̀fẹ́",
@@ -1085,10 +1085,10 @@
     "tenants_step_4_hl_2": "Ifiranṣẹ́ inú pẹ̀pẹ̀lẹ̀",
     "tenants_step_4_hl_3": "Ìrànwọ́ gbígbé sínú",
     "tenants_cta": "Bẹ̀rẹ̀ Gẹ́gẹ́ Bí Ẹni Tó Ń Yá Ilé",
-    "divider_label": "Àwọn ẹni tó ń yá ilé àti àwọn onílé méjèèjì ni wọ́n ń lo RentalHub NG",
+    "divider_label": "Àwọn ẹni tó ń yá ilé àti àwọn onílé méjèèjì ni wọ́n ń lo Amana RentalHub NG",
     "landlords_badge": "Fún Àwọn Onílé & Aṣojú",
     "landlords_heading": "Kọ Sílẹ̀ & Ṣàkóso Àwọn Ohun-Inì",
-    "landlords_desc": "Láti ìforúkọ sílẹ̀ sí ìbáṣepọ̀ ẹni tó ń yá ilé, èyí ni bí àwọn onílé ṣe ń jáyọ lórí RentalHub NG.",
+    "landlords_desc": "Láti ìforúkọ sílẹ̀ sí ìbáṣepọ̀ ẹni tó ń yá ilé, èyí ni bí àwọn onílé ṣe ń jáyọ lórí Amana RentalHub NG.",
     "landlords_step_1_title": "Forúkọ Sílẹ̀ & Múdájú",
     "landlords_step_1_desc": "Dá àkàánù onílé tàbí aṣojú kí o sì parí ìmúdájú àlàyé ara láti bẹ̀rẹ̀ síí kọ àwọn ohun-inì rẹ sílẹ̀.",
     "landlords_step_1_hl_1": "Ìforúkọ sílẹ̀ kíákíá",
@@ -1112,7 +1112,7 @@
     "landlords_cta": "Bẹ̀rẹ̀ Kíkọ Ohun-Inì Rẹ Sílẹ̀",
     "features_badge": "Àwọn Ẹ̀ya Pẹ̀pẹ̀lẹ̀",
     "features_heading": "Ohun Tí Ó Mú Pẹ̀pẹ̀lẹ̀ Náà Ṣiṣẹ́",
-    "features_desc": "Àwọn ẹ̀ya wọ̀nyí ń rí i dájú pé ìbáṣepọ̀ kọ̀ọ̀kan lórí RentalHub NG ṣààbò àti ṣe ìgbẹ́kẹ̀lé.",
+    "features_desc": "Àwọn ẹ̀ya wọ̀nyí ń rí i dájú pé ìbáṣepọ̀ kọ̀ọ̀kan lórí Amana RentalHub NG ṣààbò àti ṣe ìgbẹ́kẹ̀lé.",
     "features_verification_title": "Ìmúdájú Ẹni",
     "features_verification_desc": "Gbogbo olùmúlò — ẹni tó ń yá ilé, onílé, àti aṣojú — ń kọjá ìmúdájú ẹni tó sopọ̀ mọ́ NIN fún ètò ẹ̀mí ìgbẹ́kẹ̀lé.",
     "features_secure_title": "Àwọn Ìgbéṣe Ààbò",
@@ -1123,9 +1123,9 @@
     "features_ratings_desc": "Àwọn ìdìwọ̀n tó ṣe kedere àti àwọn àtúnyẹ̀wò tí a fọwọ́ sí ń ràn àwọn ẹni tó ń yá ilé àti àwọn onílé lọ́wọ́ láti ṣe àwọn ìpinnu tó dára.",
     "faq_badge": "ÌBÉÈRÈ ÀWỌN TÓ WỌ́PỌ̀",
     "faq_heading": "Àwọn Ìbéèrè Tí Wọ́n Ń Béèrè Lọ́pọ̀lọpọ̀",
-    "faq_desc": "Gbogbo ohun tó o nílò láti mọ̀ nípa lílò RentalHub NG.",
+    "faq_desc": "Gbogbo ohun tó o nílò láti mọ̀ nípa lílò Amana RentalHub NG.",
     "cta_heading": "Ṣé O Ṣetán Láti Bẹ̀rẹ̀?",
-    "cta_desc": "Dara pọ̀ mọ́ ẹgbẹẹgbẹ̀rún àwọn ọmọ Nàìjíríà tí wọ́n ń lo RentalHub NG láti wá àwọn ilé àti kọ àwọn ohun-inì sílẹ̀. Ìrìn-àjò rẹ bẹ̀rẹ̀ níbí.",
+    "cta_desc": "Dara pọ̀ mọ́ ẹgbẹẹgbẹ̀rún àwọn ọmọ Nàìjíríà tí wọ́n ń lo Amana RentalHub NG láti wá àwọn ilé àti kọ àwọn ohun-inì sílẹ̀. Ìrìn-àjò rẹ bẹ̀rẹ̀ níbí.",
     "cta_create": "Dá Àkàánù Ọ̀fẹ́",
     "cta_browse": "Wo Àwọn Ohun-Inì",
     "contact_heading": "Ṣé Ìbéèrè Kù Síbẹ̀?",
@@ -1149,7 +1149,7 @@
     "plan_free_subtitle": "Pípé fún ìgbìyànjú",
     "plan_free_price": "₦0",
     "plan_free_period": "fún àkójọ kan",
-    "plan_free_desc": "Bẹ̀rẹ̀ pẹ̀lú àkójọ ìpìlẹ̀ kí o sì rí ohun tí RentalHub NG ní láti pèsè.",
+    "plan_free_desc": "Bẹ̀rẹ̀ pẹ̀lú àkójọ ìpìlẹ̀ kí o sì rí ohun tí Amana RentalHub NG ní láti pèsè.",
     "plan_free_feat_1": "Kọ ohun-inì 1 sílẹ̀",
     "plan_free_feat_2": "Àwọn ìsọfúnni ohun-inì ìpìlẹ̀",
     "plan_free_feat_3": "Àwòrán tó pọ̀ ju 3",
@@ -1224,7 +1224,7 @@
     "faq_heading": "Àwọn Ìbéèrè Tí Wọ́n Ń Béèrè Lọ́pọ̀lọpọ̀",
     "faq_desc": "Gbogbo ohun tó o nílò láti mọ̀ nípa iyebíye àti sísanwó wa.",
     "cta_heading": "Bẹ̀rẹ̀ Kíkọ Sílẹ̀ Lọ́fẹ̀ẹ́ Lónìí",
-    "cta_desc": "Kò sí káàdì kíredi tó nílò. Kò sí ewu. Dara pọ̀ mọ́ ẹgbẹẹgbẹ̀rún àwọn onílé tí wọ́n gbẹ́kẹ̀lé RentalHub NG láti sopọ̀ wọn pẹ̀lú àwọn ẹni tó ń yá ilé tí a fọwọ́ sí.",
+    "cta_desc": "Kò sí káàdì kíredi tó nílò. Kò sí ewu. Dara pọ̀ mọ́ ẹgbẹẹgbẹ̀rún àwọn onílé tí wọ́n gbẹ́kẹ̀lé Amana RentalHub NG láti sopọ̀ wọn pẹ̀lú àwọn ẹni tó ń yá ilé tí a fọwọ́ sí.",
     "cta_create": "Dá Àkàánù Ọ̀fẹ́",
     "cta_list": "Kọ Ohun-Inì Rẹ Sílẹ̀",
     "contact_heading": "Àwọn Ìbéèrè Nípa Iyebíye?",
@@ -1235,7 +1235,7 @@
   "landlord_guide": {
     "hero_title_before": "Ìtọ́sọ́nà ",
     "hero_title_highlight": "Onílé",
-    "hero_desc": "Gbogbo ohun tó o nílò láti mọ̀ nípa kíkọ sílẹ̀, ṣíṣàkóso, àti yíyá àwọn ohun-inì rẹ pẹ̀lú àṣeyọrí lórí RentalHub NG — láti ìmúra sí gbígbé ẹni tó ń yá ilé sínú.",
+    "hero_desc": "Gbogbo ohun tó o nílò láti mọ̀ nípa kíkọ sílẹ̀, ṣíṣàkóso, àti yíyá àwọn ohun-inì rẹ pẹ̀lú àṣeyọrí lórí Amana RentalHub NG — láti ìmúra sí gbígbé ẹni tó ń yá ilé sínú.",
     "hero_cta_list": "Kọ Ohun-Inì Rẹ Sílẹ̀",
     "hero_cta_pricing": "Wo Àwọn Ètò Iyebíye",
     "stats_properties_listed": "Àwọn Ohun-Inì Tí A Kọ Sílẹ̀",
@@ -1258,7 +1258,7 @@
     "prep_step_2_item_3": "Ronú nípa yíyá àwòrán ọjọgbọ́n",
     "prep_step_2_item_4": "Ṣètò àwọn yàrá láti jọ ẹni tó gbòòrò àti tó wúni láti wọlé",
     "prep_step_3_title": "Múdájú Ẹni Rẹ",
-    "prep_step_3_desc": "Parí ìmúdájú onílé rẹ nípasẹ̀ RentalHub NG. Èyí ń kọ́ ìgbẹ́kẹ̀lé pẹ̀lú àwọn ẹni tó ń yá ilé tó bẹ̀rẹ̀ kí ó sì mú ìfarahàn àkójọ rẹ pọ̀.",
+    "prep_step_3_desc": "Parí ìmúdájú onílé rẹ nípasẹ̀ Amana RentalHub NG. Èyí ń kọ́ ìgbẹ́kẹ̀lé pẹ̀lú àwọn ẹni tó ń yá ilé tó bẹ̀rẹ̀ kí ó sì mú ìfarahàn àkójọ rẹ pọ̀.",
     "prep_step_3_item_1": "Fi ìwé ìdánimọ̀ ìjọba tó wà lọ́wọ́ sílẹ̀",
     "prep_step_3_item_2": "Parí ìmúdájú NIN",
     "prep_step_3_item_3": "Pèsè ẹ̀rí ohun-inì",
@@ -1308,9 +1308,9 @@
     "protip_1_title": "Ìríran Àkọ́kọ́ Ṣe Pàtàkì",
     "protip_1_desc": "Àwòrán àkọ́kọ́ nínú àkójọ rẹ ni ó ṣe pàtàkì jùlọ. Yan àwòrán tó mọ́lẹ̀, tí a ṣètò dáradára.",
     "protip_2_title": "Ṣàyẹ̀wò Àwọn Ẹni Tó Ń Yá Ilé Kíkún",
-    "protip_2_desc": "Lo àwọn ohun èlò ìmúdájú RentalHub NG láti fi ìdánimọ̀ àwọn ẹni tó ń yá ilé mọ́lẹ̀ kí o tó gba àwọn ìbéèrè.",
+    "protip_2_desc": "Lo àwọn ohun èlò ìmúdájú Amana RentalHub NG láti fi ìdánimọ̀ àwọn ẹni tó ń yá ilé mọ́lẹ̀ kí o tó gba àwọn ìbéèrè.",
     "protip_3_title": "Lo Àwọn Àdéhùn Ààbò",
-    "protip_3_desc": "Máa lo àwọn àdéhùn yíyá tí agbẹjọ́rò ti ṣàyẹ̀wò. RentalHub NG pèsè ààyè sí àwọn àwòkọ́ṣe òfin.",
+    "protip_3_desc": "Máa lo àwọn àdéhùn yíyá tí agbẹjọ́rò ti ṣàyẹ̀wò. Amana RentalHub NG pèsè ààyè sí àwọn àwòkọ́ṣe òfin.",
     "protip_4_title": "Ṣe Àbójútó Ìṣiṣẹ́ Rẹ",
     "protip_4_desc": "Lo àtòjọ ìṣàkóso onílé rẹ láti tọ̀nà àwọn wíwo, ìbéèrè, àti àwọn oṣuwọn ìbéèrè.",
     "protip_5_title": "Kọ́ Àwọn Ìbáṣepọ̀ Pẹ̀lú Àwọn Ẹni Tó Ŋ Yá Ilé",
@@ -1334,9 +1334,9 @@
     "mistake_4_fix": "Ṣetó àwọn ìkìlọ̀ kí o sì fojú sọ ọ́ láti fèsì sí gbogbo àwọn ìbéèrè láàárín wákàtí 24.",
     "faq_badge": "ÌBÉÈRÈ ÀWỌN TÓ WỌ́PỌ̀",
     "faq_heading": "Àwọn Ìbéèrè Tí Wọ́n Ń Béèrè Lọ́pọ̀lọpọ̀",
-    "faq_desc": "Gbogbo ohun tó o nílò láti mọ̀ nípa kíkọ sílẹ̀ lórí RentalHub NG.",
+    "faq_desc": "Gbogbo ohun tó o nílò láti mọ̀ nípa kíkọ sílẹ̀ lórí Amana RentalHub NG.",
     "cta_heading": "Ṣé O Ṣetán Láti Kọ Ohun-Inì Rẹ Sílẹ̀?",
-    "cta_desc": "Dara pọ̀ mọ́ àwọn onílé 5,000+ tó ń jáyọ lórí RentalHub NG. Kọ ohun-inì rẹ sílẹ̀ lónìí kí o sì bẹ̀rẹ̀ síí sopọ̀ pẹ̀lú àwọn ẹni tó ń yá ilé tí a fọwọ́ sí, tí wọ́n sì tó káàkiri Nàìjíríà.",
+    "cta_desc": "Dara pọ̀ mọ́ àwọn onílé 5,000+ tó ń jáyọ lórí Amana RentalHub NG. Kọ ohun-inì rẹ sílẹ̀ lónìí kí o sì bẹ̀rẹ̀ síí sopọ̀ pẹ̀lú àwọn ẹni tó ń yá ilé tí a fọwọ́ sí, tí wọ́n sì tó káàkiri Nàìjíríà.",
     "cta_list": "Kọ Ohun-Inì Rẹ Sílẹ̀ Ní Báyìí",
     "cta_create": "Dá Àkàánù Ọ̀fẹ́",
     "contact_heading": "Ṣé O Nílò Ìrànlọ́wọ́ Pẹ̀lú Àkójọ Rẹ?",
@@ -1346,7 +1346,7 @@
   },
   "accept_agent_invite": {
     "title": "Mú Ààyè Aṣojú Ṣiṣẹ́",
-    "subtitle": "Parí àwọn ìsọfúnni rẹ láti bẹ̀rẹ̀ síí ràn onílé lọ́wọ́ pẹ̀lú ìṣàkóso àwọn àkójọ àti àwọn iṣẹ́ ohun-inì tí a fọwọ́ sí lórí RentalHub NG.",
+    "subtitle": "Parí àwọn ìsọfúnni rẹ láti bẹ̀rẹ̀ síí ràn onílé lọ́wọ́ pẹ̀lú ìṣàkóso àwọn àkójọ àti àwọn iṣẹ́ ohun-inì tí a fọwọ́ sí lórí Amana RentalHub NG.",
     "heading": "Gba Ìpè Aṣojú",
     "desc": "Dá ọ̀rọ̀ ìgbànìwọlé rẹ kí o sì mú àtòjọ ìṣàkóso aṣojú rẹ ṣiṣẹ́.",
     "full_name_placeholder": "Orúkọ kíkún",
@@ -1371,14 +1371,14 @@
     "password_mismatch": "Àwọn ọ̀rọ̀ ìgbànìwọlé kò bá ara wọn mu",
     "success": "Wọ́n ti mú ààyè aṣojú ṣiṣẹ́ pẹ̀lú àṣeyọrí",
     "error": "Ààyè aṣojú kò ṣeé mú ṣiṣẹ́",
-    "alt_logo": "RentalHub NG"
+    "alt_logo": "Amana RentalHub NG"
   },
   "accept_lawyer_invite": {
     "title": "Mú Ààyè Òfin Mọ́lẹ̀",
     "subtitle": "Wọ́n ti pè ọ́ láti dara pọ̀ gẹ́gẹ́ bí agbẹjọ́rò. Mú àkàánù rẹ ṣiṣẹ́ láti bẹ̀rẹ̀ síí ṣàkóso àwọn ẹjọ́ òfin àti àríyànjiyàn lọ́nà tó dán.",
     "trusted": "Àwọn onílé, àwọn ẹni tó ń yá ilé, àti àwọn amọ̀fin ń gbẹ́kẹ̀lé wa.",
     "activate_heading": "Mú Ààyè Agbẹjọ́rò Pẹ̀pẹ̀lẹ̀ Ṣiṣẹ́",
-    "activate_sub": "Dá ọ̀rọ̀ ìgbànìwọlé rẹ kí o sì parí àlàyé ara agbẹjọ́rò RentalHub NG rẹ",
+    "activate_sub": "Dá ọ̀rọ̀ ìgbànìwọlé rẹ kí o sì parí àlàyé ara agbẹjọ́rò Amana RentalHub NG rẹ",
     "activate_sub_alt": "Parí àwọn ìsọfúnni àlàyé ara agbẹjọ́rò rẹ",
     "lawyer_details": "Àwọn Ìsọfúnni Agbẹjọ́rò",
     "full_name_placeholder": "Orúkọ kíkún",
@@ -1458,7 +1458,7 @@
     "invalid_otp": "OTP tí kò tọ́ - jọ̀wọ́ tun gbìyànjú",
     "platform_error": "Àṣìṣe ní ṣíṣe ìpè agbẹjọ́rò pẹ̀pẹ̀lẹ̀",
     "generic_error": "Àṣìṣe ní ṣíṣe ìpè agbẹjọ́rò",
-    "alt_logo": "RentalHub NG",
+    "alt_logo": "Amana RentalHub NG",
     "brand_text": "Rental Hub NG"
   },
   "verify_email": {
@@ -1761,7 +1761,7 @@
     "verified_listing": "àkójọ tí a fọwọ́ sí",
     "plural_suffix": "s",
     "load_failed": "Àtòjọ Nàìjíríà kò ṣeé gbàjáde",
-    "subtitle": "Ṣawari awọn ile gbigbe nipasẹ ipinlẹ, agbegbe ijọba ibilẹ ati awọn agbegbe pataki, ti o ni atilẹyin nipasẹ awọn atokọ ti a fọwọsi ti RentalHub NG.",
+    "subtitle": "Ṣawari awọn ile gbigbe nipasẹ ipinlẹ, agbegbe ijọba ibilẹ ati awọn agbegbe pataki, ti o ni atilẹyin nipasẹ awọn atokọ ti a fọwọsi ti Amana RentalHub NG.",
     "lgas_count": "{{count}} Awọn Ijọba Ibilẹ"
   },
   "dispute_details": {
@@ -2837,7 +2837,7 @@
     "outgoing_label": "Tó ń Jáde: ",
     "incoming_label": "Tó ń Wọlé: ",
     "review_note": "Àkíyèsí àtúnyẹ̀wò: ",
-    "program_title": "Ètò Agbẹjọ́rò RentalHub NG",
+    "program_title": "Ètò Agbẹjọ́rò Amana RentalHub NG",
     "program_desc": "Béèrè láti àtòjọ ìṣàkóso rẹ kí o sì tọ̀nà ìlọsíwájú àtúnyẹ̀wò ní lílo ìlànà ẹ̀yìn kanna tó wà tẹ́lẹ̀.",
     "no_broadcast": "Kò sí ìgbéde ìṣàmúlò tó ń lọ",
     "recruitment_closed": "Ìṣàmúlò ti pé ní báyìí. Ìpò ìbéèrè rẹ tó wà tẹ́lẹ̀ kò yí.",
@@ -2850,7 +2850,7 @@
     "already_approved": "Tí A Ti Fọwọ́ Sí",
     "application_pending": "Ìbéèrè Ń Dúró",
     "apply_submitting": "Ń fi sílẹ̀...",
-    "apply_btn": "Béèrè Láti Sin Lórí RentalHub NG",
+    "apply_btn": "Béèrè Láti Sin Lórí Amana RentalHub NG",
     "authorized_properties": "Àwọn Ohun-Inì Tí A Fún Láṣẹ",
     "authorized_desc": "Yan ohun-inì láti mú ààyè iṣẹ́ àríyànjiyàn rẹ dídójúkọ.",
     "no_authorized": "Kò sí àwọn ohun-inì tí a fún láṣẹ sí.",
@@ -3040,7 +3040,7 @@
       "eyebrow": "Olùtọ́sọ́nà àtòjọ ìṣàkóso rẹ",
       "resume_title": "Tẹ̀ síwájú níbi tí o dákẹ́",
       "returning_title": "Káàbọ̀ sí RentalHub",
-      "new_title": "Káàbọ̀ sí RentalHub NG",
+      "new_title": "Káàbọ̀ sí Amana RentalHub NG",
       "resume_description": "Wọ́n ti fipamọ́ ìlọsíwájú rẹ. Tẹ̀ síwájú láti ìgbésẹ̀ tó gbẹ̀yìn tí o wò, tàbí kí o tun bẹ̀rẹ̀ lọ́jọ́ mìíràn láti àlàyé ara rẹ.",
       "returning_description": "Ṣe àtúnmúráyá kíákíá kí o sì tun rí àwọn àkóónú tó ṣe pàtàkì jùlọ fún àkàánù rẹ.",
       "new_description": "Jẹ́ kí a fi àwọn àkóónú tó wúlò jùlọ fún àkàánù rẹ hàn ọ́ pẹ̀lú ìrìn-àjò kúkúrú tó dá lórí ọ̀rọ̀.",
@@ -3396,22 +3396,22 @@
     "modal_landlord": "Àkọọ́lẹ̀ Onílé",
     "modal_landlord_desc": "Ṣíṣẹ̀dá àkọọ́lẹ̀ onílé nílò ìdíyelé ìforúkọsílẹ̀ ẹ̀ẹ̀kan ṣoṣo ti",
     "modal_optional": "Àwọn Iṣẹ́ Àṣàyàn",
-    "modal_optional_desc": "Fi agbẹjọ́rò RentalHub NG kún fún",
-    "modal_optional_desc_2": "Fi aṣojú RentalHub NG kún fún",
+    "modal_optional_desc": "Fi agbẹjọ́rò Amana RentalHub NG kún fún",
+    "modal_optional_desc_2": "Fi aṣojú Amana RentalHub NG kún fún",
     "modal_footnote": "Ẹgbẹ́ wa máa ń ṣàtúnyẹ̀wò àwọn ìdíyelé, wọ́n sì lè yí padà. Tẹ̀ síwájú láti yan irú àkọọ́lẹ̀ rẹ kí o sì rí iye gangan fún ẹkùn rẹ.",
     "modal_diaspora": "Àkàánù Òkèèrè (Àjèjì)",
     "modal_diaspora_desc": "Ṣíṣẹ́ àkàánù bí ọ̀mọ orílẹ̀-èdè mìíràn nílò owó ìforúkọ́sílẹ̀ òkèèrè ẹ̀ẹ̀kan nínú láti",
     "modal_diaspora_ngn": "Wọn yóò gba owó tó ń bá Naira mu lọ́wọ́ rẹ (lọ́wọ́lọ́wọ́ ≈",
     "modal_diaspora_vary": "Owó gangan dá lórí ìpínlẹ̀ Nàìjíríà tí o fẹ́ yá ilé — àwọn ìpínlẹ̀ tó ní kúkúrú nínú ń gba owó púpọ̀.",
     "modal_diaspora_optional": "Àwọn iṣẹ́ ìyàn òkèèrè —",
-    "modal_diaspora_lawyer": "Fi agbẹjọ òfin RentalHub NG kún fún",
-    "modal_diaspora_agent": "Fi aṣọjú RentalHub NG kún fún",
+    "modal_diaspora_lawyer": "Fi agbẹjọ òfin Amana RentalHub NG kún fún",
+    "modal_diaspora_agent": "Fi aṣọjú Amana RentalHub NG kún fún",
     "modal_approx": "≈",
     "disabled_diaspora": "Ìforúkọ́sílẹ̀ òkèèrè kò lọ́wọ́ ní àkókò yìí. Túntàwo lẹ́̀ỳin.",
     "modal_skip": "Fo kọjá",
     "modal_understand": "Mo Yé",
-    "logo_alt": "Àmì RentalHub NG",
-    "left_panel_title": "Káàbọ̀ sí RentalHub NG",
+    "logo_alt": "Àmì Amana RentalHub NG",
+    "left_panel_title": "Káàbọ̀ sí Amana RentalHub NG",
     "left_panel_desc": "Ṣẹ̀dá àkọọ́lẹ̀ rẹ láti wá àwọn ilé tí a ti fìdí rẹ̀ múlẹ̀, kàn sí àwọn onílé olùfọkàntán, àti gba ìrànlọ́wọ́ òfin káàkiri Nàìjíríà.",
     "left_panel_footer": "Àwọn ilé tí a fìdí rẹ̀ múlẹ̀ ní gbogbo ìpínlẹ̀ 36 + FCT",
     "already_account": "Ṣé o ní àkọọ́lẹ̀ tẹ́lẹ̀?",
@@ -3443,9 +3443,9 @@
     "referral_placeholder": "Tẹ kóòdù ìfipamọ́",
     "referral_hint": "Tẹ kóòdù ìfipamọ́ bí ẹnìkan bá pè ọ́ wá.",
     "lawyer_email": "Imeèlì agbẹjọ́rò rẹ",
-    "lawyer_using_rentalhub": "Lílo agbẹjọ́rò RentalHub NG",
+    "lawyer_using_rentalhub": "Lílo agbẹjọ́rò Amana RentalHub NG",
     "lawyer_placeholder": "Tẹ imeèlì agbẹjọ́rò rẹ",
-    "lawyer_checkbox_label": "Mo fẹ́ lo agbẹjọ́rò RentalHub NG",
+    "lawyer_checkbox_label": "Mo fẹ́ lo agbẹjọ́rò Amana RentalHub NG",
     "lawyer_checkbox_desc": "A ó yan agbẹjọ́rò tí a ti fìdí rẹ̀ múlẹ̀ láti ràn ọ́ (ìdíyelé kan wà).",
     "agent_heading": "Fi Aṣojú Kún",
     "agent_desc": "Yàtọ̀, pese àwọn àlàyé aṣojú rẹ kí ó lè ṣàkóso àwọn ilé rẹ.",
@@ -3456,10 +3456,10 @@
     "agent_email_placeholder": "Tẹ imeèlì aṣojú",
     "agent_phone": "Tẹlifóònù Aṣojú",
     "agent_phone_placeholder": "Tẹ tẹlifóònù aṣojú",
-    "use_rentalhub_agents": "Lo aṣojú RentalHub NG",
+    "use_rentalhub_agents": "Lo aṣojú Amana RentalHub NG",
     "rentalhub_agent_desc": "Aṣojú tí a fìdí rẹ̀ múlẹ̀ yóò ṣàkóso àwọn ilé rẹ fún {{fee}}.",
     "use_our_agents": "Lo àwọn aṣojú wa",
-    "agent_auto_assigned": "A ó yan aṣojú RentalHub NG sí àkọọ́lẹ̀ rẹ lọ́nà àdánidá.",
+    "agent_auto_assigned": "A ó yan aṣojú Amana RentalHub NG sí àkọọ́lẹ̀ rẹ lọ́nà àdánidá.",
     "select_location_agent_fee": "Yan ẹkùn rẹ láti fìdí ìdíyelé aṣojú gangan múlẹ̀.",
     "back": "Padà",
     "step_3_title": "Ìfìdírí àti Ẹkùn",
@@ -3487,8 +3487,8 @@
     "payment_summary": "Àkópọ̀ Ìsanwó",
     "tenant_account_creation": "Ṣíṣẹ̀dá àkọọ́lẹ̀ agbatẹ̀rù",
     "landlord_account_creation": "Ṣíṣẹ̀dá àkọọ́lẹ̀ onílé",
-    "rentalhub_lawyer_access": "Ìwọ̀lé agbẹjọ́rò RentalHub NG",
-    "rentalhub_agent_access": "Ìwọ̀lé aṣojú RentalHub NG",
+    "rentalhub_lawyer_access": "Ìwọ̀lé agbẹjọ́rò Amana RentalHub NG",
+    "rentalhub_agent_access": "Ìwọ̀lé aṣojú Amana RentalHub NG",
     "total_due": "Àpapọ̀ tí ń ṣẹ́",
     "select_location_exact_fee": "Yan ìpínlẹ̀ àti ìjọba ìbílẹ̀ rẹ láti rí ìdíyelé gangan.",
     "password": "Ọ̀rọ̀ Ìpamọ́",
@@ -3511,7 +3511,7 @@
     "location_preview_fallback": "Kò sí àbájáde tó bá mu ní {{lga}}, {{state}}. Ń fi àwọn ilé tó wà nítòsí hàn.",
     "the_selected_state": "ìpínlẹ̀ tí a yàn",
     "location_preview_error": "Kò ṣeé ṣe láti kó àwòrán àkọ́kọ́ ilé fún ẹkùn yìí.",
-    "registration_success": "Ìforúkọsílẹ̀ ṣe àṣeyọrí! Káàbọ̀ sí RentalHub NG.",
+    "registration_success": "Ìforúkọsílẹ̀ ṣe àṣeyọrí! Káàbọ̀ sí Amana RentalHub NG.",
     "registration_failed": "Ìforúkọsílẹ̀ kùnà. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kansí.",
     "otp_before": "Àyẹ̀wò ààbò",
     "otp_title": "Múdájú fóònù rẹ",
@@ -4370,7 +4370,7 @@
   },
   "property_share": {
     "fallback_title": "Àkójọ ohun-inì",
-    "text": "Ṣàgbéwò ohun-inì yìí lórí RentalHub NG: {{title}}",
+    "text": "Ṣàgbéwò ohun-inì yìí lórí Amana RentalHub NG: {{title}}",
     "header": "Pín Àkójọ",
     "copy_success": "Wọ́n ti da ọ̀rọ̀ àsopọ̀ ohun-inì kọ",
     "copy_error": "Ọ̀rọ̀ àsopọ̀ ohun-inì kò ṣeé da kọ ní báyìí",
@@ -4556,7 +4556,7 @@
     "continue_existing": "Tẹsiwaju iwadi ti o bẹrẹ",
     "contact_no_email_agent": "Oludahun yii ko ni imeeli",
     "contact_no_email_public": "Emi ko ni imeeli lọwọlọwọ",
-    "title": "Iwadi Iwadi RentalHub NG",
+    "title": "Iwadi Iwadi Amana RentalHub NG",
     "part_a_title": "Awọn ibeere diẹ ki o to tẹsiwaju",
     "part_a_sub": "Abala akọkọ yii gba to iṣẹju meji 2. O le pari iyoku nigbamii.",
     "part_b_sub": "Abala {{section}} · Ibeere {{q}} ninu {{total}}",
@@ -4625,7 +4625,7 @@
     "gate_start": "Bẹrẹ Iwadi",
     "gate_skip": "Foju fo",
     "gate_google_hint": "O le wọle pẹlu Google lati fi awọn idahun rẹ pamọ laifọwọyi",
-    "title": "Iwadi Gbogbo Eniyan ti RentalHub NG",
+    "title": "Iwadi Gbogbo Eniyan ti Amana RentalHub NG",
     "subtitle": "Ran wa lọwọ lati ṣe agbekalẹ ọjọ iwaju ti yiyalo ile ni Naijiria",
     "choose": "Yan ipo rẹ",
     "tenant": "Ayalegbe ni mi",

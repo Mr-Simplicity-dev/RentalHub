@@ -151,7 +151,7 @@ export const PremiumSlide: React.FC<PremiumSlideProps> = ({
       >
         <img
           src={staticFile('rentalhub-mark.svg')}
-          alt="RentalHub NG"
+          alt="Amana RentalHub NG"
           style={{ width: 104, height: 104, filter: 'drop-shadow(0 12px 24px rgba(15,23,42,0.4))' }}
         />
       </div>

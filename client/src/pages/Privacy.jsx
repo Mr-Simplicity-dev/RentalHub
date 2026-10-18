@@ -233,10 +233,10 @@ const Privacy = () => {
   return (
     <>
       <Helmet>
-        <title>Privacy Policy | RentalHub NG</title>
+        <title>Privacy Policy | Amana RentalHub NG</title>
         <meta
           name="description"
-          content="How RentalHub NG collects, uses, shares, stores and protects personal data across its website and mobile applications."
+          content="How Amana RentalHub NG collects, uses, shares, stores and protects personal data across its website and mobile applications."
         />
         <link rel="canonical" href="https://rentalhub.com.ng/privacy" />
       </Helmet>
@@ -271,7 +271,7 @@ const Privacy = () => {
               <p className="text-xs font-bold uppercase tracking-[0.25em] text-amber-300">{t('privacy.hero_tagline', 'Privacy, explained clearly')}</p>
               <h1 className="mt-4 text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl">{t('privacy.hero_title', 'Your data. Your rights.')}</h1>
               <p className="mx-auto mt-5 max-w-3xl text-base leading-7 text-primary-100 sm:text-lg sm:leading-8">
-                {t('privacy.hero_sub', 'This policy explains exactly what RentalHub NG collects, where it comes from, why we use it, who may receive it, how long we keep it and the controls available to you.')}
+                {t('privacy.hero_sub', 'This policy explains exactly what Amana RentalHub NG collects, where it comes from, why we use it, who may receive it, how long we keep it and the controls available to you.')}
               </p>
               <div className="mt-7 flex flex-wrap items-center justify-center gap-3 text-sm">
                 <span className="rounded-full border border-white/20 bg-white/10 px-4 py-2 font-semibold">
@@ -309,7 +309,7 @@ const Privacy = () => {
         </header>
 
         <div className="privacy-print-header hidden">
-          <p>RENTALHUB NG</p>
+          <p>Amana RentalHub NG</p>
           <h1>{t('privacy.title', 'Privacy Policy')}</h1>
           <span>{t('privacy.effective_url', 'Effective and last updated {date} · rentalhub.com.ng/privacy', { date: LAST_UPDATED })}</span>
         </div>
@@ -351,7 +351,7 @@ const Privacy = () => {
             <div className="privacy-policy-stack min-w-0 space-y-7">
               <PolicySection id="scope" eyebrow="01 · Controller" title={t('privacy.scope.title', 'Who we are and what this policy covers')} icon={FaShieldAlt}>
                 <p>
-                  {t('privacy.scope.1', 'RentalHub NG (“RentalHub”, “we”, “us” or “our”) operates rentalhub.com.ng and the Mobile Applications from Nigeria. RentalHub is the controller of personal data it decides how and why to process. Where a landlord, agent, lawyer, employer, service provider or other user independently decides how to use information they receive, that person may also have their own responsibilities under data-protection law.')}
+                  {t('privacy.scope.1', 'Amana RentalHub NG (“RentalHub”, “we”, “us” or “our”) operates rentalhub.com.ng and the Mobile Applications from Nigeria. RentalHub is the controller of personal data it decides how and why to process. Where a landlord, agent, lawyer, employer, service provider or other user independently decides how to use information they receive, that person may also have their own responsibilities under data-protection law.')}
                 </p>
                 <div className="mt-5 grid gap-3 sm:grid-cols-3">
                   <a href="mailto:support@rentalhub.com.ng" className="rounded-xl bg-slate-50 p-4 transition hover:bg-primary-50">

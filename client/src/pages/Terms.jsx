@@ -29,7 +29,7 @@ const Terms = () => {
       icon: FaFileContract,
       title: t('terms.acceptance.title', 'Acceptance and scope'),
       body: [
-        t('terms.acceptance.1', 'These Terms of Service (the “Terms”) form a binding agreement between you and RentalHub NG (“RentalHub”, “we”, “us” or “our”) when you access rentalhub.com.ng, install or use a Mobile Application, create an account, submit information, make a payment, or use a service that links to these Terms.'),
+        t('terms.acceptance.1', 'These Terms of Service (the “Terms”) form a binding agreement between you and Amana RentalHub NG (“Amana RentalHub NG”, “we”, “us” or “our”) when you access rentalhub.com.ng, install or use a Mobile Application, create an account, submit information, make a payment, or use a service that links to these Terms.'),
         t('terms.acceptance.2', 'If you do not agree, do not create an account or continue using the service. Additional terms shown before a particular payment, booking, subscription, recruitment application, professional service or promotion form part of these Terms for that transaction. If they conflict, the more specific terms apply to that transaction.'),
       ],
     },
@@ -39,16 +39,16 @@ const Terms = () => {
       title: t('terms.eligibility.title', 'Eligibility, accounts and authority'),
       body: [
         t('terms.eligibility.1', 'You must be at least 18 years old and legally able to enter the transaction you request. You must provide accurate, current information, keep it updated, protect your password and device, and promptly report suspected unauthorised access.'),
-        t('terms.eligibility.2', 'You may act for another person, landlord, company or organisation only when you have authority to bind them. You are responsible for activity performed through your account unless it results from a security failure attributable to RentalHub.'),
+        t('terms.eligibility.2', 'You may act for another person, landlord, company or organisation only when you have authority to bind them. You are responsible for activity performed through your account unless it results from a security failure attributable to Amana RentalHub NG.'),
         t('terms.eligibility.3', 'Account roles and administrator permissions are limited to their assigned purpose and jurisdiction. You must not share an administrator account, misuse elevated access, or attempt to access another user’s records without authorisation.'),
       ],
     },
     {
       id: 'marketplace',
       icon: FaHome,
-      title: t('terms.marketplace.title', 'RentalHub’s role and marketplace relationships'),
+      title: t('terms.marketplace.title', 'Amana RentalHub NG’s role and marketplace relationships'),
       body: [
-        t('terms.marketplace.1', 'RentalHub provides technology for property discovery, listings, applications, communications, payments, bookings, support and related workflows. Unless a screen expressly says otherwise, RentalHub is not the landlord, tenant, property owner, estate agent, lawyer, bank, transporter, cleaner, fumigator, insurer or employer in a transaction between users.'),
+        t('terms.marketplace.1', 'Amana RentalHub NG provides technology for property discovery, listings, applications, communications, payments, bookings, support and related workflows. Unless a screen expressly says otherwise, Amana RentalHub NG is not the landlord, tenant, property owner, estate agent, lawyer, bank, transporter, cleaner, fumigator, insurer or employer in a transaction between users.'),
         t('terms.marketplace.2', 'A landlord, agent, lawyer, service provider or other professional remains responsible for their representations, licences, advice, work, property and legal obligations. Verification badges and administrative review reduce risk but are not a guarantee of identity, title, professional competence, property condition, availability or future conduct.'),
       ],
     },
@@ -67,9 +67,9 @@ const Terms = () => {
       icon: FaShieldAlt,
       title: t('terms.verification.title', 'Identity checks and credential revalidation'),
       body: [
-        t('terms.verification.1', 'RentalHub may require email, phone, identity-document, live-photo, liveness, role, ownership or professional verification. We may ask you to revalidate a credential where information expires, changes, conflicts, is incomplete, or presents a fraud or safety concern.'),
+        t('terms.verification.1', 'Amana RentalHub NG may require email, phone, identity-document, live-photo, liveness, role, ownership or professional verification. We may ask you to revalidate a credential where information expires, changes, conflicts, is incomplete, or presents a fraud or safety concern.'),
         t('terms.verification.2', 'You must submit only your own authentic information through the requested secure workflow. Pending, rejected or expired verification may limit features. A verification decision may be reviewed, corrected or appealed through the available support or appeal process.'),
-        t('terms.verification.3', 'How identity and biometric-related data is handled is explained in the Privacy Policy. A device biometric prompt used to unlock the app is controlled by your phone’s operating system; RentalHub does not receive the fingerprint or face template stored by your device.'),
+        t('terms.verification.3', 'How identity and biometric-related data is handled is explained in the Privacy Policy. A device biometric prompt used to unlock the app is controlled by your phone’s operating system; Amana RentalHub NG does not receive the fingerprint or face template stored by your device.'),
       ],
     },
     {
@@ -78,8 +78,8 @@ const Terms = () => {
       title: t('terms.fees.title', 'Prices, payments, wallets and payouts'),
       body: [
         t('terms.fees.1', 'The amount, purpose, taxes (if any), and material conditions of a paid feature are shown before confirmation. Charges may include registration access, property access, rent, subscriptions, applications, inspections, bookings, professional services or other clearly identified services.'),
-        t('terms.fees.2', 'Payments may be processed by Paystack, a participating bank or another approved provider. RentalHub does not ask you to place full payment-card details in messages or support tickets. Payment success is subject to provider confirmation and may be delayed while a transaction is reconciled.'),
-        t('terms.fees.3', 'A RentalHub wallet, savings view, balance or ledger is a platform record for eligible transactions; it is not a bank account and RentalHub does not promise interest unless a specific regulated product expressly says so. Withdrawals, refunds and settlements may require verification, available funds, fraud review, valid destination details and any disclosed reserve or processing rule.'),
+        t('terms.fees.2', 'Payments may be processed by Paystack, a participating bank or another approved provider. Amana RentalHub NG does not ask you to place full payment-card details in messages or support tickets. Payment success is subject to provider confirmation and may be delayed while a transaction is reconciled.'),
+        t('terms.fees.3', 'A Amana RentalHub NG wallet, savings view, balance or ledger is a platform record for eligible transactions; it is not a bank account and Amana RentalHub NG does not promise interest unless a specific regulated product expressly says so. Withdrawals, refunds and settlements may require verification, available funds, fraud review, valid destination details and any disclosed reserve or processing rule.'),
       ],
       subsections: [
         {
@@ -87,8 +87,8 @@ const Terms = () => {
           number: '06.1',
           title: t('terms.fees.circumvention.title', 'Exclusivity of In-App Payments and Anti-Circumvention'),
           body: [
-            t('terms.fees.circumvention.routing', 'Mandatory payment routing: To secure platform interactions, protect user data, and ensure accurate corporate tax compliance under the laws of the Federal Republic of Nigeria, all financial transactions initiated on or facilitated by RentalHub — including but not limited to rent payments, listing fees, service bookings and security deposits — must be completed exclusively through the integrated Paystack payment gateway within the RentalHub application or website.'),
-            t('terms.fees.circumvention.offline', 'Prohibition of offline transactions: Users (including landlords, agents, tenants and service providers) are strictly prohibited from soliciting, offering, negotiating or accepting payments outside of the RentalHub platform for any property listing, booking or relationship established via RentalHub.'),
+            t('terms.fees.circumvention.routing', 'Mandatory payment routing: To secure platform interactions, protect user data, and ensure accurate corporate tax compliance under the laws of the Federal Republic of Nigeria, all financial transactions initiated on or facilitated by Amana RentalHub NG — including but not limited to rent payments, listing fees, service bookings and security deposits — must be completed exclusively through the integrated Paystack payment gateway within the Amana RentalHub NG application or website.'),
+            t('terms.fees.circumvention.offline', 'Prohibition of offline transactions: Users (including landlords, agents, tenants and service providers) are strictly prohibited from soliciting, offering, negotiating or accepting payments outside of the Amana RentalHub NG platform for any property listing, booking or relationship established via Amana RentalHub NG.'),
             t('terms.fees.circumvention.definition', 'Definition of circumvention: Prohibited circumvention behaviours include, but are not limited to:'),
           ],
           bullets: [
@@ -96,7 +96,7 @@ const Terms = () => {
             t('terms.fees.circumvention.example_2', 'invoicing users directly outside the application; or'),
             t('terms.fees.circumvention.example_3', 'encouraging a user to cancel an application or booking on the app in order to pay by external cash, cheque or direct bank transfer.'),
           ],
-          penalty: t('terms.fees.circumvention.penalty', 'Penalties for violation: Any attempt to bypass, circumvent or avoid RentalHub’s in-app payment system constitutes a material breach of these Terms. RentalHub reserves the right, in its sole discretion and without prior notice, to immediately suspend or permanently terminate the offending user’s account, remove all active listings, withhold platform access, and charge a circumvention penalty fee equivalent to the maximum platform commission that would have been earned on the transaction.'),
+          penalty: t('terms.fees.circumvention.penalty', 'Penalties for violation: Any attempt to bypass, circumvent or avoid Amana RentalHub NG’s in-app payment system constitutes a material breach of these Terms. Amana RentalHub NG reserves the right, in its sole discretion and without prior notice, to immediately suspend or permanently terminate the offending user’s account, remove all active listings, withhold platform access, and charge a circumvention penalty fee equivalent to the maximum platform commission that would have been earned on the transaction.'),
         },
       ],
     },
@@ -116,7 +116,7 @@ const Terms = () => {
       title: t('terms.services.title', 'Bookings, agents, lawyers and other services'),
       body: [
         t('terms.services.1', 'Transportation, cleaning, fumigation, inspections, legal support, agents and other service workflows may involve independent providers. You must give accurate addresses, timing, safety information and instructions and provide safe, lawful access where required.'),
-        t('terms.services.2', 'A lawyer-client, agency, service or employment relationship is created only under the applicable engagement or appointment—not merely because a directory profile, invitation or matching tool appears on RentalHub. Emergency, medical or time-critical services should be obtained from the appropriate public authority or qualified provider, not ordinary platform support.'),
+        t('terms.services.2', 'A lawyer-client, agency, service or employment relationship is created only under the applicable engagement or appointment—not merely because a directory profile, invitation or matching tool appears on Amana RentalHub NG. Emergency, medical or time-critical services should be obtained from the appropriate public authority or qualified provider, not ordinary platform support.'),
       ],
     },
     {
@@ -144,10 +144,10 @@ const Terms = () => {
     {
       id: 'content',
       icon: FaFileContract,
-      title: t('terms.content.title', 'Your content and RentalHub intellectual property'),
+      title: t('terms.content.title', 'Your content and Amana RentalHub NG intellectual property'),
       body: [
-        t('terms.content.1', 'You keep ownership of content you lawfully submit. You grant RentalHub a non-exclusive, worldwide, royalty-free licence to host, copy, format, display, transmit and moderate that content only as reasonably necessary to operate, secure, promote and improve the service and fulfil the transaction you requested. This licence ends when the content is deleted, except for lawful backups, evidence, disputes and records that must be retained.'),
-        t('terms.content.2', 'RentalHub’s software, branding, designs, databases, text and other platform materials are protected by intellectual-property law. These Terms grant only a limited, revocable, non-transferable right to use the service for its intended purpose. They do not transfer ownership or permit use of RentalHub marks without written permission.'),
+        t('terms.content.1', 'You keep ownership of content you lawfully submit. You grant Amana RentalHub a non-exclusive, worldwide, royalty-free licence to host, copy, format, display, transmit and moderate that content only as reasonably necessary to operate, secure, promote and improve the service and fulfil the transaction you requested. This licence ends when the content is deleted, except for lawful backups, evidence, disputes and records that must be retained.'),
+        t('terms.content.2', 'Amana RentalHub’s software, branding, designs, databases, text and other platform materials are protected by intellectual-property law. These Terms grant only a limited, revocable, non-transferable right to use the service for its intended purpose. They do not transfer ownership or permit use of Amana RentalHub marks without written permission.'),
       ],
     },
     {
@@ -155,7 +155,7 @@ const Terms = () => {
       icon: FaMobileAlt,
       title: t('terms.third_parties.title', 'Third-party services and external links'),
       body: [
-        t('terms.third_parties.1', 'Maps, payment processors, identity providers, communications services, cloud storage, analytics, app stores and external websites operate under their own terms and privacy practices. RentalHub is responsible for selecting and integrating providers with reasonable care, but is not responsible for an independent third party’s service outside RentalHub’s control.'),
+        t('terms.third_parties.1', 'Maps, payment processors, identity providers, communications services, cloud storage, analytics, app stores and external websites operate under their own terms and privacy practices. Amana RentalHub NG is responsible for selecting and integrating providers with reasonable care, but is not responsible for an independent third party’s service outside Amana RentalHub’s control.'),
         t('terms.third_parties.2', 'Downloading an Android package outside an app store may require your device to allow installation from the selected source. Install only the file linked from rentalhub.com.ng, review the version and signing information, and do not install a file received from an unknown person.'),
       ],
     },
@@ -164,7 +164,7 @@ const Terms = () => {
       icon: FaMobileAlt,
       title: t('terms.availability.title', 'Availability, updates and changes to features'),
       body: [
-        t('terms.availability.1', 'We aim to keep RentalHub reliable but do not promise uninterrupted availability. Maintenance, weak networks, provider outages, safety incidents, legal requirements or events beyond reasonable control may interrupt a feature.'),
+        t('terms.availability.1', 'We aim to keep Amana RentalHub NG reliable but do not promise uninterrupted availability. Maintenance, weak networks, provider outages, safety incidents, legal requirements or events beyond reasonable control may interrupt a feature.'),
         t('terms.availability.2', 'We may update the website or app to fix defects, improve security, meet legal requirements or change a feature. A mandatory security update may be required before continued use. Sideloaded Android installations normally require the user to approve installation of a new package; app-store behaviour is controlled by the store and device settings.'),
       ],
     },
@@ -174,7 +174,7 @@ const Terms = () => {
       title: t('terms.suspension.title', 'Moderation, suspension and termination'),
       body: [
         t('terms.suspension.1', 'We may remove content, pause a transaction, restrict a feature, suspend or terminate an account where reasonably necessary to address fraud, safety, legal obligations, non-payment, serious or repeated breaches, or risk to users or the platform. Where appropriate, we will give notice, a reason and an opportunity to correct or appeal.'),
-        t('terms.suspension.2', 'You may stop using RentalHub and request account deletion through available settings or support. Deletion does not cancel a completed transaction, erase another person’s lawful record, or require deletion of information that must be retained for payments, tax, fraud, evidence, disputes, legal claims or regulatory duties.'),
+        t('terms.suspension.2', 'You may stop using Amana RentalHub NG and request account deletion through available settings or support. Deletion does not cancel a completed transaction, erase another person’s lawful record, or require deletion of information that must be retained for payments, tax, fraud, evidence, disputes, legal claims or regulatory duties.'),
       ],
     },
     {
@@ -182,8 +182,8 @@ const Terms = () => {
       icon: FaExclamationTriangle,
       title: t('terms.disclaimers.title', 'Fair disclaimers and responsibility'),
       body: [
-        t('terms.disclaimers.1', 'RentalHub provides the platform with reasonable care and skill. User-generated listings, advice and representations remain the responsibility of the person who supplied them. You should make proportionate checks before a property, payment or professional decision.'),
-        t('terms.disclaimers.2', 'To the maximum extent permitted by law, RentalHub is not liable for indirect or consequential loss that was not reasonably foreseeable when you accepted these Terms, or for loss caused solely by a user or independent provider outside our reasonable control. RentalHub remains responsible where liability cannot lawfully be excluded, including applicable liability for fraud, wilful misconduct, death or personal injury caused by negligence, and non-excludable consumer rights.'),
+        t('terms.disclaimers.1', 'Amana RentalHub NG provides the platform with reasonable care and skill. User-generated listings, advice and representations remain the responsibility of the person who supplied them. You should make proportionate checks before a property, payment or professional decision.'),
+        t('terms.disclaimers.2', 'To the maximum extent permitted by law, Amana RentalHub NG is not liable for indirect or consequential loss that was not reasonably foreseeable when you accepted these Terms, or for loss caused solely by a user or independent provider outside our reasonable control. Amana RentalHub NG remains responsible where liability cannot lawfully be excluded, including applicable liability for fraud, wilful misconduct, death or personal injury caused by negligence, and non-excludable consumer rights.'),
         t('terms.disclaimers.3', 'Nothing in this section limits a payment or service remedy expressly offered in the applicable workflow. Any assessment of responsibility will take account of the nature of the service, the amount paid, the parties’ conduct and applicable law.'),
       ],
     },
@@ -201,8 +201,8 @@ const Terms = () => {
       icon: FaLock,
       title: t('terms.privacy.title', 'Privacy and security'),
       body: [
-        t('terms.privacy.1', 'The RentalHub Privacy Policy explains what personal data we collect, why we use it, who receives it, retention, safeguards and your rights. You must use personal data obtained through RentalHub only for the transaction and lawful purpose for which it was provided and must protect it from unauthorised access or disclosure.'),
-        t('terms.privacy.2', 'Report a suspected account compromise, privacy incident or platform vulnerability promptly. Do not publicly disclose sensitive exploit details before RentalHub has had a reasonable opportunity to investigate and protect users.'),
+        t('terms.privacy.1', 'The Amana RentalHub NG Privacy Policy explains what personal data we collect, why we use it, who receives it, retention, safeguards and your rights. You must use personal data obtained through Amana RentalHub NG only for the transaction and lawful purpose for which it was provided and must protect it from unauthorised access or disclosure.'),
+        t('terms.privacy.2', 'Report a suspected account compromise, privacy incident or platform vulnerability promptly. Do not publicly disclose sensitive exploit details before Amana RentalHub NG has had a reasonable opportunity to investigate and protect users.'),
       ],
     },
     {
@@ -223,10 +223,10 @@ const Terms = () => {
   return (
     <>
       <Helmet>
-        <title>Terms of Service | RentalHub NG</title>
+        <title>Terms of Service | Amana RentalHub NG</title>
         <meta
           name="description"
-          content="RentalHub NG Terms of Service for property, payment, verification, booking, professional, website and mobile-app services."
+          content="Amana RentalHub NG Terms of Service for property, payment, verification, booking, professional, website and mobile-app services."
         />
         <link rel="canonical" href="https://rentalhub.com.ng/terms" />
       </Helmet>
@@ -258,7 +258,7 @@ const Terms = () => {
         </header>
 
         <div className="terms-print-header hidden">
-          <p>RENTALHUB NG</p>
+          <p>Amana RentalHub NG</p>
           <h1>{t('terms.title', 'Terms of Service')}</h1>
           <span>{t('terms.effective_last_updated', 'Effective and last updated {date} · rentalhub.com.ng/terms', { date: LAST_UPDATED })}</span>
         </div>

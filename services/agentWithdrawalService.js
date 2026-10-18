@@ -612,7 +612,7 @@ class AgentWithdrawalService {
         await sendEmail({
           to: contact.email,
           subject: `RentalHub withdrawal ${ref}: ${event}`,
-          html: `<p>Hello${greeting},</p><p>${message}</p><p>— RentalHub NG</p>`,
+          html: `<p>Hello${greeting},</p><p>${message}</p><p>— Amana RentalHub NG</p>`,
         }).catch((error) => logger.error(`Withdrawal email failed: ${error.message}`));
       }
 

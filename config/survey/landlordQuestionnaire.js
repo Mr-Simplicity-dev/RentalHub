@@ -465,7 +465,7 @@ L.push(q('L7.8', 'L7', 'B', 'multi', 'What would you require before trusting pla
 ], { analysis: 'adoption' }));
 
 // ── L8 Concept test ───────────────────────────────────────────────────────
-L.push(q('L8.1', 'L8', 'B', 'single', 'Before today, had you heard of RentalHub NG?', [
+L.push(q('L8.1', 'L8', 'B', 'single', 'Before today, had you heard of Amana RentalHub NG?', [
   ['yes', 'Yes'],
   ['no', 'No'],
   ['not_sure', 'Not sure'],
@@ -497,7 +497,7 @@ L.push(q('L8.2', 'L8', 'B', 'single', 'Based only on the description above, how 
   L.push(q(key, 'L8', 'B', 'likert', text, SCALE_1_5, { ...LIKERT_IMPORTANCE, analysis: 'feature' }));
 });
 
-L.push(q('L8.16', 'L8', 'B', 'rank', 'Which THREE functions above would most influence you to try RentalHub NG? Write the numbers:', null, {
+L.push(q('L8.16', 'L8', 'B', 'rank', 'Which THREE functions above would most influence you to try Amana RentalHub NG? Write the numbers:', null, {
   maxPicks: 3,
   analysis: 'feature',
   rankSource: ['L8.3', 'L8.4', 'L8.5', 'L8.6', 'L8.7', 'L8.8', 'L8.9', 'L8.10', 'L8.11', 'L8.12', 'L8.13', 'L8.14', 'L8.15'],
@@ -507,7 +507,7 @@ L.push(q('L8.17', 'L8', 'B', 'text', 'Which functions would you probably never u
 L.push(q('L8.18', 'L8', 'B', 'text', 'What important landlord problem is missing from the concept?', null, { analysis: 'open' }));
 
 // ── L9 Adoption and willingness to pay ────────────────────────────────────
-L.push(q('L9.1', 'L9', 'B', 'single', 'If RentalHub NG had active renters in your area today, how likely would you be to list one property?', [
+L.push(q('L9.1', 'L9', 'B', 'single', 'If Amana RentalHub NG had active renters in your area today, how likely would you be to list one property?', [
   ['definitely', 'Definitely would'],
   ['probably', 'Probably would'],
   ['not_sure', 'Not sure'],
@@ -515,14 +515,14 @@ L.push(q('L9.1', 'L9', 'B', 'single', 'If RentalHub NG had active renters in you
   ['definitely_not', 'Definitely would not'],
 ], { analysis: 'adoption' }));
 
-L.push(q('L9.2', 'L9', 'B', 'single', 'Would you give RentalHub NG an exclusive listing?', [
+L.push(q('L9.2', 'L9', 'B', 'single', 'Would you give Amana RentalHub NG an exclusive listing?', [
   ['yes', 'Yes'],
   ['limited', 'Maybe for a limited period'],
   ['no', 'No — I would list on multiple channels'],
   ['not_sure', 'Not sure'],
 ], { analysis: 'adoption' }));
 
-L.push(q('L9.3', 'L9', 'B', 'single', 'Would you continue using offline agents alongside RentalHub NG?', [
+L.push(q('L9.3', 'L9', 'B', 'single', 'Would you continue using offline agents alongside Amana RentalHub NG?', [
   ['yes', 'Yes, definitely'],
   ['probably', 'Probably'],
   ['when_needed', 'Only when needed'],
@@ -530,7 +530,7 @@ L.push(q('L9.3', 'L9', 'B', 'single', 'Would you continue using offline agents a
   ['no', 'No'],
 ], { analysis: 'adoption' }));
 
-L.push(q('L9.4', 'L9', 'B', 'multi', 'What would stop you from listing on RentalHub NG? Select all that apply.', [
+L.push(q('L9.4', 'L9', 'B', 'multi', 'What would stop you from listing on Amana RentalHub NG? Select all that apply.', [
   ['few_tenants', 'Too few serious tenants'],
   ['fees', 'Fees too high'],
   ['verification', 'Verification burden'],
@@ -556,7 +556,7 @@ L.push(q('L9.5', 'L9', 'B', 'single', 'Which charging model would you consider m
   ['not_sure', 'Not sure'],
 ], { analysis: 'fee' }));
 
-L.push(q('L9.6', 'L9', 'B', 'single', 'If RentalHub NG successfully introduced a tenant who completed a tenancy, what maximum platform fee would you consider before preferring your existing method?', [
+L.push(q('L9.6', 'L9', 'B', 'single', 'If Amana RentalHub NG successfully introduced a tenant who completed a tenancy, what maximum platform fee would you consider before preferring your existing method?', [
   ['0', '₦0'],
   ['lt5k', 'Below ₦5,000'],
   ['5_19', '₦5,000–₦19,999'],
@@ -575,12 +575,12 @@ L.push(q('L9.7', 'L9', 'B', 'single', 'Would you pay separately for optional ten
   ['depends', 'Depends on price/value'],
 ], { analysis: 'fee' }));
 
-L.push(q('L9.8', 'L9', 'B', 'single', 'Would you recommend RentalHub NG to another landlord IF it consistently brought serious verified applicants and reduced disputes? (0 = not at all likely; 10 = extremely likely)', SCALE_0_10, {
+L.push(q('L9.8', 'L9', 'B', 'single', 'Would you recommend Amana RentalHub NG to another landlord IF it consistently brought serious verified applicants and reduced disputes? (0 = not at all likely; 10 = extremely likely)', SCALE_0_10, {
   analysis: 'nps',
 }));
 
-L.push(q('L9.9', 'L9', 'B', 'text', 'What single failure would make you remove all your properties from RentalHub NG?', null, { analysis: 'open' }));
-L.push(q('L9.10', 'L9', 'B', 'text', 'What proof would you need before trusting RentalHub NG with important rental transactions?', null, { analysis: 'open' }));
+L.push(q('L9.9', 'L9', 'B', 'text', 'What single failure would make you remove all your properties from Amana RentalHub NG?', null, { analysis: 'open' }));
+L.push(q('L9.10', 'L9', 'B', 'text', 'What proof would you need before trusting Amana RentalHub NG with important rental transactions?', null, { analysis: 'open' }));
 
 // ── L10 Open-ended ────────────────────────────────────────────────────────
 L.push(q('L10.1', 'L10', 'B', 'text', 'Tell us about the worst tenant-related problem you have experienced.', null, { analysis: 'open' }));

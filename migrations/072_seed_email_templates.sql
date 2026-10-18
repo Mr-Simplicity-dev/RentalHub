@@ -374,7 +374,7 @@ BEGIN
           <td align="center" style="padding:36px 24px;">
             <div style="font-size:40px;">🎄</div>
             <div style="font-size:24px;font-weight:800;color:#ffffff;margin-top:12px;">Happy {{holiday}}!</div>
-            <div style="font-size:14px;color:#c4b5fd;margin-top:8px;">From all of us at RentalHub NG</div>
+            <div style="font-size:14px;color:#c4b5fd;margin-top:8px;">From all of us at Amana RentalHub NG</div>
           </td>
         </tr>
       </table>

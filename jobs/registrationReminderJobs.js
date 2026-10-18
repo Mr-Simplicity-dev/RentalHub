@@ -146,14 +146,14 @@ const runRegistrationReminders = async () => {
       }
 
       const count = Number(row.reminder_count) || 0;
-      let subject = 'Finish Your Registration on RentalHub NG';
+      let subject = 'Finish Your Registration on Amana RentalHub NG';
       let message = 'You started creating your account but your registration payment is still pending. Complete it to activate your account.';
 
       if (count === 1) {
-        subject = 'Reminder: Complete your RentalHub NG account';
-        message = 'We noticed you haven\'t finished setting up your RentalHub NG account. Your saved details are ready so you can pick up right where you left off.';
+        subject = 'Reminder: Complete your Amana RentalHub NG account';
+        message = 'We noticed you haven\'t finished setting up your Amana RentalHub NG account. Your saved details are ready so you can pick up right where you left off.';
       } else if (count >= 2) {
-        subject = 'Final Notice: Your RentalHub NG registration link is expiring soon';
+        subject = 'Final Notice: Your Amana RentalHub NG registration link is expiring soon';
         message = 'This is your final reminder to complete your registration. Your reserved registration link will expire soon.';
       }
 

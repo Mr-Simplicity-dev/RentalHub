@@ -1,4 +1,4 @@
-# RentalHub NG — 1-Hour Meeting Briefing
+# Amana RentalHub NG — 1-Hour Meeting Briefing
 
 Audience: people new to the platform. Goal: they leave understanding WHAT it
 is, WHO it serves, WHY it matters in Nigeria, and WHERE it is going.
@@ -23,7 +23,7 @@ Suggested posture: demo-led, story-first. Avoid jargon; use the live web app
 
 ## 0–5 · Intro
 
-- "RentalHub NG is a rental marketplace for Nigeria that doesn't stop at
+- "Amana RentalHub NG is a rental marketplace for Nigeria that doesn't stop at
   listings — it handles the whole journey: finding, verifying, applying,
   paying rent, managing the tenancy, and even disputes and legal help."
 - Three surfaces: web (rentalhub.com.ng), Android app, iOS app.

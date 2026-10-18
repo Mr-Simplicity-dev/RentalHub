@@ -417,7 +417,7 @@ exports.applyToPlatformLawyerProgram = async (req, res) => {
     } else if (existingResult.rows[0].status === 'approved') {
       return res.status(400).json({
         success: false,
-        message: 'You are already approved as a RentalHub NG lawyer',
+        message: 'You are already approved as a Amana RentalHub NG lawyer',
       });
     } else {
       application = (

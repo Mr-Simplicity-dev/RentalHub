@@ -19,7 +19,7 @@ const TextAd3: React.FC = () => {
         <TextSlide text="36 STATES." fontSize={110} bgColor="#0f172a" animation="zoomIn" color="#eab308" />
       </Sequence>
       <Sequence from={8 * fps} durationInFrames={2 * fps}>
-        <TextSlide text="RentalHub NG — Download Free" fontSize={50} bgColor="#0284c7" animation="slideUp" />
+        <TextSlide text="Amana RentalHub NG — Download Free" fontSize={50} bgColor="#0284c7" animation="slideUp" />
       </Sequence>
     </AbsoluteFill>
   );

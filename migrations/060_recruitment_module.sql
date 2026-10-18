@@ -1,5 +1,5 @@
 -- ============================================================
--- Recruitment Module for RentalHub NG
+-- Recruitment Module for Amana RentalHub NG
 -- Migration 060: Core recruitment tables
 -- ============================================================
 

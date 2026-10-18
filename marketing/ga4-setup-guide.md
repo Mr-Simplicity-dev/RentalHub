@@ -8,7 +8,7 @@
 3. Click **Admin** (gear icon, bottom-left)
 4. Click **+ Create Property**
 5. Fill in:
-   - **Property name:** RentalHub NG
+   - **Property name:** Amana RentalHub NG
    - **Reporting time zone:** Africa/Lagos
    - **Currency:** Nigerian Naira (₦)
 6. Click **Next**

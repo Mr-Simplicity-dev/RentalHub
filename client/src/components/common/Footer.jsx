@@ -66,7 +66,7 @@ const Footer = () => {
             <div className="leading-none">
               <span className="amana-mark amana-mark--on-dark block text-lg">Amana</span>
               <h3 className="text-xl font-bold bg-gradient-to-r from-primary-400 to-primary-200 bg-clip-text text-transparent">
-                RentalHub NG
+                Amana RentalHub NG
               </h3>
             </div>
             <p className="text-sm text-gray-400 leading-relaxed">
@@ -147,7 +147,7 @@ const Footer = () => {
         </div>
 
         <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-gray-400">&copy; 2024 RentalHub NG. {t('footer.rights')}</p>
+          <p className="text-sm text-gray-400">&copy; 2024 Amana RentalHub NG. {t('footer.rights')}</p>
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm md:justify-end">
             <Link
               to="/privacy"

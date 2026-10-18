@@ -18,7 +18,7 @@ const db = require('../middleware/database');
 const { encryptNIN, decryptNIN } = require('./ninEncryption');
 const { sendVerificationCode } = require('./smsService');
 
-const SERVICE_NAME = 'RentalHub NG';
+const SERVICE_NAME = 'Amana RentalHub NG';
 const MAX_TOTP_ATTEMPTS = 5;
 const TOTP_LOCK_MS = 15 * 60 * 1000;
 const PRIVILEGED_MFA_TTL_MS = 15 * 60 * 1000;

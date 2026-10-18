@@ -1,4 +1,4 @@
-/* RentalHub NG service worker — Web Push for survey reminders */
+/* Amana RentalHub NG service worker — Web Push for survey reminders */
 self.addEventListener('install', () => {
   self.skipWaiting();
 });
@@ -8,7 +8,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('push', (event) => {
-  let data = { title: 'RentalHub NG', body: '', icon: '/rentalhub-mark.svg', url: '/survey' };
+  let data = { title: 'Amana RentalHub NG', body: '', icon: '/rentalhub-mark.svg', url: '/survey' };
   try {
     if (event.data) {
       const parsed = event.data.json();

@@ -366,7 +366,7 @@ return (
         >
           <img
             src="/rentalhub-mark.svg"
-            alt="RentalHub NG"
+            alt="Amana RentalHub NG"
             className="h-9 shrink-0 object-contain transition-transform duration-300 group-hover:scale-105 md:h-12 lg:h-14"
           />
 
@@ -374,7 +374,7 @@ return (
           <span className="hidden min-w-0 flex-col leading-none sm:flex">
             <span className="amana-mark text-base md:text-lg">Amana</span>
             <span className="truncate text-xl font-extrabold text-primary-900 tracking-tight md:text-2xl">
-              RentalHub NG
+              Amana RentalHub NG
             </span>
           </span>
         </Link>

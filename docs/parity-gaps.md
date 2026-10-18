@@ -3,7 +3,7 @@
 Status of this document: **living** — updated as gaps are closed.
 Last audit: 2026-09-04 (read-only; source-based + artifact inspection).
 
-Scope: RentalHub NG — web (`client/` + Express backend) vs mobile
+Scope: Amana RentalHub NG — web (`client/` + Express backend) vs mobile
 (`RentalHubMobile/src`, one React Native codebase for **iOS + Android**).
 
 ---

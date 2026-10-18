@@ -574,7 +574,7 @@ const EmailMarketingTab = () => {
           <div className="grid gap-4 md:grid-cols-2">
             <label className="text-sm font-medium text-gray-700">Campaign Name <input value={campaignForm.name} onChange={(e) => setCampaignForm({ ...campaignForm, name: e.target.value })} className="input mt-1" placeholder="e.g., June Newsletter" /></label>
             <label className="text-sm font-medium text-gray-700">Email Subject <input value={campaignForm.subject} onChange={(e) => setCampaignForm({ ...campaignForm, subject: e.target.value })} className="input mt-1" placeholder="Subject line" /></label>
-            <label className="text-sm font-medium text-gray-700">Sender Name <input value={campaignForm.sender_name} onChange={(e) => setCampaignForm({ ...campaignForm, sender_name: e.target.value })} className="input mt-1" placeholder="RentalHub NG" /></label>
+            <label className="text-sm font-medium text-gray-700">Sender Name <input value={campaignForm.sender_name} onChange={(e) => setCampaignForm({ ...campaignForm, sender_name: e.target.value })} className="input mt-1" placeholder="Amana RentalHub NG" /></label>
             <label className="text-sm font-medium text-gray-700">Sender Email <input value={campaignForm.sender_email} onChange={(e) => setCampaignForm({ ...campaignForm, sender_email: e.target.value })} className="input mt-1" placeholder="support@rentalhub.com.ng" /></label>
             <label className="text-sm font-medium text-gray-700">Template <select value={campaignForm.template_id} onChange={(e) => setCampaignForm({ ...campaignForm, template_id: e.target.value })} className="input mt-1">
               <option value="">No template (use raw HTML)</option>

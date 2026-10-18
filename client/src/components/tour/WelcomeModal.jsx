@@ -207,7 +207,7 @@ const WelcomeModal = ({
                   ? t('tour.welcome.resume_title', 'Continue where you stopped')
                   : isReturningUser
                     ? t('tour.welcome.returning_title', 'Welcome back to RentalHub')
-                    : t('tour.welcome.new_title', 'Welcome to RentalHub NG')}
+                    : t('tour.welcome.new_title', 'Welcome to Amana RentalHub NG')}
               </h1>
               <p
                 id="rentalhub-tour-welcome-description"

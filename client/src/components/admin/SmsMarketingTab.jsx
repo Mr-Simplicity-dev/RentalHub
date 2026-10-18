@@ -684,7 +684,7 @@ const SmsMarketingTab = () => {
               </label>
               <label className="text-sm font-medium text-gray-700">
                 Sender Name
-                <input value={campaignForm.sender_name} onChange={(e) => setCampaignForm({ ...campaignForm, sender_name: e.target.value })} className="input mt-1" placeholder="RentalHub NG" />
+                <input value={campaignForm.sender_name} onChange={(e) => setCampaignForm({ ...campaignForm, sender_name: e.target.value })} className="input mt-1" placeholder="Amana RentalHub NG" />
               </label>
               <label className="text-sm font-medium text-gray-700">
                 Template

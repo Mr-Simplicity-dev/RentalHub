@@ -865,7 +865,7 @@ const Dashboard = () => {
     e.preventDefault();
 
     if (!inspectionForm.application_id) {
-      toast.info('Apply for a property first before requesting RentalHub NG inspection.');
+      toast.info('Apply for a property first before requesting Amana RentalHub NG inspection.');
       return;
     }
 
@@ -1435,7 +1435,7 @@ const Dashboard = () => {
                 {t('dashboard.survey_reminder_title', 'Finish your Surveyresearch survey')}
               </p>
               <p className="text-xs text-indigo-700">
-                {t('dashboard.survey_reminder_body', 'Your answers help us improve RentalHub NG. It takes about 10 more minutes — you can finish anytime.')}
+                {t('dashboard.survey_reminder_body', 'Your answers help us improve Amana RentalHub NG. It takes about 10 more minutes — you can finish anytime.')}
               </p>
             </div>
             <button
@@ -1878,8 +1878,8 @@ const Dashboard = () => {
                 <div className="mt-3">
                   <ShareMenu
                     url={referralInfo?.invite_url}
-                    title="RentalHub NG invite"
-                    text={`Join RentalHub NG with my invite link and earn \u20A6${Number(referralInfo?.reward_amount || 1000).toLocaleString()} subscription credit`}
+                    title="Amana RentalHub NG invite"
+                    text={`Join Amana RentalHub NG with my invite link and earn \u20A6${Number(referralInfo?.reward_amount || 1000).toLocaleString()} subscription credit`}
                     buttonLabel="Share invite"
                     buttonClassName="btn btn-primary gap-2"
                     headerLabel="Share referral invite"
@@ -2029,7 +2029,7 @@ const Dashboard = () => {
                   hasCompletedInspections
                     ? `${completedInspections.length} completed — tap to view reports`
                     : hasPropertyInspectionOptions
-                    ? 'Let RentalHub NG inspect an applied property against the landlord description'
+                    ? 'Let Amana RentalHub NG inspect an applied property against the landlord description'
                     : 'Activated after you apply for a property'
                 }
                 icon={<FaUserCheck />}
@@ -2197,7 +2197,7 @@ const Dashboard = () => {
                 <div>
                   <h2 className="text-lg font-bold text-gray-900">Inspection Fee</h2>
                   <p className="mt-1 text-sm text-gray-600">
-                    RentalHub NG can inspect a property you applied for and confirm it matches the landlord's description.
+                    Amana RentalHub NG can inspect a property you applied for and confirm it matches the landlord's description.
                   </p>
                 </div>
               </div>
@@ -2266,7 +2266,7 @@ const Dashboard = () => {
                     <h3 className="text-base font-semibold text-gray-900">Apply for a property first</h3>
                     <p className="mt-2 text-sm text-gray-600">
                       This inspection card becomes active after you submit a property application.
-                      Once active, you can pay ₦10,000 for RentalHub NG to inspect the property on your behalf.
+                      Once active, you can pay ₦10,000 for Amana RentalHub NG to inspect the property on your behalf.
                     </p>
                   </div>
                   <button
@@ -2285,7 +2285,7 @@ const Dashboard = () => {
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
                     <p className="font-semibold">Inspection fee: ₦{inspectionFeeAmount.toLocaleString()}</p>
                     <p className="mt-1">
-                      Use this when your schedule is tight and you want RentalHub NG to verify the property condition,
+                      Use this when your schedule is tight and you want Amana RentalHub NG to verify the property condition,
                       location, and advertised details before you continue.
                     </p>
                   </div>
@@ -3005,7 +3005,7 @@ const Dashboard = () => {
                 You are responsible for confirming the property, due date, monthly rent amount, bank details, and withdrawal information before submitting any request.
               </p>
               <p>
-                By continuing, you authorize RentalHub NG to process rent savings transactions and related fees according to the displayed plan terms.
+                By continuing, you authorize Amana RentalHub NG to process rent savings transactions and related fees according to the displayed plan terms.
               </p>
             </div>
 
