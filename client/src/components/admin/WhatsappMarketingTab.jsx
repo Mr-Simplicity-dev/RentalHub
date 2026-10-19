@@ -1,15 +1,29 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { toast } from 'react-toastify';
-import { FaWhatsapp, FaPaperPlane, FaPlus, FaTrash, FaRedo, FaChartBar, FaUsers, FaTimes } from 'react-icons/fa';
+import { FaWhatsapp, FaPaperPlane, FaPlus, FaTrash, FaRedo, FaChartBar, FaUsers } from 'react-icons/fa';
 import api from '../../services/api';
-
-const STATUS_STYLES = {
-  draft: 'bg-gray-100 text-gray-700',
-  queued: 'bg-blue-100 text-blue-700',
-  sending: 'bg-amber-100 text-amber-700',
-  sent: 'bg-green-100 text-green-700',
-  paused: 'bg-red-100 text-red-700',
-};
+import {
+  Banner,
+  DataTable,
+  Dialog,
+  EmptyState,
+  Field,
+  GhostButton,
+  LoadingState,
+  MarketingShell,
+  Panel,
+  PrimaryButton,
+  SecondaryButton,
+  SegmentedControl,
+  SelectInput,
+  StatCard,
+  StatGrid,
+  StatusBadge,
+  Td,
+  TextArea,
+  TextInput,
+  formatDate,
+} from './marketingUi';
 
 const GOVERNANCE_COPY = {
   send: {
@@ -34,6 +48,11 @@ const GOVERNANCE_COPY = {
     tone: 'danger',
   },
 };
+
+const KIND_OPTIONS = [
+  { value: 'template', label: 'Approved template' },
+  { value: 'text', label: 'Free text (24h)' },
+];
 
 const emptyForm = {
   name: '',
@@ -70,42 +89,46 @@ const MediaField = ({ label, hint, value, onChange }) => {
   };
 
   return (
-    <div className="mb-3 rounded border border-dashed border-gray-300 p-3">
-      <label className="mb-1 block text-xs font-medium text-gray-700">{label}</label>
-      {hint && <p className="mb-2 text-xs text-gray-400">{hint}</p>}
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-        <select
-          className="rounded border px-2 py-1.5 text-sm"
-          value={value.type}
-          onChange={(e) => onChange({ ...value, type: e.target.value })}
-        >
-          <option value="">No media</option>
-          <option value="image">Image</option>
-          <option value="video">Video</option>
-          <option value="document">Document (link only)</option>
-        </select>
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp,video/mp4,video/3gpp"
-          className="text-xs"
-          disabled={uploading || !value.type || value.type === 'document'}
-          onChange={handleFile}
-        />
-        <input
-          className="rounded border px-2 py-1.5 text-sm"
-          placeholder="https://… public link"
-          value={value.url}
-          onChange={(e) => onChange({ ...value, url: e.target.value })}
-        />
-      </div>
-      {uploading && <p className="mt-1 text-xs text-gray-500">Uploading…</p>}
-      {value.url && <p className="mt-1 break-all text-xs text-green-700">{value.url}</p>}
+    <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50/60 p-4">
+      <Field label={label} hint={hint}>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <SelectInput
+            value={value.type}
+            aria-label={`${label} type`}
+            onChange={(e) => onChange({ ...value, type: e.target.value })}
+          >
+            <option value="">No media</option>
+            <option value="image">Image</option>
+            <option value="video">Video</option>
+            <option value="document">Document (link only)</option>
+          </SelectInput>
+          <div className="flex items-center">
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp,video/mp4,video/3gpp"
+              className="w-full text-xs text-gray-600 file:mr-2 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-2 file:text-xs file:font-medium file:text-primary-700 hover:file:bg-primary-100 disabled:opacity-50"
+              aria-label={`Upload ${label} file`}
+              disabled={uploading || !value.type || value.type === 'document'}
+              onChange={handleFile}
+            />
+          </div>
+          <TextInput
+            placeholder="https://… public link"
+            aria-label={`${label} public link`}
+            value={value.url}
+            onChange={(e) => onChange({ ...value, url: e.target.value })}
+          />
+        </div>
+        {uploading && <p className="mt-2 text-[11px] text-gray-500">Uploading…</p>}
+        {value.url && <p className="mt-2 break-all text-[11px] text-green-700">{value.url}</p>}
+      </Field>
     </div>
   );
 };
 
 const WhatsappMarketingTab = () => {
   const [loading, setLoading] = useState(false);
+  const [listLoading, setListLoading] = useState(true);
   const [stats, setStats] = useState(null);
   const [campaigns, setCampaigns] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -132,8 +155,12 @@ const WhatsappMarketingTab = () => {
   }, []);
 
   useEffect(() => {
-    loadStats();
-    loadCampaigns();
+    const boot = async () => {
+      setListLoading(true);
+      await Promise.all([loadStats(), loadCampaigns()]);
+      setListLoading(false);
+    };
+    boot();
   }, [loadStats, loadCampaigns]);
 
   const updateForm = (patch) => {
@@ -260,330 +287,330 @@ const WhatsappMarketingTab = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900">
-          <FaWhatsapp className="text-green-600" /> WhatsApp Marketing
-        </h2>
-        <button className="btn btn-primary flex items-center gap-2" onClick={() => setShowForm((v) => !v)}>
-          <FaPlus /> New WhatsApp Campaign
-        </button>
-      </div>
+      <MarketingShell
+        eyebrow="Super admin"
+        title="WhatsApp Marketing"
+        subtitle="Send approved template or free-text campaigns to users, with optional images and clips."
+        icon={<FaWhatsapp />}
+        actions={
+          <button
+            type="button"
+            className="btn bg-white text-primary-700 shadow-sm hover:bg-primary-50"
+            onClick={() => setShowForm((v) => !v)}
+          >
+            <FaPlus className="mr-2" /> {showForm ? 'Close builder' : 'New WhatsApp Campaign'}
+          </button>
+        }
+      >
+        <div className="space-y-6">
+          <Banner tone="warning" title="Meta rules">
+            Template messages must first be approved inside your Meta app (WhatsApp → Message templates).
+            Free-text messages only reach users who messaged your business number within the last 24 hours —
+            anyone else will be rejected by Meta. Images and clips attached to free text follow the same
+            24-hour rule; for campaigns, add the image/video header when creating the template in Meta.
+            Marketing templates must mention how to opt out.
+          </Banner>
 
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-        <strong>Meta rules:</strong> template messages must first be approved inside your Meta app
-        (WhatsApp → Message templates). Free-text messages only reach users who messaged your
-        business number within the last 24 hours — anyone else will be rejected by Meta.
-        Images and clips attached to free text follow the same 24-hour rule; for campaigns, add
-        the image/video header when creating the template in Meta. Marketing templates must
-        mention how to opt out.
-      </div>
-
-      {stats && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="rounded-lg border bg-white p-4">
-            <p className="text-xs text-gray-500">Total Campaigns</p>
-            <p className="text-2xl font-bold text-gray-900">{stats.campaigns?.total ?? 0}</p>
-          </div>
-          <div className="rounded-lg border bg-white p-4">
-            <p className="text-xs text-gray-500">Messages Sent</p>
-            <p className="text-2xl font-bold text-green-600">{stats.messages?.sent ?? 0}</p>
-          </div>
-          <div className="rounded-lg border bg-white p-4">
-            <p className="text-xs text-gray-500">Messages Failed</p>
-            <p className="text-2xl font-bold text-red-600">{stats.messages?.failed ?? 0}</p>
-          </div>
-        </div>
-      )}
-
-      {showForm && (
-        <form onSubmit={handleCreate} className="rounded-lg border bg-white p-5">
-          <h3 className="mb-4 text-sm font-semibold text-gray-900">Create WhatsApp Campaign</h3>
-
-          <div className="mb-3">
-            <label className="mb-1 block text-xs font-medium text-gray-700">Campaign name</label>
-            <input
-              className="w-full rounded border px-3 py-2 text-sm"
-              value={form.name}
-              onChange={(e) => updateForm({ name: e.target.value })}
-              placeholder="e.g. October rent reminder"
-            />
-          </div>
-
-          <div className="mb-3 flex gap-4">
-            <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input
-                type="radio"
-                checked={form.kind === 'template'}
-                onChange={() => updateForm({ kind: 'template' })}
+          {stats ? (
+            <StatGrid columns={3}>
+              <StatCard
+                label="Total campaigns"
+                value={stats.campaigns?.total ?? 0}
+                tone="primary"
+                icon={<FaChartBar />}
               />
-              Approved template message
-            </label>
-            <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input
-                type="radio"
-                checked={form.kind === 'text'}
-                onChange={() => updateForm({ kind: 'text' })}
+              <StatCard
+                label="Messages sent"
+                value={stats.messages?.sent ?? 0}
+                tone="success"
+                icon={<FaPaperPlane />}
               />
-              Free text (24h window only)
-            </label>
-          </div>
-
-          {form.kind === 'template' ? (
-            <>
-            <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-700">Meta template name</label>
-                <input
-                  className="w-full rounded border px-3 py-2 text-sm"
-                  value={form.template_name}
-                  onChange={(e) => updateForm({ template_name: e.target.value })}
-                  placeholder="rent_due_reminder"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-700">Language</label>
-                <input
-                  className="w-full rounded border px-3 py-2 text-sm"
-                  value={form.template_language}
-                  onChange={(e) => updateForm({ template_language: e.target.value })}
-                  placeholder="en or en_US"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-700">Body parameters (comma separated)</label>
-                <input
-                  className="w-full rounded border px-3 py-2 text-sm"
-                  value={form.template_params}
-                  onChange={(e) => updateForm({ template_params: e.target.value })}
-                  placeholder="Ada, N50,000"
-                />
-              </div>
-            </div>
-            <MediaField
-              label="Template header media (optional)"
-              hint="Only for templates approved with an image or video header. Leave as 'No media' otherwise."
-              value={form.headerMedia}
-              onChange={(v) => setForm((prev) => ({ ...prev, headerMedia: v }))}
-            />
-            </>
-          ) : (
-            <>
-            <div className="mb-3">
-              <label className="mb-1 block text-xs font-medium text-gray-700">Message</label>
-              <textarea
-                className="w-full rounded border px-3 py-2 text-sm"
-                rows={4}
-                maxLength={1000}
-                value={form.content}
-                onChange={(e) => updateForm({ content: e.target.value })}
-                placeholder="Type the message users will receive"
+              <StatCard
+                label="Messages failed"
+                value={stats.messages?.failed ?? 0}
+                tone="danger"
+                hint="Failures are retryable from the table below"
               />
-              <p className="mt-1 text-xs text-gray-400">{form.content.length}/1000</p>
-            </div>
-            <MediaField
-              label="Attach an image or clip (optional)"
-              hint="Upload JPG/PNG/WEBP up to 5MB or MP4/3GP up to 16MB, or paste a public https link. The message text becomes the caption."
-              value={form.media}
-              onChange={(v) => setForm((prev) => ({ ...prev, media: v }))}
-            />
-            </>
-          )}
+            </StatGrid>
+          ) : null}
 
-          <div className="mb-4 grid grid-cols-1 items-end gap-3 sm:grid-cols-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-700">Audience</label>
-              <select
-                className="w-full rounded border px-3 py-2 text-sm"
-                value={form.scope}
-                onChange={(e) => updateForm({ scope: e.target.value })}
-              >
-                <option value="all">All users with a phone number</option>
-                <option value="user_type">By user type</option>
-              </select>
-            </div>
-            {form.scope === 'user_type' && (
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-700">User type</label>
-                <input
-                  className="w-full rounded border px-3 py-2 text-sm"
-                  value={form.user_type}
-                  onChange={(e) => updateForm({ user_type: e.target.value })}
-                  placeholder="e.g. tenant, landlord, agent"
-                />
-              </div>
-            )}
-            <button
-              type="button"
-              className="btn btn-secondary flex items-center justify-center gap-2"
-              onClick={previewAudience}
-              disabled={audienceLoading}
-            >
-              <FaUsers /> {audienceLoading ? 'Counting…' : 'Preview audience'}
-            </button>
-          </div>
-
-          {audienceCount !== null && (
-            <p className="mb-3 text-sm text-gray-700">
-              ≈ <strong>{audienceCount}</strong> user(s) will receive this campaign.
-            </p>
-          )}
-
-          <div className="flex gap-3">
-            <button type="submit" disabled={loading} className="btn btn-primary flex items-center gap-2">
-              <FaPaperPlane /> Create & queue send
-            </button>
-            <button type="button" className="btn" onClick={() => { setShowForm(false); setAudienceCount(null); }}>
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
-
-      <div className="rounded-lg border bg-white">
-        <h3 className="border-b px-4 py-3 text-sm font-semibold text-gray-900">WhatsApp Campaigns</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-gray-50 text-xs uppercase text-gray-500">
-              <tr>
-                <th className="px-4 py-2">Name</th>
-                <th className="px-4 py-2">Type</th>
-                <th className="px-4 py-2">Status</th>
-                <th className="px-4 py-2">Sent / Failed / Pending</th>
-                <th className="px-4 py-2">Created by</th>
-                <th className="px-4 py-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {campaigns.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-gray-400">
-                    No WhatsApp campaigns yet
-                  </td>
-                </tr>
-              )}
-              {campaigns.map((c) => (
-                <tr key={c.id} className="border-t">
-                  <td className="px-4 py-2">
-                    <p className="font-medium text-gray-900">{c.name}</p>
-                    {c.kind === 'template' && (
-                      <p className="text-xs text-gray-400">template: {c.template_name}</p>
-                    )}
-                  </td>
-                  <td className="px-4 py-2 text-xs uppercase text-gray-600">{c.kind}</td>
-                  <td className="px-4 py-2">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[c.status] || STATUS_STYLES.draft}`}>
-                      {c.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2 text-xs text-gray-600">
-                    <span className="text-green-600">{c.sent_count}</span> /{' '}
-                    <span className="text-red-600">{c.failed_count}</span> /{' '}
-                    <span className="text-gray-500">{c.pending_count}</span>
-                    <span className="text-gray-400"> (of {c.total_recipients})</span>
-                  </td>
-                  <td className="px-4 py-2 text-xs text-gray-600">{c.created_by_name || '—'}</td>
-                  <td className="px-4 py-2">
-                    <div className="flex gap-2 text-xs">
-                      <button className="text-blue-600 hover:underline" onClick={() => openStats(c)}>
-                        <FaChartBar className="mr-1 inline" /> Stats
-                      </button>
-                      {['draft', 'paused'].includes(c.status) && (
-                        <button className="text-green-600 hover:underline" onClick={() => openGovernanceAction('send', c)}>
-                          <FaPaperPlane className="mr-1 inline" /> Send
-                        </button>
-                      )}
-                      {['sent', 'paused'].includes(c.status) && (
-                        <button className="text-amber-600 hover:underline" onClick={() => openGovernanceAction('retry', c)}>
-                          <FaRedo className="mr-1 inline" /> Retry
-                        </button>
-                      )}
-                      {c.status !== 'sending' && (
-                        <button className="text-red-600 hover:underline" onClick={() => openGovernanceAction('delete', c)}>
-                          <FaTrash className="mr-1 inline" /> Delete
-                        </button>
-                      )}
+          {showForm ? (
+            <Panel title="Create WhatsApp campaign" description="Build the audience, then queue the send with an approval note.">
+              <form onSubmit={handleCreate} className="space-y-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Field label="Campaign name" required>
+                    <TextInput
+                      value={form.name}
+                      onChange={(e) => updateForm({ name: e.target.value })}
+                      placeholder="e.g. October rent reminder"
+                    />
+                  </Field>
+                  <Field label="Message type" required>
+                    <div className="pt-1">
+                      <SegmentedControl
+                        options={KIND_OPTIONS}
+                        value={form.kind}
+                        onChange={(kind) => updateForm({ kind })}
+                      />
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                  </Field>
+                </div>
 
-      {governanceAction.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <h4 className="text-sm font-semibold text-gray-900">{gov.title}</h4>
-              <button onClick={closeGovernanceAction} className="text-gray-400 hover:text-gray-600">
-                <FaTimes />
-              </button>
-            </div>
-            <p className="mb-2 text-xs text-gray-600">
-              {governanceAction.target?.name ? `Campaign: ${governanceAction.target.name}` : ''}
-            </p>
-            <label className="mb-1 block text-xs font-medium text-gray-700">{gov.label}</label>
-            <textarea
-              className="w-full rounded border px-3 py-2 text-sm"
-              rows={3}
-              value={governanceAction.note}
-              onChange={(e) => setGovernanceAction((prev) => ({ ...prev, note: e.target.value, error: '' }))}
-              placeholder={gov.placeholder}
-            />
-            {governanceAction.error && (
-              <p className="mt-1 text-xs text-red-600">{governanceAction.error}</p>
-            )}
-            <div className="mt-4 flex gap-3">
-              <button
-                className={`btn ${gov.tone === 'danger' ? 'btn-danger' : 'btn-primary'}`}
-                onClick={submitGovernanceAction}
-                disabled={loading}
+                {form.kind === 'template' ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                      <Field label="Meta template name" required>
+                        <TextInput
+                          value={form.template_name}
+                          onChange={(e) => updateForm({ template_name: e.target.value })}
+                          placeholder="rent_due_reminder"
+                        />
+                      </Field>
+                      <Field label="Language">
+                        <TextInput
+                          value={form.template_language}
+                          onChange={(e) => updateForm({ template_language: e.target.value })}
+                          placeholder="en or en_US"
+                        />
+                      </Field>
+                      <Field label="Body parameters" hint="Comma separated, in template order">
+                        <TextInput
+                          value={form.template_params}
+                          onChange={(e) => updateForm({ template_params: e.target.value })}
+                          placeholder="Ada, N50,000"
+                        />
+                      </Field>
+                    </div>
+                    <MediaField
+                      label="Template header media (optional)"
+                      hint="Only for templates approved with an image or video header. Leave as 'No media' otherwise."
+                      value={form.headerMedia}
+                      onChange={(v) => setForm((prev) => ({ ...prev, headerMedia: v }))}
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <Field label="Message" hint={`${form.content.length}/1000 characters — free text only inside the 24-hour window`}>
+                      <TextArea
+                        rows={4}
+                        maxLength={1000}
+                        value={form.content}
+                        onChange={(e) => updateForm({ content: e.target.value })}
+                        placeholder="Type the message users will receive"
+                      />
+                    </Field>
+                    <MediaField
+                      label="Attach an image or clip (optional)"
+                      hint="Upload JPG/PNG/WEBP up to 5MB or MP4/3GP up to 16MB, or paste a public https link. The message text becomes the caption."
+                      value={form.media}
+                      onChange={(v) => setForm((prev) => ({ ...prev, media: v }))}
+                    />
+                  </div>
+                )}
+
+                <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4">
+                  <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-3">
+                    <Field label="Audience">
+                      <SelectInput
+                        value={form.scope}
+                        onChange={(e) => updateForm({ scope: e.target.value })}
+                      >
+                        <option value="all">All users with a phone number</option>
+                        <option value="user_type">By user type</option>
+                      </SelectInput>
+                    </Field>
+                    {form.scope === 'user_type' ? (
+                      <Field label="User type">
+                        <TextInput
+                          value={form.user_type}
+                          onChange={(e) => updateForm({ user_type: e.target.value })}
+                          placeholder="e.g. tenant, landlord, agent"
+                        />
+                      </Field>
+                    ) : null}
+                    <SecondaryButton onClick={previewAudience} loading={audienceLoading} className="w-full">
+                      <FaUsers className="mr-2" /> Preview audience
+                    </SecondaryButton>
+                  </div>
+                  {audienceCount !== null ? (
+                    <p className="mt-3 text-sm text-gray-700">
+                      ≈ <strong>{audienceCount}</strong> user(s) will receive this campaign.
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="flex flex-wrap gap-3 border-t border-gray-100 pt-4">
+                  <PrimaryButton type="submit" loading={loading}>
+                    <FaPaperPlane className="mr-2" /> Create &amp; queue send
+                  </PrimaryButton>
+                  <SecondaryButton
+                    onClick={() => {
+                      setShowForm(false);
+                      setAudienceCount(null);
+                    }}
+                  >
+                    Cancel
+                  </SecondaryButton>
+                </div>
+              </form>
+            </Panel>
+          ) : null}
+
+          <Panel
+            title="WhatsApp campaigns"
+            description="Draft campaigns can be queued here; paused campaigns can be retried."
+            noPadding
+          >
+            {listLoading ? (
+              <div className="p-5">
+                <LoadingState label="Loading WhatsApp campaigns" rows={3} />
+              </div>
+            ) : campaigns.length === 0 ? (
+              <div className="p-5">
+                <EmptyState
+                  icon={<FaWhatsapp />}
+                  title="No WhatsApp campaigns yet"
+                  message="Create your first campaign above. You will need a Meta-approved template before you can message users who have not contacted you in the last 24 hours."
+                />
+              </div>
+            ) : (
+              <DataTable
+                columns={['Name', 'Type', 'Status', 'Sent / Failed / Pending', 'Created', 'Actions']}
               >
+                {campaigns.map((c) => (
+                  <tr key={c.id} className="transition-colors hover:bg-gray-50/70">
+                    <Td>
+                      <p className="font-medium text-gray-900">{c.name}</p>
+                      {c.kind === 'template' ? (
+                        <p className="text-xs text-gray-400">template: {c.template_name}</p>
+                      ) : null}
+                    </Td>
+                    <Td className="text-xs uppercase text-gray-500">{c.kind}</Td>
+                    <Td>
+                      <StatusBadge status={c.status} />
+                    </Td>
+                    <Td className="text-xs">
+                      <span className="font-semibold text-green-600">{c.sent_count}</span>
+                      <span className="text-gray-300"> / </span>
+                      <span className="font-semibold text-red-600">{c.failed_count}</span>
+                      <span className="text-gray-300"> / </span>
+                      <span className="font-semibold text-gray-500">{c.pending_count}</span>
+                      <span className="text-gray-400"> of {c.total_recipients}</span>
+                    </Td>
+                    <Td className="text-xs text-gray-500">
+                      <span className="block text-gray-600">{c.created_by_name || '—'}</span>
+                      {formatDate(c.created_at)}
+                    </Td>
+                    <Td>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <GhostButton onClick={() => openStats(c)} aria-label={`View stats for ${c.name}`}>
+                          <FaChartBar /> Stats
+                        </GhostButton>
+                        {['draft', 'paused'].includes(c.status) ? (
+                          <GhostButton
+                            className="text-green-700 hover:bg-green-50"
+                            onClick={() => openGovernanceAction('send', c)}
+                            aria-label={`Send ${c.name}`}
+                          >
+                            <FaPaperPlane /> Send
+                          </GhostButton>
+                        ) : null}
+                        {['sent', 'paused'].includes(c.status) ? (
+                          <GhostButton
+                            className="text-amber-700 hover:bg-amber-50"
+                            onClick={() => openGovernanceAction('retry', c)}
+                            aria-label={`Retry ${c.name}`}
+                          >
+                            <FaRedo /> Retry
+                          </GhostButton>
+                        ) : null}
+                        {c.status !== 'sending' ? (
+                          <GhostButton
+                            className="text-red-600 hover:bg-red-50"
+                            onClick={() => openGovernanceAction('delete', c)}
+                            aria-label={`Delete ${c.name}`}
+                          >
+                            <FaTrash /> Delete
+                          </GhostButton>
+                        ) : null}
+                      </div>
+                    </Td>
+                  </tr>
+                ))}
+              </DataTable>
+            )}
+          </Panel>
+        </div>
+      </MarketingShell>
+
+      <Dialog
+        open={governanceAction.open}
+        onClose={closeGovernanceAction}
+        title={gov.title}
+        subtitle={governanceAction.target?.name ? `Campaign: ${governanceAction.target.name}` : ''}
+        size="small"
+        footer={
+          <>
+            <SecondaryButton onClick={closeGovernanceAction}>Cancel</SecondaryButton>
+            {gov.tone === 'danger' ? (
+              <button type="button" className="btn btn-danger text-sm" onClick={submitGovernanceAction} disabled={loading}>
                 {loading ? 'Working…' : 'Confirm'}
               </button>
-              <button className="btn" onClick={closeGovernanceAction}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
+            ) : (
+              <PrimaryButton onClick={submitGovernanceAction} loading={loading}>
+                Confirm
+              </PrimaryButton>
+            )}
+          </>
+        }
+      >
+        <Field label={gov.label} required error={governanceAction.error || undefined}>
+          <TextArea
+            rows={3}
+            value={governanceAction.note}
+            onChange={(e) => setGovernanceAction((prev) => ({ ...prev, note: e.target.value, error: '' }))}
+            placeholder={gov.placeholder}
+          />
+        </Field>
+        <Banner tone="info" className="mt-4">
+          This action is written to the marketing audit log with your name and the note above.
+        </Banner>
+      </Dialog>
 
-      {statsModal.open && statsModal.data && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-lg bg-white p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <h4 className="text-sm font-semibold text-gray-900">
-                {statsModal.data.campaign?.name} — delivery
-              </h4>
-              <button onClick={() => setStatsModal({ open: false, data: null })} className="text-gray-400 hover:text-gray-600">
-                <FaTimes />
-              </button>
-            </div>
-            <div className="mb-3 grid grid-cols-4 gap-2 text-center text-xs">
-              <div className="rounded bg-gray-50 p-2"><p className="font-bold text-gray-900">{statsModal.data.counts?.total ?? 0}</p>Total</div>
-              <div className="rounded bg-green-50 p-2"><p className="font-bold text-green-700">{statsModal.data.counts?.sent ?? 0}</p>Sent</div>
-              <div className="rounded bg-red-50 p-2"><p className="font-bold text-red-700">{statsModal.data.counts?.failed ?? 0}</p>Failed</div>
-              <div className="rounded bg-gray-50 p-2"><p className="font-bold text-gray-600">{statsModal.data.counts?.pending ?? 0}</p>Pending</div>
-            </div>
-            {statsModal.data.recent_failures?.length > 0 && (
+      <Dialog
+        open={statsModal.open && Boolean(statsModal.data)}
+        onClose={() => setStatsModal({ open: false, data: null })}
+        title={statsModal.data ? `${statsModal.data.campaign?.name} — delivery` : 'Delivery'}
+        subtitle="Live counts from the campaign recipient queue"
+        footer={<SecondaryButton onClick={() => setStatsModal({ open: false, data: null })}>Close</SecondaryButton>}
+      >
+        {statsModal.data ? (
+          <div className="space-y-4">
+            <StatGrid>
+              <StatCard label="Total" value={statsModal.data.counts?.total ?? 0} />
+              <StatCard label="Sent" value={statsModal.data.counts?.sent ?? 0} tone="success" />
+              <StatCard label="Failed" value={statsModal.data.counts?.failed ?? 0} tone="danger" />
+              <StatCard label="Pending" value={statsModal.data.counts?.pending ?? 0} tone="warning" />
+            </StatGrid>
+            {statsModal.data.recent_failures?.length > 0 ? (
               <div>
-                <p className="mb-1 text-xs font-medium text-gray-700">Recent failures</p>
-                <ul className="max-h-40 space-y-1 overflow-y-auto text-xs text-gray-600">
+                <p className="mb-2 text-xs font-semibold text-gray-700">Recent failures</p>
+                <ul className="max-h-44 space-y-1 overflow-y-auto text-xs text-gray-600">
                   {statsModal.data.recent_failures.map((f, i) => (
-                    <li key={i} className="rounded bg-red-50 px-2 py-1">
+                    <li key={i} className="rounded-lg bg-red-50 px-3 py-2">
                       <span className="font-medium">{f.phone}</span> — {f.error_message}
                     </li>
                   ))}
                 </ul>
               </div>
-            )}
-            <p className="mt-3 text-xs text-gray-400">
+            ) : null}
+            <p className="text-[11px] text-gray-400">
               Delivery receipts (delivered/read/failed) arrive through the Meta webhook and enrich
               message statuses over time.
             </p>
           </div>
-        </div>
-      )}
+        ) : null}
+      </Dialog>
     </div>
   );
 };

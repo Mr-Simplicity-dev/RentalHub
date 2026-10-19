@@ -6,8 +6,37 @@ import {
   FaPhone, FaUpload, FaRedo, FaDollarSign, FaClock,
 } from 'react-icons/fa';
 import api from '../../services/api';
+import {
+  Banner,
+  DataTable,
+  DangerButton,
+  Dialog,
+  EmptyState,
+  Field,
+  GhostButton,
+  MarketingShell,
+  Panel,
+  PrimaryButton,
+  SecondaryButton,
+  SegmentedControl,
+  SelectInput,
+  StatCard,
+  StatGrid,
+  StatusBadge,
+  Td,
+  TextArea,
+  TextInput,
+  formatDate,
+} from './marketingUi';
 
 const TAB_KEYS = ['overview', 'campaigns', 'subscribers', 'templates'];
+
+const TAB_LABELS = {
+  overview: 'Overview',
+  campaigns: 'SMS Campaigns',
+  subscribers: 'Contacts',
+  templates: 'Templates',
+};
 
 const SEGMENT_LIMIT = 160;
 const COST_PER_SEGMENT = 4;
@@ -465,295 +494,296 @@ const SmsMarketingTab = () => {
 
   const renderOverview = () => (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-soft bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-primary-50 p-3"><FaUsers className="text-lg text-primary-600" /></div>
-            <div>
-              <p className="text-2xl font-bold">{stats?.subscribers?.total || 0}</p>
-              <p className="text-xs text-gray-500">Total SMS Contacts</p>
-            </div>
-          </div>
-          <p className="mt-2 text-xs text-green-600">{stats?.subscribers?.active || 0} active subscribers</p>
-        </div>
-
-        <div className="rounded-xl border border-soft bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-blue-50 p-3"><FaPhone className="text-lg text-blue-600" /></div>
-            <div>
-              <p className="text-2xl font-bold">{stats?.campaigns?.total || 0}</p>
-              <p className="text-xs text-gray-500">Total SMS Campaigns</p>
-            </div>
-          </div>
-          <p className="mt-2 text-xs text-green-600">{stats?.campaigns?.sent || 0} sent</p>
-        </div>
-
-        <div className="rounded-xl border border-soft bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-green-50 p-3"><FaPaperPlane className="text-lg text-green-600" /></div>
-            <div>
-              <p className="text-2xl font-bold">{stats?.monthlySent || 0}</p>
-              <p className="text-xs text-gray-500">SMS Sent (30 days)</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-soft bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-purple-50 p-3"><FaChartBar className="text-lg text-purple-600" /></div>
-            <div>
-              <p className="text-2xl font-bold">{stats?.subscribers?.active > 0 ? Math.round((stats?.subscribers?.active / stats?.subscribers?.total) * 100) : 0}%</p>
-              <p className="text-xs text-gray-500">Active Rate</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <StatGrid>
+        <StatCard
+          label="Total SMS Contacts"
+          value={stats?.subscribers?.total || 0}
+          hint={`${stats?.subscribers?.active || 0} active subscribers`}
+          tone="primary"
+          icon={<FaUsers />}
+        />
+        <StatCard
+          label="Total SMS Campaigns"
+          value={stats?.campaigns?.total || 0}
+          hint={`${stats?.campaigns?.sent || 0} sent`}
+          icon={<FaPhone />}
+        />
+        <StatCard
+          label="SMS Sent (30 days)"
+          value={stats?.monthlySent || 0}
+          tone="success"
+          icon={<FaPaperPlane />}
+        />
+        <StatCard
+          label="Active Rate"
+          value={`${stats?.subscribers?.active > 0 ? Math.round((stats?.subscribers?.active / stats?.subscribers?.total) * 100) : 0}%`}
+          tone="warning"
+          icon={<FaChartBar />}
+        />
+      </StatGrid>
 
       <div className="flex flex-wrap gap-3">
-        <button onClick={handleSync} disabled={loading} className="btn btn-primary gap-2">
+        <PrimaryButton onClick={handleSync} loading={loading} className="gap-2">
           <FaSyncAlt className={loading ? 'animate-spin' : ''} />
           Sync Contacts from Users
-        </button>
-        <button onClick={() => setActiveTab('campaigns')} className="btn btn-secondary gap-2">
+        </PrimaryButton>
+        <SecondaryButton onClick={() => setActiveTab('campaigns')} className="gap-2">
           <FaPlus /> New SMS Campaign
-        </button>
+        </SecondaryButton>
       </div>
 
       {stats?.recentCampaigns?.length > 0 && (
-        <div className="rounded-xl border border-soft bg-white p-5 shadow-sm">
-          <h3 className="mb-3 text-sm font-semibold text-gray-900">Recent SMS Campaigns</h3>
+        <Panel title="Recent SMS Campaigns">
           <div className="space-y-3">
             {stats.recentCampaigns.map((c) => (
-              <div key={c.id} className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+              <div key={c.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-100 px-4 py-3">
                 <div>
                   <p className="font-medium text-gray-900">{c.name}</p>
                   <p className="text-xs text-gray-500">
-                    {c.status} &middot; {c.sent_at ? new Date(c.sent_at).toLocaleDateString() : 'Not sent'}
+                    {c.status} &middot; {c.sent_at ? formatDate(c.sent_at) : 'Not sent'}
                     {c.stats?.sent ? ` &middot; ${c.stats.sent} sent` : ''}
                   </p>
                 </div>
-                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                  c.status === 'sent' ? 'bg-green-100 text-green-700' :
-                  c.status === 'sending' ? 'bg-blue-100 text-blue-700' :
-                  c.status === 'queued' ? 'bg-yellow-100 text-yellow-700' :
-                  c.status === 'draft' ? 'bg-gray-100 text-gray-600' : 'bg-yellow-100 text-yellow-700'
-                }`}>{c.status}</span>
+                <StatusBadge status={c.status} />
               </div>
             ))}
           </div>
-        </div>
+        </Panel>
       )}
     </div>
   );
 
   const renderSubscribers = () => (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <Panel
+      title="SMS Contacts"
+      description="People who receive your SMS broadcasts."
+      actions={
+        <>
+          <SecondaryButton onClick={handleSync} loading={loading} className="gap-2">
+            <FaSyncAlt className={loading ? 'animate-spin' : ''} /> Sync
+          </SecondaryButton>
+          <SecondaryButton onClick={() => document.getElementById('csv-input').click()} className="gap-2">
+            <FaUpload /> Import CSV
+          </SecondaryButton>
+          <PrimaryButton onClick={() => setShowAddSubscriber(true)} className="gap-2">
+            <FaPlus /> Add Contact
+          </PrimaryButton>
+        </>
+      }
+    >
+      <div className="space-y-4">
         <div className="flex flex-1 items-center gap-2">
-          <div className="relative flex-1 max-w-xs">
+          <div className="relative max-w-xs flex-1">
             <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
+            <TextInput
+              id="sms-subscriber-search"
               value={subSearch} onChange={(e) => { setSubSearch(e.target.value); setSubPage(1); }}
               placeholder="Search phone or name..."
-              className="input pl-9"
+              aria-label="Search SMS contacts"
+              className="pl-9"
             />
           </div>
-          <button onClick={() => loadSubscribers(subSearch, subPage)} className="btn btn-secondary">Search</button>
+          <SecondaryButton onClick={() => loadSubscribers(subSearch, subPage)}>Search</SecondaryButton>
         </div>
-        <div className="flex gap-2">
-          <button onClick={handleSync} disabled={loading} className="btn btn-secondary gap-2">
-            <FaSyncAlt className={loading ? 'animate-spin' : ''} /> Sync
-          </button>
-          <button onClick={() => document.getElementById('csv-input').click()} className="btn btn-secondary gap-2">
-            <FaUpload /> Import CSV
-          </button>
-          <button onClick={() => setShowAddSubscriber(true)} className="btn btn-primary gap-2">
-            <FaPlus /> Add Contact
-          </button>
-        </div>
-      </div>
 
-      <input
-        id="csv-input" type="file" accept=".csv,.txt"
-        className="hidden" onChange={handleCsvFileChange}
-      />
+        <input
+          id="csv-input" type="file" accept=".csv,.txt"
+          className="hidden" onChange={handleCsvFileChange}
+        />
 
-      {csvFile && (
-        <div className="rounded-xl border border-soft bg-white p-4 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm font-semibold text-gray-900"><FaFileAlt className="mr-1 inline" /> {csvFile.name}</p>
-              {csvPreview.length > 0 && (
-                <p className="mt-1 text-xs text-gray-500">
-                  Preview: {csvPreview.join(', ')}
-                  {csvPreview.length >= 10 && '...'}
-                </p>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <button onClick={handleCsvImport} disabled={loading} className="btn btn-primary text-xs px-3 py-2 gap-1">
-                <FaUpload /> Import
-              </button>
-              <button onClick={() => { setCsvFile(null); setCsvPreview([]); document.getElementById('csv-input').value = ''; }} className="btn btn-secondary text-xs px-3 py-2">
-                <FaTimes />
-              </button>
+        {csvFile && (
+          <div className="rounded-2xl border border-gray-100 bg-gray-50/60 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-gray-900"><FaFileAlt className="mr-1 inline" /> {csvFile.name}</p>
+                {csvPreview.length > 0 && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Preview: {csvPreview.join(', ')}
+                    {csvPreview.length >= 10 && '...'}
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <PrimaryButton onClick={handleCsvImport} loading={loading} className="gap-1">
+                  <FaUpload /> Import
+                </PrimaryButton>
+                <SecondaryButton
+                  aria-label="Cancel CSV import"
+                  onClick={() => { setCsvFile(null); setCsvPreview([]); document.getElementById('csv-input').value = ''; }}
+                >
+                  <FaTimes />
+                </SecondaryButton>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {showAddSubscriber && (
-        <form onSubmit={handleAddSubscriber} className="rounded-xl border border-soft bg-white p-4 shadow-sm">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <input value={newSubscriber.phone} onChange={(e) => setNewSubscriber({ ...newSubscriber, phone: e.target.value })} placeholder="Phone number *" className="input" required />
-            <input value={newSubscriber.full_name} onChange={(e) => setNewSubscriber({ ...newSubscriber, full_name: e.target.value })} placeholder="Full name" className="input" />
-            <div className="flex gap-2">
-              <button type="submit" className="btn btn-primary flex-1"><FaPlus /> Add</button>
-              <button type="button" onClick={() => setShowAddSubscriber(false)} className="btn btn-secondary"><FaTimes /></button>
+        {showAddSubscriber && (
+          <form onSubmit={handleAddSubscriber} className="rounded-2xl border border-gray-100 bg-gray-50/60 p-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <Field label="Phone number" required>
+                <TextInput
+                  id="new-sms-subscriber-phone"
+                  value={newSubscriber.phone} onChange={(e) => setNewSubscriber({ ...newSubscriber, phone: e.target.value })}
+                  placeholder="e.g. 0803 000 0000" required
+                />
+              </Field>
+              <Field label="Full name">
+                <TextInput
+                  id="new-sms-subscriber-name"
+                  value={newSubscriber.full_name} onChange={(e) => setNewSubscriber({ ...newSubscriber, full_name: e.target.value })}
+                  placeholder="Full name"
+                />
+              </Field>
+              <div className="flex items-end gap-2">
+                <PrimaryButton type="submit" className="flex-1 gap-1"><FaPlus /> Add</PrimaryButton>
+                <SecondaryButton type="button" aria-label="Cancel add contact" onClick={() => setShowAddSubscriber(false)}><FaTimes /></SecondaryButton>
+              </div>
             </div>
-          </div>
-        </form>
-      )}
+          </form>
+        )}
 
-      <div className="overflow-x-auto rounded-xl border border-soft bg-white shadow-sm">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500">
-              <th className="px-4 py-3">Phone</th>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Source</th>
-              <th className="px-4 py-3">Type</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Added</th>
-              <th className="px-4 py-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {subscribers.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">No SMS subscribers found. Sync contacts or import a CSV to get started.</td></tr>
-            ) : subscribers.map((sub) => (
-              <tr key={sub.id} className="border-b border-gray-50 transition hover:bg-gray-50">
-                <td className="px-4 py-3 font-medium text-gray-900">{sub.phone}</td>
-                <td className="px-4 py-3 text-gray-600">{sub.full_name || '\u2014'}</td>
-                <td className="px-4 py-3"><span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium">{sub.source}</span></td>
-                <td className="px-4 py-3 text-gray-600">{sub.user_type || '\u2014'}</td>
-                <td className="px-4 py-3">
-                  <button onClick={() => handleToggleSubscribed(sub)} className={`rounded-full px-2 py-0.5 text-xs font-semibold ${sub.subscribed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+        {subscribers.length === 0 ? (
+          <EmptyState
+            icon={<FaUsers />}
+            title="No SMS subscribers found"
+            message="Sync contacts or import a CSV to get started."
+          />
+        ) : (
+          <DataTable columns={['Phone', 'Name', 'Source', 'Type', 'Status', 'Added', 'Actions']}>
+            {subscribers.map((sub) => (
+              <tr key={sub.id} className="transition-colors hover:bg-gray-50/70">
+                <Td className="font-medium text-gray-900">{sub.phone}</Td>
+                <Td className="text-gray-600">{sub.full_name || '\u2014'}</Td>
+                <Td><span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium">{sub.source}</span></Td>
+                <Td className="text-gray-600">{sub.user_type || '\u2014'}</Td>
+                <Td>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleSubscribed(sub)}
+                    aria-label={sub.subscribed ? `Unsubscribe ${sub.phone}` : `Re-subscribe ${sub.phone}`}
+                    className={`rounded-full px-2 py-0.5 text-xs font-semibold transition-colors ${
+                      sub.subscribed ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-red-100 text-red-700 hover:bg-red-200'
+                    }`}
+                  >
                     {sub.subscribed ? 'Active' : 'Unsubscribed'}
                   </button>
-                </td>
-                <td className="px-4 py-3 text-gray-500 text-xs">{new Date(sub.created_at).toLocaleDateString()}</td>
-                <td className="px-4 py-3 text-right">
-                  <button onClick={() => openGovernanceAction('delete_subscriber', sub)} className="text-red-500 hover:text-red-700" title="Remove">
+                </Td>
+                <Td className="text-xs text-gray-500">{formatDate(sub.created_at)}</Td>
+                <Td className="text-right">
+                  <GhostButton
+                    className="text-red-600 hover:bg-red-50"
+                    onClick={() => openGovernanceAction('delete_subscriber', sub)}
+                    aria-label={`Remove ${sub.phone}`}
+                    title="Remove"
+                  >
                     <FaTrash />
-                  </button>
-                </td>
+                  </GhostButton>
+                </Td>
               </tr>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </DataTable>
+        )}
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <button disabled={subPage <= 1} onClick={() => setSubPage((p) => Math.max(1, p - 1))} className="btn btn-secondary px-3 py-2"><FaChevronLeft /></button>
-          <span className="text-sm text-gray-600">Page {subPage} of {totalPages}</span>
-          <button disabled={subPage >= totalPages} onClick={() => setSubPage((p) => p + 1)} className="btn btn-secondary px-3 py-2"><FaChevronRight /></button>
-        </div>
-      )}
-    </div>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2">
+            <SecondaryButton
+              aria-label="Previous page"
+              disabled={subPage <= 1}
+              onClick={() => setSubPage((p) => Math.max(1, p - 1))}
+            >
+              <FaChevronLeft />
+            </SecondaryButton>
+            <span className="text-sm text-gray-600">Page {subPage} of {totalPages}</span>
+            <SecondaryButton
+              aria-label="Next page"
+              disabled={subPage >= totalPages}
+              onClick={() => setSubPage((p) => p + 1)}
+            >
+              <FaChevronRight />
+            </SecondaryButton>
+          </div>
+        )}
+      </div>
+    </Panel>
   );
 
   const renderCampaigns = () => (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900">SMS Campaigns</h3>
-        <button onClick={() => { setShowCampaignForm(true); setEditingCampaignId(null); setCampaignForm(emptyCampaign); setEstimatedRecipients(0); }} className="btn btn-primary gap-2">
-          <FaPlus /> New SMS Campaign
-        </button>
-      </div>
-
-      {showCampaignForm && (
-        <form onSubmit={handleCampaignSubmit} className="rounded-xl border border-soft bg-white p-5 shadow-sm">
-          <h4 className="mb-4 text-sm font-semibold text-gray-900">{editingCampaignId ? 'Edit SMS Campaign' : 'Create SMS Campaign'}</h4>
-          <div className="grid gap-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="text-sm font-medium text-gray-700">
-                Campaign Name
-                <input value={campaignForm.name} onChange={(e) => setCampaignForm({ ...campaignForm, name: e.target.value })} className="input mt-1" placeholder="e.g., Rent Reminder" />
-              </label>
-              <label className="text-sm font-medium text-gray-700">
-                Sender Name
-                <input value={campaignForm.sender_name} onChange={(e) => setCampaignForm({ ...campaignForm, sender_name: e.target.value })} className="input mt-1" placeholder="Amana RentalHub NG" />
-              </label>
-              <label className="text-sm font-medium text-gray-700">
-                Template
-                <select value={campaignForm.template_id} onChange={(e) => { const t = templates.find((x) => String(x.id) === e.target.value); setCampaignForm({ ...campaignForm, template_id: e.target.value, content: t?.content || campaignForm.content }); }} className="input mt-1">
-                  <option value="">No template</option>
-                  {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
-              </label>
-              <label className="text-sm font-medium text-gray-700">
-                Max Retries
-                <select value={campaignForm.max_retries} onChange={(e) => setCampaignForm({ ...campaignForm, max_retries: e.target.value })} className="input mt-1">
-                  <option value={0}>No retries</option>
-                  <option value={1}>1 retry</option>
-                  <option value={2}>2 retries</option>
-                  <option value={3}>3 retries</option>
-                </select>
-              </label>
-              <label className="text-sm font-medium text-gray-700 md:col-span-2">
-                Schedule Send (optional)
-                <input type="datetime-local" value={campaignForm.scheduled_at} onChange={(e) => setCampaignForm({ ...campaignForm, scheduled_at: e.target.value })} className="input mt-1" />
-              </label>
-              <label className="text-sm font-medium text-gray-700 md:col-span-2">
-                Recipient Filter (JSON)
-                <textarea value={campaignForm.recipient_filter} onChange={(e) => setCampaignForm({ ...campaignForm, recipient_filter: e.target.value })} className="input mt-1 min-h-[60px] font-mono text-xs" placeholder='{"sources":["user","lead"],"user_types":["tenant","landlord"]}' />
-              </label>
-            </div>
-            <label className="text-sm font-medium text-gray-700">
-              SMS Text Content
-              <textarea value={campaignForm.content} onChange={(e) => setCampaignForm({ ...campaignForm, content: e.target.value })} className="input mt-1 min-h-[120px] font-mono text-xs" placeholder="Your SMS message here. Keep it short." />
-              <div className="mt-1 flex flex-wrap gap-4 text-xs">
-                <span className="text-gray-500">{campaignForm.content.length} chars</span>
-                <span className="text-gray-500">{segments} segment{segments > 1 ? 's' : ''} ({SEGMENT_LIMIT} chars each)</span>
-                <span className="text-gray-500">
-                  <FaDollarSign className="mr-0.5 inline" />
-                  ~{formatCost(segments, estimatedRecipients || 50)} for {estimatedRecipients || 50} recipients
-                </span>
+    <Panel
+      title="SMS Campaigns"
+      description="Draft campaigns can be queued here; sent campaigns with failures can be retried."
+    >
+      <div className="space-y-4">
+        {showCampaignForm && (
+          <form onSubmit={handleCampaignSubmit} className="rounded-2xl border border-gray-100 bg-gray-50/60 p-5">
+            <h4 className="mb-4 text-sm font-semibold text-gray-900">{editingCampaignId ? 'Edit SMS Campaign' : 'Create SMS Campaign'}</h4>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <Field label="Campaign Name">
+                  <TextInput id="campaign-name" value={campaignForm.name} onChange={(e) => setCampaignForm({ ...campaignForm, name: e.target.value })} placeholder="e.g., Rent Reminder" />
+                </Field>
+                <Field label="Sender Name">
+                  <TextInput id="campaign-sender-name" value={campaignForm.sender_name} onChange={(e) => setCampaignForm({ ...campaignForm, sender_name: e.target.value })} placeholder="Amana RentalHub NG" />
+                </Field>
+                <Field label="Template">
+                  <SelectInput id="campaign-template" value={campaignForm.template_id} onChange={(e) => { const t = templates.find((x) => String(x.id) === e.target.value); setCampaignForm({ ...campaignForm, template_id: e.target.value, content: t?.content || campaignForm.content }); }}>
+                    <option value="">No template</option>
+                    {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </SelectInput>
+                </Field>
+                <Field label="Max Retries">
+                  <SelectInput id="campaign-max-retries" value={campaignForm.max_retries} onChange={(e) => setCampaignForm({ ...campaignForm, max_retries: e.target.value })}>
+                    <option value={0}>No retries</option>
+                    <option value={1}>1 retry</option>
+                    <option value={2}>2 retries</option>
+                    <option value={3}>3 retries</option>
+                  </SelectInput>
+                </Field>
+                <Field label="Schedule Send (optional)" className="md:col-span-2">
+                  <TextInput id="campaign-scheduled-at" type="datetime-local" value={campaignForm.scheduled_at} onChange={(e) => setCampaignForm({ ...campaignForm, scheduled_at: e.target.value })} />
+                </Field>
+                <Field label="Recipient Filter (JSON)" className="md:col-span-2">
+                  <TextArea id="campaign-recipient-filter" className="min-h-[60px] font-mono text-xs" value={campaignForm.recipient_filter} onChange={(e) => setCampaignForm({ ...campaignForm, recipient_filter: e.target.value })} placeholder='{"sources":["user","lead"],"user_types":["tenant","landlord"]}' />
+                </Field>
               </div>
-            </label>
-            <label className="text-sm font-medium text-gray-700">
-              Estimated Recipients Count
-              <input type="number" min={0} value={estimatedRecipients} onChange={(e) => setEstimatedRecipients(parseInt(e.target.value, 10) || 0)} className="input mt-1" placeholder="e.g., 500" />
-              <p className="mt-0.5 text-xs text-gray-400">Enter roughly how many subscribers match your filter for cost estimation</p>
-            </label>
-          </div>
-          <div className="mt-4 flex gap-2">
-            <button type="submit" disabled={loading} className="btn btn-primary">{editingCampaignId ? 'Update' : 'Create'} SMS Campaign</button>
-            <button type="button" onClick={() => { setShowCampaignForm(false); setEditingCampaignId(null); }} className="btn btn-secondary">Cancel</button>
-          </div>
-        </form>
-      )}
+              <Field label="SMS Text Content">
+                <TextArea id="campaign-content" className="min-h-[120px] font-mono text-xs" value={campaignForm.content} onChange={(e) => setCampaignForm({ ...campaignForm, content: e.target.value })} placeholder="Your SMS message here. Keep it short." />
+                <div className="mt-1 flex flex-wrap gap-4 text-xs">
+                  <span className="text-gray-500">{campaignForm.content.length} chars</span>
+                  <span className="text-gray-500">{segments} segment{segments > 1 ? 's' : ''} ({SEGMENT_LIMIT} chars each)</span>
+                  <span className="text-gray-500">
+                    <FaDollarSign className="mr-0.5 inline" />
+                    ~{formatCost(segments, estimatedRecipients || 50)} for {estimatedRecipients || 50} recipients
+                  </span>
+                </div>
+              </Field>
+              <Field label="Estimated Recipients Count" hint="Enter roughly how many subscribers match your filter for cost estimation">
+                <TextInput id="campaign-estimated-recipients" type="number" min={0} value={estimatedRecipients} onChange={(e) => setEstimatedRecipients(parseInt(e.target.value, 10) || 0)} placeholder="e.g., 500" />
+              </Field>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <PrimaryButton type="submit" loading={loading}>{editingCampaignId ? 'Update' : 'Create'} SMS Campaign</PrimaryButton>
+              <SecondaryButton type="button" onClick={() => { setShowCampaignForm(false); setEditingCampaignId(null); }}>Cancel</SecondaryButton>
+            </div>
+          </form>
+        )}
 
-      <div className="space-y-3">
         {campaigns.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-gray-200 p-6 text-center text-sm text-gray-500">No SMS campaigns yet.</p>
+          <EmptyState
+            icon={<FaPhone />}
+            title="No SMS campaigns yet"
+            message="Create a campaign to queue an SMS broadcast to your contacts."
+          />
         ) : campaigns.map((c) => {
           const hasFailures = c.stats?.failed > 0;
           const hasRetries = c.max_retries > 0;
           return (
-            <div key={c.id} className="rounded-xl border border-soft bg-white p-4 shadow-sm">
+            <div key={c.id} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <h4 className="font-semibold text-gray-900">{c.name}</h4>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                      c.status === 'sent' ? 'bg-green-100 text-green-700' :
-                      c.status === 'sending' ? 'bg-blue-100 text-blue-700' :
-                      c.status === 'queued' ? 'bg-yellow-100 text-yellow-700' :
-                      c.status === 'draft' ? 'bg-gray-100 text-gray-600' : 'bg-yellow-100 text-yellow-700'
-                    }`}>{c.status}</span>
+                    <StatusBadge status={c.status} />
                   </div>
                   <p className="mt-1 text-sm text-gray-500 text-pretty line-clamp-2">{c.content}</p>
                   <div className="mt-1 flex flex-wrap gap-3 text-xs text-gray-400">
@@ -761,32 +791,32 @@ const SmsMarketingTab = () => {
                       <span>Sent: {c.stats.sent} | Failed: {c.stats.failed}</span>
                     )}
                     {c.scheduled_at && (
-                      <span><FaClock className="mr-0.5 inline" />Scheduled: {new Date(c.scheduled_at).toLocaleString()}</span>
+                      <span><FaClock className="mr-0.5 inline" />Scheduled: {formatDate(c.scheduled_at)}</span>
                     )}
                     {c.max_retries > 0 && (
                       <span>Max retries: {c.max_retries}</span>
                     )}
                   </div>
-                  <p className="text-xs text-gray-400 mt-0.5">Created by {c.created_by_name || 'Unknown'} &middot; {new Date(c.created_at).toLocaleDateString()}</p>
+                  <p className="mt-0.5 text-xs text-gray-400">Created by {c.created_by_name || 'Unknown'} &middot; {formatDate(c.created_at)}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {c.status === 'draft' && (
                     <>
-                      <button onClick={() => handleEditCampaign(c)} className="btn btn-secondary px-3 py-2 text-xs"><FaEdit /></button>
-                      <button onClick={() => openGovernanceAction('send_campaign', c)} disabled={loading} className="btn btn-primary px-3 py-2 text-xs gap-1"><FaPlay /> Send</button>
-                      <button onClick={() => openGovernanceAction('delete_campaign', c)} className="btn btn-danger px-3 py-2 text-xs"><FaTrash /></button>
+                      <GhostButton onClick={() => handleEditCampaign(c)} aria-label={`Edit ${c.name}`} title="Edit"><FaEdit /></GhostButton>
+                      <PrimaryButton onClick={() => openGovernanceAction('send_campaign', c)} loading={loading} className="gap-1"><FaPlay /> Send</PrimaryButton>
+                      <GhostButton className="text-red-600 hover:bg-red-50" onClick={() => openGovernanceAction('delete_campaign', c)} aria-label={`Delete ${c.name}`} title="Delete"><FaTrash /></GhostButton>
                     </>
                   )}
                   {(c.status === 'queued' || c.status === 'sending') && (
-                    <span className="text-xs text-yellow-600 px-3 py-2">Processing...</span>
+                    <span className="px-3 py-2 text-xs text-amber-600">Processing...</span>
                   )}
                   {c.status === 'sent' && (
                     <>
-                      <button onClick={() => handleViewStats(c.id)} className="btn btn-secondary px-3 py-2 text-xs gap-1"><FaChartBar /> Stats</button>
+                      <SecondaryButton onClick={() => handleViewStats(c.id)} className="gap-1"><FaChartBar /> Stats</SecondaryButton>
                       {hasFailures && hasRetries && (
-                        <button onClick={() => openGovernanceAction('retry_campaign', c)} disabled={loading} className="btn btn-secondary px-3 py-2 text-xs gap-1">
+                        <SecondaryButton onClick={() => openGovernanceAction('retry_campaign', c)} loading={loading} className="gap-1">
                           <FaRedo /> Retry Failed
-                        </button>
+                        </SecondaryButton>
                       )}
                     </>
                   )}
@@ -794,7 +824,7 @@ const SmsMarketingTab = () => {
               </div>
 
               {Array.isArray(c.operations) && c.operations.length > 0 && (
-                <div className="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500">
+                <div className="mt-3 rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-500">
                   <p className="mb-1 font-semibold text-gray-600">Recent governance</p>
                   <div className="space-y-1">
                     {c.operations.slice(0, 2).map((op) => (
@@ -807,25 +837,30 @@ const SmsMarketingTab = () => {
               )}
 
               {viewingCampaignId === c.id && campaignStats && (
-                <div className="mt-4 rounded-lg border border-gray-100 bg-gray-50 p-4">
+                <div className="mt-4 rounded-2xl border border-gray-100 bg-gray-50 p-4">
                   <h5 className="mb-3 text-sm font-semibold text-gray-900">Campaign Stats</h5>
-                  <div className="grid gap-3 sm:grid-cols-4">
-                    <div className="rounded-lg bg-white p-3 text-center"><p className="text-lg font-bold text-gray-900">{campaignStats.stats.total || 0}</p><p className="text-xs text-gray-500">Total</p></div>
-                    <div className="rounded-lg bg-white p-3 text-center"><p className="text-lg font-bold text-green-600">{campaignStats.stats.sent || 0}</p><p className="text-xs text-gray-500">Sent</p></div>
-                    <div className="rounded-lg bg-white p-3 text-center"><p className="text-lg font-bold text-red-600">{campaignStats.stats.failed || 0}</p><p className="text-xs text-gray-500">Failed</p></div>
-                    <div className="rounded-lg bg-white p-3 text-center"><p className="text-lg font-bold text-blue-600">{campaignStats.stats.pending || 0}</p><p className="text-xs text-gray-500">Pending</p></div>
-                  </div>
+                  <StatGrid>
+                    <StatCard label="Total" value={campaignStats.stats.total || 0} />
+                    <StatCard label="Sent" value={campaignStats.stats.sent || 0} tone="success" />
+                    <StatCard label="Failed" value={campaignStats.stats.failed || 0} tone="danger" />
+                    <StatCard label="Pending" value={campaignStats.stats.pending || 0} tone="primary" />
+                  </StatGrid>
                   {campaignStats.cost && (
-                    <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                      <div className="rounded-lg bg-white p-3 text-center"><p className="text-sm font-bold text-gray-900">{campaignStats.cost.segments_per_message} seg/msg</p><p className="text-xs text-gray-500">Segments per message</p></div>
-                      <div className="rounded-lg bg-white p-3 text-center"><p className="text-sm font-bold text-gray-900">{campaignStats.cost.total_segments}</p><p className="text-xs text-gray-500">Total segments sent</p></div>
-                      <div className="rounded-lg bg-white p-3 text-center"><p className="text-sm font-bold text-purple-600">\u20A6{campaignStats.cost.actual}</p><p className="text-xs text-gray-500">Est. cost @ \u20A6{campaignStats.cost.per_segment}/seg</p></div>
+                    <div className="mt-3">
+                      <StatGrid columns={3}>
+                        <StatCard label="Segments per message" value={campaignStats.cost.segments_per_message} />
+                        <StatCard label="Total segments sent" value={campaignStats.cost.total_segments} />
+                        <StatCard
+                          label={`Est. cost @ \\u20A6${campaignStats.cost.per_segment}/seg`}
+                          value={`\\u20A6${campaignStats.cost.actual}`}
+                        />
+                      </StatGrid>
                     </div>
                   )}
                   {campaignStats.recipients?.length > 0 && (
                     <div className="mt-3">
                       <p className="mb-1 text-xs font-semibold text-gray-600">Recent recipients (last 200):</p>
-                      <div className="max-h-40 overflow-y-auto rounded-lg bg-white text-xs">
+                      <div className="max-h-40 overflow-y-auto rounded-xl bg-white text-xs">
                         {campaignStats.recipients.map((r) => (
                           <div key={r.id} className="flex items-center justify-between border-b border-gray-50 px-3 py-1.5">
                             <span className="text-gray-700">{r.phone} {r.full_name ? `(${r.full_name})` : ''}</span>
@@ -837,164 +872,178 @@ const SmsMarketingTab = () => {
                       </div>
                     </div>
                   )}
-                  <button onClick={() => setViewingCampaignId(null)} className="mt-3 text-xs text-gray-500 hover:text-gray-700">&larr; Close stats</button>
+                  <GhostButton className="mt-3" onClick={() => setViewingCampaignId(null)}>&larr; Close stats</GhostButton>
                 </div>
               )}
             </div>
           );
         })}
       </div>
-    </div>
+    </Panel>
   );
 
   const renderTemplates = () => (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900">SMS Templates</h3>
-        <button onClick={() => { setShowTemplateForm(true); setEditingTemplateId(null); setTemplateForm(emptyTemplate); }} className="btn btn-primary gap-2">
+    <Panel
+      title="SMS Templates"
+      description="Reusable message bodies you can drop into any campaign."
+      actions={
+        <PrimaryButton onClick={() => { setShowTemplateForm(true); setEditingTemplateId(null); setTemplateForm(emptyTemplate); }} className="gap-2">
           <FaPlus /> New Template
-        </button>
-      </div>
-
-      {showTemplateForm && (
-        <form onSubmit={handleTemplateSubmit} className="rounded-xl border border-soft bg-white p-5 shadow-sm">
-          <h4 className="mb-4 text-sm font-semibold text-gray-900">{editingTemplateId ? 'Edit SMS Template' : 'Create SMS Template'}</h4>
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="text-sm font-medium text-gray-700">Name <input value={templateForm.name} onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })} className="input mt-1" placeholder="Template name" /></label>
-            <label className="text-sm font-medium text-gray-700">Category <select value={templateForm.category} onChange={(e) => setTemplateForm({ ...templateForm, category: e.target.value })} className="input mt-1">
-              <option value="general">General</option>
-              <option value="promo">Promotional</option>
-              <option value="reminder">Reminder</option>
-              <option value="alert">Alert</option>
-            </select></label>
-            <label className="text-sm font-medium text-gray-700 md:col-span-2">Description <input value={templateForm.description} onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })} className="input mt-1" placeholder="What's this template for?" /></label>
-            <label className="text-sm font-medium text-gray-700 md:col-span-2">SMS Content <textarea value={templateForm.content} onChange={(e) => setTemplateForm({ ...templateForm, content: e.target.value })} className="input mt-1 min-h-[100px] font-mono text-xs" placeholder="Your reusable SMS text template." /></label>
-          </div>
-          <div className="mt-4 flex gap-2">
-            <button type="submit" disabled={loading} className="btn btn-primary">{editingTemplateId ? 'Update' : 'Create'} Template</button>
-            <button type="button" onClick={() => { setShowTemplateForm(false); setEditingTemplateId(null); }} className="btn btn-secondary">Cancel</button>
-          </div>
-        </form>
-      )}
-
-      <div className="grid gap-3 lg:grid-cols-2">
-        {templates.length === 0 ? (
-          <div className="col-span-full rounded-lg border border-dashed border-gray-200 p-6 text-center text-sm text-gray-500">No SMS templates yet.</div>
-        ) : templates.map((t) => (
-          <div key={t.id} className="rounded-xl border border-soft bg-white p-4 shadow-sm">
-            <div className="flex items-start justify-between">
-              <div>
-                <h4 className="font-semibold text-gray-900">{t.name}</h4>
-                <p className="text-xs text-gray-500 mt-0.5">{t.category} &middot; {t.is_system ? 'System' : 'Custom'}</p>
-              </div>
-              <div className="flex gap-1">
-                <button onClick={() => handleEditTemplate(t)} className="text-gray-500 hover:text-primary-600 p-1"><FaEdit /></button>
-                {!t.is_system && <button onClick={() => openGovernanceAction('delete_template', t)} className="text-gray-500 hover:text-red-600 p-1"><FaTrash /></button>}
-              </div>
+        </PrimaryButton>
+      }
+    >
+      <div className="space-y-4">
+        {showTemplateForm && (
+          <form onSubmit={handleTemplateSubmit} className="rounded-2xl border border-gray-100 bg-gray-50/60 p-5">
+            <h4 className="mb-4 text-sm font-semibold text-gray-900">{editingTemplateId ? 'Edit SMS Template' : 'Create SMS Template'}</h4>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Field label="Name">
+                <TextInput id="template-name" value={templateForm.name} onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })} placeholder="Template name" />
+              </Field>
+              <Field label="Category">
+                <SelectInput id="template-category" value={templateForm.category} onChange={(e) => setTemplateForm({ ...templateForm, category: e.target.value })}>
+                  <option value="general">General</option>
+                  <option value="promo">Promotional</option>
+                  <option value="reminder">Reminder</option>
+                  <option value="alert">Alert</option>
+                </SelectInput>
+              </Field>
+              <Field label="Description" className="md:col-span-2">
+                <TextInput id="template-description" value={templateForm.description} onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })} placeholder="What's this template for?" />
+              </Field>
+              <Field label="SMS Content" className="md:col-span-2">
+                <TextArea id="template-content" className="min-h-[100px] font-mono text-xs" value={templateForm.content} onChange={(e) => setTemplateForm({ ...templateForm, content: e.target.value })} placeholder="Your reusable SMS text template." />
+              </Field>
             </div>
-            <p className="mt-2 text-xs text-gray-500 line-clamp-2">{t.description || 'No description'}</p>
-            <p className="mt-1 text-xs text-gray-400 text-pretty line-clamp-2">{t.content}</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <PrimaryButton type="submit" loading={loading}>{editingTemplateId ? 'Update' : 'Create'} Template</PrimaryButton>
+              <SecondaryButton type="button" onClick={() => { setShowTemplateForm(false); setEditingTemplateId(null); }}>Cancel</SecondaryButton>
+            </div>
+          </form>
+        )}
+
+        {templates.length === 0 ? (
+          <EmptyState
+            icon={<FaFileAlt />}
+            title="No SMS templates yet"
+            message="Create a reusable template to speed up campaign setup."
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {templates.map((t) => (
+              <div key={t.id} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h4 className="font-semibold text-gray-900">{t.name}</h4>
+                    <p className="mt-0.5 text-xs text-gray-500">{t.category} &middot; {t.is_system ? 'System' : 'Custom'}</p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <GhostButton onClick={() => handleEditTemplate(t)} aria-label={`Edit ${t.name}`} title="Edit"><FaEdit /></GhostButton>
+                    {!t.is_system && (
+                      <GhostButton className="text-red-600 hover:bg-red-50" onClick={() => openGovernanceAction('delete_template', t)} aria-label={`Delete ${t.name}`} title="Delete"><FaTrash /></GhostButton>
+                    )}
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-gray-500 line-clamp-2">{t.description || 'No description'}</p>
+                <p className="mt-1 text-xs text-gray-400 text-pretty line-clamp-2">{t.content}</p>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
       </div>
-    </div>
+    </Panel>
   );
 
   return (
     <div className="space-y-6">
-      <div className="flex gap-1 rounded-xl bg-gray-100 p-1">
-        {TAB_KEYS.map((key) => (
+      <MarketingShell
+        eyebrow="Super admin"
+        title="SMS Marketing"
+        subtitle="Broadcast SMS campaigns, manage contacts and reusable templates from one place."
+        icon={<FaPhone />}
+        actions={
           <button
-            key={key}
-            onClick={() => setActiveTab(key)}
-            className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition ${
-              activeTab === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-            }`}
+            type="button"
+            className="btn bg-white text-primary-700 shadow-sm hover:bg-primary-50"
+            onClick={() => {
+              setActiveTab('campaigns');
+              setShowCampaignForm(true);
+              setEditingCampaignId(null);
+              setCampaignForm(emptyCampaign);
+              setEstimatedRecipients(0);
+            }}
           >
-            {key === 'overview' && <><FaChartBar className="mr-1.5 inline" />Overview</>}
-            {key === 'campaigns' && <><FaPhone className="mr-1.5 inline" />SMS Campaigns</>}
-            {key === 'subscribers' && <><FaUsers className="mr-1.5 inline" />Contacts</>}
-            {key === 'templates' && <><FaFileAlt className="mr-1.5 inline" />Templates</>}
+            <FaPlus className="mr-2" /> New campaign
           </button>
-        ))}
-      </div>
+        }
+      >
+        <div className="space-y-6">
+          <SegmentedControl
+            options={TAB_KEYS.map((key) => ({ value: key, label: TAB_LABELS[key] }))}
+            value={activeTab}
+            onChange={setActiveTab}
+          />
 
-      {activeTab === 'overview' && renderOverview()}
-      {activeTab === 'subscribers' && renderSubscribers()}
-      {activeTab === 'campaigns' && renderCampaigns()}
-      {activeTab === 'templates' && renderTemplates()}
-
-      {governanceAction.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white shadow-xl">
-            <div className="border-b border-gray-100 px-6 py-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                {governanceCopy[governanceAction.type]?.title || 'Confirm SMS action'}
-              </h3>
-              <p className="mt-1 text-sm text-gray-500">
-                {governanceAction.type.includes('campaign')
-                  ? governanceAction.target?.name
-                  : governanceAction.type === 'delete_template'
-                    ? governanceAction.target?.name
-                    : `${governanceAction.target?.phone || ''} ${governanceAction.target?.full_name ? `- ${governanceAction.target.full_name}` : ''}`}
-              </p>
-            </div>
-
-            <div className="space-y-4 px-6 py-4">
-              {governanceAction.type === 'send_campaign' && (
-                <div className="rounded-lg border border-amber-100 bg-amber-50 p-3 text-sm text-amber-800">
-                  <p className="font-semibold">Cost and audience check</p>
-                  <p className="mt-1">
-                    Message length: {getSegments(governanceAction.target?.content)} segment
-                    {getSegments(governanceAction.target?.content) > 1 ? 's' : ''}. This will queue every subscriber matching the campaign filter.
-                  </p>
-                </div>
-              )}
-
-              {governanceAction.type === 'retry_campaign' && (
-                <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-800">
-                  Only transient failed SMS messages that are still within the retry limit will be queued again.
-                </div>
-              )}
-
-              <label className="block text-sm font-medium text-gray-700">
-                {governanceCopy[governanceAction.type]?.label || 'Reason'}
-                <textarea
-                  value={governanceAction.note}
-                  onChange={(event) => updateGovernanceNote(event.target.value)}
-                  rows={4}
-                  className="input mt-2 min-h-[110px]"
-                  placeholder={governanceCopy[governanceAction.type]?.placeholder || 'Add the reason for this action'}
-                />
-              </label>
-
-              <p className="text-xs text-gray-500">
-                This note is saved in SMS marketing governance history.
-              </p>
-
-              {governanceAction.error && (
-                <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {governanceAction.error}
-                </p>
-              )}
-            </div>
-
-            <div className="flex justify-end gap-3 border-t border-gray-100 px-6 py-4">
-              <button type="button" onClick={closeGovernanceAction} className="btn btn-secondary">
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={submitGovernanceAction}
-                disabled={loading}
-                className={governanceCopy[governanceAction.type]?.tone === 'danger' ? 'btn btn-danger' : 'btn btn-primary'}
-              >
-                {loading ? 'Working...' : 'Confirm'}
-              </button>
-            </div>
-          </div>
+          {activeTab === 'overview' && renderOverview()}
+          {activeTab === 'subscribers' && renderSubscribers()}
+          {activeTab === 'campaigns' && renderCampaigns()}
+          {activeTab === 'templates' && renderTemplates()}
         </div>
-      )}
+      </MarketingShell>
+
+      <Dialog
+        open={governanceAction.open}
+        onClose={closeGovernanceAction}
+        title={governanceCopy[governanceAction.type]?.title || 'Confirm SMS action'}
+        subtitle={
+          governanceAction.type.includes('campaign')
+            ? governanceAction.target?.name
+            : governanceAction.type === 'delete_template'
+              ? governanceAction.target?.name
+              : `${governanceAction.target?.phone || ''} ${governanceAction.target?.full_name ? `- ${governanceAction.target.full_name}` : ''}`
+        }
+        size="small"
+        footer={
+          <>
+            <SecondaryButton onClick={closeGovernanceAction}>Cancel</SecondaryButton>
+            {governanceCopy[governanceAction.type]?.tone === 'danger' ? (
+              <DangerButton onClick={submitGovernanceAction} loading={loading}>Confirm</DangerButton>
+            ) : (
+              <PrimaryButton onClick={submitGovernanceAction} loading={loading}>Confirm</PrimaryButton>
+            )}
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {governanceAction.type === 'send_campaign' && (
+            <Banner tone="warning" title="Cost and audience check">
+              Message length: {getSegments(governanceAction.target?.content)} segment
+              {getSegments(governanceAction.target?.content) > 1 ? 's' : ''}. This will queue every subscriber matching the campaign filter.
+            </Banner>
+          )}
+
+          {governanceAction.type === 'retry_campaign' && (
+            <Banner tone="info">
+              Only transient failed SMS messages that are still within the retry limit will be queued again.
+            </Banner>
+          )}
+
+          <Field
+            label={governanceCopy[governanceAction.type]?.label || 'Reason'}
+            error={governanceAction.error || undefined}
+          >
+            <TextArea
+              rows={4}
+              className="min-h-[110px]"
+              value={governanceAction.note}
+              onChange={(event) => updateGovernanceNote(event.target.value)}
+              placeholder={governanceCopy[governanceAction.type]?.placeholder || 'Add the reason for this action'}
+            />
+          </Field>
+
+          <Banner tone="info">This note is saved in SMS marketing governance history.</Banner>
+        </div>
+      </Dialog>
     </div>
   );
 };
