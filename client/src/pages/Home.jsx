@@ -327,7 +327,7 @@ const Home = () => {
                   {t('home.legal_protection_title', 'Legal protection: solved cases')}
                 </h2>
                 <p className="max-w-2xl text-slate-600">
-                  {t('home.legal_cases_intro', 'See anonymized rental disputes resolved with legal support.')}
+                  {t('home.legal_cases_intro', 'See anonymized rental disputes resolved with support.')}
                 </p>
               </div>
 
