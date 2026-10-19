@@ -31,7 +31,13 @@ Android:
 - Or CI/EAS: `npx eas build -p android --profile preview` (APK) / production (store).
 iOS:
 - `npx eas build -p ios` (or Xcode on a Mac). **No local iOS artifact exists** — iOS must be built via EAS/CI.
-- Replace the download artifact: copy the new Android APK over `uploads/app.apk` (repo root) and commit/push it, or point downloads at the EAS/CI artifact URL.
+- Replace the download artifact: copy the new Android APK to `uploads/app.apk` **on the server** and write `uploads/version.json`
+  (`{"version":"<x.y.z>","buildNumber":"<n>","lastUpdated":"<ISO>"}`). `uploads/` is gitignored (`!uploads/.gitkeep`), so
+  committing the APK does nothing — a clean deploy/`git clone` ships no APK and `/api/downloads/app` 404s. If the file is
+  dropped under a different name (`Amana RentalHub NG.apk`), the route still serves the newest `*.apk` in `uploads/`.
+  Confirm the live download works: open `/api/downloads/version` (must report `apkAvailable: true`) and download
+  `Amana RentalHub NG-<x.y.z>.apk`. Set `MOBILE_ANDROID_APK_URL=https://rentalhub.com.ng/api/downloads/app` so the in-app
+  updater can fetch it (without it the app reports "download link not configured").
 - Submit store builds (`eas submit` / App Store Connect + Play Console).
 
 ## 4. QA checklist (device + live env)

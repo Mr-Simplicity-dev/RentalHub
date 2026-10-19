@@ -326,7 +326,6 @@ const createManualPlatformLawyer = async (req, res) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
 
       return res.status(400).json({ message: 'Enter a valid lawyer email address' });
-Amana RentalHub NG
     }
 
 
@@ -382,7 +381,6 @@ Amana RentalHub NG
       existingUserResult.rows[0].user_type !== 'lawyer'
 
     ) {
-Amana RentalHub NG
       return res.status(409).json({
 
         message: 'This email already belongs to a non-lawyer account',
