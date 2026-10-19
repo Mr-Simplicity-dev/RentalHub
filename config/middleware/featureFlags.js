@@ -210,6 +210,8 @@ const attachUserFromToken = (req) => {
       ...(req.user || {}),
       id: identity.userId,
       user_type: identity.userType,
+      // Token-derived only: authenticate must still load and validate the row.
+      _tokenOnly: true,
     };
   } catch {
     // Ignore invalid tokens here; auth middleware will handle protected routes.

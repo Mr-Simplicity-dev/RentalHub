@@ -15,7 +15,11 @@ const ensureUserSuspensionSchema = async () => {
 // Verify JWT Token
 const authenticate = async (req, res, next) => {
   try {
-    if (req.user?.id) {
+    // Security: only reuse a user that an earlier middleware loaded from the
+    // database. enforceFlags pre-attaches {id, user_type} straight from the
+    // JWT; trusting that here would skip the token-version (logout-all),
+    // deleted-account and suspension checks below.
+    if (req.user?.id && !req.user._tokenOnly) {
       return next();
     }
 

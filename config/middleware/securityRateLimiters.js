@@ -6,12 +6,18 @@ const redis = require('../utils/redis');
 // survive deploys/reloads. Falls back to express-rate-limit's in-memory store
 // when Redis is unavailable. Keys are hashed so raw client identifiers (IP +
 // route) never land in Redis.
+//
+// The bucket name is what keeps limiters apart: the default key is only the
+// client IP, so without a per-limiter name every limiter hashed to the same
+// Redis key and shared ONE counter — 12 ordinary "sensitive" requests in the
+// window then blocked unrelated routes for that IP.
 const { MemoryStore } = rateLimit;
 
 class RedisRateLimitStore {
-  constructor() {
+  constructor(bucket) {
     this.memory = new MemoryStore();
     this.windowMs = 60 * 1000;
+    this.bucket = bucket || 'default';
   }
 
   init(options) {
@@ -21,7 +27,10 @@ class RedisRateLimitStore {
   }
 
   _hash(key) {
-    return crypto.createHash('sha256').update(`${this.prefix}:${key}`).digest('hex');
+    return crypto
+      .createHash('sha256')
+      .update(`${this.bucket}:${this.prefix}:${key}`)
+      .digest('hex');
   }
 
   async increment(key) {
@@ -55,11 +64,11 @@ class RedisRateLimitStore {
   }
 }
 
-const buildLimiter = ({ windowMs, max, message }) =>
+const buildLimiter = ({ name, windowMs, max, message }) =>
   rateLimit({
     windowMs,
     max,
-    store: new RedisRateLimitStore(),
+    store: new RedisRateLimitStore(name || message),
     standardHeaders: true,
     legacyHeaders: false,
     message: {
