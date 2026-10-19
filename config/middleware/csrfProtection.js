@@ -9,6 +9,7 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const CSRF_EXEMPT_PATHS = new Set([
   '/api/auth/login',
   '/api/recruitment/payments/webhook',
+  '/api/whatsapp/webhook',
   '/api/mobile/diagnostics/crash',
   '/api/mobile/analytics/events',
 ]);

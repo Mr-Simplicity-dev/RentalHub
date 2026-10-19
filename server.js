@@ -79,6 +79,7 @@ const smsDeliveryRoutes = require('./routes/smsDelivery');
 const appLinksRoutes = require('./routes/appLinks');
 const downloadsRoutes = require('./routes/downloads');
 const premblyRecoveryRoutes = require('./routes/premblyRecovery');
+const whatsappWebhookRoutes = require('./routes/whatsappWebhook');
 
 const disputesRoutes = require('./routes/disputes');
 const disputeRoutes = require('./routes/disputeRoutes');
@@ -646,6 +647,7 @@ const publicDownloadLimiter = rateLimit({
 app.use('/api/downloads', publicDownloadLimiter, downloadsRoutes);
 app.use('/api/sms', smsDeliveryRoutes);
 app.use('/api/prembly', premblyRecoveryRoutes);
+app.use('/api/whatsapp/webhook', whatsappWebhookRoutes);
 app.use('/api', enforceFlags);
 
 app.get('/api/auth/verify-email', async (req, res) => {
