@@ -558,6 +558,11 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 // body parsers and before the global CSRF/sanitizer chain.
 app.use('/voice', voiceRoutes);
 
+// Meta's WhatsApp webhook verification handshake sends hub.mode / hub.verify_token /
+// hub.challenge — the input sanitizer below deletes query keys containing dots,
+// so like /voice this route must be mounted before the sanitizer chain.
+app.use('/api/whatsapp/webhook', whatsappWebhookRoutes);
+
 const hpp = require('hpp');
 app.use(hpp({
   whitelist: [
@@ -647,7 +652,6 @@ const publicDownloadLimiter = rateLimit({
 app.use('/api/downloads', publicDownloadLimiter, downloadsRoutes);
 app.use('/api/sms', smsDeliveryRoutes);
 app.use('/api/prembly', premblyRecoveryRoutes);
-app.use('/api/whatsapp/webhook', whatsappWebhookRoutes);
 app.use('/api', enforceFlags);
 
 app.get('/api/auth/verify-email', async (req, res) => {

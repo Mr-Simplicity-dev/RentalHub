@@ -5,6 +5,7 @@ const http = require('http');
 const crypto = require('crypto');
 
 const whatsappWebhookRoutes = require('../routes/whatsappWebhook');
+const inputSanitizer = require('../config/middleware/inputSanitizer');
 
 const VERIFY_TOKEN = 'test-verify-token-9f2b';
 const APP_SECRET = 'test-app-secret-77aa';
@@ -91,6 +92,39 @@ test('verification fails closed when no token is configured', async (t) => {
     path: '/api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=&hub.challenge=1',
   });
   assert.equal(res.status, 403, 'empty configured token never verifies');
+});
+
+test('handshake works with the global input sanitizer in the chain', async (t) => {
+  // Production mounts this route BEFORE inputSanitizer: the sanitizer deletes
+  // every query key containing a dot, which would wipe Meta's hub.* params.
+  process.env.WHATSAPP_VERIFY_TOKEN = VERIFY_TOKEN;
+  delete process.env.WHATSAPP_APP_SECRET;
+
+  const app = express();
+  app.use('/api/whatsapp/webhook', whatsappWebhookRoutes);
+  app.use(inputSanitizer);
+  app.get('/sanitized', (req, res) => res.json(req.query));
+
+  const server = http.createServer(app);
+  await new Promise((resolve) => server.listen(0, resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  t.after(restoreEnv);
+  const port = server.address().port;
+
+  const ok = await request(port, {
+    path: `/api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=${VERIFY_TOKEN}&hub.challenge=8421836`,
+  });
+  assert.equal(ok.status, 200, 'handshake succeeds when the route precedes the sanitizer');
+  assert.equal(ok.body, '8421836');
+
+  const stripped = await request(port, {
+    path: '/sanitized?hub.mode=subscribe&hub.verify_token=abc&hub.challenge=1',
+  });
+  assert.deepEqual(
+    JSON.parse(stripped.body),
+    {},
+    'documents why: the sanitizer drops dotted query keys entirely'
+  );
 });
 
 test('event deliveries are acknowledged and optionally signature-checked', async (t) => {
