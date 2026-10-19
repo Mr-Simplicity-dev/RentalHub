@@ -18,6 +18,7 @@ import BroadcastTab from "../components/admin/BroadcastTab";
 import AdSpacesTab from "../components/admin/AdSpacesTab";
 import EmailMarketingTab from "../components/admin/EmailMarketingTab";
 import SmsMarketingTab from "../components/admin/SmsMarketingTab";
+import WhatsappMarketingTab from "../components/admin/WhatsappMarketingTab";
 import PlatformRatingsTab from "../components/admin/PlatformRatingsTab";
 import FlagsTab from "../components/admin/FlagsTab";
 import FraudTab from "../components/admin/FraudTab";
@@ -62,6 +63,7 @@ const tabs = [
   "ad_spaces",
   "email_marketing",
   "sms_marketing",
+  "whatsapp_marketing",
   "platform_ratings",
   "recruitment",
   "pricing",
@@ -97,6 +99,7 @@ const tabLabels = {
   ad_spaces: "Ad Spaces",
   email_marketing: "Email Marketing",
   sms_marketing: "SMS Marketing",
+  whatsapp_marketing: "WhatsApp Marketing",
   platform_ratings: "Service Ratings",
   recruitment: "Recruitment",
   pricing: "Pricing",
@@ -142,6 +145,7 @@ const shortcutCategories = [
       { name: "ad_spaces", label: "Ad Spaces", detail: "Manage advert placements and visibility" },
       { name: "email_marketing", label: "Email Marketing", detail: "Create email campaigns and manage subscribers" },
       { name: "sms_marketing", label: "SMS Marketing", detail: "Create SMS campaigns and manage phone subscribers" },
+      { name: "whatsapp_marketing", label: "WhatsApp Marketing", detail: "Send approved template and free-text WhatsApp campaigns to users" },
       { name: "platform_ratings", label: "Service Ratings", detail: "Moderate ratings, reviews, and location rules" },
     ],
   },
@@ -768,6 +772,7 @@ export default function SuperAdminDashboard() {
       platform_ratings: ["ratings", "reviews"],
       email_marketing: ["email"],
       sms_marketing: ["sms"],
+      whatsapp_marketing: ["whatsapp", "wa"],
       platform_lawyers: ["lawyer"],
       platform_agents: ["agents"],
       admin: ["staff", "accounts"],
@@ -1537,6 +1542,10 @@ export default function SuperAdminDashboard() {
 
       {tab === "sms_marketing" && (
         <SmsMarketingTab />
+      )}
+
+      {tab === "whatsapp_marketing" && (
+        <WhatsappMarketingTab />
       )}
 
       {tab === "platform_ratings" && (
