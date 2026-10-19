@@ -1,7 +1,7 @@
 const logger = require('../config/utils/logger');
 const cron = require('node-cron');
 const db = require('../config/middleware/database');
-const { sendWhatsAppText, sendWhatsAppTemplate } = require('../config/utils/whatsappService');
+const { sendWhatsAppText, sendWhatsAppTemplate, sendWhatsAppMedia } = require('../config/utils/whatsappService');
 const { ensureSchema } = require('../services/whatsappMarketingService');
 
 const BATCH_SIZE = 25;
@@ -56,7 +56,8 @@ const processWhatsappQueue = async () => {
     const { rows: activated } = await db.query(
       `UPDATE whatsapp_campaigns SET status = 'sending', updated_at = NOW()
        WHERE status = 'queued'
-       RETURNING id, kind, template_name, template_language, template_params, content`
+       RETURNING id, kind, template_name, template_language, template_params, content,
+                 media_type, media_url, header_media_type, header_media_url`
     );
 
     if (activated.length === 0) return;
@@ -91,14 +92,27 @@ const processWhatsappQueue = async () => {
           break;
         }
 
-        const result = camp.kind === 'template'
-          ? await sendWhatsAppTemplate({
-              to: rec.phone,
-              templateName: camp.template_name,
-              language: camp.template_language,
-              params: camp.template_params,
-            })
-          : await sendWhatsAppText({ to: rec.phone, message: camp.content });
+        let result;
+        if (camp.kind === 'template') {
+          result = await sendWhatsAppTemplate({
+            to: rec.phone,
+            templateName: camp.template_name,
+            language: camp.template_language,
+            params: camp.template_params,
+            headerMedia: camp.header_media_url
+              ? { type: camp.header_media_type, link: camp.header_media_url }
+              : null,
+          });
+        } else if (camp.media_url) {
+          result = await sendWhatsAppMedia({
+            to: rec.phone,
+            mediaType: camp.media_type,
+            link: camp.media_url,
+            caption: camp.content || '',
+          });
+        } else {
+          result = await sendWhatsAppText({ to: rec.phone, message: camp.content });
+        }
 
         if (result.success) {
           rateLimitStreak = 0;

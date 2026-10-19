@@ -44,6 +44,64 @@ const emptyForm = {
   content: '',
   scope: 'all',
   user_type: '',
+  media: { type: '', url: '' },
+  headerMedia: { type: '', url: '' },
+};
+
+const MediaField = ({ label, hint, value, onChange }) => {
+  const [uploading, setUploading] = useState(false);
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const data = new FormData();
+    data.append('file', file);
+    setUploading(true);
+    try {
+      const res = await api.post('/whatsapp-marketing/media', data);
+      onChange({ type: res.data.data.media_type, url: res.data.data.url });
+      toast.success('Media uploaded');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="mb-3 rounded border border-dashed border-gray-300 p-3">
+      <label className="mb-1 block text-xs font-medium text-gray-700">{label}</label>
+      {hint && <p className="mb-2 text-xs text-gray-400">{hint}</p>}
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <select
+          className="rounded border px-2 py-1.5 text-sm"
+          value={value.type}
+          onChange={(e) => onChange({ ...value, type: e.target.value })}
+        >
+          <option value="">No media</option>
+          <option value="image">Image</option>
+          <option value="video">Video</option>
+          <option value="document">Document (link only)</option>
+        </select>
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp,video/mp4,video/3gpp"
+          className="text-xs"
+          disabled={uploading || !value.type || value.type === 'document'}
+          onChange={handleFile}
+        />
+        <input
+          className="rounded border px-2 py-1.5 text-sm"
+          placeholder="https://… public link"
+          value={value.url}
+          onChange={(e) => onChange({ ...value, url: e.target.value })}
+        />
+      </div>
+      {uploading && <p className="mt-1 text-xs text-gray-500">Uploading…</p>}
+      {value.url && <p className="mt-1 break-all text-xs text-green-700">{value.url}</p>}
+    </div>
+  );
 };
 
 const WhatsappMarketingTab = () => {
@@ -139,7 +197,15 @@ const WhatsappMarketingTab = () => {
     if (form.kind === 'template' && !form.template_name.trim()) {
       return toast.error('The approved Meta template name is required');
     }
-    if (form.kind === 'text' && !form.content.trim()) return toast.error('A message is required');
+    if (form.kind === 'text' && !form.content.trim() && !form.media.url.trim()) {
+      return toast.error('A message or a media attachment is required');
+    }
+    if (form.media.type && !form.media.url.trim()) {
+      return toast.error('Upload a file or paste a public link for the selected media type');
+    }
+    if (form.headerMedia.type && !form.headerMedia.url.trim()) {
+      return toast.error('Upload a file or paste a public link for the template header media');
+    }
     if (form.scope === 'user_type' && !form.user_type.trim()) {
       return toast.error('Enter the user type to target, or switch to all users');
     }
@@ -153,13 +219,17 @@ const WhatsappMarketingTab = () => {
           scope: form.scope,
           user_type: form.scope === 'user_type' ? form.user_type.trim() : null,
         },
+        media_type: form.kind === 'text' ? form.media.type || null : null,
+        media_url: form.kind === 'text' ? form.media.url.trim() || null : null,
+        header_media_type: form.kind === 'template' ? form.headerMedia.type || null : null,
+        header_media_url: form.kind === 'template' ? form.headerMedia.url.trim() || null : null,
         ...(form.kind === 'template'
           ? {
               template_name: form.template_name.trim(),
               template_language: form.template_language.trim() || 'en',
               template_params: form.template_params.split(',').map((s) => s.trim()).filter(Boolean),
             }
-          : { content: form.content.trim() }),
+          : { content: form.content.trim() || null }),
       };
       const res = await api.post('/whatsapp-marketing/campaigns', payload);
       const created = res.data.data;
@@ -203,7 +273,9 @@ const WhatsappMarketingTab = () => {
         <strong>Meta rules:</strong> template messages must first be approved inside your Meta app
         (WhatsApp → Message templates). Free-text messages only reach users who messaged your
         business number within the last 24 hours — anyone else will be rejected by Meta.
-        Marketing templates must mention how to opt out.
+        Images and clips attached to free text follow the same 24-hour rule; for campaigns, add
+        the image/video header when creating the template in Meta. Marketing templates must
+        mention how to opt out.
       </div>
 
       {stats && (
@@ -257,6 +329,7 @@ const WhatsappMarketingTab = () => {
           </div>
 
           {form.kind === 'template' ? (
+            <>
             <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-700">Meta template name</label>
@@ -286,7 +359,15 @@ const WhatsappMarketingTab = () => {
                 />
               </div>
             </div>
+            <MediaField
+              label="Template header media (optional)"
+              hint="Only for templates approved with an image or video header. Leave as 'No media' otherwise."
+              value={form.headerMedia}
+              onChange={(v) => setForm((prev) => ({ ...prev, headerMedia: v }))}
+            />
+            </>
           ) : (
+            <>
             <div className="mb-3">
               <label className="mb-1 block text-xs font-medium text-gray-700">Message</label>
               <textarea
@@ -299,6 +380,13 @@ const WhatsappMarketingTab = () => {
               />
               <p className="mt-1 text-xs text-gray-400">{form.content.length}/1000</p>
             </div>
+            <MediaField
+              label="Attach an image or clip (optional)"
+              hint="Upload JPG/PNG/WEBP up to 5MB or MP4/3GP up to 16MB, or paste a public https link. The message text becomes the caption."
+              value={form.media}
+              onChange={(v) => setForm((prev) => ({ ...prev, media: v }))}
+            />
+            </>
           )}
 
           <div className="mb-4 grid grid-cols-1 items-end gap-3 sm:grid-cols-3">

@@ -11,7 +11,7 @@ const {
   createCampaign,
   sendCampaign,
 } = require('../services/whatsappMarketingService');
-const { sendWhatsAppTemplate } = require('../config/utils/whatsappService');
+const { sendWhatsAppTemplate, sendWhatsAppMedia } = require('../config/utils/whatsappService');
 const { isRateLimitError, isTransientError } = require('../jobs/whatsappMarketingJobs');
 
 const makeRes = () => {
@@ -229,4 +229,170 @@ test('queue processor classifies Meta errors so campaigns pause on rate limits',
   assert.equal(isTransientError('gateway timeout'), true);
   assert.equal(isTransientError('connect ECONNRESET'), true);
   assert.equal(isTransientError('Template name does not exist'), false);
+});
+
+test('validateCampaignPayload accepts media with an optional caption and rejects bad links', () => {
+  const mediaOnly = validateCampaignPayload({
+    name: 'Photos blast',
+    kind: 'text',
+    media_type: 'image',
+    media_url: 'https://rentalhub.com.ng/uploads/whatsapp-campaigns/wa_1.jpg',
+  });
+  assert.ok(!mediaOnly.error, 'media without text is allowed');
+  assert.equal(mediaOnly.value.media_type, 'image');
+  assert.equal(mediaOnly.value.content, null);
+
+  const mediaWithCaption = validateCampaignPayload({
+    name: 'Photos blast',
+    kind: 'text',
+    content: 'New listings this week',
+    media_type: 'video',
+    media_url: 'https://rentalhub.com.ng/uploads/whatsapp-campaigns/wa_2.mp4',
+  });
+  assert.ok(!mediaWithCaption.error);
+  assert.equal(mediaWithCaption.value.content, 'New listings this week');
+
+  assert.ok(
+    validateCampaignPayload({
+      name: 'bad', kind: 'text', media_type: 'image', media_url: 'http://insecure.example.com/a.jpg',
+    }).error,
+    'non-https media links rejected'
+  );
+  assert.ok(
+    validateCampaignPayload({ name: 'bad', kind: 'text', media_type: 'image' }).error,
+    'media type without a link rejected'
+  );
+  assert.ok(
+    validateCampaignPayload({ name: 'bad', kind: 'text', media_url: 'https://x.test/a.jpg' }).error,
+    'media link without a type rejected'
+  );
+  assert.ok(
+    validateCampaignPayload({ name: 'bad', kind: 'text', media_type: 'audio', media_url: 'https://x.test/a.mp3' }).error,
+    'unsupported media type rejected'
+  );
+
+  const templateWithHeader = validateCampaignPayload({
+    name: 'Template blast',
+    kind: 'template',
+    template_name: 'listing_alert',
+    header_media_type: 'image',
+    header_media_url: 'https://rentalhub.com.ng/uploads/whatsapp-campaigns/wa_3.jpg',
+  });
+  assert.ok(!templateWithHeader.error);
+  assert.equal(templateWithHeader.value.header_media_type, 'image');
+  assert.equal(templateWithHeader.value.header_media_url, 'https://rentalhub.com.ng/uploads/whatsapp-campaigns/wa_3.jpg');
+  assert.equal(templateWithHeader.value.media_url, null, 'free-form media is not used for template campaigns');
+});
+
+test('createCampaign persists media columns for free-form media campaigns', async (t) => {
+  const queries = mockDb(t, (text) => {
+    if (text.startsWith('CREATE TABLE') || text.startsWith('CREATE INDEX') || text.startsWith('ALTER TABLE')) {
+      return { rows: [], rowCount: 0 };
+    }
+    if (text.includes('FROM users')) return { rows: [{ id: 1, phone: '08034444444', full_name: 'Ada' }] };
+    if (text.includes('INSERT INTO whatsapp_campaigns')) {
+      return { rows: [{ id: 88, name: 'Photos blast', kind: 'text', status: 'draft' }] };
+    }
+    if (text.includes('INSERT INTO whatsapp_campaign_recipients')) return { rows: [], rowCount: 1 };
+    if (text.includes('INSERT INTO whatsapp_marketing_operations')) return { rows: [{}], rowCount: 1 };
+    return { rows: [], rowCount: 0 };
+  });
+
+  const response = makeRes();
+  await createCampaign(makeReq({
+    body: {
+      name: 'Photos blast',
+      kind: 'text',
+      media_type: 'image',
+      media_url: 'https://rentalhub.com.ng/uploads/whatsapp-campaigns/wa_9.jpg',
+    },
+  }), response);
+
+  assert.equal(response.statusCode, 201);
+  const insert = queries.find((q) => q.text.includes('INSERT INTO whatsapp_campaigns'));
+  assert.ok(insert.text.includes('media_type, media_url, header_media_type, header_media_url'));
+  assert.equal(insert.params[6], 'image');
+  assert.equal(insert.params[7], 'https://rentalhub.com.ng/uploads/whatsapp-campaigns/wa_9.jpg');
+});
+
+test('sendWhatsAppMedia builds the exact Meta Graph payload', async (t) => {
+  process.env.WHATSAPP_PROVIDER = 'meta';
+  process.env.WHATSAPP_META_TOKEN = 'test-eb-token';
+  process.env.WHATSAPP_PHONE_NUMBER_ID = '1122334455667788';
+
+  const axios = require('axios');
+  const originalPost = axios.post;
+  const captured = {};
+  axios.post = async (url, payload, config) => {
+    captured.url = url;
+    captured.payload = payload;
+    captured.auth = config?.headers?.Authorization;
+    return { data: { messages: [{ id: 'wamid.MEDIA1' }] } };
+  };
+  t.after(() => {
+    axios.post = originalPost;
+    delete process.env.WHATSAPP_META_TOKEN;
+    delete process.env.WHATSAPP_PHONE_NUMBER_ID;
+  });
+
+  const image = await sendWhatsAppMedia({
+    to: '2348034444444',
+    mediaType: 'image',
+    link: 'https://rentalhub.com.ng/uploads/whatsapp-campaigns/wa_1.jpg',
+    caption: 'New listings',
+  });
+  assert.equal(image.success, true);
+  assert.equal(image.messageId, 'wamid.MEDIA1');
+  assert.equal(captured.payload.type, 'image');
+  assert.deepEqual(captured.payload.image, {
+    link: 'https://rentalhub.com.ng/uploads/whatsapp-campaigns/wa_1.jpg',
+    caption: 'New listings',
+  });
+
+  const video = await sendWhatsAppMedia({
+    to: '2348034444444',
+    mediaType: 'video',
+    link: 'https://rentalhub.com.ng/uploads/whatsapp-campaigns/wa_2.mp4',
+  });
+  assert.equal(video.success, true);
+  assert.equal(captured.payload.type, 'video');
+  assert.deepEqual(captured.payload.video, {
+    link: 'https://rentalhub.com.ng/uploads/whatsapp-campaigns/wa_2.mp4',
+  });
+
+  const badType = await sendWhatsAppMedia({ to: '2348034444444', mediaType: 'audio', link: 'https://x.test/a.mp3' });
+  assert.equal(badType.success, false);
+});
+
+test('sendWhatsAppTemplate prepends a header media component when supplied', async (t) => {
+  process.env.WHATSAPP_PROVIDER = 'meta';
+  process.env.WHATSAPP_META_TOKEN = 'test-eb-token';
+  process.env.WHATSAPP_PHONE_NUMBER_ID = '1122334455667788';
+
+  const axios = require('axios');
+  const originalPost = axios.post;
+  const captured = {};
+  axios.post = async (url, payload) => {
+    captured.payload = payload;
+    return { data: { messages: [{ id: 'wamid.HDR1' }] } };
+  };
+  t.after(() => {
+    axios.post = originalPost;
+    delete process.env.WHATSAPP_META_TOKEN;
+    delete process.env.WHATSAPP_PHONE_NUMBER_ID;
+  });
+
+  const result = await sendWhatsAppTemplate({
+    to: '2348034444444',
+    templateName: 'listing_alert',
+    language: 'en',
+    params: ['Ada'],
+    headerMedia: { type: 'image', link: 'https://rentalhub.com.ng/uploads/whatsapp-campaigns/wa_3.jpg' },
+  });
+
+  assert.equal(result.success, true);
+  assert.deepEqual(captured.payload.template.components, [
+    { type: 'header', parameters: [{ type: 'image', image: { link: 'https://rentalhub.com.ng/uploads/whatsapp-campaigns/wa_3.jpg' } }] },
+    { type: 'body', parameters: [{ type: 'text', text: 'Ada' }] },
+  ]);
 });

@@ -506,6 +506,25 @@ if (fs.existsSync(adSpacesUploadPath)) {
   }));
 }
 
+// WhatsApp campaign media must be publicly fetchable by Meta's servers, so
+// these uploads are intentionally unauthenticated — only images and videos.
+const whatsappCampaignMediaPath = path.join(__dirname, 'uploads', 'whatsapp-campaigns');
+if (fs.existsSync(whatsappCampaignMediaPath)) {
+  app.use('/uploads/whatsapp-campaigns', express.static(whatsappCampaignMediaPath, {
+    dotfiles: 'deny',
+    index: false,
+    maxAge: '1d',
+    setHeaders: (res, filePath) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      const ext = path.extname(filePath).toLowerCase();
+      const SAFE_MEDIA_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.mp4', '.3gp']);
+      if (!SAFE_MEDIA_EXTS.has(ext)) {
+        res.setHeader('Content-Type', 'application/octet-stream');
+      }
+    },
+  }));
+}
+
 const limiter = rateLimit({
   windowMs: apiRateLimitWindowMs,
   max: apiRateLimitMax,

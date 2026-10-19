@@ -61,6 +61,11 @@ const ensureSchema = async () => {
     CREATE INDEX IF NOT EXISTS idx_wmo_created ON whatsapp_marketing_operations(created_at DESC)
   `);
 
+  await db.query(`ALTER TABLE whatsapp_campaigns ADD COLUMN IF NOT EXISTS media_type VARCHAR(20)`);
+  await db.query(`ALTER TABLE whatsapp_campaigns ADD COLUMN IF NOT EXISTS media_url TEXT`);
+  await db.query(`ALTER TABLE whatsapp_campaigns ADD COLUMN IF NOT EXISTS header_media_type VARCHAR(20)`);
+  await db.query(`ALTER TABLE whatsapp_campaigns ADD COLUMN IF NOT EXISTS header_media_url TEXT`);
+
   schemaReady = true;
 };
 
@@ -120,6 +125,26 @@ const buildAudienceQuery = (filter = {}) => {
   return { whereClause: `WHERE ${where.join(' AND ')}`, params };
 };
 
+const MEDIA_TYPES = ['image', 'video', 'document'];
+
+// Media is sent to Meta as a public https:// link that Meta downloads, so the
+// URL must already be reachable from the internet (uploads are hosted publicly).
+const normalizeMedia = (mediaType, mediaUrl, label) => {
+  const type = String(mediaType || '').toLowerCase().trim();
+  const url = String(mediaUrl || '').trim();
+  if (!type && !url) return { type: null, url: null };
+  if (!type || !url) {
+    return { error: `${label}: choose a media type and provide the file or link` };
+  }
+  if (!MEDIA_TYPES.includes(type)) {
+    return { error: `${label}: media type must be image, video or document` };
+  }
+  if (!/^https:\/\/\S+$/i.test(url)) {
+    return { error: `${label}: media must be a public https:// link` };
+  }
+  return { type, url };
+};
+
 const validateCampaignPayload = (body = {}) => {
   const name = String(body.name || '').trim();
   if (!name || name.length > 200) {
@@ -130,6 +155,11 @@ const validateCampaignPayload = (body = {}) => {
   if (!kind) {
     return { error: "Message type must be 'template' or 'text'" };
   }
+
+  const media = normalizeMedia(body.media_type, body.media_url, 'Media attachment');
+  if (media.error) return { error: media.error };
+  const header = normalizeMedia(body.header_media_type, body.header_media_url, 'Template header media');
+  if (header.error) return { error: header.error };
 
   if (kind === 'template') {
     const templateName = String(body.template_name || '').trim();
@@ -152,15 +182,35 @@ const validateCampaignPayload = (body = {}) => {
         template_language: templateLanguage,
         template_params: templateParams,
         content: null,
+        media_type: null,
+        media_url: null,
+        header_media_type: header.type,
+        header_media_url: header.url,
       },
     };
   }
 
   const content = String(body.content || '').trim();
-  if (!content || content.length > 1000) {
-    return { error: 'A free-text message of 1 to 1000 characters is required' };
+  if (!media.url && !content) {
+    return { error: 'A message or a media attachment is required' };
   }
-  return { value: { name, kind, template_name: null, template_language: null, template_params: [], content } };
+  if (content.length > 1000) {
+    return { error: 'A message or caption of at most 1000 characters is required' };
+  }
+  return {
+    value: {
+      name,
+      kind,
+      template_name: null,
+      template_language: null,
+      template_params: [],
+      content: content || null,
+      media_type: media.type,
+      media_url: media.url,
+      header_media_type: null,
+      header_media_url: null,
+    },
+  };
 };
 
 const getDashboardStats = async (req, res) => {
@@ -243,8 +293,9 @@ const createCampaign = async (req, res) => {
 
     const campaign = await db.query(
       `INSERT INTO whatsapp_campaigns
-         (name, kind, template_name, template_language, template_params, content, status, recipient_filter, created_by)
-       VALUES ($1, $2, $3, $4, $5::jsonb, $6, 'draft', $7::jsonb, $8)
+         (name, kind, template_name, template_language, template_params, content, status,
+          media_type, media_url, header_media_type, header_media_url, recipient_filter, created_by)
+       VALUES ($1, $2, $3, $4, $5::jsonb, $6, 'draft', $7, $8, $9, $10, $11::jsonb, $12)
        RETURNING *`,
       [
         validated.value.name,
@@ -253,6 +304,10 @@ const createCampaign = async (req, res) => {
         validated.value.template_language,
         JSON.stringify(validated.value.template_params),
         validated.value.content,
+        validated.value.media_type,
+        validated.value.media_url,
+        validated.value.header_media_type,
+        validated.value.header_media_url,
         JSON.stringify(filter),
         req.user?.id || null,
       ]
@@ -326,6 +381,7 @@ const getCampaignStats = async (req, res) => {
     const { id } = req.params;
     const campaign = await db.query(
       `SELECT id, name, kind, template_name, template_language, template_params, content,
+              media_type, media_url, header_media_type, header_media_url,
               status, stats, sent_at, created_at
        FROM whatsapp_campaigns WHERE id = $1`,
       [id]
