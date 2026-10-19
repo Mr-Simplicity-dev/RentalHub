@@ -9,7 +9,7 @@ const waCtrl = require('../controllers/whatsappMarketingController');
 const { authenticate } = require('../config/middleware/auth');
 const validateRequest = require('../config/middleware/validateRequest');
 
-const { requireSuperAdmin } = waCtrl;
+const { requireSuperAdmin, isSafeMediaFilename } = waCtrl;
 
 const MEDIA_DIR = path.join(__dirname, '..', 'uploads', 'whatsapp-campaigns');
 fs.mkdirSync(MEDIA_DIR, { recursive: true });
@@ -57,10 +57,29 @@ const uploadCampaignMedia = (req, res) => {
       try { fs.unlinkSync(req.file.path); } catch { /* ignore */ }
       return res.status(400).json({ success: false, message: 'Images must be under 5MB and videos under 16MB' });
     }
-    const url = `${req.protocol}://${req.get('host')}/uploads/whatsapp-campaigns/${req.file.filename}`;
+    const url = `${req.protocol}://${req.get('host')}/api/whatsapp-marketing/media/${req.file.filename}`;
     return res.status(201).json({ success: true, data: { url, media_type: rule.type, size: req.file.size } });
   });
 };
+
+// Meta fetches campaign media from this URL, so it is intentionally public.
+// Filenames are server-generated random strings and strictly validated, and
+// nginx only proxies /api/ to the app (it blocks every /uploads/ path).
+router.get('/media/:file', (req, res) => {
+  const { file } = req.params;
+  if (!isSafeMediaFilename(file)) {
+    return res.status(404).json({ success: false, message: 'Media not found' });
+  }
+  return res.sendFile(
+    path.join(MEDIA_DIR, file),
+    { headers: { 'X-Content-Type-Options': 'nosniff' } },
+    (err) => {
+      if (err && !res.headersSent) {
+        res.status(404).json({ success: false, message: 'Media not found' });
+      }
+    }
+  );
+});
 
 router.get('/stats', authenticate, requireSuperAdmin, waCtrl.getDashboardStats);
 

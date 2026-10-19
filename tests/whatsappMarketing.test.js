@@ -8,6 +8,7 @@ const {
   requireSuperAdmin,
   normalizeWhatsphone,
   validateCampaignPayload,
+  isSafeMediaFilename,
   createCampaign,
   sendCampaign,
 } = require('../services/whatsappMarketingService');
@@ -364,8 +365,7 @@ test('sendWhatsAppMedia builds the exact Meta Graph payload', async (t) => {
   assert.equal(badType.success, false);
 });
 
-test('sendWhatsAppTemplate prepends a header media component when supplied', async (t) => {
-  process.env.WHATSAPP_PROVIDER = 'meta';
+test('sendWhatsAppTemplate prepends a header media component when supplied', async (t) => {  process.env.WHATSAPP_PROVIDER = 'meta';
   process.env.WHATSAPP_META_TOKEN = 'test-eb-token';
   process.env.WHATSAPP_PHONE_NUMBER_ID = '1122334455667788';
 
@@ -395,4 +395,18 @@ test('sendWhatsAppTemplate prepends a header media component when supplied', asy
     { type: 'header', parameters: [{ type: 'image', image: { link: 'https://rentalhub.com.ng/uploads/whatsapp-campaigns/wa_3.jpg' } }] },
     { type: 'body', parameters: [{ type: 'text', text: 'Ada' }] },
   ]);
+});
+
+test('isSafeMediaFilename only resolves server-generated media names', () => {
+  assert.equal(isSafeMediaFilename('wa_1699999999999_0123456789abcdef01234567.jpg'), true);
+  assert.equal(isSafeMediaFilename('wa_1699999999999_0123456789abcdef01234567.mp4'), true);
+  assert.equal(isSafeMediaFilename('wa_1699999999999_0123456789abcdef01234567.3gp'), true);
+
+  assert.equal(isSafeMediaFilename('../../etc/passwd'), false);
+  assert.equal(isSafeMediaFilename('wa_1_zzz.jpg'), false);
+  assert.equal(isSafeMediaFilename('wa_1_0123456789abcdef01234567.svg'), false);
+  assert.equal(isSafeMediaFilename('wa_1_0123456789abcdef01234567.jpg.exe'), false);
+  assert.equal(isSafeMediaFilename('wa_1_0123456789ABCDEF01234567.jpg'), false);
+  assert.equal(isSafeMediaFilename(''), false);
+  assert.equal(isSafeMediaFilename(null), false);
 });

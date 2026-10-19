@@ -127,6 +127,12 @@ const buildAudienceQuery = (filter = {}) => {
 
 const MEDIA_TYPES = ['image', 'video', 'document'];
 
+// Uploaded campaign media is served back to Meta through a public API route,
+// so only server-generated random filenames may ever be resolved from disk.
+const SAFE_MEDIA_FILENAME = /^wa_\d+_[a-f0-9]{24}\.(jpg|png|webp|mp4|3gp)$/;
+
+const isSafeMediaFilename = (name) => SAFE_MEDIA_FILENAME.test(String(name || ''));
+
 // Media is sent to Meta as a public https:// link that Meta downloads, so the
 // URL must already be reachable from the internet (uploads are hosted publicly).
 const normalizeMedia = (mediaType, mediaUrl, label) => {
@@ -550,6 +556,7 @@ module.exports = {
   ensureSchema,
   requireSuperAdmin,
   normalizeWhatsphone,
+  isSafeMediaFilename,
   validateCampaignPayload,
   getDashboardStats,
   getAudienceEstimate,
