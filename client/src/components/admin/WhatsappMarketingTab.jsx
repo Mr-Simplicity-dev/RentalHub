@@ -312,7 +312,7 @@ const WhatsappMarketingTab = () => {
           </Banner>
 
           {stats ? (
-            <StatGrid columns={3}>
+            <StatGrid columns={4}>
               <StatCard
                 label="Total campaigns"
                 value={stats.campaigns?.total ?? 0}
@@ -330,6 +330,13 @@ const WhatsappMarketingTab = () => {
                 value={stats.messages?.failed ?? 0}
                 tone="danger"
                 hint="Failures are retryable from the table below"
+              />
+              <StatCard
+                label="Sent today"
+                value={`${stats.daily_quota?.sent_today ?? 0} / ${stats.daily_quota?.limit ?? 250}`}
+                tone="warning"
+                icon={<FaWhatsapp />}
+                hint="Sends pause at the daily cap and resume automatically the next day"
               />
             </StatGrid>
           ) : null}

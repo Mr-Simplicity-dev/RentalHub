@@ -13,7 +13,7 @@ const {
   sendCampaign,
 } = require('../services/whatsappMarketingService');
 const { sendWhatsAppTemplate, sendWhatsAppMedia } = require('../config/utils/whatsappService');
-const { isRateLimitError, isTransientError } = require('../jobs/whatsappMarketingJobs');
+const { isRateLimitError, isTransientError, processWhatsappQueue, dailySendLimit } = require('../jobs/whatsappMarketingJobs');
 
 const makeRes = () => {
   const res = { statusCode: 200, body: null };
@@ -409,4 +409,91 @@ test('isSafeMediaFilename only resolves server-generated media names', () => {
   assert.equal(isSafeMediaFilename('wa_1_0123456789ABCDEF01234567.jpg'), false);
   assert.equal(isSafeMediaFilename(''), false);
   assert.equal(isSafeMediaFilename(null), false);
+});
+
+test('dailySendLimit reads WHATSAPP_DAILY_SEND_LIMIT and defaults to 250', () => {
+  const original = process.env.WHATSAPP_DAILY_SEND_LIMIT;
+  try {
+    delete process.env.WHATSAPP_DAILY_SEND_LIMIT;
+    assert.equal(dailySendLimit(), 250, 'defaults to the Meta unverified-tier ceiling');
+
+    process.env.WHATSAPP_DAILY_SEND_LIMIT = '200';
+    assert.equal(dailySendLimit(), 200, 'the operator can pin a smaller daily chunk');
+
+    process.env.WHATSAPP_DAILY_SEND_LIMIT = '0';
+    assert.equal(dailySendLimit(), 250, 'zero falls back to the default');
+
+    process.env.WHATSAPP_DAILY_SEND_LIMIT = 'not-a-number';
+    assert.equal(dailySendLimit(), 250, 'garbage falls back to the default');
+  } finally {
+    if (original === undefined) delete process.env.WHATSAPP_DAILY_SEND_LIMIT;
+    else process.env.WHATSAPP_DAILY_SEND_LIMIT = original;
+  }
+});
+
+test('queue processor stops spending once the daily budget is used up', async (t) => {
+  const original = process.env.WHATSAPP_DAILY_SEND_LIMIT;
+  process.env.WHATSAPP_DAILY_SEND_LIMIT = '200';
+  t.after(() => {
+    if (original === undefined) delete process.env.WHATSAPP_DAILY_SEND_LIMIT;
+    else process.env.WHATSAPP_DAILY_SEND_LIMIT = original;
+  });
+
+  const queries = mockDb(t, (text) => {
+    if (text.startsWith('CREATE TABLE') || text.startsWith('CREATE INDEX') || text.startsWith('ALTER TABLE')) {
+      return { rows: [], rowCount: 0 };
+    }
+    // 200 already sent today for this UTC day.
+    if (text.includes('FROM whatsapp_campaign_recipients') && text.includes('sent_today')
+      || text.includes('COUNT(*)::int AS sent FROM whatsapp_campaign_recipients')) {
+      return { rows: [{ sent: 200 }] };
+    }
+    if (text.includes("WHERE status IN ('queued', 'sending')")) {
+      return { rows: [{ id: 1, kind: 'text', content: 'hi' }] };
+    }
+    return { rows: [], rowCount: 0 };
+  });
+
+  await processWhatsappQueue();
+
+  assert.ok(
+    !queries.some((q) => q.text.includes("WHERE status IN ('queued', 'sending')")),
+    'a spent budget means no campaign is even activated for sending'
+  );
+});
+
+test('queue processor re-picks campaigns already marked sending so the queue drains across days', async (t) => {
+  const original = process.env.WHATSAPP_DAILY_SEND_LIMIT;
+  process.env.WHATSAPP_DAILY_SEND_LIMIT = '200';
+  t.after(() => {
+    if (original === undefined) delete process.env.WHATSAPP_DAILY_SEND_LIMIT;
+    else process.env.WHATSAPP_DAILY_SEND_LIMIT = original;
+  });
+
+  const queries = mockDb(t, (text) => {
+    if (text.startsWith('CREATE TABLE') || text.startsWith('CREATE INDEX') || text.startsWith('ALTER TABLE')) {
+      return { rows: [], rowCount: 0 };
+    }
+    if (text.includes('COUNT(*)::int AS sent FROM whatsapp_campaign_recipients')) {
+      return { rows: [{ sent: 20 }] };
+    }
+    if (text.includes("WHERE status IN ('queued', 'sending')")) {
+      return { rows: [{ id: 9, kind: 'text', content: 'rent due' }] };
+    }
+    if (text.includes('FROM whatsapp_campaign_recipients') && text.includes("status = 'pending'")) {
+      return { rows: [{ id: 1001, phone: '2348034444444' }] };
+    }
+    return { rows: [], rowCount: 0 };
+  });
+
+  await processWhatsappQueue();
+
+  assert.ok(
+    queries.some((q) => q.text.includes("WHERE status IN ('queued', 'sending')")),
+    'a campaign left in "sending" is activated again instead of stalling'
+  );
+  assert.ok(
+    queries.some((q) => q.text.includes('WHERE id = $1') && q.text.includes('whatsapp_campaign_recipients') && q.params?.[0] === 1001),
+    'the resumed recipient is processed and its outcome written back'
+  );
 });

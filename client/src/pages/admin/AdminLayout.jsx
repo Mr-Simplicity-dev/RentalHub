@@ -42,6 +42,7 @@ import {
   FaFilter,
   FaArrowUp,
   FaCalculator,
+  FaWhatsapp,
 } from 'react-icons/fa';
 
 const scrollDashboardToTarget = (hash = '', scrollContainer = null, behavior = 'smooth') => {
@@ -703,6 +704,11 @@ const AdminLayout = () => {
                 <NavLink to="/super-admin?tab=sms_marketing" className={() => superAdminNavItem('sms_marketing')}>
                   <FaPhone className="mr-3" />
                   SMS Marketing
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=whatsapp_marketing" className={() => superAdminNavItem('whatsapp_marketing')}>
+                  <FaWhatsapp className="mr-3" />
+                  WhatsApp Marketing
                 </NavLink>
 
                 <NavLink to="/super-admin?tab=platform_ratings" className={() => superAdminFeaturedNavItem('platform_ratings')}>

@@ -3,6 +3,14 @@ const { sendWhatsAppText, sendWhatsAppTemplate } = require('../config/utils/what
 
 let schemaReady = false;
 
+// Meta caps business-initiated conversations per rolling 24h; the sender spends
+// this budget each UTC day and resumes the queue the next day. Keep in sync with
+// jobs/whatsappMarketingJobs.js.
+const getDailySendLimit = () => {
+  const raw = Number(process.env.WHATSAPP_DAILY_SEND_LIMIT);
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 250;
+};
+
 const ensureSchema = async () => {
   if (schemaReady) return;
 
@@ -232,11 +240,23 @@ const getDashboardStats = async (req, res) => {
          COUNT(*) FILTER (WHERE status = 'failed')::int AS failed
        FROM whatsapp_campaign_recipients`
     );
+    const today = await db.query(
+      `SELECT COUNT(*)::int AS sent_today FROM whatsapp_campaign_recipients
+       WHERE status = 'sent'
+         AND sent_at >= date_trunc('day', (NOW() AT TIME ZONE 'UTC'))`
+    );
+    const dailyLimit = getDailySendLimit();
+    const sentToday = today.rows[0]?.sent_today || 0;
     res.json({
       success: true,
       data: {
         campaigns: campaigns.rows[0],
         messages: messages.rows[0],
+        daily_quota: {
+          limit: dailyLimit,
+          sent_today: sentToday,
+          remaining_today: Math.max(0, dailyLimit - sentToday),
+        },
       },
     });
   } catch (error) {
@@ -559,6 +579,7 @@ module.exports = {
   isSafeMediaFilename,
   validateCampaignPayload,
   getDashboardStats,
+  getDailySendLimit,
   getAudienceEstimate,
   createCampaign,
   listCampaigns,

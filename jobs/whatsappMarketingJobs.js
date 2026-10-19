@@ -2,11 +2,18 @@ const logger = require('../config/utils/logger');
 const cron = require('node-cron');
 const db = require('../config/middleware/database');
 const { sendWhatsAppText, sendWhatsAppTemplate, sendWhatsAppMedia } = require('../config/utils/whatsappService');
-const { ensureSchema } = require('../services/whatsappMarketingService');
+const { ensureSchema, getDailySendLimit } = require('../services/whatsappMarketingService');
 
 const BATCH_SIZE = 25;
 const SEND_DELAY_MS = Number(process.env.WHATSAPP_CAMPAIGN_DELAY_MS || 300);
 const RATE_LIMIT_STREAK_LIMIT = 3;
+
+// Meta limits business-initiated conversations per rolling 24h (the unverified
+// tier starts around 250/day). Rather than blast the whole audience in one run,
+// we spend a fixed budget per UTC day and let the cron resume tomorrow until the
+// queue drains. The limit itself lives in whatsappMarketingService so the panel
+// and the sender never disagree.
+const dailySendLimit = getDailySendLimit;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -34,6 +41,15 @@ const isTransientError = (message = '') => {
   );
 };
 
+const countSentToday = async () => {
+  const { rows } = await db.query(
+    `SELECT COUNT(*)::int AS sent FROM whatsapp_campaign_recipients
+     WHERE status = 'sent'
+       AND sent_at >= date_trunc('day', (NOW() AT TIME ZONE 'UTC'))`
+  );
+  return rows[0]?.sent || 0;
+};
+
 const finalizeCampaign = async (campaignId) => {
   const stats = await db.query(
     `SELECT
@@ -53,25 +69,36 @@ const finalizeCampaign = async (campaignId) => {
 const processWhatsappQueue = async () => {
   try {
     await ensureSchema();
+
+    if (dailySendLimit() <= 0) return;
+
+    const sentToday = await countSentToday();
+    let budget = dailySendLimit() - sentToday;
+
+    if (budget <= 0) {
+      logger.info(`WhatsApp daily send budget reached (${sentToday}/${dailySendLimit()}); resuming next UTC day`);
+      return;
+    }
+
+    // 'sending' campaigns are re-picked so a queue that hit yesterday's budget
+    // keeps draining today instead of stalling mid-campaign.
     const { rows: activated } = await db.query(
       `UPDATE whatsapp_campaigns SET status = 'sending', updated_at = NOW()
-       WHERE status = 'queued'
+       WHERE status IN ('queued', 'sending')
        RETURNING id, kind, template_name, template_language, template_params, content,
                  media_type, media_url, header_media_type, header_media_url`
     );
 
     if (activated.length === 0) return;
 
-    let globalCount = 0;
-
     for (const camp of activated) {
-      if (globalCount >= BATCH_SIZE) break;
+      if (budget <= 0) break;
 
       const { rows: batch } = await db.query(
         `SELECT id, phone FROM whatsapp_campaign_recipients
          WHERE campaign_id = $1 AND status = 'pending'
          ORDER BY id LIMIT $2`,
-        [camp.id, BATCH_SIZE - globalCount]
+        [camp.id, Math.min(BATCH_SIZE, budget)]
       );
 
       if (batch.length === 0) {
@@ -79,10 +106,11 @@ const processWhatsappQueue = async () => {
         continue;
       }
 
-      globalCount += batch.length;
       let rateLimitStreak = 0;
 
       for (const rec of batch) {
+        if (budget <= 0) break;
+
         if (rateLimitStreak >= RATE_LIMIT_STREAK_LIMIT) {
           await db.query(
             `UPDATE whatsapp_campaigns SET status = 'paused', updated_at = NOW() WHERE id = $1`,
@@ -113,6 +141,9 @@ const processWhatsappQueue = async () => {
         } else {
           result = await sendWhatsAppText({ to: rec.phone, message: camp.content });
         }
+
+        // Every attempt spends one unit of the day's budget, successful or not.
+        budget -= 1;
 
         if (result.success) {
           rateLimitStreak = 0;
@@ -150,3 +181,5 @@ exports.startWhatsappMarketingJobs = () => {
 exports.processWhatsappQueue = processWhatsappQueue;
 exports.isRateLimitError = isRateLimitError;
 exports.isTransientError = isTransientError;
+exports.countSentToday = countSentToday;
+exports.dailySendLimit = dailySendLimit;
