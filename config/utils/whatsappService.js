@@ -120,8 +120,61 @@ exports.sendWhatsAppTemplate = async ({ to, templateName, language = 'en', param
   }
 };
 
-// Free-form media (image/video/document with optional caption) is only allowed
-// inside the 24-hour customer service window, same as free-form text.
+// Meta's contact check: tells us which numbers are reachable on WhatsApp.
+// Docs: POST /{phone-number-id}/contacts with { contacts: [...], force_check }.
+// Accepted in small batches only (Meta caps the array), so the caller chunks.
+exports.checkWhatsAppContacts = async (phones = []) => {
+  const provider = (process.env.WHATSAPP_PROVIDER || 'meta').toLowerCase();
+
+  if (provider !== 'meta') {
+    return { success: false, message: 'Unsupported WhatsApp provider', results: [] };
+  }
+
+  const token = process.env.WHATSAPP_META_TOKEN;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+  if (!token || !phoneNumberId) {
+    return { success: false, message: 'WhatsApp provider not configured', results: [] };
+  }
+
+  const contacts = (Array.isArray(phones) ? phones : [])
+    .map((p) => normalizePhone(p))
+    .filter(Boolean)
+    .slice(0, 100);
+
+  if (contacts.length === 0) {
+    return { success: false, message: 'No valid phone numbers to check', results: [] };
+  }
+
+  try {
+    const { data } = await axios.post(
+      `https://graph.facebook.com/v20.0/${phoneNumberId}/contacts`,
+      { blocking: 'wait', contacts, force_check: true },
+      {
+        timeout: Number(process.env.WHATSAPP_TIMEOUT_MS || 15000),
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    // Meta returns { contacts: [{ input, wa_id, status }] } where status is
+    // 'valid' (on WhatsApp) or 'invalid' (not reachable).
+    const results = (data?.contacts || []).map((entry) => ({
+      phone: normalizePhone(entry.input || entry.wa_id || ''),
+      status: String(entry.status || 'invalid').toLowerCase() === 'valid' ? 'valid' : 'invalid',
+    }));
+
+    return { success: true, results };
+  } catch (error) {
+    return {
+      success: false,
+      message: error.response?.data?.error?.message || error.message,
+      results: [],
+    };
+  }
+};
 exports.sendWhatsAppMedia = async ({ to, mediaType, link, caption = '' }) => {
   const provider = (process.env.WHATSAPP_PROVIDER || 'meta').toLowerCase();
 

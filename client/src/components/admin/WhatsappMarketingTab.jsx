@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { toast } from 'react-toastify';
-import { FaWhatsapp, FaPaperPlane, FaPlus, FaTrash, FaRedo, FaChartBar, FaUsers } from 'react-icons/fa';
+import { FaWhatsapp, FaPaperPlane, FaPlus, FaTrash, FaRedo, FaChartBar, FaUsers, FaFileAlt, FaCheckCircle, FaTimes } from 'react-icons/fa';
 import api from '../../services/api';
 import {
   Banner,
@@ -63,6 +63,7 @@ const emptyForm = {
   content: '',
   scope: 'all',
   user_type: '',
+  source: 'users',
   media: { type: '', url: '' },
   headerMedia: { type: '', url: '' },
 };
@@ -154,6 +155,28 @@ const WhatsappMarketingTab = () => {
     }
   }, []);
 
+  // Imported contacts (numbers that are not platform users) + their WhatsApp verdict.
+  const [contacts, setContacts] = useState([]);
+  const [contactStats, setContactStats] = useState(null);
+  const [contactsLoading, setContactsLoading] = useState(true);
+  const [csvFile, setCsvFile] = useState(null);
+  const [csvPreview, setCsvPreview] = useState([]);
+  const [importing, setImporting] = useState(false);
+  const [checking, setChecking] = useState(false);
+
+  const loadContacts = useCallback(async () => {
+    setContactsLoading(true);
+    try {
+      const res = await api.get('/whatsapp-marketing/contacts');
+      setContacts(res.data.data.contacts || []);
+      setContactStats(res.data.data.stats || null);
+    } catch {
+      toast.error('Failed to load imported contacts');
+    } finally {
+      setContactsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     const boot = async () => {
       setListLoading(true);
@@ -161,7 +184,84 @@ const WhatsappMarketingTab = () => {
       setListLoading(false);
     };
     boot();
-  }, [loadStats, loadCampaigns]);
+    loadContacts();
+  }, [loadStats, loadCampaigns, loadContacts]);
+
+  const handleCsvFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setCsvFile(file);
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const lines = ev.target.result.split('\n').filter((l) => l.trim());
+      const phones = lines
+        .map((l) => l.split(',')[0].replace(/[\s"']/g, ''))
+        .filter((p) => p.length >= 10);
+      setCsvPreview(phones.slice(0, 10));
+    };
+    reader.readAsText(file);
+  };
+
+  const handleCsvImport = async () => {
+    if (!csvFile) {
+      toast.error('Select a CSV file first');
+      return;
+    }
+    setImporting(true);
+    try {
+      const text = await csvFile.text();
+      const phones = text
+        .split(/\r?\n/)
+        .filter((l) => l.trim())
+        .map((l) => l.split(',')[0].replace(/[\s"']/g, ''))
+        .filter((p) => p.length >= 10);
+
+      if (phones.length === 0) {
+        toast.error('No phone numbers found in that file');
+        return;
+      }
+
+      const res = await api.post('/whatsapp-marketing/contacts/import', { phones });
+      const { added, invalid, duplicates, total } = res.data.data;
+      toast.success(`Imported: ${added} · Duplicates skipped: ${duplicates} · Invalid: ${invalid} · Total: ${total}`);
+      setCsvFile(null);
+      setCsvPreview([]);
+      loadContacts();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Import failed');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleCheckContacts = async () => {
+    setChecking(true);
+    try {
+      const res = await api.post('/whatsapp-marketing/contacts/check', { all: true });
+      const { checked, valid, invalid } = res.data.data;
+      if (checked === 0) {
+        toast.info('Nothing new to check — every contact already has a verdict');
+      } else {
+        toast.success(`Checked ${checked} · On WhatsApp: ${valid} · Not on WhatsApp: ${invalid}`);
+      }
+      loadContacts();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'WhatsApp check failed');
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const handleDeleteContact = async (contact) => {
+    try {
+      await api.delete(`/whatsapp-marketing/contacts/${contact.id}`);
+      toast.success('Contact removed');
+      loadContacts();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to remove contact');
+    }
+  };
 
   const updateForm = (patch) => {
     setForm((prev) => ({ ...prev, ...patch }));
@@ -171,7 +271,7 @@ const WhatsappMarketingTab = () => {
   const previewAudience = async () => {
     setAudienceLoading(true);
     try {
-      const params = { scope: form.scope };
+      const params = { source: form.source, scope: form.scope };
       if (form.scope === 'user_type' && form.user_type.trim()) params.user_type = form.user_type.trim();
       const res = await api.get('/whatsapp-marketing/audience', { params });
       setAudienceCount(res.data.data.count);
@@ -233,7 +333,7 @@ const WhatsappMarketingTab = () => {
     if (form.headerMedia.type && !form.headerMedia.url.trim()) {
       return toast.error('Upload a file or paste a public link for the template header media');
     }
-    if (form.scope === 'user_type' && !form.user_type.trim()) {
+    if (form.source === 'users' && form.scope === 'user_type' && !form.user_type.trim()) {
       return toast.error('Enter the user type to target, or switch to all users');
     }
 
@@ -243,8 +343,9 @@ const WhatsappMarketingTab = () => {
         name: form.name.trim(),
         kind: form.kind,
         recipient_filter: {
-          scope: form.scope,
-          user_type: form.scope === 'user_type' ? form.user_type.trim() : null,
+          scope: form.source === 'users' ? form.scope : 'all',
+          user_type: form.source === 'users' && form.scope === 'user_type' ? form.user_type.trim() : null,
+          source: form.source,
         },
         media_type: form.kind === 'text' ? form.media.type || null : null,
         media_url: form.kind === 'text' ? form.media.url.trim() || null : null,
@@ -417,16 +518,30 @@ const WhatsappMarketingTab = () => {
 
                 <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4">
                   <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-3">
-                    <Field label="Audience">
+                    <Field label="Audience source" hint="Platform users, or numbers you imported below">
                       <SelectInput
-                        value={form.scope}
-                        onChange={(e) => updateForm({ scope: e.target.value })}
+                        value={form.source}
+                        onChange={(e) => updateForm({ source: e.target.value })}
                       >
-                        <option value="all">All users with a phone number</option>
-                        <option value="user_type">By user type</option>
+                        <option value="users">Platform users</option>
+                        <option value="contacts">Imported contacts</option>
+                        <option value="both">Both</option>
                       </SelectInput>
                     </Field>
-                    {form.scope === 'user_type' ? (
+                    {form.source === 'users' ? (
+                      <Field label="Filter">
+                        <SelectInput
+                          value={form.scope}
+                          onChange={(e) => updateForm({ scope: e.target.value })}
+                        >
+                          <option value="all">All users with a phone number</option>
+                          <option value="user_type">By user type</option>
+                        </SelectInput>
+                      </Field>
+                    ) : (
+                      <div className="hidden sm:block" />
+                    )}
+                    {form.source === 'users' && form.scope === 'user_type' ? (
                       <Field label="User type">
                         <TextInput
                           value={form.user_type}
@@ -441,7 +556,7 @@ const WhatsappMarketingTab = () => {
                   </div>
                   {audienceCount !== null ? (
                     <p className="mt-3 text-sm text-gray-700">
-                      ≈ <strong>{audienceCount}</strong> user(s) will receive this campaign.
+                      ≈ <strong>{audienceCount}</strong> recipient(s) will receive this campaign.
                     </p>
                   ) : null}
                 </div>
@@ -546,6 +661,122 @@ const WhatsappMarketingTab = () => {
                 ))}
               </DataTable>
             )}
+          </Panel>
+
+          <Panel
+            title="WhatsApp contacts"
+            description="Numbers that are not platform users — import them, then check which are actually on WhatsApp."
+          >
+            <div className="space-y-5">
+              <Banner tone="info" title="How this works">
+                A number only counts as reachable if Meta confirms it is on WhatsApp. Imported numbers start as
+                <strong> Not checked </strong>
+                until you run the check. Numbers Meta rejects are skipped automatically when you build an audience.
+              </Banner>
+
+              {contactStats ? (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div className="rounded-lg border border-gray-100 bg-gray-50/60 p-3">
+                    <p className="text-xs uppercase tracking-wide text-gray-400">Total</p>
+                    <p className="text-lg font-semibold text-gray-900">{contactStats.total ?? 0}</p>
+                  </div>
+                  <div className="rounded-lg border border-green-100 bg-green-50/60 p-3">
+                    <p className="text-xs uppercase tracking-wide text-green-600">On WhatsApp</p>
+                    <p className="text-lg font-semibold text-green-700">{contactStats.valid ?? 0}</p>
+                  </div>
+                  <div className="rounded-lg border border-red-100 bg-red-50/60 p-3">
+                    <p className="text-xs uppercase tracking-wide text-red-500">Not on WhatsApp</p>
+                    <p className="text-lg font-semibold text-red-600">{contactStats.invalid ?? 0}</p>
+                  </div>
+                  <div className="rounded-lg border border-gray-100 bg-white p-3">
+                    <p className="text-xs uppercase tracking-wide text-gray-400">Not checked</p>
+                    <p className="text-lg font-semibold text-gray-500">{contactStats.unknown ?? 0}</p>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-3">
+                <Field label="Import from CSV" hint="One number per line, or the first column of a CSV">
+                  <input
+                    type="file"
+                    accept=".csv,text/csv,text/plain"
+                    onChange={handleCsvFileChange}
+                    className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-primary-700 hover:file:bg-primary-100"
+                  />
+                </Field>
+                <SecondaryButton onClick={handleCsvImport} loading={importing} disabled={!csvFile} className="w-full">
+                  <FaFileAlt className="mr-2" /> Import numbers
+                </SecondaryButton>
+                <button
+                  type="button"
+                  onClick={handleCheckContacts}
+                  disabled={checking}
+                  className="btn w-full bg-green-600 text-white shadow-sm hover:bg-green-700 disabled:opacity-60"
+                >
+                  <FaCheckCircle className="mr-2" />
+                  {checking ? 'Checking…' : 'Check on WhatsApp'}
+                </button>
+              </div>
+
+              {csvPreview.length > 0 ? (
+                <div className="rounded-lg border border-gray-100 bg-gray-50/60 p-3">
+                  <p className="text-xs font-medium text-gray-500">
+                    Preview — first {csvPreview.length} number(s) in {csvFile?.name}:
+                  </p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {csvPreview.map((p, i) => (
+                      <span key={`${p}-${i}`} className="rounded bg-white px-2 py-0.5 text-xs text-gray-600 shadow-sm">
+                        {p}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {contactsLoading ? (
+                <LoadingState label="Loading WhatsApp contacts" rows={3} />
+              ) : contacts.length === 0 ? (
+                <EmptyState
+                  icon={<FaUsers />}
+                  title="No imported contacts yet"
+                  message="Upload a CSV of phone numbers above. You can then target 'Imported contacts' when building a campaign."
+                />
+              ) : (
+                <DataTable columns={['Number', 'Name', 'Source', 'On WhatsApp', 'Added', '']}>
+                  {contacts.map((c) => (
+                    <tr key={c.id} className="transition-colors hover:bg-gray-50/70">
+                      <Td className="font-medium text-gray-900">{c.phone}</Td>
+                      <Td className="text-gray-600">{c.full_name || '—'}</Td>
+                      <Td className="text-xs uppercase text-gray-500">{c.source}</Td>
+                      <Td>
+                        {c.wa_status === 'valid' ? (
+                          <span className="badge bg-green-100 text-green-700">🟢 On WhatsApp</span>
+                        ) : c.wa_status === 'invalid' ? (
+                          <span className="badge bg-red-100 text-red-700">🔴 Not on WhatsApp</span>
+                        ) : (
+                          <span className="badge bg-gray-100 text-gray-500">⚪ Not checked</span>
+                        )}
+                      </Td>
+                      <Td className="text-xs text-gray-500">
+                        <span className="block text-gray-600">{formatDate(c.created_at)}</span>
+                        {c.wa_checked_at ? (
+                          <span className="text-gray-400">checked {formatDate(c.wa_checked_at)}</span>
+                        ) : null}
+                      </Td>
+                      <Td>
+                        <GhostButton
+                          className="text-red-600 hover:bg-red-50"
+                          onClick={() => handleDeleteContact(c)}
+                          aria-label={`Remove ${c.phone}`}
+                        >
+                          <FaTimes /> Remove
+                        </GhostButton>
+                      </Td>
+                    </tr>
+                  ))}
+                </DataTable>
+              )}
+            </div>
           </Panel>
         </div>
       </MarketingShell>

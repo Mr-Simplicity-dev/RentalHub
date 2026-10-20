@@ -85,6 +85,27 @@ router.get('/stats', authenticate, requireSuperAdmin, waCtrl.getDashboardStats);
 
 router.get('/audience', authenticate, requireSuperAdmin, waCtrl.getAudienceEstimate);
 
+// Imported WhatsApp contacts (numbers that are not platform users).
+router.get('/contacts', authenticate, requireSuperAdmin, waCtrl.listContacts);
+router.post(
+  '/contacts',
+  [body('phone').isString().trim().isLength({ min: 5, max: 20 }), body('full_name').optional({ values: 'null' }).isString().trim().isLength({ max: 255 })],
+  validateRequest,
+  authenticate,
+  requireSuperAdmin,
+  waCtrl.addContact
+);
+router.post(
+  '/contacts/import',
+  [body('phones').isArray({ min: 1, max: 5000 })],
+  validateRequest,
+  authenticate,
+  requireSuperAdmin,
+  waCtrl.importContacts
+);
+router.post('/contacts/check', authenticate, requireSuperAdmin, waCtrl.checkContacts);
+router.delete('/contacts/:id', [param('id').isInt()], validateRequest, authenticate, requireSuperAdmin, waCtrl.deleteContact);
+
 router.post('/media', authenticate, requireSuperAdmin, uploadCampaignMedia);
 
 router.get('/campaigns', authenticate, requireSuperAdmin, waCtrl.listCampaigns);

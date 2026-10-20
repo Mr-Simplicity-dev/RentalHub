@@ -1,5 +1,5 @@
 const db = require('../config/middleware/database');
-const { sendWhatsAppText, sendWhatsAppTemplate } = require('../config/utils/whatsappService');
+const { sendWhatsAppText, sendWhatsAppTemplate, checkWhatsAppContacts } = require('../config/utils/whatsappService');
 
 let schemaReady = false;
 
@@ -74,6 +74,31 @@ const ensureSchema = async () => {
   await db.query(`ALTER TABLE whatsapp_campaigns ADD COLUMN IF NOT EXISTS header_media_type VARCHAR(20)`);
   await db.query(`ALTER TABLE whatsapp_campaigns ADD COLUMN IF NOT EXISTS header_media_url TEXT`);
 
+  // Imported contacts are phone numbers that are NOT platform users (CSV import
+  // or manual add). They can be targeted by campaigns alongside users.
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS whatsapp_contacts (
+      id SERIAL PRIMARY KEY,
+      phone VARCHAR(20) NOT NULL UNIQUE,
+      full_name VARCHAR(255),
+      source VARCHAR(40) NOT NULL DEFAULT 'import',
+      subscribed BOOLEAN NOT NULL DEFAULT TRUE,
+      wa_status VARCHAR(20) NOT NULL DEFAULT 'unknown',
+      wa_checked_at TIMESTAMP,
+      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await db.query(`CREATE INDEX IF NOT EXISTS idx_wa_contacts_status ON whatsapp_contacts (wa_status)`);
+  await db.query(`CREATE INDEX IF NOT EXISTS idx_wa_contacts_subscribed ON whatsapp_contacts (subscribed)`);
+
+  await db.query(`
+    ALTER TABLE whatsapp_campaign_recipients
+      ADD COLUMN IF NOT EXISTS contact_id INTEGER REFERENCES whatsapp_contacts(id) ON DELETE SET NULL
+  `);
+
   schemaReady = true;
 };
 
@@ -140,6 +165,56 @@ const buildAudienceQuery = (filter = {}) => {
     where.push(`user_type = $${params.length}`);
   }
   return { whereClause: `WHERE ${where.join(' AND ')}`, params };
+};
+
+// Audience sources: platform users (default) or imported WhatsApp contacts.
+const AUDIENCE_SOURCES = ['users', 'contacts', 'both'];
+
+const normalizeAudienceScope = (value) => {
+  const scope = String(value || 'users').toLowerCase();
+  return AUDIENCE_SOURCES.includes(scope) ? scope : 'users';
+};
+
+// Collects the deduped, E.164-normalized audience for a campaign. Imported
+// contacts carry the same shape as users so recipients stay uniform. Contacts
+// marked invalid by the Meta check are excluded so we never spend a send on a
+// number Meta already told us is not on WhatsApp.
+const resolveAudience = async (filter = {}) => {
+  const source = normalizeAudienceScope(filter.source || filter.scope_source);
+  const byPhone = new Map();
+  let skipped = 0;
+
+  const add = (rawPhone, meta) => {
+    const phone = normalizeWhatsphone(rawPhone);
+    if (!phone || byPhone.has(phone)) {
+      skipped++;
+      return;
+    }
+    byPhone.set(phone, meta);
+  };
+
+  if (source === 'users' || source === 'both') {
+    const { whereClause, params } = buildAudienceQuery(filter);
+    const { rows } = await db.query(
+      `SELECT id, phone, full_name FROM users ${whereClause}`,
+      params
+    );
+    for (const user of rows) {
+      add(user.phone, { userId: user.id, contactId: null, fullName: user.full_name || null });
+    }
+  }
+
+  if (source === 'contacts' || source === 'both') {
+    const { rows } = await db.query(
+      `SELECT id, phone, full_name FROM whatsapp_contacts
+       WHERE subscribed = TRUE AND wa_status <> 'invalid'`
+    );
+    for (const contact of rows) {
+      add(contact.phone, { userId: null, contactId: contact.id, fullName: contact.full_name || null });
+    }
+  }
+
+  return { byPhone, skipped, source };
 };
 
 const MEDIA_TYPES = ['image', 'video', 'document'];
@@ -276,12 +351,8 @@ const getDashboardStats = async (req, res) => {
 
 const getAudienceEstimate = async (req, res) => {
   try {
-    const { whereClause, params } = buildAudienceQuery(req.query || {});
-    const result = await db.query(
-      `SELECT COUNT(*)::int AS count FROM users ${whereClause}`,
-      params
-    );
-    res.json({ success: true, data: { count: result.rows[0].count } });
+    const { byPhone } = await resolveAudience(req.query || {});
+    res.json({ success: true, data: { count: byPhone.size } });
   } catch (error) {
     req.logger.error('WhatsApp audience estimate error:', error.message);
     res.status(500).json({ success: false, message: 'Failed to estimate audience' });
@@ -300,29 +371,15 @@ const createCampaign = async (req, res) => {
     const filter = {
       scope: req.body?.recipient_filter?.scope === 'user_type' ? 'user_type' : 'all',
       user_type: req.body?.recipient_filter?.user_type || null,
+      source: normalizeAudienceScope(req.body?.recipient_filter?.source),
     };
 
-    const { whereClause, params } = buildAudienceQuery(filter);
-    const { rows: users } = await db.query(
-      `SELECT id, phone, full_name FROM users ${whereClause}`,
-      params
-    );
-
-    const byPhone = new Map();
-    let skipped = 0;
-    for (const user of users) {
-      const phone = normalizeWhatsphone(user.phone);
-      if (!phone || byPhone.has(phone)) {
-        skipped++;
-        continue;
-      }
-      byPhone.set(phone, { userId: user.id, fullName: user.full_name || null });
-    }
+    const { byPhone, skipped } = await resolveAudience(filter);
 
     if (byPhone.size === 0) {
       return res.status(400).json({
         success: false,
-        message: 'No users with valid phone numbers match this audience',
+        message: 'No users or imported contacts with valid phone numbers match this audience',
       });
     }
 
@@ -357,11 +414,11 @@ const createCampaign = async (req, res) => {
       const chunkParams = [];
       const values = chunk.map(([phone, meta]) => {
         const base = chunkParams.length;
-        chunkParams.push(campaignId, phone, meta.userId, meta.fullName);
-        return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`;
+        chunkParams.push(campaignId, phone, meta.userId, meta.contactId, meta.fullName);
+        return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5})`;
       });
       const result = await db.query(
-        `INSERT INTO whatsapp_campaign_recipients (campaign_id, phone, user_id, full_name)
+        `INSERT INTO whatsapp_campaign_recipients (campaign_id, phone, user_id, contact_id, full_name)
          VALUES ${values.join(', ')}`,
         chunkParams
       );
@@ -544,12 +601,233 @@ const retryCampaign = async (req, res) => {
   }
 };
 
+const WA_CONTACT_STATUSES = ['unknown', 'valid', 'invalid'];
+
+const listContacts = async (req, res) => {
+  try {
+    await ensureSchema();
+    const search = String(req.query?.search || '').trim();
+    const status = String(req.query?.status || '').trim().toLowerCase();
+    const limit = Math.min(Math.max(parseInt(req.query?.limit, 10) || 200, 1), 1000);
+
+    const where = [];
+    const params = [];
+    if (search) {
+      params.push(`%${search}%`);
+      where.push(`(phone ILIKE $${params.length} OR full_name ILIKE $${params.length})`);
+    }
+    if (WA_CONTACT_STATUSES.includes(status)) {
+      params.push(status);
+      where.push(`wa_status = $${params.length}`);
+    }
+    const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+    params.push(limit);
+    const { rows } = await db.query(
+      `SELECT id, phone, full_name, source, subscribed, wa_status, wa_checked_at, created_at
+       FROM whatsapp_contacts ${whereClause}
+       ORDER BY created_at DESC LIMIT $${params.length}`,
+      params
+    );
+
+    const stats = await db.query(
+      `SELECT
+         COUNT(*)::int AS total,
+         COUNT(*) FILTER (WHERE wa_status = 'valid')::int AS valid,
+         COUNT(*) FILTER (WHERE wa_status = 'invalid')::int AS invalid,
+         COUNT(*) FILTER (WHERE wa_status = 'unknown')::int AS unknown
+       FROM whatsapp_contacts`
+    );
+
+    res.json({ success: true, data: { contacts: rows, stats: stats.rows[0] } });
+  } catch (error) {
+    req.logger.error('List WhatsApp contacts error:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to load WhatsApp contacts' });
+  }
+};
+
+const addContact = async (req, res) => {
+  try {
+    await ensureSchema();
+    const phone = normalizeWhatsphone(req.body?.phone);
+    if (!phone) {
+      return res.status(400).json({ success: false, message: 'A valid Nigerian phone number is required' });
+    }
+    const fullName = String(req.body?.full_name || '').trim().slice(0, 255) || null;
+
+    const result = await db.query(
+      `INSERT INTO whatsapp_contacts (phone, full_name, source, subscribed, created_by)
+       VALUES ($1, $2, 'manual', TRUE, $3)
+       ON CONFLICT (phone) DO UPDATE SET
+         full_name = COALESCE(EXCLUDED.full_name, whatsapp_contacts.full_name),
+         updated_at = CURRENT_TIMESTAMP
+       RETURNING id, phone, full_name, source, subscribed, wa_status, wa_checked_at, created_at`,
+      [phone, fullName, req.user?.id || null]
+    );
+
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    req.logger.error('Add WhatsApp contact error:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to add WhatsApp contact' });
+  }
+};
+
+// CSV/paste import. Accepts an array of raw phone strings (the UI extracts the
+// first column) or already-normalized E.164 numbers and dedupes on insert.
+const importContacts = async (req, res) => {
+  try {
+    await ensureSchema();
+    const incoming = Array.isArray(req.body?.phones) ? req.body.phones : [];
+    if (incoming.length === 0) {
+      return res.status(400).json({ success: false, message: 'No phone numbers provided' });
+    }
+
+    const seen = new Set();
+    const normalized = [];
+    let invalid = 0;
+    for (const raw of incoming) {
+      const phone = normalizeWhatsphone(raw);
+      if (!phone) {
+        invalid++;
+        continue;
+      }
+      if (seen.has(phone)) continue;
+      seen.add(phone);
+      normalized.push(phone);
+    }
+
+    if (normalized.length === 0) {
+      return res.status(400).json({ success: false, message: 'No valid Nigerian phone numbers found' });
+    }
+
+    let added = 0;
+    for (let i = 0; i < normalized.length; i += 250) {
+      const chunk = normalized.slice(i, i + 250);
+      const params = [];
+      const values = chunk.map((phone) => {
+        params.push(phone);
+        return `($${params.length}, 'import', TRUE, $${params.length + 1})`;
+      });
+      // created_by is appended once at the end of the parameter list.
+      params.push(req.user?.id || null);
+      const result = await db.query(
+        `INSERT INTO whatsapp_contacts (phone, source, subscribed, created_by)
+         VALUES ${values.join(', ')}
+         ON CONFLICT (phone) DO UPDATE SET
+           subscribed = TRUE,
+           updated_at = CURRENT_TIMESTAMP`,
+        params
+      );
+      added += result.rowCount ?? chunk.length;
+    }
+
+    const total = await db.query(`SELECT COUNT(*)::int AS total FROM whatsapp_contacts`);
+
+    await recordOperation({
+      actor: req.user,
+      entityType: 'whatsapp_contact',
+      entityId: null,
+      eventType: 'contacts_imported',
+      metadata: { submitted: incoming.length, normalized: normalized.length, invalid, total: total.rows[0].total },
+    });
+
+    res.status(201).json({
+      success: true,
+      data: {
+        added,
+        invalid,
+        duplicates: incoming.length - invalid - normalized.length,
+        total: total.rows[0].total,
+      },
+    });
+  } catch (error) {
+    req.logger.error('Import WhatsApp contacts error:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to import WhatsApp contacts' });
+  }
+};
+
+const deleteContact = async (req, res) => {
+  try {
+    await ensureSchema();
+    const { id } = req.params;
+    const result = await db.query(`DELETE FROM whatsapp_contacts WHERE id = $1 RETURNING id`, [id]);
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, message: 'Contact not found' });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    req.logger.error('Delete WhatsApp contact error:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to delete WhatsApp contact' });
+  }
+};
+
+// Asks Meta which of our contacts are actually on WhatsApp, then stores the
+// verdict. Chunked to Meta's small batch cap so one big list does not fail whole.
+const CHECK_BATCH_SIZE = 50;
+
+const checkContacts = async (req, res) => {
+  try {
+    await ensureSchema();
+
+    const requestedIds = Array.isArray(req.body?.ids) ? req.body.ids.map((n) => parseInt(n, 10)).filter(Number.isInteger) : [];
+    const checkAll = req.body?.all === true || requestedIds.length === 0;
+
+    const { rows: contacts } = checkAll
+      ? await db.query(`SELECT id, phone FROM whatsapp_contacts WHERE wa_status = 'unknown' OR wa_status IS NULL LIMIT 500`)
+      : await db.query(`SELECT id, phone FROM whatsapp_contacts WHERE id = ANY($1::int[])`, [requestedIds]);
+
+    if (contacts.length === 0) {
+      return res.json({ success: true, data: { checked: 0, valid: 0, invalid: 0 } });
+    }
+
+    let valid = 0;
+    let invalid = 0;
+    let failures = 0;
+
+    for (let i = 0; i < contacts.length; i += CHECK_BATCH_SIZE) {
+      const chunk = contacts.slice(i, i + CHECK_BATCH_SIZE);
+      const { success, results, message } = await checkWhatsAppContacts(chunk.map((c) => c.phone));
+
+      if (!success) {
+        failures++;
+        if (failures === 1 && i === 0) {
+          return res.status(502).json({ success: false, message: message || 'WhatsApp contact check failed' });
+        }
+        // Keep the rows as 'unknown' — a later run will retry them.
+        continue;
+      }
+
+      for (const result of results) {
+        const status = result.status === 'valid' ? 'valid' : 'invalid';
+        if (status === 'valid') valid++; else invalid++;
+        await db.query(
+          `UPDATE whatsapp_contacts SET wa_status = $2, wa_checked_at = NOW(), updated_at = NOW()
+           WHERE phone = $1`,
+          [result.phone, status]
+        );
+      }
+    }
+
+    await recordOperation({
+      actor: req.user,
+      entityType: 'whatsapp_contact',
+      entityId: null,
+      eventType: 'contacts_checked',
+      metadata: { checked: contacts.length, valid, invalid, failures },
+    });
+
+    res.json({ success: true, data: { checked: contacts.length - (failures * CHECK_BATCH_SIZE), valid, invalid } });
+  } catch (error) {
+    req.logger.error('Check WhatsApp contacts error:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to check WhatsApp contacts' });
+  }
+};
+
 const deleteCampaign = async (req, res) => {
   try {
     await ensureSchema();
     const note = requireActionNote(req, res, 'A deletion reason is required');
     if (!note) return;
-
     const { id } = req.params;
     const result = await db.query(
       `DELETE FROM whatsapp_campaigns WHERE id = $1 AND status <> 'sending' RETURNING id`,
@@ -596,4 +874,11 @@ module.exports = {
   sendCampaign,
   retryCampaign,
   deleteCampaign,
+  listContacts,
+  addContact,
+  importContacts,
+  deleteContact,
+  checkContacts,
+  normalizeAudienceScope,
+  resolveAudience,
 };

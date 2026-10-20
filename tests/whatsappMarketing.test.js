@@ -11,6 +11,11 @@ const {
   isSafeMediaFilename,
   createCampaign,
   sendCampaign,
+  importContacts,
+  addContact,
+  checkContacts,
+  resolveAudience,
+  normalizeAudienceScope,
 } = require('../services/whatsappMarketingService');
 const { sendWhatsAppTemplate, sendWhatsAppMedia } = require('../config/utils/whatsappService');
 const { isRateLimitError, isTransientError, processWhatsappQueue, dailySendLimit } = require('../jobs/whatsappMarketingJobs');
@@ -130,9 +135,9 @@ test('createCampaign resolves, normalizes and dedupes the audience', async (t) =
 
   const insert = queries.find((q) => q.text.includes('INSERT INTO whatsapp_campaign_recipients'));
   assert.ok(insert, 'recipients inserted');
-  assert.ok(insert.text.includes('($1, $2, $3, $4)'), 'batch insert uses positional params');
+  assert.ok(insert.text.includes('($1, $2, $3, $4, $5)'), 'batch insert uses positional params');
   assert.equal(insert.params[1], '2348034444444', 'phone normalized before insert');
-  assert.equal(insert.params[5], '2349099999999', 'second phone normalized too');
+  assert.equal(insert.params[6], '2349099999999', 'second phone normalized too');
 });
 
 test('createCampaign rejects payloads the service validator refuses', async (t) => {
@@ -496,4 +501,93 @@ test('queue processor re-picks campaigns already marked sending so the queue dra
     queries.some((q) => q.text.includes('WHERE id = $1') && q.text.includes('whatsapp_campaign_recipients') && q.params?.[0] === 1001),
     'the resumed recipient is processed and its outcome written back'
   );
+});
+
+test('importContacts normalizes Nigerian numbers, dedupes and counts invalid', async (t) => {
+  const queries = mockDb(t, (text) => {
+    if (text.startsWith('CREATE TABLE') || text.startsWith('CREATE INDEX') || text.startsWith('ALTER TABLE')) {
+      return { rows: [], rowCount: 0 };
+    }
+    if (text.includes('INSERT INTO whatsapp_contacts')) return { rows: [], rowCount: 3 };
+    if (text.includes('COUNT(*)::int AS total FROM whatsapp_contacts')) return { rows: [{ total: 3 }] };
+    if (text.includes('INSERT INTO whatsapp_marketing_operations')) return { rows: [{}], rowCount: 1 };
+    return { rows: [], rowCount: 0 };
+  });
+
+  const response = makeRes();
+  await importContacts(
+    makeReq({ body: { phones: ['08034444444', '2348034444444', '+234 809 999 9999', 'nonsense'] } }),
+    response
+  );
+
+  assert.equal(response.statusCode, 201);
+  assert.equal(response.body.data.invalid, 1, 'the junk entry is reported as invalid');
+  assert.equal(response.body.data.duplicates, 1, 'the duplicate is not re-inserted');
+  assert.equal(response.body.data.total, 3, 'total reflects the stored contacts');
+
+  const insert = queries.find((q) => q.text.includes('INSERT INTO whatsapp_contacts'));
+  assert.ok(insert.params.includes('2348034444444'), 'number stored in E.164 form');
+  assert.ok(insert.params.includes('2348099999999'), 'spaced/plus number normalized too');
+  assert.ok(!insert.params.includes('08034444444'), 'no raw local numbers stored');
+});
+
+test('addContact rejects numbers Meta could never reach', async (t) => {
+  mockDb(t, () => ({ rows: [], rowCount: 0 }));
+  const response = makeRes();
+  await addContact(makeReq({ body: { phone: '123' } }), response);
+  assert.equal(response.statusCode, 400);
+  assert.match(response.body.message, /valid Nigerian phone/i);
+});
+
+test('checkContacts fails loudly when the provider cannot be reached', async (t) => {
+  const queries = mockDb(t, (text) => {
+    if (text.startsWith('CREATE TABLE') || text.startsWith('CREATE INDEX') || text.startsWith('ALTER TABLE')) {
+      return { rows: [], rowCount: 0 };
+    }
+    if (text.includes('FROM whatsapp_contacts WHERE wa_status')) {
+      return { rows: [{ id: 1, phone: '2348034444444' }] };
+    }
+    return { rows: [], rowCount: 0 };
+  });
+
+  // No Meta credentials in the test env, so the first batch fails.
+  delete process.env.WHATSAPP_META_TOKEN;
+  delete process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+  const response = makeRes();
+  await checkContacts(makeReq({ body: { all: true } }), response);
+
+  assert.equal(response.statusCode, 502, 'a provider failure surfaces instead of silently passing');
+  assert.equal(queries.filter((q) => q.text.includes('UPDATE whatsapp_contacts SET wa_status')).length, 0);
+});
+
+test('resolveAudience excludes contacts Meta flagged as invalid', async (t) => {
+  const queries = mockDb(t, (text) => {
+    if (text.startsWith('CREATE TABLE') || text.startsWith('CREATE INDEX') || text.startsWith('ALTER TABLE')) {
+      return { rows: [], rowCount: 0 };
+    }
+    if (text.includes('FROM whatsapp_contacts')) {
+      return { rows: [{ id: 5, phone: '2348034444444', full_name: 'Ada' }] };
+    }
+    return { rows: [], rowCount: 0 };
+  });
+
+  const { byPhone, source } = await resolveAudience({ source: 'contacts' });
+  assert.equal(source, 'contacts');
+  assert.equal(byPhone.size, 1);
+  assert.equal(byPhone.get('2348034444444').contactId, 5, 'imported contact carries its id');
+
+  const contactSelect = queries.find((q) => q.text.includes('FROM whatsapp_contacts'));
+  assert.ok(
+    contactSelect.text.includes("wa_status <> 'invalid'"),
+    'contacts Meta marked invalid are never queued'
+  );
+  assert.ok(contactSelect.text.includes('subscribed = TRUE'), 'unsubscribed contacts are excluded');
+});
+
+test('normalizeAudienceScope falls back to platform users for unknown values', () => {
+  assert.equal(normalizeAudienceScope('contacts'), 'contacts');
+  assert.equal(normalizeAudienceScope('both'), 'both');
+  assert.equal(normalizeAudienceScope('whatever'), 'users');
+  assert.equal(normalizeAudienceScope(undefined), 'users');
 });
