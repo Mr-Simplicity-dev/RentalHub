@@ -100,6 +100,12 @@ const platformApkUrl = (platform) => {
 const platformUpdateUrl = (platform) =>
   platformApkUrl(platform) || platformStoreUrl(platform);
 
+// iOS and Android ship on separate tracks: version.json describes the Android
+// build, so using it for iOS would tell every iPhone it is 1.0.39 behind and
+// loop the update prompt forever. iOS therefore answers from its own version.
+const readIosVersion = () =>
+  process.env.MOBILE_IOS_LATEST_VERSION || '1.0.3';
+
 router.post(
   '/diagnostics/crash',
   [
@@ -210,15 +216,21 @@ router.post(
 router.get('/app-version', (req, res) => {
   const platform = String(req.query.platform || '').toLowerCase();
   const currentVersion = String(req.query.version || '').trim();
-  const latestVersion =
-    readDeployedVersion() ||
-    process.env.MOBILE_LATEST_VERSION ||
-    process.env.MOBILE_ANDROID_LATEST_VERSION ||
-    '1.0.0';
-  const minimumVersion =
-    process.env.MOBILE_MINIMUM_VERSION ||
-    process.env.MOBILE_ANDROID_MINIMUM_VERSION ||
-    '1.0.0';
+  const isIos = platform === 'ios';
+
+  // An iOS device is only ever compared against the iOS track, so an Android
+  // release cannot trigger an update prompt it has no way to satisfy.
+  const latestVersion = isIos
+    ? readIosVersion()
+    : readDeployedVersion() ||
+      process.env.MOBILE_LATEST_VERSION ||
+      process.env.MOBILE_ANDROID_LATEST_VERSION ||
+      '1.0.0';
+  const minimumVersion = isIos
+    ? process.env.MOBILE_IOS_MINIMUM_VERSION || '1.0.0'
+    : process.env.MOBILE_MINIMUM_VERSION ||
+      process.env.MOBILE_ANDROID_MINIMUM_VERSION ||
+      '1.0.0';
 
   const updateAvailable = currentVersion
     ? compareVersions(currentVersion, latestVersion) < 0

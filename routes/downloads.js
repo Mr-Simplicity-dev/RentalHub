@@ -102,9 +102,11 @@ router.get('/version', (req, res) => {
         apkAvailable,
         lastUpdated: info.lastUpdated,
       },
+      // iOS is on its own release track; mirroring the Android build here would
+      // advertise an iOS update that no App Store build can satisfy.
       ios: {
-        version: info.version,
-        buildNumber: info.buildNumber,
+        version: process.env.MOBILE_IOS_LATEST_VERSION || '1.0.3',
+        buildNumber: String(process.env.MOBILE_IOS_BUILD_NUMBER || '13'),
         downloadUrl: null,
         lastUpdated: info.lastUpdated,
       },
