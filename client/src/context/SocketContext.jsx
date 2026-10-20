@@ -162,7 +162,14 @@ export const SocketProvider = ({ children }) => {
 
         const localStream = await navigator.mediaDevices.getUserMedia({
           audio: true,
-          video: isVideoCall ? { facingMode: 'user' } : false,
+          video: isVideoCall
+            ? {
+                facingMode: 'user',
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                frameRate: { ideal: 30, max: 30 },
+              }
+            : false,
         });
 
         localStreamRef.current = localStream;
