@@ -14,6 +14,7 @@ const {
   importContacts,
   addContact,
   checkContacts,
+  deleteInvalidContacts,
   resolveAudience,
   normalizeAudienceScope,
 } = require('../services/whatsappMarketingService');
@@ -503,32 +504,82 @@ test('queue processor re-picks campaigns already marked sending so the queue dra
   );
 });
 
-test('importContacts normalizes Nigerian numbers, dedupes and counts invalid', async (t) => {
+test('importContacts refuses numbers already in the system and never revives them', async (t) => {
+  // 2348034444444 (=08034444444) is a registered user, 2348099999999 already
+  // sits in the WhatsApp list. Both must be refused, not upserted.
   const queries = mockDb(t, (text) => {
     if (text.startsWith('CREATE TABLE') || text.startsWith('CREATE INDEX') || text.startsWith('ALTER TABLE')) {
       return { rows: [], rowCount: 0 };
     }
-    if (text.includes('INSERT INTO whatsapp_contacts')) return { rows: [], rowCount: 3 };
-    if (text.includes('COUNT(*)::int AS total FROM whatsapp_contacts')) return { rows: [{ total: 3 }] };
+    if (text.includes('FROM users WHERE phone')) return { rows: [{ phone: '2348034444444' }] };
+    if (text.includes('FROM sms_subscribers WHERE phone')) return { rows: [] };
+    if (text.includes('FROM whatsapp_contacts WHERE phone')) return { rows: [{ phone: '2348099999999' }] };
+    if (text.includes('FROM survey_responses')) return { rows: [] };
+    if (text.includes('INSERT INTO whatsapp_contacts')) return { rows: [], rowCount: 1 };
+    if (text.includes('COUNT(*)::int AS total FROM whatsapp_contacts')) return { rows: [{ total: 4 }] };
     if (text.includes('INSERT INTO whatsapp_marketing_operations')) return { rows: [{}], rowCount: 1 };
     return { rows: [], rowCount: 0 };
   });
 
   const response = makeRes();
   await importContacts(
-    makeReq({ body: { phones: ['08034444444', '2348034444444', '+234 809 999 9999', 'nonsense'] } }),
+    makeReq({
+      body: {
+        phones: [
+          '08034444444',      // registered user -> refused
+          '2348034444444',    // same user, other shape -> also refused, not a duplicate
+          '+234 809 999 9999', // already in the WhatsApp list -> refused
+          '08076543210',      // genuinely new -> imported
+          '08076543210',      // same as above -> duplicate within the upload
+          'nonsense',         // invalid
+        ],
+      },
+    }),
     response
   );
 
   assert.equal(response.statusCode, 201);
-  assert.equal(response.body.data.invalid, 1, 'the junk entry is reported as invalid');
-  assert.equal(response.body.data.duplicates, 1, 'the duplicate is not re-inserted');
-  assert.equal(response.body.data.total, 3, 'total reflects the stored contacts');
+  assert.equal(response.body.data.invalid, 1, 'junk entry counted as invalid');
+  assert.equal(
+    response.body.data.duplicates,
+    2,
+    'the same number appearing twice in the upload (including as 0803… and 234803…) is counted once'
+  );
+  assert.equal(
+    response.body.data.alreadyKnown,
+    2,
+    'the registered user and the existing WhatsApp contact are both refused'
+  );
 
   const insert = queries.find((q) => q.text.includes('INSERT INTO whatsapp_contacts'));
-  assert.ok(insert.params.includes('2348034444444'), 'number stored in E.164 form');
-  assert.ok(insert.params.includes('2348099999999'), 'spaced/plus number normalized too');
-  assert.ok(!insert.params.includes('08034444444'), 'no raw local numbers stored');
+  assert.equal(
+    insert.text.includes('DO UPDATE'),
+    false,
+    'an existing contact is never upserted back to subscribed'
+  );
+  assert.ok(insert.text.includes('DO NOTHING'), 'conflicting rows are left untouched');
+  assert.ok(insert.params.includes('2348076543210'), 'the one new number is stored in E.164 form');
+  assert.ok(!insert.params.includes('2348034444444'), 'the registered user is never written');
+  assert.ok(!insert.params.includes('2348099999999'), 'the existing WhatsApp contact is never rewritten');
+});
+
+test('importContacts refuses the whole upload when every number is already known', async (t) => {
+  mockDb(t, (text) => {
+    if (text.startsWith('CREATE TABLE') || text.startsWith('CREATE INDEX') || text.startsWith('ALTER TABLE')) {
+      return { rows: [], rowCount: 0 };
+    }
+    if (text.includes('FROM users WHERE phone')) return { rows: [{ phone: '2348034444444' }] };
+    if (text.includes('FROM sms_subscribers WHERE phone')) return { rows: [] };
+    if (text.includes('FROM whatsapp_contacts WHERE phone')) return { rows: [] };
+    if (text.includes('FROM survey_responses')) return { rows: [] };
+    return { rows: [], rowCount: 0 };
+  });
+
+  const response = makeRes();
+  await importContacts(makeReq({ body: { phones: ['08034444444'] } }), response);
+
+  assert.equal(response.statusCode, 400);
+  assert.match(response.body.message, /already exist in the system/i);
 });
 
 test('addContact rejects numbers Meta could never reach', async (t) => {
@@ -590,4 +641,39 @@ test('normalizeAudienceScope falls back to platform users for unknown values', (
   assert.equal(normalizeAudienceScope('both'), 'both');
   assert.equal(normalizeAudienceScope('whatever'), 'users');
   assert.equal(normalizeAudienceScope(undefined), 'users');
+});
+
+test('deleteInvalidContacts removes only numbers Meta rejected', async (t) => {
+  const queries = mockDb(t, (text) => {
+    if (text.startsWith('CREATE TABLE') || text.startsWith('CREATE INDEX') || text.startsWith('ALTER TABLE')) {
+      return { rows: [], rowCount: 0 };
+    }
+    if (text.includes("DELETE FROM whatsapp_contacts WHERE wa_status = 'invalid'")) {
+      return { rows: [{ id: 4 }, { id: 7 }], rowCount: 2 };
+    }
+    if (text.includes('INSERT INTO whatsapp_marketing_operations')) return { rows: [{}], rowCount: 1 };
+    return { rows: [], rowCount: 0 };
+  });
+
+  const response = makeRes();
+  await deleteInvalidContacts(makeReq(), response);
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.data.deleted, 2);
+
+  const del = queries.find((q) => q.text.includes('DELETE FROM whatsapp_contacts'));
+  assert.ok(del.text.includes("wa_status = 'invalid'"), 'only invalid contacts are swept');
+  assert.ok(
+    !del.text.includes("wa_status = 'unknown'"),
+    'unchecked contacts are kept so the list can still be checked later'
+  );
+});
+
+test('phoneKey treats 0803… and 234803… as the same person', () => {
+  const { phoneKey, isUsableNigerianNumber } = require('../services/contactIdentityService');
+  assert.equal(phoneKey('08034444444'), phoneKey('2348034444444'));
+  assert.equal(phoneKey('+234 803 444 4444'), phoneKey('08034444444'));
+  assert.equal(isUsableNigerianNumber('08034444444'), true);
+  assert.equal(isUsableNigerianNumber('12345'), false, 'too short');
+  assert.equal(isUsableNigerianNumber('080344444'), false, 'nine digits is not a Nigerian number');
 });

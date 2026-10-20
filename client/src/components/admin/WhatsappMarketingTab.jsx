@@ -163,6 +163,7 @@ const WhatsappMarketingTab = () => {
   const [csvPreview, setCsvPreview] = useState([]);
   const [importing, setImporting] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [deletingInvalid, setDeletingInvalid] = useState(false);
 
   const loadContacts = useCallback(async () => {
     setContactsLoading(true);
@@ -223,8 +224,10 @@ const WhatsappMarketingTab = () => {
       }
 
       const res = await api.post('/whatsapp-marketing/contacts/import', { phones });
-      const { added, invalid, duplicates, total } = res.data.data;
-      toast.success(`Imported: ${added} · Duplicates skipped: ${duplicates} · Invalid: ${invalid} · Total: ${total}`);
+      const { added, alreadyKnown, invalid, duplicates, total } = res.data.data;
+      toast.success(
+        `Imported ${added} new · Already in system: ${alreadyKnown} · Duplicates: ${duplicates} · Invalid: ${invalid} · Total now: ${total}`
+      );
       setCsvFile(null);
       setCsvPreview([]);
       loadContacts();
@@ -260,6 +263,24 @@ const WhatsappMarketingTab = () => {
       loadContacts();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to remove contact');
+    }
+  };
+
+  const handleDeleteInvalidContacts = async () => {
+    const count = contactStats?.invalid ?? 0;
+    if (count === 0) {
+      toast.info('There are no invalid contacts to delete');
+      return;
+    }
+    setDeletingInvalid(true);
+    try {
+      const res = await api.delete('/whatsapp-marketing/contacts/invalid');
+      toast.success(`Removed ${res.data.data.deleted} invalid contact(s)`);
+      loadContacts();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete invalid contacts');
+    } finally {
+      setDeletingInvalid(false);
     }
   };
 
@@ -716,6 +737,22 @@ const WhatsappMarketingTab = () => {
                   <FaCheckCircle className="mr-2" />
                   {checking ? 'Checking…' : 'Check on WhatsApp'}
                 </button>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <GhostButton
+                  className="text-red-600 hover:bg-red-50"
+                  onClick={handleDeleteInvalidContacts}
+                  disabled={deletingInvalid || (contactStats?.invalid ?? 0) === 0}
+                >
+                  <FaTrash className="mr-2" />
+                  {deletingInvalid
+                    ? 'Deleting…'
+                    : `Delete all invalid contacts (${contactStats?.invalid ?? 0})`}
+                </GhostButton>
+                <p className="text-xs text-gray-500">
+                  Removes every number Meta confirmed is not on WhatsApp. Unchecked numbers are kept.
+                </p>
               </div>
 
               {csvPreview.length > 0 ? (

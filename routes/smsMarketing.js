@@ -16,6 +16,8 @@ router.get('/subscribers', authenticate, requireSuperAdmin, smsCtrl.listSubscrib
 router.post('/subscribers/sync', authenticate, requireSuperAdmin, smsCtrl.syncSubscribers);
 router.post('/subscribers', [body('phone').isString().trim().isLength({ min: 5, max: 20 }), body('full_name').optional().isString().trim().isLength({ max: 200 })], validateRequest, authenticate, requireSuperAdmin, smsCtrl.addSubscriber);
 router.post('/subscribers/import', authenticate, requireSuperAdmin, smsCtrl.importSubscribers);
+// Registered before /subscribers/:id so the literal path is not read as an id.
+router.delete('/subscribers/unsubscribed', authenticate, requireSuperAdmin, smsCtrl.deleteUnsubscribedSubscribers);
 router.patch('/subscribers/:id', [param('id').isInt(), body('phone').optional().isString().trim().isLength({ max: 20 }), body('full_name').optional().isString().trim().isLength({ max: 200 })], validateRequest, authenticate, requireSuperAdmin, smsCtrl.updateSubscriber);
 router.delete('/subscribers/:id', [param('id').isInt()], validateRequest, authenticate, requireSuperAdmin, smsCtrl.deleteSubscriber);
 

@@ -104,6 +104,8 @@ router.post(
   waCtrl.importContacts
 );
 router.post('/contacts/check', authenticate, requireSuperAdmin, waCtrl.checkContacts);
+// Registered before /contacts/:id so the literal path is not read as an id.
+router.delete('/contacts/invalid', authenticate, requireSuperAdmin, waCtrl.deleteInvalidContacts);
 router.delete('/contacts/:id', [param('id').isInt()], validateRequest, authenticate, requireSuperAdmin, waCtrl.deleteContact);
 
 router.post('/media', authenticate, requireSuperAdmin, uploadCampaignMedia);

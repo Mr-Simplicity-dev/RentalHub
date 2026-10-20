@@ -319,10 +319,13 @@ const SmsMarketingTab = () => {
       const text = await csvFile.text();
       const phones = text.split('\n')
         .map((l) => l.split(',')[0].replace(/[\s"']/g, '').trim())
-        .filter((p) => p.length >= 10 && /^\d+$/.test(p));
+        .filter((p) => p.length >= 10);
 
       const res = await api.post('/sms-marketing/subscribers/import', { phones });
-      toast.success(`Imported: ${res.data.data.added} contacts`);
+      const { added, alreadyKnown, invalid, duplicates } = res.data.data;
+      toast.success(
+        `Imported ${added} new · Already in system: ${alreadyKnown} · Duplicates: ${duplicates} · Invalid: ${invalid}`
+      );
       setCsvFile(null);
       setCsvPreview([]);
       document.getElementById('csv-input').value = '';
@@ -332,6 +335,19 @@ const SmsMarketingTab = () => {
       toast.error(err.response?.data?.message || 'Import failed');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteUnsubscribed = async () => {
+    try {
+      const res = await api.delete('/sms-marketing/subscribers/unsubscribed', {
+        data: { note: 'Bulk cleanup of opted-out subscribers' },
+      });
+      toast.success(`Removed ${res.data.data.deleted} unsubscribed subscriber(s)`);
+      loadSubscribers(subSearch, subPage);
+      loadStats();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete unsubscribed subscribers');
     }
   };
 
@@ -564,6 +580,13 @@ const SmsMarketingTab = () => {
           </SecondaryButton>
           <SecondaryButton onClick={() => document.getElementById('csv-input').click()} className="gap-2">
             <FaUpload /> Import CSV
+          </SecondaryButton>
+          <SecondaryButton
+            onClick={handleDeleteUnsubscribed}
+            className="gap-2 text-red-600 hover:bg-red-50"
+            aria-label="Delete all unsubscribed SMS contacts"
+          >
+            <FaTrash /> Delete unsubscribed
           </SecondaryButton>
           <PrimaryButton onClick={() => setShowAddSubscriber(true)} className="gap-2">
             <FaPlus /> Add Contact

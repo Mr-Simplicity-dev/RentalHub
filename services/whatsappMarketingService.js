@@ -1,5 +1,6 @@
 const db = require('../config/middleware/database');
 const { sendWhatsAppText, sendWhatsAppTemplate, checkWhatsAppContacts } = require('../config/utils/whatsappService');
+const { classifyNewPhones } = require('./contactIdentityService');
 
 let schemaReady = false;
 
@@ -682,23 +683,22 @@ const importContacts = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No phone numbers provided' });
     }
 
-    const seen = new Set();
-    const normalized = [];
-    let invalid = 0;
-    for (const raw of incoming) {
-      const phone = normalizeWhatsphone(raw);
-      if (!phone) {
-        invalid++;
-        continue;
-      }
-      if (seen.has(phone)) continue;
-      seen.add(phone);
-      normalized.push(phone);
+    // classifyNewPhones refuses anything the platform already holds — users,
+    // the SMS list, survey leads or an earlier WhatsApp import — so a number
+    // can never be imported twice or silently revived after it unsubscribed.
+    const { accepted, alreadyKnown, invalid, duplicates } = await classifyNewPhones(incoming);
+
+    if (accepted.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: alreadyKnown > 0
+          ? `All ${alreadyKnown} number(s) already exist in the system`
+          : 'No valid Nigerian phone numbers found',
+        data: { added: 0, alreadyKnown, invalid, duplicates },
+      });
     }
 
-    if (normalized.length === 0) {
-      return res.status(400).json({ success: false, message: 'No valid Nigerian phone numbers found' });
-    }
+    const normalized = accepted.map((p) => normalizeWhatsphone(p)).filter(Boolean);
 
     let added = 0;
     for (let i = 0; i < normalized.length; i += 250) {
@@ -713,12 +713,10 @@ const importContacts = async (req, res) => {
       const result = await db.query(
         `INSERT INTO whatsapp_contacts (phone, source, subscribed, created_by)
          VALUES ${values.join(', ')}
-         ON CONFLICT (phone) DO UPDATE SET
-           subscribed = TRUE,
-           updated_at = CURRENT_TIMESTAMP`,
+         ON CONFLICT (phone) DO NOTHING`,
         params
       );
-      added += result.rowCount ?? chunk.length;
+      added += result.rowCount ?? 0;
     }
 
     const total = await db.query(`SELECT COUNT(*)::int AS total FROM whatsapp_contacts`);
@@ -728,15 +726,16 @@ const importContacts = async (req, res) => {
       entityType: 'whatsapp_contact',
       entityId: null,
       eventType: 'contacts_imported',
-      metadata: { submitted: incoming.length, normalized: normalized.length, invalid, total: total.rows[0].total },
+      metadata: { submitted: incoming.length, added, alreadyKnown, invalid, duplicates, total: total.rows[0].total },
     });
 
     res.status(201).json({
       success: true,
       data: {
         added,
+        alreadyKnown,
         invalid,
-        duplicates: incoming.length - invalid - normalized.length,
+        duplicates,
         total: total.rows[0].total,
       },
     });
@@ -758,6 +757,30 @@ const deleteContact = async (req, res) => {
   } catch (error) {
     req.logger.error('Delete WhatsApp contact error:', error.message);
     res.status(500).json({ success: false, message: 'Failed to delete WhatsApp contact' });
+  }
+};
+
+// Housekeeping: clears every number Meta confirmed is not on WhatsApp so the
+// list stays small and the daily quota is never spent on dead numbers.
+const deleteInvalidContacts = async (req, res) => {
+  try {
+    await ensureSchema();
+    const result = await db.query(
+      `DELETE FROM whatsapp_contacts WHERE wa_status = 'invalid' RETURNING id`
+    );
+
+    await recordOperation({
+      actor: req.user,
+      entityType: 'whatsapp_contact',
+      entityId: null,
+      eventType: 'invalid_contacts_deleted',
+      metadata: { deleted: result.rows.length },
+    });
+
+    res.json({ success: true, data: { deleted: result.rows.length } });
+  } catch (error) {
+    req.logger.error('Delete invalid WhatsApp contacts error:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to delete invalid contacts' });
   }
 };
 
@@ -878,6 +901,7 @@ module.exports = {
   addContact,
   importContacts,
   deleteContact,
+  deleteInvalidContacts,
   checkContacts,
   normalizeAudienceScope,
   resolveAudience,

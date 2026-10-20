@@ -1,5 +1,6 @@
 const db = require('../config/middleware/database');
 const { sendSMS } = require('../config/utils/smsService');
+const { classifyNewPhones } = require('./contactIdentityService');
 
 const BATCH_SIZE = 50;
 
@@ -106,7 +107,16 @@ const getActorName = (user = {}) =>
   user.full_name || user.name || user.email || user.username || 'Admin';
 
 const requireActionNote = (req, res, message) => {
-  const note = String(req.body?.reason || req.body?.note || req.body?.approval_note || '').trim();
+  const bodies = [req.body, req.body?.data, req.body?.payload];
+  let note = '';
+  for (const source of bodies) {
+    if (!source || typeof source !== 'object') continue;
+    const candidate = String(source.reason || source.note || source.approval_note || '').trim();
+    if (candidate) {
+      note = candidate;
+      break;
+    }
+  }
   if (!note) {
     res.status(400).json({ success: false, message });
     return null;
@@ -334,6 +344,34 @@ const deleteSubscriber = async (req, res) => {
   } catch (error) {
     req.logger.error('Delete SMS subscriber error:', error.message);
     res.status(500).json({ success: false, message: 'Failed to delete SMS subscriber' });
+  }
+};
+
+// Bulk housekeeping: removes every subscriber who opted out. Mirrors the
+// WhatsApp "delete invalid contacts" control so both channels can be cleaned.
+const deleteUnsubscribedSubscribers = async (req, res) => {
+  try {
+    await ensureSchema();
+    const reason = requireActionNote(req, res, 'A removal reason is required');
+    if (!reason) return;
+
+    const result = await db.query(
+      `DELETE FROM sms_subscribers WHERE subscribed = FALSE RETURNING id`
+    );
+
+    await recordOperation({
+      actor: req.user,
+      entityType: 'subscriber',
+      entityId: null,
+      eventType: 'unsubscribed_removed',
+      note: reason,
+      metadata: { deleted: result.rows.length },
+    });
+
+    res.json({ success: true, data: { deleted: result.rows.length } });
+  } catch (error) {
+    req.logger.error('Delete unsubscribed SMS subscribers error:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to delete unsubscribed subscribers' });
   }
 };
 
@@ -604,28 +642,33 @@ const importSubscribers = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No phone numbers provided' });
     }
 
-    const normalized = phones
-      .map((p) => String(p).replace(/[\s-]/g, '').trim())
-      .filter((p) => p.length >= 10 && /^\d+$/.test(p));
+    const { accepted, alreadyKnown, invalid, duplicates } = await classifyNewPhones(phones);
 
-    if (normalized.length === 0) {
-      return res.status(400).json({ success: false, message: 'No valid phone numbers found' });
+    if (accepted.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: alreadyKnown > 0
+          ? `All ${alreadyKnown} number(s) already exist in the system`
+          : 'No valid phone numbers found',
+        data: { added: 0, alreadyKnown, invalid, duplicates },
+      });
     }
 
     let added = 0;
-    let skipped = 0;
-
-    for (const phone of normalized) {
-      await db.query(
+    for (let i = 0; i < accepted.length; i += 250) {
+      const chunk = accepted.slice(i, i + 250);
+      const params = [];
+      const values = chunk.map((phone) => {
+        params.push(phone);
+        return `($${params.length}, 'import', TRUE)`;
+      });
+      const result = await db.query(
         `INSERT INTO sms_subscribers (phone, source, subscribed)
-         VALUES ($1, 'import', TRUE)
-         ON CONFLICT (phone) DO UPDATE SET
-           subscribed = TRUE,
-           unsubscribed_at = NULL,
-           updated_at = CURRENT_TIMESTAMP`,
-        [phone]
+         VALUES ${values.join(', ')}
+         ON CONFLICT (phone) DO NOTHING`,
+        params
       );
-      added++;
+      added += result.rowCount ?? 0;
     }
 
     const total = await db.query(
@@ -636,7 +679,10 @@ const importSubscribers = async (req, res) => {
       success: true,
       data: {
         added,
-        skipped: phones.length - normalized.length,
+        alreadyKnown,
+        invalid,
+        duplicates,
+        skipped: invalid + duplicates,
         totalImport: total.rows[0].total,
       },
     });
@@ -868,6 +914,7 @@ module.exports = {
   listSubscribers,
   syncSubscribers,
   importSubscribers,
+  deleteUnsubscribedSubscribers,
   addSubscriber,
   updateSubscriber,
   deleteSubscriber,
