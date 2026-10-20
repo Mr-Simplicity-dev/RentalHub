@@ -81,7 +81,16 @@ const getActorName = (user = {}) =>
   user.full_name || user.name || user.email || user.username || 'Admin';
 
 const requireActionNote = (req, res, message) => {
-  const note = String(req.body?.reason || req.body?.note || '').trim();
+  const body = req.body || {};
+  const note = String(
+    body.reason ||
+    body.note ||
+    body.data?.reason ||
+    body.data?.note ||
+    body.payload?.reason ||
+    body.payload?.note ||
+    ''
+  ).trim();
   if (!note) {
     res.status(400).json({ success: false, message });
     return null;
