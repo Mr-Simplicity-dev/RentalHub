@@ -118,7 +118,7 @@ const { startWhatsappMarketingJobs } = require('./jobs/whatsappMarketingJobs');
 const { startRecruitmentJobs } = require('./jobs/recruitmentJobs');
 const { startPremblyRecoveryJobs } = require('./jobs/premblyRecoveryJobs');
 const { startRegistrationReminderJobs } = require('./jobs/registrationReminderJobs');
-const csrfProtection = require('./config/middleware/csrfProtection');
+const { startSupportReassignJobs } = require('./jobs/supportReassignJobs');const csrfProtection = require('./config/middleware/csrfProtection');
 const securityAlertMiddleware = require('./config/middleware/securityAlertMiddleware');
 const {
   authSensitiveLimiter,
@@ -875,6 +875,7 @@ startMarketingCommissionJobs();
   startRecruitmentJobs();
   startPremblyRecoveryJobs();
   startRegistrationReminderJobs();
+  startSupportReassignJobs();
   startScheduler();
   scheduleEvidenceIntegrityMonitoring();
   schedulePayoutRetries();

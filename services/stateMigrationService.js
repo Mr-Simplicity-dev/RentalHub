@@ -1,5 +1,7 @@
 const db = require('../config/middleware/database');
 const { statesMatch } = require('../config/utils/stateScope');
+const logger = require('../config/utils/logger');
+const { createNotification } = require('../config/utils/notificationService');
 
 const STATE_SUPPORT_ROLE = 'state_support_admin';
 const SUPER_SUPPORT_ROLE = 'super_support_admin';
@@ -197,6 +199,31 @@ const logAuditEvent = async ({
      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
     [requestId, actorId, actorRole, action, direction, decision, note, metadata]
   );
+};
+
+/**
+ * Tell the migrating user what was decided. Nothing used to be sent on
+ * approval, so an agent or lawyer could be moved to a new state, or refused,
+ * without ever being told. Runs after COMMIT so the written row is visible.
+ */
+const notifyMigrationDecision = async ({ requestRow, decision, note = null }) => {
+  try {
+    const userId = Number(requestRow?.user_id);
+    if (!Number.isInteger(userId) || userId <= 0) return;
+
+    const fromState = requestRow.from_state || 'your current state';
+    const toState = requestRow.to_state || 'the new state';
+    const approved = decision === 'approved';
+
+    const title = approved ? 'State migration approved' : 'State migration not approved';
+    const message = approved
+      ? `Your move from ${fromState} to ${toState} has been approved. Your assigned state is now ${toState}.`
+      : `Your request to move from ${fromState} to ${toState} was not approved.${note ? ` Reason: ${note}` : ''}`;
+
+    await createNotification(userId, `state_migration_${approved ? 'approved' : 'rejected'}`, title, message, '/dashboard');
+  } catch (error) {
+    logger.error('Migration decision notification error:', error);
+  }
 };
 
 const applyApprovedMigration = async ({ client, requestRow, actorId, actorRole }) => {
@@ -659,6 +686,15 @@ exports.reviewMigrationByDirection = async (req, res) => {
 
     await client.query('COMMIT');
 
+    // Notify only when this review reached a terminal state for the request.
+    if (updated.status === 'approved' || updated.status === 'rejected') {
+      await notifyMigrationDecision({
+        requestRow: updated,
+        decision: updated.status,
+        note: reviewNote,
+      });
+    }
+
     return res.json({
       success: true,
       message: `${direction} review ${decision}`,
@@ -776,6 +812,13 @@ exports.superSupportFinalReview = async (req, res) => {
     }
 
     await client.query('COMMIT');
+
+    // The migrating user is always told the final decision.
+    await notifyMigrationDecision({
+      requestRow: updated,
+      decision,
+      note: reviewNote,
+    });
 
     return res.json({
       success: true,

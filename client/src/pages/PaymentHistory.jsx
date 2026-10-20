@@ -156,6 +156,7 @@ const PaymentHistory = () => {
   const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [selectedReceiptGroup, setSelectedReceiptGroup] = useState([]);
   const [receiptData, setReceiptData] = useState(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   // Group payments that were paid in ONE combined transaction (registration
   // base + lawyer + agent share a base reference). Separate transactions keep
@@ -194,8 +195,27 @@ const PaymentHistory = () => {
 
   const downloadPdf = async (group) => {
     const base = group[0];
+    if (!base?.id || downloadingPdf) return;
+
+    setDownloadingPdf(true);
     try {
       const blob = await paymentService.downloadReceiptPdf(base.id);
+
+      // When the server answers with JSON (an error or an expired session) axios
+      // still hands back a Blob, so the "PDF" saved was a corrupt file the
+      // browser could not open. Detect that and surface the real message.
+      const looksLikePdf = blob && blob.type === 'application/pdf';
+      if (!looksLikePdf && blob && blob.type && blob.type.includes('json')) {
+        const text = await blob.text();
+        let message = 'Failed to download receipt';
+        try {
+          message = JSON.parse(text)?.message || message;
+        } catch {
+          // Not JSON after all; keep the generic message.
+        }
+        throw new Error(message);
+      }
+
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -203,10 +223,13 @@ const PaymentHistory = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      // Revoking immediately can cancel the download in some browsers.
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
       toast.success('Receipt downloaded');
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to download receipt');
+      toast.error(error.response?.data?.message || error.message || 'Failed to download receipt');
+    } finally {
+      setDownloadingPdf(false);
     }
   };
 
@@ -421,14 +444,14 @@ const PaymentHistory = () => {
 
       {selectedReceipt && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto"
           onClick={() => setSelectedReceipt(null)}
         >
           <div
-            className="w-full max-w-md rounded-xl bg-white shadow-xl"
+            className="my-auto flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-xl bg-white shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="receipt-print-area p-6">
+            <div className="receipt-print-area flex-1 overflow-y-auto p-6">
               <div className="border-b border-gray-200 pb-4 text-center">
                 <img
                   src="/rentalhub-mark.svg"
@@ -603,20 +626,25 @@ const PaymentHistory = () => {
                 require a signature.
               </div>
             </div>
-            <div className="flex justify-end gap-2 border-t border-gray-100 p-4 print:hidden">
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-gray-100 p-4 print:hidden">
               <button
+                type="button"
                 onClick={() => setSelectedReceipt(null)}
-                className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                className="inline-flex items-center justify-center whitespace-nowrap rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
               >
                 Close
               </button>
               <button
+                type="button"
                 onClick={() => downloadPdf(selectedReceiptGroup)}
-                className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                disabled={downloadingPdf}
+                className="inline-flex items-center justify-center whitespace-nowrap rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <FaFilePdf className="mr-1.5" /> Download PDF
+                <FaFilePdf className="mr-1.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                {downloadingPdf ? 'Preparing…' : 'Download PDF'}
               </button>
               <button
+                type="button"
                 onClick={() => {
                   document.body.classList.add('printing-receipt');
                   const cleanup = () => {
@@ -626,9 +654,9 @@ const PaymentHistory = () => {
                   window.addEventListener('afterprint', cleanup);
                   window.print();
                 }}
-                className="inline-flex items-center rounded-md bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700"
+                className="inline-flex items-center justify-center whitespace-nowrap rounded-md bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700"
               >
-                <FaPrint className="mr-1.5" /> Print
+                <FaPrint className="mr-1.5 h-4 w-4 shrink-0" aria-hidden="true" /> Print
               </button>
             </div>
           </div>

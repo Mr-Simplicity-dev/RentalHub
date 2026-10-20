@@ -4,6 +4,7 @@ const { sendMessageNotification } = require('../config/utils/emailService');
 const { detectPhoneNumber } = require('../config/utils/phoneNumberFilter');
 const { emitToUser } = require('../config/utils/realtimeEmitter');
 const { sendPushToUser } = require('../config/utils/pushNotificationService');
+const logger = require('../config/utils/logger');
 
 let messageSchemaReady = false;
 const ESCALATION_TICKET_STATUSES = ['approval_pending', 'under_review', 'approved', 'rejected'];
@@ -125,6 +126,26 @@ const ensureMessageSchema = async () => {
 
     CREATE INDEX IF NOT EXISTS idx_escalation_tickets_message
       ON escalation_tickets(escalation_message_id);
+
+    ALTER TABLE escalation_tickets
+      ADD COLUMN IF NOT EXISTS assigned_to INTEGER REFERENCES users(id),
+      ADD COLUMN IF NOT EXISTS assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS handover_count INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS exhausted_at TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS first_handled_at TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS last_typing_at TIMESTAMP;
+
+    CREATE TABLE IF NOT EXISTS escalation_assignments (
+      id SERIAL PRIMARY KEY,
+      escalation_message_id INTEGER NOT NULL,
+      assigned_to INTEGER,
+      reason VARCHAR(40) NOT NULL DEFAULT 'auto_reassign',
+      handover_count INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_escalation_assignments_message
+      ON escalation_assignments(escalation_message_id, created_at DESC);
   `);
 
   messageSchemaReady = true;
@@ -614,6 +635,11 @@ exports.markAsRead = async (req, res) => {
         success: false,
         message: 'Message not found or unauthorized'
       });
+    }
+
+    // Reading an escalation stops its 90-second clock: it is now with a person.
+    if (String(result.rows[0].message_type || '') === 'escalation') {
+      await exports.markEscalationHandledByAdmin(result.rows[0].id, userId).catch(() => {});
     }
 
     emitToUser(result.rows[0].sender_id, 'message:read', {
@@ -1111,6 +1137,173 @@ exports.clearFlaggedMessage = async (req, res) => {
   } catch (error) {
     req.logger.error('Clear flagged message error:', error.message);
     res.status(500).json({ success: false, message: 'Failed to clear flag' });
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Direct-message escalations get the same 90-second treatment as tickets:
+// an unanswered escalation moves on, twice at most, then goes to super admin.
+// ---------------------------------------------------------------------------
+
+const findNextEscalationAdmin = async (excludeIds = []) => {
+  const exclude = [...new Set(excludeIds.map(Number).filter(Number.isInteger))];
+  const params = [];
+  let excludeClause = '';
+  if (exclude.length) {
+    params.push(exclude);
+    excludeClause = ` AND u.id <> ALL($1::int[])`;
+  }
+
+  const result = await db.query(
+    `SELECT u.id
+     FROM users u
+     WHERE u.user_type IN ('lga_admin', 'lga_support_admin', 'state_support_admin', 'super_admin', 'super_support_admin')
+       AND u.deleted_at IS NULL
+       AND u.account_suspended_at IS NULL
+       ${excludeClause}
+     ORDER BY
+       CASE u.user_type
+         WHEN 'lga_support_admin' THEN 1
+         WHEN 'lga_admin' THEN 2
+         WHEN 'state_support_admin' THEN 3
+         WHEN 'super_support_admin' THEN 4
+         ELSE 5
+       END,
+       u.id ASC
+     LIMIT 1`,
+    params
+  );
+  return result.rows[0]?.id || null;
+};
+
+exports.reassignUnansweredEscalations = async () => {
+  try {
+    await ensureMessageSchema();
+    const { REASSIGN_AFTER_SECONDS, MAX_HANDOVERS, TYPING_GRACE_SECONDS } = require('./supportReassignService');
+
+    const candidates = await db.query(
+      `SELECT m.id AS message_id, m.sender_id, m.subject, m.message_text,
+              et.assigned_to, COALESCE(et.handover_count, 0) AS handover_count,
+              COALESCE(et.assigned_at, m.created_at) AS waiting_since,
+              et.first_handled_at, et.last_typing_at,
+              EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - et.last_typing_at)) AS typing_age_seconds
+       FROM messages m
+       JOIN escalation_tickets et ON et.escalation_message_id = m.id
+       WHERE m.message_type = 'escalation'
+         AND m.is_read = FALSE
+         AND et.handled_at IS NULL
+         AND COALESCE(et.exhausted_at, NULL) IS NULL
+         AND COALESCE(et.first_handled_at, NULL) IS NULL
+         AND COALESCE(et.assigned_at, m.created_at) <=
+             CURRENT_TIMESTAMP - ($1::int * INTERVAL '1 second')
+       ORDER BY et.assigned_at ASC NULLS FIRST
+       LIMIT 50`,
+      [REASSIGN_AFTER_SECONDS]
+    );
+
+    let reassigned = 0;
+    let escalated = 0;
+
+    for (const row of candidates.rows) {
+      const typingAge = Number(row.typing_age_seconds);
+      // GUARD: the admin is typing — leave it with him.
+      if (row.last_typing_at && Number.isFinite(typingAge) && typingAge < TYPING_GRACE_SECONDS) {
+        continue;
+      }
+
+      const handoverCount = Number(row.handover_count) || 0;
+
+      const history = await db.query(
+        `SELECT DISTINCT assigned_to FROM escalation_assignments WHERE escalation_message_id = $1`,
+        [row.message_id]
+      );
+      const excludeIds = history.rows.map((r) => r.assigned_to).concat([row.assigned_to, row.sender_id]);
+
+      let nextId = null;
+      let reason = 'auto_reassign_timeout';
+      let isEscalation = false;
+
+      if (handoverCount >= MAX_HANDOVERS) {
+        nextId = await findNextEscalationAdmin(excludeIds);
+        reason = 'auto_escalated_super';
+        isEscalation = true;
+      } else {
+        nextId = await findNextEscalationAdmin(excludeIds);
+      }
+
+      if (!nextId) {
+        await db.query(
+          `UPDATE escalation_tickets SET exhausted_at = CURRENT_TIMESTAMP WHERE escalation_message_id = $1`,
+          [row.message_id]
+        );
+        continue;
+      }
+
+      await db.query(
+        `UPDATE escalation_tickets
+         SET assigned_to = $1,
+             assigned_at = CURRENT_TIMESTAMP,
+             handover_count = $2,
+             last_typing_at = NULL,
+             exhausted_at = CASE WHEN $3 THEN CURRENT_TIMESTAMP ELSE exhausted_at END
+         WHERE escalation_message_id = $4`,
+        [nextId, handoverCount + 1, isEscalation || handoverCount >= MAX_HANDOVERS, row.message_id]
+      );
+
+      await db.query(
+        `INSERT INTO escalation_assignments
+           (escalation_message_id, assigned_to, reason, handover_count)
+         VALUES ($1, $2, $3, $4)`,
+        [row.message_id, nextId, reason, handoverCount + 1]
+      );
+
+      const { createNotification } = require('../config/utils/notificationService');
+      await createNotification(
+        nextId,
+        'message_escalation_assigned',
+        'Escalation needs your reply',
+        `An escalation "${String(row.subject || 'Direct message').slice(0, 90)}" is waiting for a reply and is now yours.`,
+        '/messages'
+      ).catch(() => {});
+
+      if (isEscalation || handoverCount >= MAX_HANDOVERS) escalated += 1;
+      else reassigned += 1;
+    }
+
+    return { scanned: candidates.rows.length, reassigned, escalated };
+  } catch (error) {
+    logger.error('Escalation auto-reassign error:', error);
+    return { scanned: 0, reassigned: 0, escalated: 0 };
+  }
+};
+
+/** Called when an admin reads or replies, so the clock stops. */
+exports.markEscalationHandledByAdmin = async (messageId, adminId = null) => {
+  try {
+    await ensureMessageSchema();
+    await db.query(
+      `UPDATE escalation_tickets
+       SET first_handled_at = COALESCE(first_handled_at, CURRENT_TIMESTAMP),
+           last_typing_at = NULL,
+           assigned_to = COALESCE(assigned_to, $2)
+       WHERE escalation_message_id = $1`,
+      [messageId, adminId]
+    );
+  } catch (error) {
+    logger.warn(`markEscalationHandledByAdmin failed: ${error.message}`);
+  }
+};
+
+/** Called from the typing indicator so the guard can see activity. */
+exports.markEscalationTyping = async (messageId) => {
+  try {
+    await ensureMessageSchema();
+    await db.query(
+      'UPDATE escalation_tickets SET last_typing_at = CURRENT_TIMESTAMP WHERE escalation_message_id = $1',
+      [messageId]
+    );
+  } catch (error) {
+    logger.warn(`markEscalationTyping failed: ${error.message}`);
   }
 };
 

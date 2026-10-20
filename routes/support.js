@@ -1689,6 +1689,14 @@ router.post('/tickets', authenticate, [
         await db.query('UPDATE support_tickets SET assigned_to = $1 WHERE id = $2', [assignedTo, ticket.id]);
         ticket.assigned_to = assignedTo;
 
+        // Start the 90-second first-response clock from this moment.
+        try {
+          const { markTicketAssigned } = require('../services/supportReassignService');
+          await markTicketAssigned(ticket.id, assignedTo);
+        } catch (assignClockError) {
+          logger.warn(`Assign clock start skipped: ${assignClockError.message}`);
+        }
+
         await activityLogger.log({
           userId: assignedTo,
           action: 'ticket_auto_assigned',
@@ -2697,6 +2705,17 @@ router.post('/tickets/:id/reply', authenticate, uploadAttachment.single('attachm
 
     const isAdminReply = isSupportAdmin || isDeptAdmin;
 
+    // The auto-handover rule: an admin reply ends the 90-second clock for good.
+    // Once an agent has answered, the ticket stays with him.
+    if (isAdminReply) {
+      try {
+        const { markTicketAnswered } = require('../services/supportReassignService');
+        await markTicketAnswered(ticketId);
+      } catch (reassignError) {
+        logger.warn(`markTicketAnswered skipped: ${reassignError.message}`);
+      }
+    }
+
     // Insert reply
     const result = await db.query(
       `INSERT INTO support_ticket_replies (ticket_id, user_id, author_name, message, is_admin, attachment_url, attachment_name, attachment_type)
@@ -2971,6 +2990,17 @@ router.post('/tickets/:id/typing', authenticate, typingLimiter, async (req, res)
         userName: req.user.full_name || req.user.email,
         timestamp: Date.now(),
       });
+    }
+
+    // Persist the fact that the assigned agent is typing, so the 90-second
+    // handover guard can see it and leave the ticket alone.
+    if (isAdmin) {
+      try {
+        const { markTicketTyping } = require('../services/supportReassignService');
+        await markTicketTyping(ticketId);
+      } catch (typingError) {
+        req.logger.warn(`Typing guard update skipped: ${typingError.message}`);
+      }
     }
 
     res.json({ success: true });
