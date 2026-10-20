@@ -1626,46 +1626,49 @@ router.post('/tickets', authenticate, [
       escalation_department: escalationDepartment,
     });
 
-    // Auto-assign: LGA support → State support → Super support (least-loaded)
-    if (state) {
-      try {
-        let assignedTo = null;
+    // Auto-assign: LGA support → State support → Super support (least-loaded).
+    // State names are compared loosely because rows mix "FCT" and
+    // "Federal Capital Territory"; a strict text match left tickets unassigned.
+    try {
+      const { normalizeStateName } = require('../config/utils/stateName');
+      const { notifyTicketCreated } = require('../config/utils/ticketNotificationService');
+
+      const stateKey = normalizeStateName(state);
+      let assignedTo = null;
+
+      if (stateKey) {
+        const findSupportAdmin = async ({ userType, lgaName = null }) => {
+          const params = [stateKey, userType];
+          let lgaClause = '';
+          if (lgaName) {
+            params.push(String(lgaName).trim().toLowerCase());
+            lgaClause = ` AND LOWER(TRIM(COALESCE(u.assigned_city, ''))) = $${params.length}`;
+          }
+
+          const result = await db.query(
+            `SELECT u.id, COUNT(st.id) AS open_tickets
+             FROM users u
+             LEFT JOIN support_tickets st ON st.assigned_to = u.id
+               AND st.status NOT IN ('resolved', 'closed')
+             WHERE u.user_type = $2
+               AND LOWER(TRIM(COALESCE(u.assigned_state, ''))) <> ''
+               AND regexp_replace(LOWER(TRIM(u.assigned_state)), '\\s+state$', '') IN ($1, 'federal capital territory')
+               ${lgaClause}
+               AND u.deleted_at IS NULL AND u.account_suspended_at IS NULL
+             GROUP BY u.id
+             ORDER BY open_tickets ASC, u.id ASC
+             LIMIT 1`,
+            params
+          );
+          return result.rows[0]?.id || null;
+        };
 
         if (lga) {
-          const lgaResult = await db.query(
-            `SELECT u.id, COUNT(st.id) AS open_tickets
-             FROM users u
-             LEFT JOIN support_tickets st ON st.assigned_to = u.id
-               AND st.status NOT IN ('resolved', 'closed')
-             WHERE u.user_type = 'lga_support_admin'
-               AND u.assigned_state = $1
-               AND u.assigned_city = $2
-               AND u.deleted_at IS NULL AND u.account_suspended_at IS NULL
-             GROUP BY u.id
-             ORDER BY open_tickets ASC, u.id ASC
-             LIMIT 1`,
-            [state, lga]
-          );
-          if (lgaResult.rows.length > 0) assignedTo = lgaResult.rows[0].id;
+          assignedTo = await findSupportAdmin({ userType: 'lga_support_admin', lgaName: lga });
         }
-
-        if (!assignedTo) {
-          const stateResult = await db.query(
-            `SELECT u.id, COUNT(st.id) AS open_tickets
-             FROM users u
-             LEFT JOIN support_tickets st ON st.assigned_to = u.id
-               AND st.status NOT IN ('resolved', 'closed')
-             WHERE u.user_type = 'state_support_admin'
-               AND u.assigned_state = $1
-               AND u.deleted_at IS NULL AND u.account_suspended_at IS NULL
-             GROUP BY u.id
-             ORDER BY open_tickets ASC, u.id ASC
-             LIMIT 1`,
-            [state]
-          );
-          if (stateResult.rows.length > 0) assignedTo = stateResult.rows[0].id;
+        if (!assignedTo && stateKey) {
+          assignedTo = await findSupportAdmin({ userType: 'state_support_admin' });
         }
-
         if (!assignedTo) {
           const superResult = await db.query(
             `SELECT u.id, COUNT(st.id) AS open_tickets
@@ -1680,25 +1683,30 @@ router.post('/tickets', authenticate, [
           );
           if (superResult.rows.length > 0) assignedTo = superResult.rows[0].id;
         }
-
-        if (assignedTo) {
-          await db.query('UPDATE support_tickets SET assigned_to = $1 WHERE id = $2', [assignedTo, ticket.id]);
-          ticket.assigned_to = assignedTo;
-
-          await activityLogger.log({
-            userId: assignedTo,
-            action: 'ticket_auto_assigned',
-            entityType: 'ticket',
-            entityId: ticket.id,
-            metadata: { source: 'authenticated', state, lga, userId: req.user.id },
-            state,
-            lga,
-            ip: req.ip,
-          });
-        }
-      } catch (assignErr) {
-        logger.error('Ticket auto-assignment error (non-fatal):', assignErr);
       }
+
+      if (assignedTo) {
+        await db.query('UPDATE support_tickets SET assigned_to = $1 WHERE id = $2', [assignedTo, ticket.id]);
+        ticket.assigned_to = assignedTo;
+
+        await activityLogger.log({
+          userId: assignedTo,
+          action: 'ticket_auto_assigned',
+          entityType: 'ticket',
+          entityId: ticket.id,
+          metadata: { source: 'authenticated', state, lga, userId: req.user.id },
+          state,
+          lga,
+          ip: req.ip,
+        });
+      }
+
+      // Write a real notification so a new ticket is never silent. This works
+      // whether or not the admin has the dashboard open, and it feeds the
+      // unread badge that every surface reads.
+      await notifyTicketCreated({ ticket, assignedTo });
+    } catch (assignErr) {
+      logger.error('Ticket auto-assignment error (non-fatal):', assignErr);
     }
 
     emitTicketToAdmins('ticket:created', {

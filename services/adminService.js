@@ -1461,6 +1461,13 @@ exports.approveProperty = async (req, res) => {
 
     const property = result.rows[0];
 
+    // Tell the tenants who registered for this state, and the landlord who
+    // owns the listing, that it is live. Runs in the background so approval is
+    // never slowed down.
+    void require('../config/utils/propertyPostedNotificationService')
+      .notifyTenantsOfLiveProperty(property)
+      .catch(() => {});
+
     // 🔔 Notify landlord by email
     const landlordResult = await db.query(
       'SELECT email, full_name FROM users WHERE id = $1',

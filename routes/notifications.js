@@ -227,6 +227,30 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
+// Combined unread activity for the app badge. Web, APK and iOS all read this
+// one number so the badge agrees everywhere.
+router.get('/unread/activity', authenticate, async (req, res) => {
+  try {
+    const { getUnreadActivityCount } = require('../config/utils/unreadActivityService');
+    const counts = await getUnreadActivityCount(req.user.id);
+    res.json({
+      success: true,
+      data: {
+        total: counts.total,
+        unread_count: counts.total,
+        unread_notifications: counts.unreadNotifications,
+        unread_messages: counts.unreadMessages,
+      },
+    });
+  } catch (error) {
+    req.logger?.error?.('Unread activity count error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch unread activity count',
+    });
+  }
+});
+
 // Get unread count
 router.get('/unread/count', authenticate, async (req, res) => {
   try {

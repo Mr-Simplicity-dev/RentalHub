@@ -62,6 +62,7 @@ const Header = () => {
     const [showNotifications, setShowNotifications] = useState(false);
     const [notifications, setNotifications] = useState([]);
     const [notifUnreadCount, setNotifUnreadCount] = useState(0);
+    const [unreadTotal, setUnreadTotal] = useState(0);
     const [selectedNotification, setSelectedNotification] = useState(null);
     const [showAvatarPopup, setShowAvatarPopup] = useState(false);
     const notifRef = useRef(null);
@@ -212,6 +213,15 @@ if (role === 'zonal_financial_admin') return '/admin/zonal-financial-dashboard';
     } catch {
       // Ignore errors
     }
+    try {
+      // One number for everything unread — shown on the logo badge.
+      const activityRes = await api.get('/notifications/unread/activity');
+      if (activityRes.data?.success) {
+        setUnreadTotal(Number(activityRes.data?.data?.total || 0));
+      }
+    } catch {
+      // Ignore errors
+    }
   }, [isAuthenticated, user?.id]);
 
   useEffect(() => {
@@ -234,6 +244,7 @@ if (role === 'zonal_financial_admin') return '/admin/zonal-financial-dashboard';
         prev.map((n) => (n.id === notifId ? { ...n, is_read: true } : n))
       );
       setNotifUnreadCount((prev) => Math.max(0, prev - 1));
+      setUnreadTotal((prev) => Math.max(0, prev - 1));
     } catch {
       // Ignore
     }
@@ -244,6 +255,7 @@ if (role === 'zonal_financial_admin') return '/admin/zonal-financial-dashboard';
       await api.patch('/notifications/read-all');
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
       setNotifUnreadCount(0);
+      setUnreadTotal((prev) => Math.max(0, prev - notifUnreadCount));
       toast.success('All notifications marked as read');
     } catch {
       // Ignore
@@ -364,11 +376,23 @@ return (
           onClick={() => handleHeaderNavigation('/')}
           className="flex min-w-0 max-w-[55%] sm:max-w-none items-center gap-2 group sm:gap-3"
         >
-          <img
-            src="/rentalhub-mark.svg"
-            alt="Amana RentalHub NG"
-            className="h-9 shrink-0 object-contain transition-transform duration-300 group-hover:scale-105 md:h-12 lg:h-14"
-          />
+          <span className="relative shrink-0">
+            <img
+              src="/rentalhub-mark.svg"
+              alt="Amana RentalHub NG"
+              className="h-9 shrink-0 object-contain transition-transform duration-300 group-hover:scale-105 md:h-12 lg:h-14"
+            />
+
+            {/* Everything unread, in one number, on the app mark. */}
+            {isAuthenticated && unreadTotal > 0 && (
+              <span
+                className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white ring-2 ring-white animate-scaleIn"
+                aria-label={`${unreadTotal} unread`}
+              >
+                {unreadTotal > 99 ? '99+' : unreadTotal}
+              </span>
+            )}
+          </span>
 
           {/* FIXED */}
           <span className="hidden min-w-0 flex-col leading-none sm:flex">

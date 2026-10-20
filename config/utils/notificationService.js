@@ -45,6 +45,18 @@ exports.createNotification = async (userId, type, title, message, link = null) =
     );
 
     const notification = result.rows[0];
+
+    // Send the real unread total so the icon badge counts (1, 2, 3...) even
+    // when the push lands while the app is closed. Falls back to 1 if the
+    // count cannot be read, so a badge is never left blank.
+    let badge = 1;
+    try {
+      const { getPushBadgeCount } = require('./unreadActivityService');
+      badge = await getPushBadgeCount(userId);
+    } catch (badgeError) {
+      logger.warn(`Push badge count failed: ${badgeError.message}`);
+    }
+
     void sendPushToUser(userId, {
       title,
       body: message,
@@ -54,6 +66,7 @@ exports.createNotification = async (userId, type, title, message, link = null) =
         link: link || '',
       },
       channelId: type === 'message' ? 'messages' : 'general',
+      badge: Math.max(1, Number(badge) || 1),
     }).catch((error) => logger.error('Push notification failed:', error.message));
     return notification;
   } catch (error) {

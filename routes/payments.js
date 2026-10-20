@@ -14,6 +14,7 @@ const db = require('../config/middleware/database');
 const { releaseEscrowForPayment } = require('../services/walletLedgerService');
 const { savingsReceiptNumber, buildReference } = require('../config/utils/referenceGenerator');
 const { RECEIPT_NOTICE, formatNigerianDateTime } = require('../config/utils/receiptFormat');
+const { registerMoneyFont } = require('../config/utils/pdfMoneyFont');
 
 // ============ TENANT SUBSCRIPTION PAYMENTS ============
 
@@ -539,6 +540,10 @@ router.get('/receipt-pdf/:paymentId',
       const amanaFontPath = path.join(__dirname, '..', 'assets', 'AmanaScript.ttf');
       try { doc.registerFont('AmanaScript', amanaFontPath); } catch (e) { /* fall back to Helvetica */ }
 
+      // Helvetica has no naira glyph, so "₦12,500" printed as "12,500".
+      // Every amount on this receipt is drawn with this font instead.
+      const moneyFont = registerMoneyFont(doc);
+
       // Header: logo + Amana wordmark + company name + contact
       try { doc.image(logoPath, 50, 46, { width: 56, height: 56 }); } catch (e) {}
       doc.font('AmanaScript').fontSize(21).fillColor('#6e1b2b').text('Amana', 122, 50, { width: 200 });
@@ -602,9 +607,10 @@ router.get('/receipt-pdf/:paymentId',
         doc.moveDown(0.5);
         doc.font('Helvetica').fontSize(9).fillColor('#166534');
         doc.text(`Diaspora registration quote: $${Number(receipt.quoteUsd).toFixed(2)} USD${receipt.quoteCurrency ? ` (${receipt.quoteCurrency})` : ''}`);
-        if (receipt.fxRate) doc.text(`FX rate applied: ₦${Number(receipt.fxRate).toLocaleString()} / USD`);
-        if (receipt.fxMarkupPct) doc.text(`FX markup: ${Number(receipt.fxMarkupPct).toFixed(2)}%`);
-        doc.text(`Amount charged: ${receipt.total} NGN`);
+        if (receipt.fxRate) doc.font(moneyFont).text(`FX rate applied: ₦${Number(receipt.fxRate).toLocaleString()} / USD`);
+        if (receipt.fxMarkupPct) doc.font('Helvetica').text(`FX markup: ${Number(receipt.fxMarkupPct).toFixed(2)}%`);
+        doc.font(moneyFont).text(`Amount charged: ${receipt.total} NGN`);
+        doc.font('Helvetica');
       }
       doc.moveDown(1);
 
@@ -618,21 +624,21 @@ router.get('/receipt-pdf/:paymentId',
       let y = tableTop + 24;
       doc.font('Helvetica').fontSize(10).fillColor('#334155');
       receipt.items.forEach((item) => {
-        doc.text(item.label, 50, y, { width: 330 });
-        doc.text(item.amount, 400, y, { width: 145, align: 'right' });
+        doc.font('Helvetica').text(item.label, 50, y, { width: 330 });
+        doc.font(moneyFont).text(item.amount, 400, y, { width: 145, align: 'right' });
         y += 22;
       });
 
       doc.moveTo(50, y + 4).lineTo(545, y + 4).strokeColor('#e2e8f0').stroke();
       doc.moveDown(1.2);
       doc.font('Helvetica-Bold').fontSize(12).fillColor('#0f172a').text('TOTAL PAID', 50, doc.y);
-      doc.font('Helvetica-Bold').fontSize(14).fillColor('#0284c7').text(receipt.total, 400, doc.y - 16, { width: 145, align: 'right' });
+      doc.font(moneyFont).fontSize(14).fillColor('#0284c7').text(receipt.total, 400, doc.y - 16, { width: 145, align: 'right' });
 
       // Actual platform fee recorded against this payment, when it was
       // deducted from the recipient instead of charged to the payer.
       if (Number(receipt.rent?.platformFee) > 0) {
         doc.moveDown(1.2);
-        doc.font('Helvetica').fontSize(9).fillColor('#475569');
+        doc.font(moneyFont).fontSize(9).fillColor('#475569');
         doc.text(`Platform/Service Fee: ₦${Number(receipt.rent.platformFee).toLocaleString()} (deducted from the landlord's payout - not charged to you)`, { width: 495 });
       }
 
@@ -695,6 +701,8 @@ router.get('/savings-receipt.pdf',
       );
       doc.pipe(res);
 
+      const moneyFont = registerMoneyFont(doc);
+
       doc.fontSize(20).text('Amana RentalHub NG', { align: 'center' });
       doc.moveDown(0.2);
       doc.fontSize(11).fillColor('#64748b').text('Rent Savings Contribution Receipt', { align: 'center' });
@@ -724,8 +732,8 @@ router.get('/savings-receipt.pdf',
         ['Net saved', `₦${net.toLocaleString()}`],
       ];
       rows.forEach(([label, value]) => {
-        doc.fillColor('#334155').text(label, 50, y, { width: 330 });
-        doc.text(value, 400, y, { width: 150, align: 'right' });
+        doc.font('Helvetica').fillColor('#334155').text(label, 50, y, { width: 330 });
+        doc.font(moneyFont).text(value, 400, y, { width: 150, align: 'right' });
         y += 22;
       });
 
@@ -733,7 +741,7 @@ router.get('/savings-receipt.pdf',
       doc.moveDown();
       doc.font('Helvetica-Bold');
       doc.fillColor('#0f172a').text('Amount Saved', 50, doc.y);
-      doc.text(`₦${net.toLocaleString()}`, 400, doc.y - 14, { width: 150, align: 'right' });
+      doc.font(moneyFont).text(`₦${net.toLocaleString()}`, 400, doc.y - 14, { width: 150, align: 'right' });
       doc.moveDown(2);
       doc.fontSize(9).fillColor('#94a3b8').text('Thank you for saving with Amana RentalHub NG.', { align: 'center' });
       doc.moveDown(0.2);
@@ -818,6 +826,8 @@ router.get('/commission-statement.pdf',
       res.setHeader('Content-Disposition', `attachment; filename="commission-statement-${userId}.pdf"`);
       doc.pipe(res);
 
+      const moneyFont = registerMoneyFont(doc);
+
       doc.fontSize(20).text('Amana RentalHub NG', { align: 'center' });
       doc.moveDown(0.2);
       doc.fontSize(11).fillColor('#64748b').text('Commission Earnings Statement', { align: 'center' });
@@ -829,11 +839,11 @@ router.get('/commission-statement.pdf',
       doc.text(`Role: ${role}`);
       doc.moveDown();
 
-      doc.font('Helvetica-Bold').fontSize(10).fillColor('#0f172a');
+      doc.font(moneyFont).fontSize(10).fillColor('#0f172a');
       doc.text(`Total Earned: ₦${totals.earned.toLocaleString()}`);
       doc.text(`Total Pending: ₦${totals.pending.toLocaleString()}`);
       doc.text(`Total Paid: ₦${totals.paid.toLocaleString()}`);
-      doc.moveDown();
+      doc.font('Helvetica').moveDown();
 
       const tableTop = doc.y;
       doc.font('Helvetica-Bold');
@@ -851,11 +861,11 @@ router.get('/commission-statement.pdf',
           doc.addPage();
           y = 50;
         }
-        doc.fillColor('#334155').text(item.label, 50, y, { width: 165 });
+        doc.font('Helvetica').fillColor('#334155').text(item.label, 50, y, { width: 165 });
         doc.text(item.meta || '', 220, y, { width: 90 });
         doc.text(String(item.status || ''), 320, y, { width: 70 });
         doc.text(new Date(item.date).toLocaleDateString('en-NG'), 400, y, { width: 25, align: 'right' });
-        doc.text(`₦${item.amount.toLocaleString()}`, 430, y, { width: 115, align: 'right' });
+        doc.font(moneyFont).text(`₦${item.amount.toLocaleString()}`, 430, y, { width: 115, align: 'right' });
         y += 18;
       });
 
@@ -863,7 +873,7 @@ router.get('/commission-statement.pdf',
       doc.moveDown();
       doc.font('Helvetica-Bold').fontSize(10).fillColor('#0f172a');
       doc.text('Statement Total', 50, doc.y);
-      doc.text(`₦${(totals.earned + totals.pending + totals.paid).toLocaleString()}`, 430, doc.y - 14, { width: 115, align: 'right' });
+      doc.font(moneyFont).text(`₦${(totals.earned + totals.pending + totals.paid).toLocaleString()}`, 430, doc.y - 14, { width: 115, align: 'right' });
       doc.moveDown(2);
       doc.fontSize(9).fillColor('#94a3b8').text('Thank you for using Amana RentalHub NG.', { align: 'center' });
 
