@@ -76,6 +76,8 @@ const EmailMarketingTab = () => {
   const [subTotal, setSubTotal] = useState(0);
   const [showAddSubscriber, setShowAddSubscriber] = useState(false);
   const [newSubscriber, setNewSubscriber] = useState({ email: '', full_name: '', source: 'manual' });
+  const [emailCsvFile, setEmailCsvFile] = useState(null);
+  const [emailCsvPreview, setEmailCsvPreview] = useState([]);
 
   // Campaigns
   const [campaigns, setCampaigns] = useState([]);
@@ -220,6 +222,64 @@ const EmailMarketingTab = () => {
       toast.error(err.response?.data?.message || 'Sync failed');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ─── Import subscribers (CSV or paste) ────────────────────────────────────
+  const handleEmailCsvFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setEmailCsvFile(file);
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const lines = ev.target.result.split('\n').filter((l) => l.trim());
+      const emails = lines
+        .map((l) => l.split(',')[0].replace(/[\s"']/g, '').toLowerCase())
+        .filter((v) => v.includes('@'));
+      setEmailCsvPreview(emails.slice(0, 10));
+    };
+    reader.readAsText(file);
+  };
+
+  const handleEmailImport = async () => {
+    if (!emailCsvFile) { toast.error('Select a CSV file first'); return; }
+    try {
+      setLoading(true);
+      const text = await emailCsvFile.text();
+      const emails = text
+        .split('\n')
+        .map((l) => l.split(',')[0].replace(/[\s"']/g, '').toLowerCase())
+        .filter((v) => v.includes('@'));
+
+      if (emails.length === 0) { toast.error('No email addresses found in that file'); return; }
+
+      const res = await api.post('/email-marketing/subscribers/import', { emails });
+      const { added, alreadyKnown, invalid, duplicates } = res.data.data;
+      toast.success(
+        `Imported ${added} new · Already in system: ${alreadyKnown} · Duplicates: ${duplicates} · Invalid: ${invalid}`
+      );
+      setEmailCsvFile(null);
+      setEmailCsvPreview([]);
+      loadSubscribers(subSearch, subPage);
+      loadStats();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Import failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteUnsubscribedEmails = async () => {
+    try {
+      const res = await api.delete('/email-marketing/subscribers/unsubscribed', {
+        data: { note: 'Bulk cleanup of opted-out email contacts' },
+      });
+      toast.success(`Removed ${res.data.data.deleted} unsubscribed contact(s)`);
+      loadSubscribers(subSearch, subPage);
+      loadStats();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete unsubscribed contacts');
     }
   };
 
@@ -475,6 +535,16 @@ const EmailMarketingTab = () => {
           <SecondaryButton onClick={handleSync} disabled={loading} className="gap-2">
             <FaSyncAlt className={loading ? 'animate-spin' : ''} /> Sync
           </SecondaryButton>
+          <SecondaryButton onClick={() => document.getElementById('email-csv-input').click()} className="gap-2">
+            <FaFileAlt /> Import CSV
+          </SecondaryButton>
+          <SecondaryButton
+            onClick={handleDeleteUnsubscribedEmails}
+            className="gap-2 text-red-600 hover:bg-red-50"
+            aria-label="Delete all unsubscribed email contacts"
+          >
+            <FaTrash /> Delete unsubscribed
+          </SecondaryButton>
           <PrimaryButton onClick={() => setShowAddSubscriber(true)} className="gap-2">
             <FaPlus /> Add Contact
           </PrimaryButton>
@@ -494,6 +564,39 @@ const EmailMarketingTab = () => {
           </div>
           <SecondaryButton onClick={() => loadSubscribers(subSearch, subPage)}>Search</SecondaryButton>
         </div>
+
+        <input
+          id="email-csv-input" type="file" accept=".csv,.txt"
+          className="hidden" onChange={handleEmailCsvFileChange}
+          aria-label="Choose email CSV file"
+        />
+
+        {emailCsvFile && (
+          <div className="rounded-2xl border border-gray-100 bg-gray-50/60 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-gray-900"><FaFileAlt className="mr-1 inline" /> {emailCsvFile.name}</p>
+                {emailCsvPreview.length > 0 && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Preview: {emailCsvPreview.join(', ')}
+                    {emailCsvPreview.length >= 10 && '...'}
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <PrimaryButton onClick={handleEmailImport} loading={loading} className="gap-1">
+                  <FaFileAlt /> Import
+                </PrimaryButton>
+                <SecondaryButton
+                  aria-label="Cancel email CSV import"
+                  onClick={() => { setEmailCsvFile(null); setEmailCsvPreview([]); document.getElementById('email-csv-input').value = ''; }}
+                >
+                  <FaTimes />
+                </SecondaryButton>
+              </div>
+            </div>
+          </div>
+        )}
 
         {showAddSubscriber && (
           <form onSubmit={handleAddSubscriber} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">

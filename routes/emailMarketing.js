@@ -18,6 +18,16 @@ router.get('/stats', authenticate, requireSuperAdmin, emailCtrl.getDashboardStat
 
 router.get('/subscribers', authenticate, requireSuperAdmin, emailCtrl.listSubscribers);
 router.post('/subscribers/sync', authenticate, requireSuperAdmin, emailCtrl.syncSubscribers);
+router.post(
+  '/subscribers/import',
+  [body('emails').isArray({ min: 1, max: 5000 })],
+  validateRequest,
+  authenticate,
+  requireSuperAdmin,
+  emailCtrl.importSubscribers
+);
+// Registered before /subscribers/:id so the literal path is not read as an id.
+router.delete('/subscribers/unsubscribed', authenticate, requireSuperAdmin, emailCtrl.deleteUnsubscribedSubscribers);
 router.post('/subscribers', [body('email').isEmail().normalizeEmail(), body('full_name').optional().isString().trim().isLength({ max: 200 })], validateRequest, authenticate, requireSuperAdmin, emailCtrl.addSubscriber);
 router.patch('/subscribers/:id', [param('id').isInt(), body('email').optional().isEmail().normalizeEmail(), body('full_name').optional().isString().trim().isLength({ max: 200 })], validateRequest, authenticate, requireSuperAdmin, emailCtrl.updateSubscriber);
 router.delete('/subscribers/:id', [param('id').isInt()], validateRequest, authenticate, requireSuperAdmin, emailCtrl.deleteSubscriber);

@@ -2,6 +2,7 @@ const db = require('../config/middleware/database');
 const crypto = require('crypto');
 const { sendEmail } = require('../config/utils/mailer');
 const { buildEmail } = require('../config/utils/emailTemplates');
+const { classifyNewEmails } = require('./contactIdentityService');
 
 const EMAIL_FROM = process.env.EMAIL_FROM || 'Amana RentalHub NG <support@rentalhub.com.ng>';
 const BASE_URL = process.env.BASE_URL || 'https://rentalhub.com.ng';
@@ -118,7 +119,16 @@ const getActorName = (user = {}) =>
   user.full_name || user.name || user.email || user.username || 'Admin';
 
 const requireActionNote = (req, res, message) => {
-  const note = String(req.body?.reason || req.body?.note || req.body?.approval_note || '').trim();
+  const bodies = [req.body, req.body?.data, req.body?.payload];
+  let note = '';
+  for (const source of bodies) {
+    if (!source || typeof source !== 'object') continue;
+    const candidate = String(source.reason || source.note || source.approval_note || '').trim();
+    if (candidate) {
+      note = candidate;
+      break;
+    }
+  }
   if (!note) {
     res.status(400).json({ success: false, message });
     return null;
@@ -287,6 +297,69 @@ const syncSubscribers = async (req, res) => {
   }
 };
 
+// CSV/paste import. Mirrors the SMS and WhatsApp rules: anyone who is already
+// a platform user or already on the email list is refused, so an address can
+// never be added twice and an unsubscribed subscriber is never revived.
+const importSubscribers = async (req, res) => {
+  try {
+    await ensureSchema();
+    const incoming = Array.isArray(req.body?.emails) ? req.body.emails : [];
+
+    if (incoming.length === 0) {
+      return res.status(400).json({ success: false, message: 'No email addresses provided' });
+    }
+
+    const { accepted, alreadyKnown, invalid, duplicates } = await classifyNewEmails(incoming);
+
+    if (accepted.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: alreadyKnown > 0
+          ? `All ${alreadyKnown} address(es) already exist in the system`
+          : 'No valid email addresses found',
+        data: { added: 0, alreadyKnown, invalid, duplicates },
+      });
+    }
+
+    let added = 0;
+    for (let i = 0; i < accepted.length; i += 250) {
+      const chunk = accepted.slice(i, i + 250);
+      const params = [];
+      const values = chunk.map((email) => {
+        params.push(email, generateUnsubscribeToken());
+        return `($${params.length - 1}, 'import', TRUE, $${params.length})`;
+      });
+      const result = await db.query(
+        `INSERT INTO email_subscribers (email, source, subscribed, unsubscribe_token)
+         VALUES ${values.join(', ')}
+         ON CONFLICT (email) DO NOTHING`,
+        params
+      );
+      added += result.rowCount ?? 0;
+    }
+
+    const total = await db.query(
+      `SELECT COUNT(*)::int AS total FROM email_subscribers WHERE source = 'import'`
+    );
+
+    await recordOperation({
+      actor: req.user,
+      entityType: 'subscriber',
+      entityId: null,
+      eventType: 'subscribers_imported',
+      metadata: { submitted: incoming.length, added, alreadyKnown, invalid, duplicates },
+    }).catch(() => {});
+
+    res.status(201).json({
+      success: true,
+      data: { added, alreadyKnown, invalid, duplicates, totalImport: total.rows[0].total },
+    });
+  } catch (error) {
+    req.logger.error('Import email subscribers error:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to import email subscribers' });
+  }
+};
+
 const addSubscriber = async (req, res) => {
   try {
     await ensureSchema();
@@ -295,7 +368,6 @@ const addSubscriber = async (req, res) => {
     if (!email || !email.trim()) {
       return res.status(400).json({ success: false, message: 'Email is required' });
     }
-
     const token = generateUnsubscribeToken();
     const result = await db.query(
       `INSERT INTO email_subscribers (email, full_name, source, user_type, tags, unsubscribe_token, subscribed)
@@ -377,6 +449,34 @@ const deleteSubscriber = async (req, res) => {
   } catch (error) {
     req.logger.error('Delete subscriber error:', error.message);
     res.status(500).json({ success: false, message: 'Failed to delete subscriber' });
+  }
+};
+
+// Bulk housekeeping: removes every address that opted out, matching the
+// SMS and WhatsApp cleanup controls.
+const deleteUnsubscribedSubscribers = async (req, res) => {
+  try {
+    await ensureSchema();
+    const reason = requireActionNote(req, res, 'A removal reason is required');
+    if (!reason) return;
+
+    const result = await db.query(
+      `DELETE FROM email_subscribers WHERE subscribed = FALSE RETURNING id`
+    );
+
+    await recordOperation({
+      actor: req.user,
+      entityType: 'subscriber',
+      entityId: null,
+      eventType: 'unsubscribed_removed',
+      note: reason,
+      metadata: { deleted: result.rows.length },
+    });
+
+    res.json({ success: true, data: { deleted: result.rows.length } });
+  } catch (error) {
+    req.logger.error('Delete unsubscribed email subscribers error:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to delete unsubscribed subscribers' });
   }
 };
 
@@ -878,7 +978,9 @@ const getDashboardStats = async (req, res) => {
 module.exports = {
   listSubscribers,
   syncSubscribers,
+  importSubscribers,
   addSubscriber,
+  deleteUnsubscribedSubscribers,
   updateSubscriber,
   deleteSubscriber,
   unsubscribe,

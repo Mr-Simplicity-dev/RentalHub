@@ -85,9 +85,71 @@ const classifyNewPhones = async (phones = [], { excludeKey = null } = {}) => {
   return { accepted, alreadyKnown, invalid, duplicates };
 };
 
+// Emails are compared in lowercase because mail is case-insensitive: a
+// subscriber stored as Ada@Mail.com must still block an import of ada@mail.com.
+const emailKey = (email) => {
+  const value = String(email || '').trim().toLowerCase();
+  if (!value) return null;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? value : null;
+};
+
+const collectKnownEmails = async () => {
+  const known = new Map();
+
+  const remember = (email, source) => {
+    const key = emailKey(email);
+    if (!key) return;
+    if (!known.has(key)) known.set(key, source);
+  };
+
+  const [users, subscribers] = await Promise.all([
+    db.query(`SELECT email FROM users WHERE email IS NOT NULL AND email <> ''`),
+    db.query(`SELECT email FROM email_subscribers WHERE email IS NOT NULL AND email <> ''`),
+  ]);
+
+  for (const row of users.rows) remember(row.email, 'user');
+  for (const row of subscribers.rows) remember(row.email, 'email');
+
+  return known;
+};
+
+// Email counterpart of classifyNewPhones: anyone who is already a platform
+// user or already on the email list is refused rather than merged back in.
+const classifyNewEmails = async (emails = []) => {
+  const known = await collectKnownEmails();
+  const seen = new Set();
+  const accepted = [];
+  let alreadyKnown = 0;
+  let invalid = 0;
+  let duplicates = 0;
+
+  for (const raw of Array.isArray(emails) ? emails : []) {
+    const key = emailKey(raw);
+    if (!key) {
+      invalid++;
+      continue;
+    }
+    if (seen.has(key)) {
+      duplicates++;
+      continue;
+    }
+    seen.add(key);
+    if (known.has(key)) {
+      alreadyKnown++;
+      continue;
+    }
+    accepted.push(key);
+  }
+
+  return { accepted, alreadyKnown, invalid, duplicates };
+};
+
 module.exports = {
   phoneKey,
+  emailKey,
   isUsableNigerianNumber,
   collectKnownPhones,
   classifyNewPhones,
+  collectKnownEmails,
+  classifyNewEmails,
 };
