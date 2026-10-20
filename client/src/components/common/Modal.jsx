@@ -27,7 +27,7 @@ const Modal = ({ isOpen, onClose, title, children, size = 'medium' }) => {
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         {/* Background overlay with fade transition */}
         <div
-          className="fixed inset-0 bg-gray-500/60 backdrop-blur-sm transition-all duration-300"
+          className="fixed inset-0 bg-gray-900/70 transition-all duration-300"
           onClick={onClose}
         />
 
