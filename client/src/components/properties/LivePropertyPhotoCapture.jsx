@@ -6,6 +6,23 @@ import { useTranslation } from 'react-i18next';
 
 const DEFAULT_MAX_PHOTOS = 20;
 
+/**
+ * The guided shot list. It is the running order for the whole photo set, and
+ * the server builds the automatic tour video in this same order, so the video
+ * walks in from the street and moves through the house instead of jumping
+ * around. Keep this list in step with GUIDED_SHOTS on the server.
+ */
+export const GUIDED_SHOT_PROMPTS = [
+  { key: 'building_front', label: 'Front of the building', hint: 'Stand outside and face the main entrance.' },
+  { key: 'compound', label: 'Compound / surroundings', hint: 'Show the yard, gate and parking space.' },
+  { key: 'sitting_room', label: 'Sitting room', hint: 'Stand at the doorway and show the whole room.' },
+  { key: 'kitchen', label: 'Kitchen', hint: 'Capture the counters and fittings.' },
+  { key: 'bedroom', label: 'Bedroom', hint: 'Show the room and any wardrobe.' },
+  { key: 'bathroom', label: 'Bathroom', hint: 'Show the fittings and water source.' },
+  { key: 'toilet', label: 'Toilet', hint: 'Show the toilet and its condition.' },
+  { key: 'street', label: 'Street outside', hint: 'Show the road and how the house is reached.' },
+];
+
 const getCameraErrorMessage = (error, t) => {
   if (error?.name === 'NotAllowedError' || error?.name === 'SecurityError') {
     return t('live_property_capture.camera_permission_denied', 'Camera permission was denied. Allow camera access and try again.');
@@ -217,6 +234,7 @@ const LivePropertyPhotoCapture = ({
   }, [onChange, onTokensChange]);
 
   const canCaptureMore = photos.length < maxPhotos;
+  const currentShot = GUIDED_SHOT_PROMPTS[Math.min(photos.length, GUIDED_SHOT_PROMPTS.length - 1)];
 
   return (
     <section className="space-y-4 rounded-lg border border-gray-200 bg-white p-4">

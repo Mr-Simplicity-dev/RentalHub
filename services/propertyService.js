@@ -1445,6 +1445,13 @@ exports.createProperty = async (req, res) => {
 
     await client.query('COMMIT');
 
+    // The listing is already live; the tour video is built in the background
+    // so a slow encode never delays the landlord's submission.
+    if (images.length >= 2) {
+      const { enqueuePropertyTour } = require('../jobs/propertyTourJobs');
+      enqueuePropertyTour(property.id).catch(() => {});
+    }
+
     // 🔥 Submit property URL to Google (non-blocking)
 const propertyUrl = `${getFrontendUrl()}/properties/${property.id}`;
 
@@ -1559,6 +1566,13 @@ exports.uploadPropertyPhotos = async (req, res) => {
     });
 
     const results = await Promise.all(photoPromises);
+
+    // Photos added after the fact should earn a tour video too, but only when
+    // the property has no video yet.
+    if (currentCount + results.length >= 2) {
+      const { enqueuePropertyTour } = require('../jobs/propertyTourJobs');
+      enqueuePropertyTour(propertyId).catch(() => {});
+    }
 
     res.json({
       success: true,
