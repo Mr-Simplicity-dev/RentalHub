@@ -1626,6 +1626,16 @@ router.post('/tickets', authenticate, [
       escalation_department: escalationDepartment,
     });
 
+    // Make sure the handover columns exist before anything tries to write to
+    // them. Without this the assignment silently failed on a database that had
+    // not yet run the reassign sweep.
+    try {
+      const { ensureReassignSchema } = require('../services/supportReassignService');
+      await ensureReassignSchema();
+    } catch (schemaError) {
+      logger.warn(`Handover schema check skipped: ${schemaError.message}`);
+    }
+
     // Auto-assign: LGA support → State support → Super support (least-loaded).
     // State names are compared loosely because rows mix "FCT" and
     // "Federal Capital Territory"; a strict text match left tickets unassigned.
