@@ -119,18 +119,19 @@ exports.verifyNINWithPrembly = async (
   }
 
   try {
-    // Prembly National ID endpoint
+    // Prembly's Nigerian NIN lookup is /verification/vnin and takes number_nin.
+    // The previous path (/identityverification/verify/national_id) does not
+    // exist and returned 404 for every caller.
     const response = await axios.post(
-      `${PREMBLY_BASE_URL}/identityverification/verify/national_id`,
-      addCallbackUrl({
-        id_number: nin,
-        first_name: firstName,
-        last_name: lastName,
-        date_of_birth: dateOfBirth,
-      }, options),
+      `${PREMBLY_BASE_URL}/verification/vnin`,
+      addCallbackUrl({ number_nin: nin }, options),
       {
         timeout: PREMBLY_TIMEOUT_MS,
-        headers: getPremblyHeaders(true)
+        headers: {
+          'x-api-key': PREMBLY_SECRET_KEY,
+          'app-id': PREMBLY_PUBLIC_KEY,
+          'Content-Type': 'application/json',
+        }
       }
     );
 
@@ -190,18 +191,24 @@ exports.verifyInternationalPassportWithPrembly = async (
   }
 
   try {
-    // Prembly International Passport endpoint
+    // Prembly exposes the international passport lookup as
+    // /verification/national_passport taking `number`; the previous path
+    // (/identityverification/verify/international_passport) does not exist.
     const response = await axios.post(
-      `${PREMBLY_BASE_URL}/identityverification/verify/international_passport`,
+      `${PREMBLY_BASE_URL}/verification/national_passport`,
       addCallbackUrl({
-        passport_number: passportNumber,
+        number: passportNumber,
         full_name: fullName,
         country: nationality,
         date_of_birth: dateOfBirth,
       }, options),
       {
         timeout: PREMBLY_TIMEOUT_MS,
-        headers: getPremblyHeaders(true)
+        headers: {
+          'x-api-key': PREMBLY_SECRET_KEY,
+          'app-id': PREMBLY_PUBLIC_KEY,
+          'Content-Type': 'application/json',
+        }
       }
     );
 
