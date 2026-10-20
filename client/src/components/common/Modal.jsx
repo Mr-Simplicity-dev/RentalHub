@@ -1,9 +1,11 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { FaTimes } from 'react-icons/fa';
 
 const Modal = ({ isOpen, onClose, title, children, size = 'medium' }) => {
   const { t } = useTranslation();
+
   // Close on Escape key
   useEffect(() => {
     const handleEsc = (e) => {
@@ -12,6 +14,16 @@ const Modal = ({ isOpen, onClose, title, children, size = 'medium' }) => {
     if (isOpen) window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
   }, [isOpen, onClose]);
+
+  // Lock background scroll while open so the page behind cannot drift.
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -22,18 +34,19 @@ const Modal = ({ isOpen, onClose, title, children, size = 'medium' }) => {
     full: 'max-w-6xl',
   };
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-        {/* Background overlay with fade transition */}
-        <div
-          className="fixed inset-0 bg-gray-900/70 transition-all duration-300"
-          onClick={onClose}
-        />
+  // Portal to <body> so the dialog escapes any ancestor stacking context
+  // (the admin sidebar/header use backdrop-blur + z-index, which previously
+  // let the dimming overlay paint over the panel and made forms look "blurred").
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] overflow-y-auto">
+      <div
+        className="fixed inset-0 z-0 bg-gray-900/70 transition-opacity duration-300"
+        onClick={onClose}
+        aria-hidden="true"
+      />
 
-        {/* Modal panel with scale animation */}
-        <div className={`inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-elevated-lg transform transition-all duration-300 sm:my-8 sm:align-middle animate-scaleIn ${sizeClasses[size]} w-full`}>
-          {/* Header */}
+      <div className="relative z-10 flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+        <div className={`relative inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-elevated-lg transform transition-all duration-300 sm:my-8 sm:align-middle animate-scaleIn ${sizeClasses[size]} w-full`}>
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
             <button
@@ -45,11 +58,11 @@ const Modal = ({ isOpen, onClose, title, children, size = 'medium' }) => {
             </button>
           </div>
 
-          {/* Content */}
           <div className="px-6 py-4">{children}</div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
