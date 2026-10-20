@@ -1800,21 +1800,30 @@ exports.getMyUnlockedProperties = async (req, res) => {
     await ensurePropertyUnlockSchema();
     const userId = req.user.id;
 
+    // The properties table has rent_amount/payment_frequency, not price/price_frequency,
+    // and photos live in property_photos rather than a media column. The mobile
+    // PropertyCard reads rent_amount, payment_frequency, primary_photo, area and
+    // state_name, so return those names directly.
     const result = await db.query(
       `SELECT
          tu.id,
          tu.property_id,
          tu.unlocked_at,
          tu.transaction_reference,
-         p.title AS property_title,
+         p.title,
          p.city,
-         s.state_name AS state,
-         p.full_address,
+         p.area,
+         p.property_type,
          p.bedrooms,
          p.bathrooms,
-         p.price,
-         p.price_frequency,
-         p.media
+         p.rent_amount,
+         p.payment_frequency,
+         p.full_address,
+         p.featured,
+         s.state_name,
+         (SELECT photo_url FROM property_photos
+          WHERE property_id = p.id AND is_primary = TRUE LIMIT 1) AS primary_photo,
+         (SELECT COUNT(*) FROM property_photos WHERE property_id = p.id) AS photo_count
        FROM tenant_property_unlocks tu
        JOIN properties p ON p.id = tu.property_id
        LEFT JOIN states s ON s.id = p.state_id
