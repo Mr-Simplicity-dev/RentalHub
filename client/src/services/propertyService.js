@@ -81,6 +81,21 @@ export const propertyService = {
     return response.data;
   },
 
+  // Upload short live-camera clips that are slow-motioned into the tour video
+  uploadClips: async (propertyId, files, captureTokens = [], shotKeys = []) => {
+    const formData = new FormData();
+    formData.append('image_capture_source', 'live_camera');
+    formData.append('image_capture_tokens', JSON.stringify(captureTokens));
+    formData.append('clip_shot_keys', JSON.stringify(shotKeys));
+    files.forEach(file => {
+      formData.append('clips', file);
+    });
+    const response = await api.post(`/properties/${propertyId}/clips`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  },
+
   // Delete property photo
   deletePhoto: async (propertyId, photoId) => {
     const response = await api.delete(`/properties/${propertyId}/photos/${photoId}`);

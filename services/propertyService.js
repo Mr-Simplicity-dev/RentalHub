@@ -102,6 +102,27 @@ const parsePropertyImageCaptureTokens = (value) => {
   }
 };
 
+/** Optional shot keys sent alongside clips, e.g. ["sitting_room","kitchen"]. */
+const parseClipShotKeys = (value) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || '').trim()).filter(Boolean);
+  }
+
+  if (!value) return [];
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed)
+      ? parsed.map((item) => String(item || '').trim()).filter(Boolean)
+      : [];
+  } catch {
+    return String(value)
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+};
+
 const parseCoordinate = (value, min, max) => {
   if (value === undefined || value === null || value === '') return null;
 
@@ -136,6 +157,19 @@ const ensurePropertySchema = async () => {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       UNIQUE (tenant_id, property_id)
     );
+
+    CREATE TABLE IF NOT EXISTS property_clips (
+      id SERIAL PRIMARY KEY,
+      property_id INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+      clip_url VARCHAR(1000) NOT NULL,
+      clip_order INTEGER NOT NULL DEFAULT 0,
+      shot_key VARCHAR(60),
+      duration_seconds NUMERIC(6,2),
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_property_clips_property
+      ON property_clips(property_id, clip_order ASC, id ASC);
   `);
   propertySchemaReady = true;
 };
@@ -1584,6 +1618,115 @@ exports.uploadPropertyPhotos = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to upload photos'
+    });
+  }
+};
+
+
+// -----------------------------------------------------
+// Upload Property Clips
+// -----------------------------------------------------
+// Short live-camera clips. They are slow-motioned into the tour video, so they
+// carry the same live-capture promise as the photos: the clip must come from
+// the in-app camera, never the gallery.
+exports.uploadPropertyClips = async (req, res) => {
+  try {
+    await ensurePropertySchema();
+
+    const { propertyId } = req.params;
+    const userId = req.user.id;
+
+    const propertyCheck = await db.query(
+      'SELECT id FROM properties WHERE id = $1 AND landlord_id = $2',
+      [propertyId, userId]
+    );
+
+    if (propertyCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Property not found or unauthorized'
+      });
+    }
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please record at least one property clip'
+      });
+    }
+
+    const captureSource = String(req.body.image_capture_source || '').trim();
+    const captureTokens = parsePropertyImageCaptureTokens(req.body.image_capture_tokens);
+
+    if (captureSource !== 'live_camera') {
+      return res.status(400).json({
+        success: false,
+        message: 'Property clips must be recorded with the live camera.',
+      });
+    }
+
+    if (captureTokens.length !== req.files.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'Every property clip must be recorded live before upload.',
+      });
+    }
+
+    const uniqueTokens = new Set(captureTokens);
+    if (uniqueTokens.size !== captureTokens.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'Each live property clip must have its own capture session.',
+      });
+    }
+
+    const allTokensValid = captureTokens.every((token) =>
+      consumePropertyImageCaptureToken(userId, token)
+    );
+
+    if (!allTokensValid) {
+      return res.status(403).json({
+        success: false,
+        message: 'Invalid or expired live capture session. Please record the clips again.',
+      });
+    }
+
+    const countResult = await db.query(
+      'SELECT COUNT(*) FROM property_clips WHERE property_id = $1',
+      [propertyId]
+    );
+
+    const currentCount = parseInt(countResult.rows[0].count, 10) || 0;
+    const shotKeys = parseClipShotKeys(req.body.clip_shot_keys);
+
+    const clipPromises = req.files.map(async (file, index) => {
+      const uploadOrder = currentCount + index;
+
+      return db.query(
+        `INSERT INTO property_clips (property_id, clip_url, clip_order, shot_key)
+         VALUES ($1, $2, $3, $4)
+         RETURNING *`,
+        [propertyId, file.path, uploadOrder, shotKeys[index] || null]
+      );
+    });
+
+    const results = await Promise.all(clipPromises);
+
+    // Clips change the tour, so rebuild it. The landlord's own uploaded video is
+    // still protected: generatePropertyTour never overwrites one unless forced.
+    const { enqueuePropertyTour } = require('../jobs/propertyTourJobs');
+    enqueuePropertyTour(propertyId).catch(() => {});
+
+    res.json({
+      success: true,
+      message: `${results.length} clip(s) uploaded successfully`,
+      data: results.map((r) => r.rows[0])
+    });
+  } catch (error) {
+    req.logger.error('Upload clips error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to upload clips'
     });
   }
 };

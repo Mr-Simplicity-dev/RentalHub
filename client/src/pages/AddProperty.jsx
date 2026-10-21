@@ -8,6 +8,7 @@ import { propertyService } from '../services/propertyService';
 import { useAuth } from '../hooks/useAuth';
 import BackToDashboard from '../components/common/BackToDashboard';
 import LivePropertyPhotoCapture from '../components/properties/LivePropertyPhotoCapture';
+import LivePropertyClipCapture from '../components/properties/LivePropertyClipCapture';
 
 const PROPERTY_TYPES = ['apartment', 'house', 'bungalow', 'duplex', 'studio', 'flat', 'room'];
 
@@ -28,6 +29,8 @@ const AddProperty = () => {
   const [locationOptions, setLocationOptions] = useState([]);
   const [images, setImages] = useState([]);
   const [imageCaptureTokens, setImageCaptureTokens] = useState([]);
+  const [clips, setClips] = useState([]);
+  const [clipCaptureTokens, setClipCaptureTokens] = useState([]);
   const [video, setVideo] = useState(null);
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const locationPrefillAppliedRef = useRef(false);
@@ -158,9 +161,20 @@ const AddProperty = () => {
       if (video) fd.append('video', video);
       const res = await propertyService.createProperty(fd);
       if (!res.success) return toast.error(res.message || t('add_property.failed'));
-      
+
+      // Clips attach to the new property. They are optional, so a clips problem
+      // never fails a published listing.
+      const createdId = res.data?.id;
+      if (createdId && clips.length) {
+        try {
+          await propertyService.uploadClips(createdId, clips, clipCaptureTokens, []);
+        } catch (clipError) {
+          toast.info('Your listing is live, but the clips could not be added. You can add them again from the property page.');
+        }
+      }
+
       // Set the created property ID to show post-publish UI
-      setCreatedPropertyId(res.data?.id);
+      setCreatedPropertyId(createdId);
       setStep(2);
       
       toast.success(res.message || t('add_property.success'));
@@ -232,6 +246,16 @@ const AddProperty = () => {
               setImageCaptureTokens(nextTokens);
             }}
             onTokensChange={setImageCaptureTokens}
+            disabled={loading}
+          />
+          <LivePropertyClipCapture
+            clips={clips}
+            captureTokens={clipCaptureTokens}
+            onChange={(nextClips, nextTokens = clipCaptureTokens) => {
+              setClips(nextClips);
+              setClipCaptureTokens(nextTokens);
+            }}
+            onTokensChange={setClipCaptureTokens}
             disabled={loading}
           />
           <div><label className="mb-1 block text-sm font-medium">{t('add_property.form.video')}</label><input type="file" accept="video/*" onChange={(e) => setVideo(e.target.files?.[0] || null)} /></div>

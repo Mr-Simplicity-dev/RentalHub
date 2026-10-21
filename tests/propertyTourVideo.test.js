@@ -15,6 +15,7 @@ const {
   findFontPath,
   buildIntroArgs,
   buildOutroArgs,
+  buildClipArgs,
   shotPlan,
   labelWindows,
   totalTourSeconds,
@@ -27,6 +28,10 @@ const {
   BRAND_DOMAIN,
   BRAND_EMAIL,
   BRAND_PHONE,
+  INTRO_THEMES,
+  resolveIntroTheme,
+  formatPriceShort,
+  buildFactsLine,
 } = require('../config/utils/propertyTourVideo');
 
 const serviceSource = fs.readFileSync(
@@ -166,13 +171,18 @@ test('the caption windows line up with the shots', () => {
   );
 });
 
-test('a tour is never built from a single photo', () => {
-  // One still is not a tour, and the listing already shows it.
+test('a tour is never built from a single photo alone', () => {
+  // One still is not a tour, and the listing already shows it. It is only
+  // allowed when a live clip supplies the motion instead.
   const videoSource = fs.readFileSync(
     path.join(__dirname, '..', 'config', 'utils', 'propertyTourVideo.js'),
     'utf8'
   );
   assert.ok(videoSource.includes('photoPaths.length < 2'), 'the encoder refuses a lone photo');
+  assert.ok(
+    videoSource.includes('clipPaths') && videoSource.includes('buildClipArgs'),
+    'a lone photo is only excused when there are clips to carry the motion'
+  );
   assert.ok(serviceSource.includes('MIN_PHOTOS = 2'), 'the service needs at least two photos');
 });
 
@@ -269,4 +279,130 @@ test('ffmpeg resolves on this machine, bundled or from the system', () => {
   const binary = resolveFfmpegPath();
   assert.ok(binary, 'a binary (bundled or system) must be found');
   assert.ok(isFfmpegAvailable());
+});
+
+test('the resolution can be raised to 8K without touching the code', () => {
+  const videoSource = fs.readFileSync(
+    path.join(__dirname, '..', 'config', 'utils', 'propertyTourVideo.js'),
+    'utf8'
+  );
+  assert.ok(videoSource.includes('PROPERTY_TOUR_RESOLUTION'), 'resolution must be configurable');
+  assert.ok(videoSource.includes("'8k'"), 'an 8K option must exist');
+  assert.ok(videoSource.includes('7680') && videoSource.includes('4320'), '8K is 7680x4320');
+  // The default stays 4K so nobody accidentally pays 4x the encode time.
+  assert.equal(OUTPUT_WIDTH, 3840, '4K remains the default master');
+});
+
+test('the intro is a receipt-style panel, not a plain caption', () => {
+  const args = buildIntroArgs({
+    outputPath: 'intro.mp4',
+    markPath: findMarkPath(),
+    title: '3 Bedroom Flat',
+    location: 'Gwarinpa, Abuja',
+    tagline: 'Easy city living',
+    facts: '2.5 million naira   \u2022   3 bedrooms',
+    propertyType: 'flat',
+    fontPath: findFontPath(),
+  });
+
+  const graph = args[args.indexOf('-filter_complex') + 1];
+
+  assert.ok(graph.includes('drawbox'), 'the receipt panel is drawn with a box');
+  assert.ok(graph.includes('0.92'), 'the panel sits over the frame as a solid plate');
+  assert.ok(graph.includes('3 Bedroom Flat'), 'the title sits on the receipt');
+  assert.ok(graph.includes('Gwarinpa, Abuja'), 'the location sits on the receipt');
+  assert.ok(graph.includes('2.5 million naira'), 'the price sits on the receipt');
+  assert.ok(graph.includes('EASY CITY LIVING'), 'the themed tagline is upper-cased');
+  // The panel slides up rather than appearing instantly.
+  assert.ok(graph.includes('max(0,'), 'the panel animates into place');
+});
+
+test('price and bedroom count are shown on screen', () => {
+  assert.equal(formatPriceShort(2500000), '2.5 million naira');
+  assert.equal(formatPriceShort(3500000), '3.5 million naira');
+  assert.equal(formatPriceShort(450000), '450 thousand naira');
+  assert.equal(formatPriceShort(1500000000), '1.5 billion naira');
+  assert.equal(formatPriceShort(0), '', 'no price means no price line');
+
+  const line = buildFactsLine({
+    rentAmount: 2500000,
+    paymentFrequency: 'yearly',
+    bedrooms: 3,
+    bathrooms: 2,
+    propertyType: 'flat',
+  });
+
+  assert.ok(line.includes('2.5 million naira'), 'the price is readable, not 2500000.00');
+  assert.ok(line.includes('per year'), 'the frequency is stated');
+  assert.ok(line.includes('3 bedrooms'), 'the bedroom count is stated');
+  assert.ok(line.includes('2 bathrooms'), 'the bathroom count is stated');
+  assert.ok(line.includes('flat'), 'the property type is stated');
+
+  const monthly = buildFactsLine({ rentAmount: 200000, paymentFrequency: 'monthly', bedrooms: 1 });
+  assert.ok(monthly.includes('per month'), 'monthly rent says so');
+  assert.ok(monthly.includes('1 bedroom'), 'a single bedroom is not pluralised');
+});
+
+test('each property type gets its own intro theme', () => {
+  const types = ['apartment', 'house', 'bungalow', 'duplex', 'studio', 'flat', 'room'];
+
+  for (const type of types) {
+    const theme = resolveIntroTheme(type);
+    assert.ok(theme.background && theme.accent, `${type} needs colours`);
+    assert.ok(theme.tagline && theme.tagline.length > 3, `${type} needs a tagline`);
+  }
+
+  // The themes must not all be the same, or the feature is pointless.
+  const taglines = new Set(types.map((type) => resolveIntroTheme(type).tagline));
+  assert.ok(taglines.size >= 5, 'the property types should not all read alike');
+
+  // An unknown or missing type still gets a sensible card rather than crashing.
+  assert.ok(resolveIntroTheme('mansion').tagline, 'an unknown type still gets a theme');
+  assert.ok(resolveIntroTheme('').tagline, 'a missing type still gets a theme');
+  assert.ok(resolveIntroTheme(null).tagline, 'a null type still gets a theme');
+});
+
+test('clips are slowed down and cut to a fixed slot', () => {
+  const args = buildClipArgs({
+    outputPath: 'clips.mp4',
+    clipPaths: ['a.mp4', 'b.mp4'],
+    fontPath: findFontPath(),
+    facts: '2.5 million naira   \u2022   3 bedrooms',
+    phone: BRAND_PHONE,
+  });
+
+  const graph = args[args.indexOf('-filter_complex') + 1];
+
+  assert.ok(graph.includes('setpts=0.5000*PTS'), 'clips play at half speed');
+  assert.ok(graph.includes('fps=30'), 'clips are normalised to the tour frame rate');
+  assert.ok(graph.includes('xfade'), 'clips cross-fade into one reel');
+  assert.ok(graph.includes('tpad'), 'a short clip is padded so no black gap appears');
+});
+
+test('a clip reel keeps the same branding as the photo tour', () => {
+  const args = buildClipArgs({
+    outputPath: 'clips.mp4',
+    clipPaths: ['a.mp4'],
+    fontPath: findFontPath(),
+    phone: BRAND_PHONE,
+  });
+
+  const graph = args[args.indexOf('-filter_complex') + 1];
+
+  assert.ok(graph.includes(BRAND_DOMAIN), 'the crawl still advertises the domain');
+  assert.ok(graph.includes(BRAND_EMAIL), 'the crawl still shows the support email');
+  assert.ok(graph.includes('drawbox'), 'the crawl sits on the dark strip');
+});
+
+test('clips join the film between the tour and the end card', () => {
+  const videoSource = fs.readFileSync(
+    path.join(__dirname, '..', 'config', 'utils', 'propertyTourVideo.js'),
+    'utf8'
+  );
+  assert.ok(
+    videoSource.includes('[introPath, tourPath, clipPath, outroPath]'),
+    'the running order is intro, tour, clips, outro'
+  );
+  assert.ok(serviceSource.includes('fetchPropertyClips'), 'the service must look for clips');
+  assert.ok(serviceSource.includes('clipPaths'), 'clips must reach the encoder');
 });

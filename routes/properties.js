@@ -10,7 +10,7 @@ const {
   isTenant,
 } = require('../config/middleware/auth');
 const audit = require('../config/middleware/auditMiddleware');
-const { uploadPropertyMedia, uploadPropertyPhotos } = require('../config/middleware/upload');
+const { uploadPropertyMedia, uploadPropertyPhotos, uploadPropertyClips } = require('../config/middleware/upload');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -186,6 +186,15 @@ router.post(
   isLandlordOrAgent,
   uploadPropertyPhotos,
   propertyController.uploadPropertyPhotos
+);
+
+// Upload short live-camera clips that are slow-motioned into the tour video
+router.post(
+  '/:propertyId/clips',
+  authenticate,
+  isLandlordOrAgent,
+  uploadPropertyClips,
+  propertyController.uploadPropertyClips
 );
 
 // Update property

@@ -11,6 +11,7 @@ const {
   cleanupScratchDir,
   GUIDED_SHOTS,
   BRAND_PHONE,
+  buildFactsLine,
 } = require('./propertyTourVideo');
 
 /**
@@ -69,6 +70,22 @@ const extensionFor = (url, fallback = '.jpg') => {
   return match ? `.${match[1].toLowerCase()}` : fallback;
 };
 
+const videoExtensionFor = (url) => {
+  const match = String(url || '').split('?')[0].match(/\.(mp4|mov|m4v|webm|avi|mkv)$/i);
+  return match ? `.${match[1].toLowerCase()}` : '.mp4';
+};
+
+const downloadMedia = async (url, destinationPath, index) => {
+  const response = await axios.get(url, {
+    responseType: 'arraybuffer',
+    timeout: DOWNLOAD_TIMEOUT_MS,
+    maxContentLength: 120 * 1024 * 1024,
+  });
+
+  fs.writeFileSync(destinationPath, Buffer.from(response.data));
+  return destinationPath;
+};
+
 const downloadPhoto = async (url, destinationBase, index) => {
   const response = await axios.get(url, {
     responseType: 'arraybuffer',
@@ -92,6 +109,26 @@ const fetchPropertyPhotos = async (propertyId) => {
   );
 
   return result.rows.map((row) => row.photo_url).filter(Boolean);
+};
+
+const fetchPropertyClips = async (propertyId) => {
+  try {
+    const result = await db.query(
+      `SELECT clip_url
+       FROM property_clips
+       WHERE property_id = $1
+       ORDER BY clip_order ASC, id ASC
+       LIMIT 4`,
+      [propertyId]
+    );
+
+    return result.rows.map((row) => row.clip_url).filter(Boolean);
+  } catch (error) {
+    // The table may not exist yet on a server that has not migrated. A tour
+    // without clips is still a good tour, so this never fails the job.
+    logger.warn(`Property clips unavailable for #${propertyId}: ${error.message}`);
+    return [];
+  }
 };
 
 const uploadTourToCloudinary = async (filePath) =>
@@ -130,7 +167,8 @@ const generatePropertyTour = async ({ propertyId, force = false, logger: reqLogg
     }
 
     const existing = await db.query(
-      `SELECT id, title, video_url, city, area, state
+      `SELECT id, title, video_url, city, area, state,
+              property_type, bedrooms, bathrooms, rent_amount, payment_frequency
        FROM properties WHERE id = $1 LIMIT 1`,
       [id]
     );
@@ -140,7 +178,9 @@ const generatePropertyTour = async ({ propertyId, force = false, logger: reqLogg
     if (!force && existing.rows[0].video_url) return false;
 
     const photoUrls = await fetchPropertyPhotos(id);
-    if (photoUrls.length < MIN_PHOTOS) {
+    const clipUrls = await fetchPropertyClips(id);
+
+    if (photoUrls.length < MIN_PHOTOS && !clipUrls.length) {
       reqLogger.warn?.(`Property tour skipped for #${id}: needs at least ${MIN_PHOTOS} photos`);
       return false;
     }
@@ -156,7 +196,24 @@ const generatePropertyTour = async ({ propertyId, force = false, logger: reqLogg
         }
       }
 
-      if (downloaded.length < MIN_PHOTOS) {
+      const downloadedClips = [];
+      for (let index = 0; index < clipUrls.length; index += 1) {
+        try {
+          downloadedClips.push(
+            await downloadMedia(
+              clipUrls[index],
+              path.join(scratch, `clip_${index}${videoExtensionFor(clipUrls[index])}`),
+              index
+            )
+          );
+        } catch (clipError) {
+          reqLogger.warn?.(`Property tour: skipping unreadable clip ${index + 1}: ${clipError.message}`);
+        }
+      }
+
+      // A single still is not a tour, but a clip is motion: a property with one
+      // photo and one clip still has a story worth telling.
+      if (downloaded.length < MIN_PHOTOS && !downloadedClips.length) {
         reqLogger.warn?.(`Property tour skipped for #${id}: too few photos downloaded`);
         return false;
       }
@@ -166,6 +223,13 @@ const generatePropertyTour = async ({ propertyId, force = false, logger: reqLogg
 
       const property = existing.rows[0];
       const location = [property.area, property.city, property.state].filter(Boolean).join(', ');
+      const facts = buildFactsLine({
+        rentAmount: property.rent_amount,
+        paymentFrequency: property.payment_frequency,
+        bedrooms: property.bedrooms,
+        bathrooms: property.bathrooms,
+        propertyType: property.property_type,
+      });
 
       const produced = await createTourVideo({
         photoPaths: downloaded,
@@ -174,6 +238,9 @@ const generatePropertyTour = async ({ propertyId, force = false, logger: reqLogg
         title: property.title || '',
         location,
         phone: resolvePhoneForState(property.state),
+        facts,
+        propertyType: property.property_type || '',
+        clipPaths: downloadedClips,
         logger: reqLogger,
       });
 
@@ -205,6 +272,7 @@ const generatePropertyTour = async ({ propertyId, force = false, logger: reqLogg
 module.exports = {
   generatePropertyTour,
   fetchPropertyPhotos,
+  fetchPropertyClips,
   ensureCloudinary,
   resolvePhoneForState,
   MIN_PHOTOS,

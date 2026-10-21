@@ -167,6 +167,23 @@ const uploadPropertyPhotos = multer({
   limits: { fileSize: 20 * 1024 * 1024 },
 }).array('photos', 20);
 
+// Property clips: short live-camera video clips blended into the tour video.
+// Capped at 25 MB each because a clip is a few seconds, not a full film, and
+// landlords are often on mobile data.
+const MAX_PROPERTY_CLIPS = 4;
+
+const uploadPropertyClips = multer({
+  storage: propertyMediaStorage,
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype && file.mimetype.startsWith('video/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only video files are allowed!'), false);
+    }
+  },
+  limits: { fileSize: 25 * 1024 * 1024 },
+}).array('clips', MAX_PROPERTY_CLIPS);
+
 // ---------------- LOCAL PASSPORT STORAGE (primary) ----------------
 
 const passportUploadDir = path.join(__dirname, '..', '..', 'uploads', 'passports');
@@ -271,6 +288,8 @@ module.exports = {
   uploadPassportLocal,
   uploadPropertyMedia: withCloudinaryConfig(uploadPropertyMedia),
   uploadPropertyPhotos: withCloudinaryConfig(uploadPropertyPhotos),
+  uploadPropertyClips: withCloudinaryConfig(uploadPropertyClips),
+  MAX_PROPERTY_CLIPS,
   validateFileMagicBytes,
   validateFileMagicBytesMiddleware,
   reprocessPassportImage,
