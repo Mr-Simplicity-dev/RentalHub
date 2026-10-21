@@ -69,6 +69,29 @@ test('the mobile photo limit matches the web limit of 8', () => {
   assert.match(source, /MAX_PROPERTY_PHOTOS\s*=\s*8/);
 });
 
+test('the app guides the landlord through the same shots as the web', () => {
+  const mobile = read('src', 'components', 'properties', 'LivePropertyCapture.js');
+  const web = fs.readFileSync(
+    path.join(__dirname, '..', 'client', 'src', 'components', 'properties', 'LivePropertyPhotoCapture.jsx'),
+    'utf8'
+  );
+  const server = fs.readFileSync(
+    path.join(__dirname, '..', 'config', 'utils', 'propertyTourVideo.js'),
+    'utf8'
+  );
+
+  assert.ok(mobile.includes('GUIDED_SHOT_PROMPTS'), 'the app must show the guided prompts');
+  assert.ok(mobile.includes('currentShot.label'), 'the current shot must be named on screen');
+
+  // The three copies of the shot list must agree, or the video order would
+  // disagree with what the landlord was told to shoot.
+  for (const shot of ['building_front', 'sitting_room', 'toilet', 'street']) {
+    assert.ok(mobile.includes(shot), `mobile is missing the ${shot} prompt`);
+    assert.ok(web.includes(shot), `web is missing the ${shot} prompt`);
+    assert.ok(server.includes(shot), `the video order is missing ${shot}`);
+  }
+});
+
 test('the app renders the property video the server already returns', () => {
   const detail = read('src', 'screens', 'home', 'PropertyDetailScreen.js');
   assert.ok(

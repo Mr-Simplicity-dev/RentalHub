@@ -130,7 +130,8 @@ const generatePropertyTour = async ({ propertyId, force = false, logger: reqLogg
     }
 
     const existing = await db.query(
-      'SELECT id, video_url FROM properties WHERE id = $1 LIMIT 1',
+      `SELECT id, title, video_url, city, area, state
+       FROM properties WHERE id = $1 LIMIT 1`,
       [id]
     );
     if (!existing.rows.length) return false;
@@ -163,10 +164,16 @@ const generatePropertyTour = async ({ propertyId, force = false, logger: reqLogg
       const labels = GUIDED_SHOTS.slice(0, downloaded.length).map((shot) => shot.label);
       const outputPath = path.join(scratch, `tour_${id}.mp4`);
 
+      const property = existing.rows[0];
+      const location = [property.area, property.city, property.state].filter(Boolean).join(', ');
+
       const produced = await createTourVideo({
         photoPaths: downloaded,
         outputPath,
         labels,
+        title: property.title || '',
+        location,
+        phone: resolvePhoneForState(property.state),
         logger: reqLogger,
       });
 
@@ -199,5 +206,6 @@ module.exports = {
   generatePropertyTour,
   fetchPropertyPhotos,
   ensureCloudinary,
+  resolvePhoneForState,
   MIN_PHOTOS,
 };

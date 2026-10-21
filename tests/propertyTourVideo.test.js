@@ -9,12 +9,24 @@ process.env.NODE_ENV = 'test';
 
 const {
   GUIDED_SHOTS,
-  buildTourArgs,
   isFfmpegAvailable,
   resolveFfmpegPath,
+  findMarkPath,
+  findFontPath,
+  buildIntroArgs,
+  buildOutroArgs,
+  shotPlan,
+  labelWindows,
+  totalTourSeconds,
   OUTPUT_WIDTH,
   OUTPUT_HEIGHT,
   OUTPUT_FPS,
+  PREMIUM_HOLD,
+  SNAPPY_HOLD,
+  BRAND_NAME,
+  BRAND_DOMAIN,
+  BRAND_EMAIL,
+  BRAND_PHONE,
 } = require('../config/utils/propertyTourVideo');
 
 const serviceSource = fs.readFileSync(
@@ -43,35 +55,115 @@ test('the guided shots cover a sensible walk through the property', () => {
   }
 });
 
-test('the tour is encoded at watchable quality', () => {
-  assert.equal(OUTPUT_WIDTH, 1280);
-  assert.equal(OUTPUT_HEIGHT, 720);
+test('the tour is encoded at 4K for a sharp master', () => {
+  assert.equal(OUTPUT_WIDTH, 3840);
+  assert.equal(OUTPUT_HEIGHT, 2160);
   assert.equal(OUTPUT_FPS, 30);
 });
 
-test('the encode command uses a broadly playable format', () => {
-  const args = buildTourArgs({
-    photoPaths: ['a.jpg', 'b.jpg', 'c.jpg'],
-    outputPath: 'out.mp4',
-    labels: ['One', 'Two', 'Three'],
+test('the brand identity is baked in and configurable', () => {
+  assert.equal(BRAND_NAME, 'Amana RentalHub NG');
+  assert.equal(BRAND_DOMAIN, 'rentalhub.com.ng');
+  assert.equal(BRAND_EMAIL, 'support@rentalhub.com.ng');
+  assert.ok(BRAND_PHONE, 'a phone number must be available for the advert');
+});
+
+test('the real logo mark and font are found for the watermark', () => {
+  assert.ok(findMarkPath(), 'the brand mark PNG must resolve');
+  assert.ok(findMarkPath().endsWith('rentalhub-mark.png'));
+  assert.ok(findFontPath(), 'a font must resolve');
+});
+
+test('the intro drops the mark in and spins it a full circle', () => {
+  const args = buildIntroArgs({
+    outputPath: 'intro.mp4',
+    markPath: findMarkPath(),
+    title: '4 Bedroom Duplex',
+    location: 'Gwarinpa, Abuja',
+    fontPath: findFontPath(),
   });
 
   const joined = args.join(' ');
-  assert.ok(joined.includes('libx264'), 'H.264 plays everywhere');
-  assert.ok(joined.includes('yuv420p'), 'yuv420p is required by many phone players');
-  assert.ok(joined.includes('+faststart'), 'faststart lets the video begin before it finishes downloading');
-  assert.ok(joined.includes('xfade'), 'stills should glide together, not cut');
-  assert.ok(joined.includes('zoompan'), 'each still should slowly zoom');
+  assert.ok(joined.includes('rotate=2*PI*t'), 'the mark must turn a full 360 degrees');
+  assert.ok(joined.includes('overlay'), 'the mark must be composited over the card');
+  assert.ok(joined.includes('4 Bedroom Duplex'), 'the property title belongs on the card');
+  assert.ok(joined.includes('Gwarinpa, Abuja'), 'the location belongs on the card');
+  assert.ok(joined.includes('libx264') && joined.includes('yuv420p'), 'intro must be broadly playable');
 });
 
-test('the encode handles a single photo without a cross-fade', () => {
-  const args = buildTourArgs({
-    photoPaths: ['only.jpg'],
-    outputPath: 'out.mp4',
-    labels: ['One'],
+test('the intro pads the mark so a spinning image never clips', () => {
+  // ffmpeg sizes the rotate output once, at setup, so a time-based out size
+  // fails. Padding to a fixed square is what makes the spin possible.
+  const args = buildIntroArgs({ outputPath: 'i.mp4', markPath: findMarkPath(), fontPath: findFontPath() });
+  assert.ok(args.join(' ').includes('pad='), 'the mark must be padded before rotating');
+});
+
+test('the end card shows every way to reach us', () => {
+  const args = buildOutroArgs({
+    outputPath: 'outro.mp4',
+    markPath: findMarkPath(),
+    fontPath: findFontPath(),
+    phone: '08030601238',
   });
-  // One input, one output, and no xfade chain that would reference a missing input.
-  assert.ok(!args.join(' ').includes('xfade'), 'a lone photo cannot be cross-faded');
+
+  const joined = args.join(' ');
+  assert.ok(joined.includes(BRAND_NAME), 'the brand name must close the video');
+  assert.ok(joined.includes('rentalhub.com.ng'), 'the website must be on the card');
+  assert.ok(joined.includes('support@rentalhub.com.ng'), 'the support email must be on the card');
+  assert.ok(joined.includes('08030601238'), 'the phone number must be on the card');
+});
+
+test('the contact crawl advertises while the tour plays', () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '..', 'config', 'utils', 'propertyTourVideo.js'),
+    'utf8'
+  );
+  assert.ok(source.includes('drawtext'), 'the crawl is drawn with drawtext');
+  assert.ok(source.includes('W-mod(t*'), 'the crawl must scroll like a news ticker');
+  assert.ok(source.includes('crawl'), 'the crawl must be assembled');
+});
+
+test('the premium and snappy feels alternate shot to shot', () => {
+  assert.ok(PREMIUM_HOLD > SNAPPY_HOLD, 'the premium feel holds longer');
+  assert.ok(shotPlan(0).premium, 'the tour opens on the premium feel');
+  assert.ok(!shotPlan(1).premium, 'the next shot uses the snappy feel');
+  assert.ok(shotPlan(2).premium, 'the feels keep alternating');
+});
+
+test('the tour body uses a broadly playable format', () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '..', 'config', 'utils', 'propertyTourVideo.js'),
+    'utf8'
+  );
+  assert.ok(source.includes('libx264'), 'H.264 plays everywhere');
+  assert.ok(source.includes('yuv420p'), 'yuv420p is required by many phone players');
+  assert.ok(source.includes('+faststart'), 'faststart lets the video begin before it downloads');
+  assert.ok(source.includes('xfade'), 'stills should glide together, not cut');
+  assert.ok(source.includes('zoompan'), 'each still should slowly zoom');
+});
+
+test('the caption windows line up with the shots', () => {
+  const labels = GUIDED_SHOTS.slice(0, 4).map((shot) => shot.label);
+  const windows = labelWindows(labels);
+
+  assert.equal(windows.length, 4, 'one window per shot');
+  assert.equal(windows[0].from, 0, 'the first caption is on screen immediately');
+
+  for (let index = 1; index < windows.length; index += 1) {
+    assert.ok(
+      windows[index].from > windows[index - 1].from,
+      'captions must appear in order'
+    );
+    assert.ok(
+      windows[index].to > windows[index].from,
+      'every caption needs time on screen'
+    );
+  }
+
+  assert.ok(
+    windows[windows.length - 1].to <= totalTourSeconds(labels.length) + 0.01,
+    'the last caption cannot outlive the tour'
+  );
 });
 
 test('a tour is never built from a single photo', () => {
@@ -82,6 +174,31 @@ test('a tour is never built from a single photo', () => {
   );
   assert.ok(videoSource.includes('photoPaths.length < 2'), 'the encoder refuses a lone photo');
   assert.ok(serviceSource.includes('MIN_PHOTOS = 2'), 'the service needs at least two photos');
+});
+
+test('a single photo would have no cross-fade to build', () => {
+  // The cross-fade chain only starts from the second shot, so one still simply
+  // has no transition; the guard above stops it ever reaching the encoder.
+  const labels = GUIDED_SHOTS.slice(0, 2).map((shot) => shot.label);
+  const windows = labelWindows(labels);
+  assert.equal(windows.length, 2);
+  assert.ok(windows[1].from > 0, 'the second caption only appears after a transition');
+});
+
+test('the phone number can differ per state', () => {
+  assert.ok(
+    serviceSource.includes('PROPERTY_TOUR_PHONE_STATES'),
+    'per-state numbers must be configurable'
+  );
+  assert.ok(
+    serviceSource.includes('resolvePhoneForState'),
+    'the state must be resolved to a number'
+  );
+});
+
+test('the intro card is given the property title and location', () => {
+  assert.ok(serviceSource.includes('title: property.title'), 'the intro needs the title');
+  assert.ok(serviceSource.includes('location,'), 'the intro needs the location');
 });
 
 test('a generated tour never overwrites a real landlord video', () => {

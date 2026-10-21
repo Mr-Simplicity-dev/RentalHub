@@ -202,9 +202,13 @@ const buildIntroArgs = ({
   location = '',
   fontPath = null,
 }) => {
-  const markSize = 720;
+  // Scaled for the 4K frame so the mark and type are proportionally the same as
+  // a 720p broadcast card.
+  const scale = OUTPUT_HEIGHT / 2160;
+  const markSize = Math.round(900 * scale);
   const canvas = Math.ceil(markSize * 1.5);
   const spin = '2*PI*t/2.2';
+  const dropFrom = canvas + Math.round(520 * scale);
 
   const filters = [
     `[1:v]format=rgba,scale=${markSize}:${markSize},` +
@@ -214,8 +218,8 @@ const buildIntroArgs = ({
       `format=rgba,fade=t=in:st=0:d=0.35:alpha=1[spin]`,
     // Fall from far above, then a small settle overshoot on landing.
     `[0:v][spin]overlay=x='(W-w)/2':` +
-      `y='if(lt(t,1.9), -${canvas + 400} + ((H-h)/2 + ${canvas + 400})*min(1,t/1.9)*1.05, ` +
-      `if(lt(t,2.2), (H-h)/2 - 34*(2.2-t)/0.3, (H-h)/2))':format=auto[landed]`,
+      `y='if(lt(t,1.9), -${dropFrom} + ((H-h)/2 + ${dropFrom})*min(1,t/1.9)*1.05, ` +
+      `if(lt(t,2.2), (H-h)/2 - ${Math.round(46 * scale)}*(2.2-t)/0.3, (H-h)/2))':format=auto[landed]`,
     // Vignette focuses the eye on the centre of the card.
     `[landed]vignette=PI/4.6[card]`,
   ];
@@ -225,8 +229,8 @@ const buildIntroArgs = ({
   if (title) {
     filters.push(
       withFont(
-        `[${last}]drawtext=text='${escapeDrawText(title)}':fontsize=96:fontcolor=white:` +
-          `x=(w-tw)/2:y=h-330:alpha='min(1,max(0,(t-2.25)/0.7))':` +
+        `[${last}]drawtext=text='${escapeDrawText(title)}':fontsize=${Math.round(112 * scale)}:fontcolor=white:` +
+          `x=(w-tw)/2:y=${OUTPUT_HEIGHT - Math.round(430 * scale)}:alpha='min(1,max(0,(t-2.25)/0.7))':` +
           `shadowcolor=black@0.7:shadowx=3:shadowy=3[t1]`,
         fontPath
       )
@@ -237,8 +241,8 @@ const buildIntroArgs = ({
   if (location) {
     filters.push(
       withFont(
-        `[${last}]drawtext=text='${escapeDrawText(location)}':fontsize=52:fontcolor=0xfacc15:` +
-          `x=(w-tw)/2:y=h-215:alpha='min(1,max(0,(t-2.7)/0.7))':` +
+        `[${last}]drawtext=text='${escapeDrawText(location)}':fontsize=${Math.round(62 * scale)}:fontcolor=0xfacc15:` +
+          `x=(w-tw)/2:y=${OUTPUT_HEIGHT - Math.round(290 * scale)}:alpha='min(1,max(0,(t-2.7)/0.7))':` +
           `shadowcolor=black@0.7:shadowx=2:shadowy=2[t2]`,
         fontPath
       )
@@ -248,7 +252,8 @@ const buildIntroArgs = ({
 
   // A gold hairline that draws itself out under the title block.
   filters.push(
-    `[${last}]drawbox=x='(w-900)/2':y=h-120:w='min(900,max(0,(t-2.9)*1400))':h=5:` +
+    `[${last}]drawbox=x='(w-${Math.round(1200 * scale)})/2':y=${OUTPUT_HEIGHT - Math.round(160 * scale)}:` +
+      `w='min(${Math.round(1200 * scale)},max(0,(t-2.9)*${Math.round(2000 * scale)}))':h=${Math.max(4, Math.round(6 * scale))}:` +
       `color=0xfacc15@0.95:t=fill[t3]`
   );
   last = 't3';
@@ -267,16 +272,32 @@ const buildIntroArgs = ({
 
 /** The branded end card: mark, name, and every way to reach us, fading up. */
 const buildOutroArgs = ({ outputPath, markPath, fontPath, phone }) => {
-  const markSize = 460;
+  // Sized for the 4K frame. Everything is expressed against the frame height so
+  // the card stays balanced if the output resolution is ever changed.
+  const scale = OUTPUT_HEIGHT / 2160;
+  const markSize = Math.round(620 * scale);
+
   const filters = [
     `[1:v]format=rgba,scale=${markSize}:${markSize}[mark]`,
-    `[0:v][mark]overlay=x='(W-w)/2':y='240 - 190*exp(-2.6*t)':format=auto[b1]`,
+    `[0:v][mark]overlay=x='(W-w)/2':y='${Math.round(560 * scale)} - ${Math.round(230 * scale)}*exp(-2.6*t)':format=auto[b1]`,
   ];
 
   const lines = [
-    { text: BRAND_NAME, size: 108, colour: 'white', y: 800, from: 0.8 },
-    { text: `${BRAND_DOMAIN}   |   ${BRAND_EMAIL}`, size: 54, colour: '0xfacc15', y: 980, from: 1.4 },
-    { text: `Call or WhatsApp: ${phone}`, size: 60, colour: 'white', y: 1090, from: 2.0 },
+    { text: BRAND_NAME, size: Math.round(128 * scale), colour: 'white', y: Math.round(1340 * scale), from: 0.8 },
+    {
+      text: `${BRAND_DOMAIN}   |   ${BRAND_EMAIL}`,
+      size: Math.round(62 * scale),
+      colour: '0xfacc15',
+      y: Math.round(1560 * scale),
+      from: 1.4,
+    },
+    {
+      text: `Call or WhatsApp: ${phone}`,
+      size: Math.round(70 * scale),
+      colour: 'white',
+      y: Math.round(1690 * scale),
+      from: 2.0,
+    },
   ];
 
   let last = 'b1';
@@ -294,7 +315,9 @@ const buildOutroArgs = ({ outputPath, markPath, fontPath, phone }) => {
   });
 
   filters.push(
-    `[${last}]drawbox=x='(w-1100)/2':y=930:w='min(1100,max(0,(t-1.15)*1500))':h=5:color=0xfacc15@0.95:t=fill[oLine]`
+    `[${last}]drawbox=x='(w-${Math.round(1500 * scale)})/2':y=${Math.round(1490 * scale)}:` +
+      `w='min(${Math.round(1500 * scale)},max(0,(t-1.15)*${Math.round(2000 * scale)}))':h=${Math.max(4, Math.round(6 * scale))}:` +
+      `color=0xfacc15@0.95:t=fill[oLine]`
   );
   filters.push(`[oLine]vignette=PI/4.8[v]`);
 
@@ -410,7 +433,15 @@ const createTourVideo = async ({
     const crawl = `${crawlOnce}     \u2022     ${crawlOnce}     \u2022     `;
 
     let layered = assembled;
-    filters.push(`[${layered}]drawbox=x=0:y=h-190:w=iw:h=190:color=0x0b1220@0.78:t=fill[strip]`);
+    // Explicit pixel geometry. drawbox is evaluated once at setup, so a value
+    // derived from the (time-varying) chain cannot be trusted here; fixed
+    // numbers tie the bar to the 4K frame exactly.
+    const uiScale = OUTPUT_HEIGHT / 2160;
+    const stripHeight = Math.round(230 * uiScale);
+    const stripY = OUTPUT_HEIGHT - stripHeight;
+    filters.push(
+      `[${layered}]drawbox=x=0:y=${stripY}:w=${OUTPUT_WIDTH}:h=${stripHeight}:color=0x0b1220@0.82:t=fill[strip]`
+    );
     layered = 'strip';
 
     if (labels.length) {
@@ -425,8 +456,8 @@ const createTourVideo = async ({
         const next = `lab${index}`;
         filters.push(
           withFont(
-            `[${layered}]drawtext=text='${escapeDrawText(win.label)}':fontsize=64:fontcolor=0xfacc15:` +
-              `x=70:y=h-172:alpha='${alpha}':shadowcolor=black@0.6:shadowx=2:shadowy=2[${next}]`,
+            `[${layered}]drawtext=text='${escapeDrawText(win.label)}':fontsize=${Math.round(74 * uiScale)}:fontcolor=0xfacc15:` +
+              `x=${Math.round(80 * uiScale)}:y=${stripY + Math.round(30 * uiScale)}:alpha='${alpha}':shadowcolor=black@0.6:shadowx=2:shadowy=2[${next}]`,
             fontPath
           )
         );
@@ -436,17 +467,18 @@ const createTourVideo = async ({
 
     filters.push(
       withFont(
-        `[${layered}]drawtext=text='${escapeDrawText(crawl)}':fontsize=58:fontcolor=white:` +
-          `x='W-mod(t*260\\,W+tw)':y=h-124:shadowcolor=black@0.6:shadowx=2:shadowy=2[crawlout]`,
+        `[${layered}]drawtext=text='${escapeDrawText(crawl)}':fontsize=${Math.round(66 * uiScale)}:fontcolor=white:` +
+          `x='W-mod(t*${Math.round(330 * uiScale)}\\,W+tw)':y=${stripY + Math.round(112 * uiScale)}:shadowcolor=black@0.6:shadowx=2:shadowy=2[crawlout]`,
         fontPath
       )
     );
     layered = 'crawlout';
 
     if (markPath) {
-      filters.push(`[${frames}:v]format=rgba,scale=230:230,colorchannelmixer=aa=0.9[mark]`);
+      const markSize = Math.round(260 * (OUTPUT_HEIGHT / 2160));
+      filters.push(`[${frames}:v]format=rgba,scale=${markSize}:${markSize},colorchannelmixer=aa=0.9[mark]`);
       filters.push(
-        `[${layered}][mark]overlay=x='W-w-70':y='70':format=auto[wm]`
+        `[${layered}][mark]overlay=x='W-w-${Math.round(80 * (OUTPUT_HEIGHT / 2160))}':y=${Math.round(80 * (OUTPUT_HEIGHT / 2160))}:format=auto[wm]`
       );
       layered = 'wm';
     }

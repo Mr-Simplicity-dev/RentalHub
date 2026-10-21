@@ -261,6 +261,19 @@ const LivePropertyPhotoCapture = ({
         </div>
       )}
 
+      {canCaptureMore && (
+        <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
+            {t('live_property_capture.next_shot', 'Shot {{number}} of {{max}}', {
+              number: photos.length + 1,
+              max: Math.min(maxPhotos, GUIDED_SHOT_PROMPTS.length),
+            })}
+          </p>
+          <p className="mt-1 text-sm font-semibold text-sky-900">{currentShot.label}</p>
+          <p className="mt-0.5 text-xs text-sky-700">{currentShot.hint}</p>
+        </div>
+      )}
+
       {cameraOpen && (
         <div className="space-y-3">
           <div className="relative aspect-[4/3] overflow-hidden rounded-lg bg-black">
@@ -272,6 +285,10 @@ const LivePropertyPhotoCapture = ({
               className="h-full w-full object-cover"
             />
             <div className="pointer-events-none absolute inset-0 border-[10px] border-black/10" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-4 pb-3 pt-8">
+              <p className="text-sm font-semibold text-white">{currentShot.label}</p>
+              <p className="text-xs text-white/80">{currentShot.hint}</p>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -314,6 +331,11 @@ const LivePropertyPhotoCapture = ({
                   alt={t('live_property_capture.captured_property_alt', 'Captured property {{number}}', { number: index + 1 })}
                   className="h-full w-full object-cover"
                 />
+                {GUIDED_SHOT_PROMPTS[index] && (
+                  <span className="absolute bottom-0 left-0 right-0 bg-black/70 px-2 py-1 text-[11px] font-medium text-white">
+                    {index + 1}. {GUIDED_SHOT_PROMPTS[index].label}
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={() => removePhoto(index)}

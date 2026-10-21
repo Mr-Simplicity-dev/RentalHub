@@ -119,7 +119,8 @@ const { startRecruitmentJobs } = require('./jobs/recruitmentJobs');
 const { startPremblyRecoveryJobs } = require('./jobs/premblyRecoveryJobs');
 const { startRegistrationReminderJobs } = require('./jobs/registrationReminderJobs');
 const { startSupportReassignJobs } = require('./jobs/supportReassignJobs');
-const { startPropertyTourJobs } = require('./jobs/propertyTourJobs');const csrfProtection = require('./config/middleware/csrfProtection');
+const { startPropertyTourJobs } = require('./jobs/propertyTourJobs');
+const csrfProtection = require('./config/middleware/csrfProtection');
 const securityAlertMiddleware = require('./config/middleware/securityAlertMiddleware');
 const {
   authSensitiveLimiter,
