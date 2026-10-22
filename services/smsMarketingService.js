@@ -375,6 +375,37 @@ const deleteUnsubscribedSubscribers = async (req, res) => {
   }
 };
 
+const cleanDuplicateSubscribers = async (req, res) => {
+  try {
+    await ensureSchema();
+    const reason = requireActionNote(req, res, 'A cleanup reason is required');
+    if (!reason) return;
+
+    const result = await db.query(
+      `WITH ranked AS (
+         SELECT id,
+                ROW_NUMBER() OVER (PARTITION BY regexp_replace(phone,'\\D','','g') ORDER BY id ASC) rn
+         FROM sms_subscribers
+       )
+       DELETE FROM sms_subscribers WHERE id IN (SELECT id FROM ranked WHERE rn > 1) RETURNING id`
+    );
+
+    await recordOperation({
+      actor: req.user,
+      entityType: 'subscriber',
+      entityId: null,
+      eventType: 'duplicates_cleaned',
+      note: reason,
+      metadata: { deleted: result.rows.length },
+    });
+
+    res.json({ success: true, data: { deleted: result.rows.length } });
+  } catch (error) {
+    req.logger.error('Clean duplicate SMS subscribers error:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to clean duplicate SMS subscribers' });
+  }
+};
+
 // ─── Templates ──────────────────────────────────────────────────────────────
 
 const listTemplates = async (req, res) => {

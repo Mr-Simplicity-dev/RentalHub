@@ -811,6 +811,37 @@ const deleteInvalidContacts = async (req, res) => {
   }
 };
 
+const cleanDuplicateContacts = async (req, res) => {
+  try {
+    await ensureSchema();
+    const note = requireActionNote(req, res, 'A cleanup reason is required');
+    if (!note) return;
+
+    const result = await db.query(
+      `WITH ranked AS (
+         SELECT id,
+                ROW_NUMBER() OVER (PARTITION BY regexp_replace(phone,'\\D','','g') ORDER BY id ASC) rn
+         FROM whatsapp_contacts
+       )
+       DELETE FROM whatsapp_contacts WHERE id IN (SELECT id FROM ranked WHERE rn > 1) RETURNING id`
+    );
+
+    await recordOperation({
+      actor: req.user,
+      entityType: 'whatsapp_contact',
+      entityId: null,
+      eventType: 'duplicates_cleaned',
+      note,
+      metadata: { deleted: result.rows.length },
+    });
+
+    res.json({ success: true, data: { deleted: result.rows.length } });
+  } catch (error) {
+    req.logger.error('Clean duplicate WhatsApp contacts error:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to clean duplicate WhatsApp contacts' });
+  }
+};
+
 // Asks Meta which of our contacts are actually on WhatsApp, then stores the
 // verdict. Chunked to Meta's small batch cap so one big list does not fail whole.
 const CHECK_BATCH_SIZE = 50;
