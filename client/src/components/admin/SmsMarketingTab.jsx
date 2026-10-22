@@ -709,9 +709,10 @@ const SmsMarketingTab = () => {
             message="Sync contacts or import a CSV to get started."
           />
         ) : (
-          <DataTable columns={['Phone', 'Name', 'Source', 'Type', 'Status', 'Added', 'Actions']}>
-            {subscribers.map((sub) => (
+          <DataTable columns={['S/N', 'Phone', 'Name', 'Source', 'Type', 'Status', 'Added', 'Actions']}>
+            {subscribers.map((sub, index) => (
               <tr key={sub.id} className="transition-colors hover:bg-gray-50/70">
+                <Td className="text-gray-600">{(subPage - 1) * 50 + index + 1}</Td>
                 <Td className="font-medium text-gray-900">{sub.phone}</Td>
                 <Td className="text-gray-600">{sub.full_name || '\u2014'}</Td>
                 <Td><span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium">{sub.source}</span></Td>

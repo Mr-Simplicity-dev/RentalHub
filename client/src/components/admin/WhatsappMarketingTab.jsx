@@ -803,9 +803,10 @@ const WhatsappMarketingTab = () => {
                   message="Upload a CSV of phone numbers above. You can then target 'Imported contacts' when building a campaign."
                 />
               ) : (
-                <DataTable columns={['Number', 'Name', 'Source', 'On WhatsApp', 'Added', '']}>
-                  {contacts.map((c) => (
+                <DataTable columns={['S/N', 'Number', 'Name', 'Source', 'On WhatsApp', 'Added', '']}>
+                  {contacts.map((c, index) => (
                     <tr key={c.id} className="transition-colors hover:bg-gray-50/70">
+                      <Td className="text-gray-600">{index + 1}</Td>
                       <Td className="font-medium text-gray-900">{c.phone}</Td>
                       <Td className="text-gray-600">{c.full_name || '—'}</Td>
                       <Td className="text-xs uppercase text-gray-500">{c.source}</Td>
