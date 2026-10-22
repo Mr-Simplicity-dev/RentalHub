@@ -516,6 +516,17 @@ exports.requirePrivilegedMfa = async (req, res, next) => {
       return next();
     }
   } catch (error) {
+    // A wrong or locked-out code must be reported honestly. A blanket 403 makes
+    // the client prompt forever without ever explaining what went wrong.
+    if (error instanceof TwoFactorError) {
+      const locked = error.code === 'TOTP_LOCKED';
+      return res.status(locked ? 429 : 403).json({
+        success: false,
+        code: locked ? 'MFA_LOCKED' : 'MFA_REQUIRED',
+        message: error.message,
+        retry_after: error.extra?.retryAfter || undefined,
+      });
+    }
     console.error('Privileged MFA check failed:', error.message);
   }
 

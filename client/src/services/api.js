@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { clearAuthSession, getAuthToken, setAuthToken } from './authStorage';
+import { requestMfaCode, resetMfaAttempts } from './mfaPromptService';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
 const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
@@ -62,9 +63,38 @@ api.interceptors.request.use(
 
 // Response interceptor with silent token refresh
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (response.config?.mfaAttempts) resetMfaAttempts();
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
+
+    // Privileged dashboards answer 403 MFA_REQUIRED until a fresh TOTP code is
+    // supplied. Ask for one, then replay the request with it attached.
+    if (
+      error.response?.status === 403 &&
+      error.response?.data?.code === 'MFA_REQUIRED' &&
+      originalRequest
+    ) {
+      const attempts = (originalRequest.mfaAttempts || 0) + 1;
+
+      if (attempts > 3) {
+        return Promise.reject(error);
+      }
+
+      try {
+        const mfaCode = await requestMfaCode(error.response?.data?.message || '');
+        originalRequest.mfaAttempts = attempts;
+        originalRequest.headers = {
+          ...(originalRequest.headers || {}),
+          'X-RentalHub-Mfa-Code': mfaCode,
+        };
+        return api(originalRequest);
+      } catch (promptError) {
+        return Promise.reject(error);
+      }
+    }
 
     if (originalRequest?.skipAuthRefresh) {
       return Promise.reject(error);
