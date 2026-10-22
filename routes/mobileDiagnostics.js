@@ -76,6 +76,19 @@ const compareVersions = (left, right) => {
   return 0;
 };
 
+const parseBuildNumber = (value) => {
+  const num = Number.parseInt(String(value || '').trim(), 10);
+  return Number.isFinite(num) ? num : null;
+};
+
+const compareBuildNumbers = (left, right) => {
+  const a = parseBuildNumber(left);
+  const b = parseBuildNumber(right);
+  if (a === null || b === null) return null;
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+};
+
 const platformStoreUrl = (platform) => {
   if (platform === 'ios') {
     return process.env.MOBILE_IOS_STORE_URL || process.env.MOBILE_STORE_URL || '';
@@ -232,11 +245,22 @@ router.get('/app-version', (req, res) => {
       process.env.MOBILE_ANDROID_MINIMUM_VERSION ||
       '1.0.0';
 
+  let deployedBuildNumber = null;
+  try {
+    deployedBuildNumber = JSON.parse(fs.readFileSync(BUILD_INFO_PATH, 'utf8'))?.buildNumber || null;
+  } catch {
+    deployedBuildNumber = null;
+  }
+
+  // Prefer build number (versionCode/buildNumber) over semver when both are present
+  // so reinstalling the same versionName/build doesn't show "update available".
+  const buildComparison = compareBuildNumbers(req.query.buildNumber || req.query.build || req.query.versionCode, deployedBuildNumber);
+
   const updateAvailable = currentVersion
-    ? compareVersions(currentVersion, latestVersion) < 0
+    ? (buildComparison !== null ? buildComparison < 0 : compareVersions(currentVersion, latestVersion) < 0)
     : false;
   const updateRequired = currentVersion
-    ? compareVersions(currentVersion, minimumVersion) < 0
+    ? (buildComparison !== null ? buildComparison < 0 && false : compareVersions(currentVersion, minimumVersion) < 0)
     : false;
 
   return res.json({
