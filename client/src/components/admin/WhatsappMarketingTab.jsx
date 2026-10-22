@@ -188,6 +188,37 @@ const WhatsappMarketingTab = () => {
     loadContacts();
   }, [loadStats, loadCampaigns, loadContacts]);
 
+  const extractPhoneNumbers = (text = '') => {
+    if (!text) return [];
+    const normalized = String(text)
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n');
+    const tokens = normalized.split(/[\n,;\t|]+/);
+    const phones = [];
+    const seen = new Set();
+    for (let i = 0; i < tokens.length; i += 1) {
+      const raw = tokens[i];
+      if (!raw) continue;
+      const matches = raw.match(/\+?\d[\d\s\-\(\)]{7,}\d/g);
+      if (matches && matches.length > 0) {
+        for (let m = 0; m < matches.length; m += 1) {
+          const cleaned = matches[m].replace(/[\s\-\(\)\+]/g, '').trim();
+          if (cleaned.length >= 10 && cleaned.length <= 15 && !seen.has(cleaned)) {
+            seen.add(cleaned);
+            phones.push(cleaned);
+          }
+        }
+      } else {
+        const cleaned = raw.replace(/[^0-9+]/g, '').replace(/^\+/, '');
+        if (cleaned.length >= 10 && cleaned.length <= 15 && !seen.has(cleaned)) {
+          seen.add(cleaned);
+          phones.push(cleaned);
+        }
+      }
+    }
+    return phones;
+  };
+
   const handleCsvFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -195,10 +226,7 @@ const WhatsappMarketingTab = () => {
 
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const lines = ev.target.result.split('\n').filter((l) => l.trim());
-      const phones = lines
-        .map((l) => l.split(',')[0].replace(/[\s"']/g, ''))
-        .filter((p) => p.length >= 10);
+      const phones = extractPhoneNumbers(ev.target.result || '');
       setCsvPreview(phones.slice(0, 10));
     };
     reader.readAsText(file);
@@ -212,14 +240,10 @@ const WhatsappMarketingTab = () => {
     setImporting(true);
     try {
       const text = await csvFile.text();
-      const phones = text
-        .split(/\r?\n/)
-        .filter((l) => l.trim())
-        .map((l) => l.split(',')[0].replace(/[\s"']/g, ''))
-        .filter((p) => p.length >= 10);
+      const phones = extractPhoneNumbers(text);
 
       if (phones.length === 0) {
-        toast.error('No phone numbers found in that file');
+        toast.error('No valid phone numbers found in the file');
         return;
       }
 

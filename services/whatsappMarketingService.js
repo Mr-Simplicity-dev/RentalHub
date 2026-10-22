@@ -678,15 +678,33 @@ const addContact = async (req, res) => {
 const importContacts = async (req, res) => {
   try {
     await ensureSchema();
-    const incoming = Array.isArray(req.body?.phones) ? req.body.phones : [];
+    let incoming = req.body?.phones;
+    if (typeof incoming === 'string') {
+      incoming = incoming
+        .split(/[\n,;\t|]+/)
+        .map((p) => p.replace(/[^0-9+]/g, '').replace(/^\+/, ''))
+        .filter((p) => p.length >= 10);
+    }
+    incoming = Array.isArray(incoming) ? incoming : [];
     if (incoming.length === 0) {
       return res.status(400).json({ success: false, message: 'No phone numbers provided' });
+    }
+
+    const normalizedIncoming = incoming
+      .map((p) => {
+        if (typeof p !== 'string') return '';
+        return p.replace(/\D/g, '');
+      })
+      .filter((p) => p.length >= 10 && p.length <= 15);
+
+    if (normalizedIncoming.length === 0) {
+      return res.status(400).json({ success: false, message: 'No valid phone numbers found' });
     }
 
     // classifyNewPhones refuses anything the platform already holds — users,
     // the SMS list, survey leads or an earlier WhatsApp import — so a number
     // can never be imported twice or silently revived after it unsubscribed.
-    const { accepted, alreadyKnown, invalid, duplicates } = await classifyNewPhones(incoming);
+    const { accepted, alreadyKnown, invalid, duplicates } = await classifyNewPhones(normalizedIncoming);
 
     if (accepted.length === 0) {
       return res.status(400).json({

@@ -226,6 +226,37 @@ const EmailMarketingTab = () => {
   };
 
   // ─── Import subscribers (CSV or paste) ────────────────────────────────────
+  const extractEmails = (text = '') => {
+    if (!text) return [];
+    const normalized = String(text)
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n');
+    const tokens = normalized.split(/[\n,;\t|]+/);
+    const emails = [];
+    const seen = new Set();
+    for (let i = 0; i < tokens.length; i += 1) {
+      const raw = tokens[i];
+      if (!raw) continue;
+      const matches = raw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi);
+      if (matches && matches.length > 0) {
+        for (let m = 0; m < matches.length; m += 1) {
+          const email = matches[m].trim().toLowerCase();
+          if (!seen.has(email)) {
+            seen.add(email);
+            emails.push(email);
+          }
+        }
+      } else {
+        const cleaned = raw.replace(/[\s"']/g, '').trim().toLowerCase();
+        if (cleaned.includes('@') && !seen.has(cleaned)) {
+          seen.add(cleaned);
+          emails.push(cleaned);
+        }
+      }
+    }
+    return emails;
+  };
+
   const handleEmailCsvFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -233,10 +264,7 @@ const EmailMarketingTab = () => {
 
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const lines = ev.target.result.split('\n').filter((l) => l.trim());
-      const emails = lines
-        .map((l) => l.split(',')[0].replace(/[\s"']/g, '').toLowerCase())
-        .filter((v) => v.includes('@'));
+      const emails = extractEmails(ev.target.result || '');
       setEmailCsvPreview(emails.slice(0, 10));
     };
     reader.readAsText(file);
@@ -247,12 +275,9 @@ const EmailMarketingTab = () => {
     try {
       setLoading(true);
       const text = await emailCsvFile.text();
-      const emails = text
-        .split('\n')
-        .map((l) => l.split(',')[0].replace(/[\s"']/g, '').toLowerCase())
-        .filter((v) => v.includes('@'));
+      const emails = extractEmails(text);
 
-      if (emails.length === 0) { toast.error('No email addresses found in that file'); return; }
+      if (emails.length === 0) { toast.error('No valid email addresses found in the file'); return; }
 
       const res = await api.post('/email-marketing/subscribers/import', { emails });
       const { added, alreadyKnown, invalid, duplicates } = res.data.data;

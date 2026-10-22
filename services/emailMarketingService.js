@@ -303,13 +303,28 @@ const syncSubscribers = async (req, res) => {
 const importSubscribers = async (req, res) => {
   try {
     await ensureSchema();
-    const incoming = Array.isArray(req.body?.emails) ? req.body.emails : [];
+    let incoming = req.body?.emails;
+    if (typeof incoming === 'string') {
+      incoming = incoming.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
+    }
+    incoming = Array.isArray(incoming) ? incoming : [];
 
     if (incoming.length === 0) {
       return res.status(400).json({ success: false, message: 'No email addresses provided' });
     }
 
-    const { accepted, alreadyKnown, invalid, duplicates } = await classifyNewEmails(incoming);
+    const normalizedIncoming = incoming
+      .map((e) => {
+        if (typeof e !== 'string') return '';
+        return e.trim().toLowerCase();
+      })
+      .filter((e) => e.includes('@'));
+
+    if (normalizedIncoming.length === 0) {
+      return res.status(400).json({ success: false, message: 'No valid email addresses found' });
+    }
+
+    const { accepted, alreadyKnown, invalid, duplicates } = await classifyNewEmails(normalizedIncoming);
 
     if (accepted.length === 0) {
       return res.status(400).json({
