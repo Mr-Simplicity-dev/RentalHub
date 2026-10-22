@@ -1890,7 +1890,11 @@ exports.initializeRegistrationPayment = async (req, res) => {
       });
     }
 
-    if (!PAYSTACK_SECRET_KEY) {
+    const paymentMethod = String(req.body.payment_method || 'paystack').toLowerCase() === 'bank_transfer'
+      ? 'bank_transfer'
+      : 'paystack';
+
+    if (paymentMethod === 'paystack' && !PAYSTACK_SECRET_KEY) {
       return res.status(500).json({
         success: false,
         message: 'Payment service is not configured'
@@ -2088,9 +2092,10 @@ exports.initializeRegistrationPayment = async (req, res) => {
          amount_ngn,
          passport_issuing_country,
          ip_country,
-         ip_flagged
+         ip_flagged,
+         payment_method
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
       [
         preparedRegistrationWithLocation.user_type,
         preparedRegistrationWithLocation.email,
@@ -2110,8 +2115,30 @@ exports.initializeRegistrationPayment = async (req, res) => {
         preparedRegistrationWithLocation.passportIssuingCountry || null,
         ipCountry,
         ipFlagged,
+        paymentMethod,
       ]
     );
+
+    if (paymentMethod === 'bank_transfer') {
+      const { listActiveAccounts } = require('./bankTransferService');
+      const bankAccounts = await listActiveAccounts();
+
+      return res.json({
+        success: true,
+        message: `${preparedRegistration.user_type === 'tenant' ? 'Tenant' : 'Landlord'} registration payment initialized`,
+        data: {
+          payment_method: 'bank_transfer',
+          status: 'awaiting_transfer',
+          amount: chargeableAmountNgn,
+          currency: 'NGN',
+          base_amount: baseAmountNgn,
+          quote_currency: isDiasporaQuote ? 'USD' : 'NGN',
+          quote_amount_usd: quoteUsd,
+          reference,
+          bank_accounts: bankAccounts,
+        }
+      });
+    }
 
     const paystackResponse = await axios.post(
       `${PAYSTACK_BASE_URL}/transaction/initialize`,
@@ -2263,7 +2290,7 @@ exports.getRegistrationPaymentStatus = async (req, res) => {
 
     const result = await db.query(
       `SELECT id, user_type, email, phone, full_name, amount, payment_status,
-              created_at, registered_user_id
+              payment_method, created_at, registered_user_id
        FROM tenant_registration_payments
        WHERE transaction_reference = $1`,
       [reference]
@@ -2292,6 +2319,36 @@ exports.getRegistrationPaymentStatus = async (req, res) => {
     }
 
     let authorizationUrl = null;
+
+    // Bank-transfer registrations never touch Paystack: the user pays into a
+    // platform account and a super admin approves the proof.
+    if (row.payment_method === 'bank_transfer') {
+      const { listActiveAccounts } = require('./bankTransferService');
+      const transfer = await db.query(
+        `SELECT status, review_note, amount_confirmed, created_at, reviewed_at
+         FROM bank_transfer_payments
+         WHERE registration_reference = $1
+         ORDER BY id DESC LIMIT 1`,
+        [reference]
+      );
+      const latestTransfer = transfer.rows[0] || null;
+
+      return res.json({
+        success: true,
+        data: {
+          status: latestTransfer?.status || 'awaiting_transfer',
+          payment_method: 'bank_transfer',
+          user_type: row.user_type,
+          email: row.email,
+          full_name: row.full_name,
+          amount: row.amount,
+          currency: 'NGN',
+          reference,
+          review_note: latestTransfer?.review_note || null,
+          bank_accounts: latestTransfer ? [] : await listActiveAccounts(),
+        }
+      });
+    }
 
     if (PAYSTACK_SECRET_KEY) {
       const paystackResponse = await axios.post(
@@ -2353,6 +2410,262 @@ exports.getRegistrationPaymentStatus = async (req, res) => {
 
 
 
+
+// Shared by the Paystack completion endpoint and the super-admin bank-transfer
+// approval so both paths create the account, the ledger rows and the receipt
+// identically.
+const finalizeRegistrationFromPayment = async ({ tenantRegistrationPayment, reference, logger }) => {
+    // Diaspora tier: a Nigerian-funded card is only a review flag unless the
+    // super admin enables diaspora_require_foreign_card, which hard-blocks it.
+    const storedPayload = tenantRegistrationPayment.registration_payload || {};
+    const storedTier = storedPayload.registrationTier || 'local';
+    if (storedTier === 'diaspora') {
+      const diasporaFlags = await getFeatureFlagsMap();
+      const diasporaBillingCountry = String(
+        tenantRegistrationPayment.billing_country ||
+        tenantRegistrationPayment.gateway_response?.authorization?.bin_country ||
+        ''
+      ).toUpperCase();
+
+      if (
+        diasporaFlags.diaspora_require_foreign_card === true &&
+        diasporaBillingCountry === 'NG'
+      ) {
+        const error = new Error('Diaspora registration requires a foreign-issued payment card. Nigerian-issued cards are not accepted for diaspora registrations.');
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+
+    // ── Foreign-card local registrants: black-market premium + $5 fee ──────
+    // A local (₦) rate paid with a card issued outside Nigeria is priced at
+    // the black-market conversion rate plus a fixed $5 processing fee. The
+    // difference is charged as a second payment before the account activates.
+    const storedBillingCountry = String(tenantRegistrationPayment.billing_country || '').toUpperCase();
+    if (storedTier === 'local' && storedBillingCountry && storedBillingCountry !== 'NG') {
+      const localFee = Number(tenantRegistrationPayment.amount || 0);
+      const officialRate = Number(await getUsdToNgnRate()) || 1500;
+      const blackMarketRate = await getBlackMarketRate();
+      const conversionFeeUsd = await getForeignCardConversionFeeUsd();
+
+      const foreignTotal =
+        Math.round((localFee / officialRate) * blackMarketRate) +
+        Math.round(conversionFeeUsd * blackMarketRate);
+      const adjustment = Math.max(0, foreignTotal - localFee);
+
+      if (adjustment > 0) {
+        await db.query(
+          `UPDATE tenant_registration_payments
+           SET foreign_card_adjustment_ngn = $1
+           WHERE transaction_reference = $2`,
+          [adjustment, reference]
+        );
+
+        if (!tenantRegistrationPayment.foreign_card_adjustment_paid_at) {
+          const error = new Error(
+            `Your card is issued outside Nigeria (${storedBillingCountry}). An additional ₦${adjustment.toLocaleString()} ` +
+            `(black-market conversion + $${conversionFeeUsd} processing fee) is required before your account is activated.`
+          );
+          error.statusCode = 402;
+          error.code = 'FOREIGN_CARD_ADJUSTMENT';
+          error.data = { amount: adjustment, reference };
+          throw error;
+        }
+      }
+    }
+
+    const verificationMeta = tenantRegistrationPayment.verification_meta || null;
+    const kycResult = storedPayload.kycResult || null;
+    // Identity numbers were encrypted at rest during initialization; decrypt
+    // them back to their plaintext form only when the payload value carries
+    // the iv:authTag:ciphertext envelope (legacy plaintext passes through).
+    const decryptStoredIdentity = (value) => {
+      if (typeof value === 'string' && value.split(':').length === 3) {
+        return decryptNIN(value);
+      }
+      return value || null;
+    };
+    const preparedRegistration = {
+      email: storedPayload.email,
+      phone: storedPayload.phone,
+      full_name: storedPayload.full_name,
+      cleanLawyerEmail: storedPayload.cleanLawyerEmail || '',
+            useRentalhubLawyers: storedPayload.useRentalhubLawyers === true,
+      useRentalhubAgents: storedPayload.useRentalhubAgents === true,
+        user_type:
+        tenantRegistrationPayment.user_type ||
+        storedPayload.user_type,
+      cleanNIN: decryptStoredIdentity(storedPayload.cleanNIN),
+      ninVerified: storedPayload.ninVerified === true,
+      identityType: storedPayload.identityType || null,
+      cleanPassportNumber: decryptStoredIdentity(storedPayload.cleanPassportNumber),
+      cleanNationality: storedPayload.cleanNationality || 'Nigeria',
+      registrationTier: storedTier,
+      passportIssuingCountry: storedPayload.passportIssuingCountry || null,
+      diasporaCountry: storedTier === 'diaspora'
+        ? (storedPayload.diasporaCountry || storedPayload.cleanNationality || null)
+        : null,
+      billingCountry: tenantRegistrationPayment.billing_country || null,
+      cardBrand: tenantRegistrationPayment.card_brand || null,
+      optionalAgentInvite: storedPayload.optionalAgentInvite || null,
+      referralCode: normalizeReferralCode(storedPayload.referralCode || storedPayload.referral_code),
+      preferredStateId:
+        storedPayload.preferredStateId ||
+        storedPayload.state_id ||
+        null,
+      preferredStateName: storedPayload.preferredStateName || null,
+      preferredLgaName:
+        storedPayload.preferredLgaName ||
+        storedPayload.lga_name ||
+        null,
+    };
+
+    const data = await createUserFromPreparedRegistration({
+      preparedRegistration,
+      passwordHash: storedPayload.password_hash,
+      verificationMeta,
+      kycResult,
+      tenantRegistrationPayment,
+      utm: {
+        utm_source: storedPayload.utm_source || null,
+        utm_medium: storedPayload.utm_medium || null,
+        utm_campaign: storedPayload.utm_campaign || null,
+        utm_term: storedPayload.utm_term || null,
+        utm_content: storedPayload.utm_content || null,
+      }
+    });
+
+    // Marketing agent attribution. Two routes in: the agent was signed in and opened
+    // the account from their dashboard, or the person signed up themselves through
+    // the agent's invite link (their referral code). Either way we record who it was
+    // and pay the registration-paid commission now the fee has cleared.
+    let openingAgentId = Number(storedPayload.agent_user_id) || null;
+    if (!openingAgentId && (storedPayload.referralCode || storedPayload.referral_code)) {
+      try {
+        const { resolveMarketingAgentByCode } = require('./marketingAgentCommissionService');
+        openingAgentId = await resolveMarketingAgentByCode(
+          storedPayload.referralCode || storedPayload.referral_code
+        );
+      } catch (agentLookupError) {
+        logger.error('Marketing agent referral lookup failed (non-fatal):', agentLookupError.message);
+      }
+    }
+
+    if (openingAgentId && data?.user?.id && Number(openingAgentId) !== Number(data.user.id)) {
+      try {
+        await db.query(
+          `UPDATE users
+              SET created_by_agent_id = $2
+            WHERE id = $1 AND created_by_agent_id IS NULL`,
+          [data.user.id, openingAgentId]
+        );
+        const { qualifyCommission } = require('./marketingAgentCommissionService');
+        qualifyCommission({
+          newUserId: data.user.id,
+          stage: 'registration_paid',
+          source: 'registration_payment',
+          paymentId: tenantRegistrationPayment?.id || null,
+        }).catch(() => {});
+      } catch (agentError) {
+        logger.error('Marketing agent attribution failed (non-fatal):', agentError.message);
+      }
+    }
+
+    // If a marketing agent already surveyed this person in the field, attach that
+    // capture to their new account so the app does not ask them to take it again.
+    try {
+      const { linkFieldCaptureToNewUser } = require('./surveyService');
+      await linkFieldCaptureToNewUser({
+        newUserId: data?.user?.id,
+        userType: data?.user?.user_type || preparedRegistration.user_type,
+        phone: tenantRegistrationPayment.phone,
+        email: tenantRegistrationPayment.email,
+      });
+    } catch (surveyLinkError) {
+      logger.error('Survey capture link failed (non-fatal):', surveyLinkError.message);
+    }
+
+    // Email the registration receipt (covers base + lawyer/agent add-ons)
+    if (tenantRegistrationPayment?.id) {
+      const basePaymentResult = await db.query(
+        `SELECT id FROM payments
+         WHERE transaction_reference = $1
+         ORDER BY id LIMIT 1`,
+        [reference]
+      );
+      const basePaymentId = basePaymentResult.rows[0]?.id;
+      if (basePaymentId) {
+        const { sendReceiptForPayment } = require('../config/utils/paymentReceipt');
+        sendReceiptForPayment(basePaymentId).catch(() => {});
+      }
+    }
+
+  return { data };
+};
+
+// Called by the super-admin approval of a bank transfer. It marks the pending
+// registration as paid and then runs the exact same finalize path Paystack
+// uses (user row, ledger rows, receipt email, agent attribution).
+exports.finalizeBankTransferRegistration = async ({ reference, transfer, reviewer, logger = console }) => {
+  await ensureTenantRegistrationPaymentSchema();
+
+  const result = await db.query(
+    `SELECT * FROM tenant_registration_payments
+     WHERE transaction_reference = $1
+     LIMIT 1`,
+    [reference]
+  );
+
+  if (!result.rows.length) {
+    const error = new Error('Registration payment not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const registrationPayment = result.rows[0];
+
+  if (registrationPayment.registered_user_id) {
+    return { alreadyCompleted: true, user_id: registrationPayment.registered_user_id };
+  }
+
+  const gateway = {
+    gateway: 'bank_transfer',
+    transfer_id: transfer?.id || null,
+    bank_account_id: transfer?.bank_account_id || null,
+    payer_name: transfer?.payer_name || null,
+    payer_bank: transfer?.payer_bank || null,
+    amount_confirmed: transfer?.amount_confirmed === null || transfer?.amount_confirmed === undefined
+      ? null
+      : Number(transfer.amount_confirmed),
+    proof_captured_at: transfer?.proof_captured_at || null,
+    approved_by: reviewer?.id || null,
+    approved_at: new Date().toISOString(),
+  };
+
+  await db.query(
+    `UPDATE tenant_registration_payments
+     SET payment_status = 'completed',
+         payment_method = 'bank_transfer',
+         completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP),
+         gateway_response = $1
+     WHERE transaction_reference = $2
+       AND registered_user_id IS NULL`,
+    [JSON.stringify(gateway), reference]
+  );
+
+  registrationPayment.payment_status = 'completed';
+  registrationPayment.payment_method = 'bank_transfer';
+  registrationPayment.completed_at = registrationPayment.completed_at || new Date();
+  registrationPayment.gateway_response = gateway;
+
+  const { data } = await finalizeRegistrationFromPayment({
+    tenantRegistrationPayment: registrationPayment,
+    reference,
+    logger,
+  });
+
+  return { data };
+};
 
 exports.completeRegistrationAfterPayment = async (req, res) => {
   try {
@@ -2520,191 +2833,11 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
       tenantRegistrationPayment.card_brand = cardBrand;
     }
 
-    // Diaspora tier: a Nigerian-funded card is only a review flag unless the
-    // super admin enables diaspora_require_foreign_card, which hard-blocks it.
-    const storedPayload = tenantRegistrationPayment.registration_payload || {};
-    const storedTier = storedPayload.registrationTier || 'local';
-    if (storedTier === 'diaspora') {
-      const diasporaFlags = await getFeatureFlagsMap();
-      const billingCountry = String(
-        tenantRegistrationPayment.billing_country ||
-        tenantRegistrationPayment.gateway_response?.authorization?.bin_country ||
-        ''
-      ).toUpperCase();
-
-      if (
-        diasporaFlags.diaspora_require_foreign_card === true &&
-        billingCountry === 'NG'
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: 'Diaspora registration requires a foreign-issued payment card. Nigerian-issued cards are not accepted for diaspora registrations.'
-        });
-      }
-    }
-
-    // ── Foreign-card local registrants: black-market premium + $5 fee ──────
-    // A local (₦) rate paid with a card issued outside Nigeria is priced at
-    // the black-market conversion rate plus a fixed $5 processing fee. The
-    // difference is charged as a second payment before the account activates.
-    const storedBillingCountry = String(billingCountry || '').toUpperCase();
-    if (storedTier === 'local' && storedBillingCountry && storedBillingCountry !== 'NG') {
-      const localFee = Number(tenantRegistrationPayment.amount || 0);
-      const officialRate = Number(await getUsdToNgnRate()) || 1500;
-      const blackMarketRate = await getBlackMarketRate();
-      const conversionFeeUsd = await getForeignCardConversionFeeUsd();
-
-      const foreignTotal =
-        Math.round((localFee / officialRate) * blackMarketRate) +
-        Math.round(conversionFeeUsd * blackMarketRate);
-      const adjustment = Math.max(0, foreignTotal - localFee);
-
-      if (adjustment > 0) {
-        await db.query(
-          `UPDATE tenant_registration_payments
-           SET foreign_card_adjustment_ngn = $1
-           WHERE transaction_reference = $2`,
-          [adjustment, reference]
-        );
-
-        if (!tenantRegistrationPayment.foreign_card_adjustment_paid_at) {
-          return res.status(402).json({
-            success: false,
-            code: 'FOREIGN_CARD_ADJUSTMENT',
-            message:
-              `Your card is issued outside Nigeria (${storedBillingCountry}). An additional ₦${adjustment.toLocaleString()} ` +
-              `(black-market conversion + $${conversionFeeUsd} processing fee) is required before your account is activated.`,
-            data: { amount: adjustment, reference },
-          });
-        }
-      }
-    }
-
-    const verificationMeta = tenantRegistrationPayment.verification_meta || null;
-    const kycResult = storedPayload.kycResult || null;
-    // Identity numbers were encrypted at rest during initialization; decrypt
-    // them back to their plaintext form only when the payload value carries
-    // the iv:authTag:ciphertext envelope (legacy plaintext passes through).
-    const decryptStoredIdentity = (value) => {
-      if (typeof value === 'string' && value.split(':').length === 3) {
-        return decryptNIN(value);
-      }
-      return value || null;
-    };
-    const preparedRegistration = {
-      email: storedPayload.email,
-      phone: storedPayload.phone,
-      full_name: storedPayload.full_name,
-      cleanLawyerEmail: storedPayload.cleanLawyerEmail || '',
-            useRentalhubLawyers: storedPayload.useRentalhubLawyers === true,
-      useRentalhubAgents: storedPayload.useRentalhubAgents === true,
-        user_type:
-        tenantRegistrationPayment.user_type ||
-        storedPayload.user_type,
-      cleanNIN: decryptStoredIdentity(storedPayload.cleanNIN),
-      ninVerified: storedPayload.ninVerified === true,
-      identityType: storedPayload.identityType || null,
-      cleanPassportNumber: decryptStoredIdentity(storedPayload.cleanPassportNumber),
-      cleanNationality: storedPayload.cleanNationality || 'Nigeria',
-      registrationTier: storedTier,
-      passportIssuingCountry: storedPayload.passportIssuingCountry || null,
-      diasporaCountry: storedTier === 'diaspora'
-        ? (storedPayload.diasporaCountry || storedPayload.cleanNationality || null)
-        : null,
-      billingCountry: tenantRegistrationPayment.billing_country || null,
-      cardBrand: tenantRegistrationPayment.card_brand || null,
-      optionalAgentInvite: storedPayload.optionalAgentInvite || null,
-      referralCode: normalizeReferralCode(storedPayload.referralCode || storedPayload.referral_code),
-      preferredStateId:
-        storedPayload.preferredStateId ||
-        storedPayload.state_id ||
-        null,
-      preferredStateName: storedPayload.preferredStateName || null,
-      preferredLgaName:
-        storedPayload.preferredLgaName ||
-        storedPayload.lga_name ||
-        null,
-    };
-
-    const data = await createUserFromPreparedRegistration({
-      preparedRegistration,
-      passwordHash: storedPayload.password_hash,
-      verificationMeta,
-      kycResult,
+    const { data } = await finalizeRegistrationFromPayment({
       tenantRegistrationPayment,
-      utm: {
-        utm_source: storedPayload.utm_source || null,
-        utm_medium: storedPayload.utm_medium || null,
-        utm_campaign: storedPayload.utm_campaign || null,
-        utm_term: storedPayload.utm_term || null,
-        utm_content: storedPayload.utm_content || null,
-      }
+      reference,
+      logger: req.logger,
     });
-
-    // Marketing agent attribution. Two routes in: the agent was signed in and opened
-    // the account from their dashboard, or the person signed up themselves through
-    // the agent's invite link (their referral code). Either way we record who it was
-    // and pay the registration-paid commission now the fee has cleared.
-    let openingAgentId = Number(storedPayload.agent_user_id) || null;
-    if (!openingAgentId && (storedPayload.referralCode || storedPayload.referral_code)) {
-      try {
-        const { resolveMarketingAgentByCode } = require('./marketingAgentCommissionService');
-        openingAgentId = await resolveMarketingAgentByCode(
-          storedPayload.referralCode || storedPayload.referral_code
-        );
-      } catch (agentLookupError) {
-        req.logger.error('Marketing agent referral lookup failed (non-fatal):', agentLookupError.message);
-      }
-    }
-
-    if (openingAgentId && data?.user?.id && Number(openingAgentId) !== Number(data.user.id)) {
-      try {
-        await db.query(
-          `UPDATE users
-              SET created_by_agent_id = $2
-            WHERE id = $1 AND created_by_agent_id IS NULL`,
-          [data.user.id, openingAgentId]
-        );
-        const { qualifyCommission } = require('./marketingAgentCommissionService');
-        qualifyCommission({
-          newUserId: data.user.id,
-          stage: 'registration_paid',
-          source: 'registration_payment',
-          paymentId: tenantRegistrationPayment?.id || null,
-        }).catch(() => {});
-      } catch (agentError) {
-        req.logger.error('Marketing agent attribution failed (non-fatal):', agentError.message);
-      }
-    }
-
-    // If a marketing agent already surveyed this person in the field, attach that
-    // capture to their new account so the app does not ask them to take it again.
-    try {
-      const { linkFieldCaptureToNewUser } = require('./surveyService');
-      await linkFieldCaptureToNewUser({
-        newUserId: data?.user?.id,
-        userType: data?.user?.user_type || preparedRegistration.user_type,
-        phone: tenantRegistrationPayment.phone,
-        email: tenantRegistrationPayment.email,
-      });
-    } catch (surveyLinkError) {
-      req.logger.error('Survey capture link failed (non-fatal):', surveyLinkError.message);
-    }
-
-    // Email the registration receipt (covers base + lawyer/agent add-ons)
-    if (tenantRegistrationPayment?.id) {
-      const basePaymentResult = await db.query(
-        `SELECT id FROM payments
-         WHERE transaction_reference = $1
-         ORDER BY id LIMIT 1`,
-        [reference]
-      );
-      const basePaymentId = basePaymentResult.rows[0]?.id;
-      if (basePaymentId) {
-        const { sendReceiptForPayment } = require('../config/utils/paymentReceipt');
-        sendReceiptForPayment(basePaymentId).catch(() => {});
-      }
-    }
 
     res.status(201).json({
       success: true,
@@ -2716,7 +2849,9 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
     const statusCode = error.statusCode || 500;
     res.status(statusCode).json({
       success: false,
-      message: statusCode >= 500 ? 'Failed to complete registration' : error.message || 'Failed to complete registration'
+      message: statusCode >= 500 ? 'Failed to complete registration' : error.message || 'Failed to complete registration',
+      code: error.code || undefined,
+      data: error.data || undefined,
     });
   }
 };

@@ -358,9 +358,9 @@ const SmsMarketingTab = () => {
       }
 
       const res = await api.post('/sms-marketing/subscribers/import', { phones });
-      const { added, alreadyKnown, invalid, duplicates } = res.data.data || {};
+      const { added, alreadyKnown, invalid, duplicates, removedDuplicates } = res.data.data || {};
       toast.success(
-        `Imported ${added || 0} new · Already in system: ${alreadyKnown || 0} · Duplicates: ${duplicates || 0} · Invalid: ${invalid || 0}`
+        `Imported ${added || 0} new · Already in system: ${alreadyKnown || 0} · Duplicates: ${duplicates || 0} · Invalid: ${invalid || 0} · Old duplicates removed: ${removedDuplicates || 0}`
       );
       setCsvFile(null);
       setCsvPreview([]);
@@ -371,6 +371,20 @@ const SmsMarketingTab = () => {
       toast.error(err.response?.data?.message || 'Failed to import SMS subscribers');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCleanDuplicates = async () => {
+    try {
+      const res = await api.delete('/sms-marketing/subscribers/duplicates', {
+        data: { note: 'Bulk duplicate cleanup' },
+      });
+      const { deleted = 0, normalized = 0 } = res.data.data || {};
+      toast.success(`Removed ${deleted} duplicate(s) and normalised ${normalized} number(s)`);
+      loadSubscribers(subSearch, subPage);
+      loadStats();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to clean duplicates');
     }
   };
 
@@ -623,6 +637,9 @@ const SmsMarketingTab = () => {
             aria-label="Delete all unsubscribed SMS contacts"
           >
             <FaTrash /> Delete unsubscribed
+          </SecondaryButton>
+          <SecondaryButton onClick={handleCleanDuplicates} className="gap-2 text-amber-700 hover:bg-amber-50">
+            <FaSyncAlt /> Remove duplicates
           </SecondaryButton>
           <PrimaryButton onClick={() => setShowAddSubscriber(true)} className="gap-2">
             <FaPlus /> Add Contact

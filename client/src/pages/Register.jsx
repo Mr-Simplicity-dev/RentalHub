@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import FloatingContactWidget from '../components/common/FloatingContactWidget';
 import WhatsAppBotWidget from '../components/common/WhatsAppBotWidget';
 import TurnstileWidget from '../components/common/TurnstileWidget';
+import BankTransferCheckout from '../components/BankTransferCheckout';
 import { setAuthSession } from '../services/authStorage';
 import { getStoredUtm } from '../hooks/useUtmParams';
 import { useTranslation } from 'react-i18next';
@@ -114,6 +115,12 @@ const Register = () => {
   const [premblyPending, setPremblyPending] = useState(null);
   const [turnstileToken, setTurnstileToken] = useState(null);
   const turnstileRef = useRef(null);
+  const registrationFormRef = useRef(null);
+  const [paymentMethod, setPaymentMethod] = useState(null);
+  const [showPaymentMethodChooser, setShowPaymentMethodChooser] = useState(false);
+  const [bankTransfer, setBankTransfer] = useState(null);
+  const [bankTransferSubmitted, setBankTransferSubmitted] = useState(false);
+  const [bankTransferStatus, setBankTransferStatus] = useState(null);
   const resetTurnstile = () => {
   setTurnstileToken(null);
   turnstileRef.current?.reset();
@@ -497,6 +504,50 @@ const Register = () => {
     };
   }, [registrationReference, t]);
 
+  // Bank-transfer registrations are approved by a super admin, so the payer's
+  // screen waits on the transfer status instead of a Paystack redirect.
+  useEffect(() => {
+    if (!bankTransferSubmitted || !bankTransfer?.reference) return undefined;
+
+    let active = true;
+
+    const checkStatus = async () => {
+      try {
+        const response = await api.get(
+          `/bank-transfer/registration/status/${bankTransfer.reference}`,
+          { skipAuth: true, skipAuthRefresh: true }
+        );
+
+        if (!active) return;
+
+        const data = response.data?.data;
+        if (!data) return;
+
+        if (data.status === 'approved' || data.registered) {
+          setBankTransferStatus(data);
+          setBankTransferSubmitted(false);
+          setBankTransfer(null);
+          return;
+        }
+
+        if (data.status === 'rejected') {
+          setBankTransferStatus(data);
+          setBankTransferSubmitted(false);
+        }
+      } catch (error) {
+        // A transient failure must not drop the pending screen.
+      }
+    };
+
+    checkStatus();
+    const timer = setInterval(checkStatus, 8000);
+
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [bankTransferSubmitted, bankTransfer?.reference]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -710,9 +761,14 @@ const Register = () => {
 
     // Payment-required roles must complete payment before account creation
     if (requiresPayment) {
+      if (!paymentMethod) {
+        setShowPaymentMethodChooser(true);
+        return;
+      }
+
       const paymentResponse = await api.post(
   '/auth/register/payment',
-  registrationData,
+  { ...registrationData, payment_method: paymentMethod },
   {
     skipAuth: true,
     skipAuthRefresh: true,
@@ -733,6 +789,20 @@ const Register = () => {
   toast.info(t('register.prembly_check'));
   return;
 }
+
+      if (
+        paymentResponse.data?.success &&
+        paymentResponse.data?.data?.payment_method === 'bank_transfer'
+      ) {
+        resetTurnstile();
+        setPaymentMethod(null);
+        setBankTransfer({
+          reference: paymentResponse.data.data.reference,
+          amount: paymentResponse.data.data.amount,
+          bank_accounts: paymentResponse.data.data.bank_accounts || [],
+        });
+        return;
+      }
 
       if (
         paymentResponse.data?.success &&
@@ -1086,6 +1156,21 @@ return (
             >
               Pay Now
             </a>
+          ) : resumePayment.payment_method === 'bank_transfer' ? (
+            <button
+              type="button"
+              onClick={() => {
+                setBankTransfer({
+                  reference: resumePayment.reference,
+                  amount: resumePayment.amount,
+                  bank_accounts: resumePayment.bank_accounts || [],
+                });
+                setResumePayment(null);
+              }}
+              className="mt-5 block w-full rounded-xl bg-teal-600 py-3 text-center text-sm font-semibold text-white hover:bg-teal-700"
+            >
+              Pay by bank transfer
+            </button>
           ) : (
             <p className="mt-5 text-center text-sm text-amber-600">
               Payment is temporarily unavailable. Please try again in a few minutes.
@@ -1306,6 +1391,170 @@ return (
         </div>
       </div>
     )}
+    {showPaymentMethodChooser && (
+      <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/60 px-4">
+        <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">Payment method</p>
+              <h2 className="mt-1 text-xl font-bold text-gray-900">
+                Pay {formatNaira(displayedRegistrationAmount)}
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowPaymentMethodChooser(false)}
+              className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              aria-label="Close"
+            >
+              ×
+            </button>
+          </div>
+
+          <p className="mt-2 text-sm text-gray-600">
+            Choose how you want to pay. Your account is only created after the fee is confirmed.
+          </p>
+
+          <button
+            type="button"
+            onClick={() => {
+              setPaymentMethod('paystack');
+              setShowPaymentMethodChooser(false);
+              setTimeout(() => registrationFormRef.current?.requestSubmit(), 0);
+            }}
+            className="mt-5 w-full rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-left hover:border-primary-400"
+          >
+            <span className="block text-sm font-semibold text-primary-900">Pay with Paystack</span>
+            <span className="block text-xs text-primary-700">Card, bank account, USSD or Paystack transfer</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setPaymentMethod('bank_transfer');
+              setShowPaymentMethodChooser(false);
+              setTimeout(() => registrationFormRef.current?.requestSubmit(), 0);
+            }}
+            className="mt-3 w-full rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-left hover:border-teal-400"
+          >
+            <span className="block text-sm font-semibold text-teal-900">Pay by bank transfer</span>
+            <span className="block text-xs text-teal-700">
+              Transfer to an Amana RentalHub NG account and capture the confirmation
+            </span>
+          </button>
+        </div>
+      </div>
+    )}
+
+    {bankTransfer && !bankTransferSubmitted && !bankTransferStatus && (
+      <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/60 px-4 py-4">
+        <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wide text-teal-600">Bank transfer</p>
+              <h2 className="mt-1 text-xl font-bold text-gray-900">Complete your registration payment</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setBankTransfer(null);
+                setBankTransferSubmitted(false);
+              }}
+              className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              aria-label="Close"
+            >
+              ×
+            </button>
+          </div>
+
+          <div className="mt-4">
+            <BankTransferCheckout
+              amount={bankTransfer.amount}
+              reference={bankTransfer.reference}
+              accounts={bankTransfer.bank_accounts}
+              endpoint="/bank-transfer/registration/proof"
+              onSubmitted={() => setBankTransferSubmitted(true)}
+              onCancel={() => {
+                setBankTransfer(null);
+                setBankTransferSubmitted(false);
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    )}
+
+    {bankTransferSubmitted && (
+      <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/60 px-4">
+        <div className="w-full max-w-md rounded-2xl bg-white p-6 text-center shadow-2xl">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-2xl">⏳</div>
+          <h2 className="text-lg font-bold text-gray-900">Waiting for confirmation</h2>
+          <p className="mt-2 text-sm text-gray-600">
+            Your capture was received. A super admin is checking the credit; this screen updates automatically.
+          </p>
+          <p className="mt-3 font-mono text-xs text-gray-500">{bankTransfer?.reference}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setBankTransferSubmitted(false);
+              setBankTransfer(null);
+            }}
+            className="mt-5 w-full rounded-xl py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100"
+          >
+            I will check back later
+          </button>
+        </div>
+      </div>
+    )}
+
+    {bankTransferStatus && (
+      <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 px-4">
+        <div className="w-full max-w-md rounded-2xl bg-white p-6 text-center shadow-2xl">
+          {bankTransferStatus.status === 'rejected' ? (
+            <>
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-2xl">✕</div>
+              <h2 className="text-lg font-bold text-gray-900">Transfer not confirmed</h2>
+              <p className="mt-2 text-sm text-gray-600">
+                {bankTransferStatus.review_note || 'The transfer could not be confirmed.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => setBankTransferStatus(null)}
+                className="mt-5 w-full rounded-xl bg-primary-600 py-3 text-sm font-semibold text-white hover:bg-primary-700"
+              >
+                Try again
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setBankTransferStatus(null);
+                  setBankTransfer(null);
+                }}
+                className="mt-2 w-full rounded-xl py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100"
+              >
+                Close
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-2xl">✓</div>
+              <h2 className="text-lg font-bold text-gray-900">Registration payment confirmed</h2>
+              <p className="mt-2 text-sm text-gray-600">
+                Your {bankTransferStatus.user_type === 'landlord' ? 'landlord' : 'tenant'} account has been
+                created. Sign in with the password you chose.
+              </p>
+              <Link
+                to="/login"
+                className="mt-5 block w-full rounded-xl bg-primary-600 py-3 text-sm font-semibold text-white hover:bg-primary-700"
+              >
+                Go to sign in
+              </Link>
+            </>
+          )}
+        </div>
+      </div>
+    )}
+
     {showRegistrationFeeModal && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-4">
         <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl bg-white p-6 shadow-2xl">
@@ -2113,7 +2362,7 @@ return (
 
             {/* STEP 4 — Password & Submit */}
             {step === 4 && (
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} ref={registrationFormRef} className="space-y-4">
 
                 {/* Payment notice */}
                 {requiresPayment && (

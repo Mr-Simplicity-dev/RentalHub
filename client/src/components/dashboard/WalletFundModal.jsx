@@ -3,6 +3,7 @@ import { FaCheckCircle, FaTimes, FaWallet, FaHistory, FaReceipt } from 'react-ic
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
+import BankTransferCheckout from '../BankTransferCheckout';
 
 const TYPE_LABELS = {
   wallet_funding: 'wallet_fund.type.wallet_funding',
@@ -36,11 +37,17 @@ export default function WalletFundModal({
   const [transactions, setTransactions] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [method, setMethod] = useState('');
+  const [choiceOpen, setChoiceOpen] = useState(false);
+  const [submitted, setSubmitted] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!isOpen) return;
     setShowHistory(false);
+    setMethod('');
+    setChoiceOpen(false);
+    setSubmitted(null);
     setHistoryLoading(true);
     api.get('/payments/wallet/transactions', { params: { limit: 20 } })
       .then((res) => setTransactions(res.data?.data || []))
@@ -121,19 +128,91 @@ export default function WalletFundModal({
             <span>{t('wallet_fund.secure_notice', 'Payment is processed securely. Your wallet will be credited immediately after successful payment.')}</span>
           </div>
 
-          <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="btn w-full">{t('wallet_fund.cancel', 'Cancel')}</button>
-            <button
-              type="button"
-              onClick={() => onSubmit(amount)}
-              disabled={isLoading || !amount || Number(amount) < 100}
-              className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading
-                ? t('wallet_fund.redirecting', 'Redirecting...')
-                : `${t('wallet_fund.pay', 'Pay')} ₦${amount ? Number(amount).toLocaleString() : '0'}`}
-            </button>
-          </div>
+          {submitted ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-800">
+              <p className="font-semibold">Transfer submitted for approval</p>
+              <p className="mt-1">
+                Reference <span className="font-mono">{submitted.reference}</span>. A super admin confirms
+                the credit and your wallet is funded automatically — the receipt is emailed to you.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setSubmitted(null);
+                  setMethod('');
+                  onClose();
+                }}
+                className="mt-3 w-full rounded-xl bg-emerald-700 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800"
+              >
+                Done
+              </button>
+            </div>
+          ) : method === 'bank_transfer' ? (
+            <BankTransferCheckout
+              amount={Number(amount)}
+              endpoint="/bank-transfer/wallet/proof"
+              buildPayload={(payload) => ({ ...payload, amount: Number(amount) })}
+              onSubmitted={(data) => setSubmitted(data)}
+              onCancel={() => {
+                setMethod('');
+                setChoiceOpen(false);
+              }}
+            />
+          ) : choiceOpen ? (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-gray-700">
+                {t('wallet_fund.choose_method', 'Choose how to pay')} ₦{Number(amount).toLocaleString()}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setChoiceOpen(false);
+                  onSubmit(amount);
+                }}
+                className="w-full rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-left hover:border-teal-400"
+              >
+                <span className="block text-sm font-semibold text-teal-900">Pay with Paystack</span>
+                <span className="block text-xs text-teal-700">Card, bank account or USSD</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setChoiceOpen(false);
+                  setMethod('bank_transfer');
+                }}
+                className="w-full rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-left hover:border-indigo-400"
+              >
+                <span className="block text-sm font-semibold text-indigo-900">Pay by bank transfer</span>
+                <span className="block text-xs text-indigo-700">
+                  Transfer into a platform account and capture the confirmation
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setChoiceOpen(false)}
+                className="w-full text-center text-xs text-gray-500 hover:text-gray-700"
+              >
+                {t('common.cancel', 'Cancel')}
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-3">
+              <button type="button" onClick={onClose} className="btn w-full">{t('wallet_fund.cancel', 'Cancel')}</button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!amount || Number(amount) < 100) return;
+                  setChoiceOpen(true);
+                }}
+                disabled={isLoading || !amount || Number(amount) < 100}
+                className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading
+                  ? t('wallet_fund.redirecting', 'Redirecting...')
+                  : `${t('wallet_fund.pay', 'Pay')} ₦${amount ? Number(amount).toLocaleString() : '0'}`}
+              </button>
+            </div>
+          )}
 
           <button
             type="button"

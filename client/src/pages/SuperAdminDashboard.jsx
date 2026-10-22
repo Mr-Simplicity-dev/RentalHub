@@ -45,6 +45,8 @@ import AdminMonitorTab from "../components/admin/AdminMonitorTab";
 import CommissionConfigTab from "../components/admin/CommissionConfigTab";
 import AppealsTab from "../components/admin/AppealsTab";
 import VoiceSupportOverview from "../components/admin/VoiceSupportOverview";
+import BankAccountsTab from "../components/admin/BankAccountsTab";
+import BankTransfersTab from "../components/admin/BankTransfersTab";
 
 const tabs = [
   "overview",
@@ -80,6 +82,8 @@ const tabs = [
   "calculator_fees",
   "rent_savings_fees",
   "rent_savings_withdrawals",
+  "bank_accounts",
+  "bank_transfers",
 ];
 
 const tabLabels = {
@@ -116,6 +120,8 @@ const tabLabels = {
   calculator_fees: "Calculator Fees",
   rent_savings_fees: "Rent Savings Fees",
   rent_savings_withdrawals: "Rent Savings Withdrawals",
+  bank_accounts: "Bank Accounts",
+  bank_transfers: "Manual Payments",
 };
 
 const shortcutCategories = [
@@ -175,6 +181,8 @@ const shortcutCategories = [
       { name: "admin_monitor", label: "Admin Monitor", detail: "Monitor admin activity and performance" },
       { name: "pending_approvals", label: "Pending Approvals", detail: "Review pending admin account approvals" },
       { name: "commission_config", label: "Commission Config", detail: "Manage commission rates and fee distribution" },
+      { name: "bank_transfers", label: "Manual Payments", detail: "Approve or reject bank-transfer payments and view the captured proof" },
+      { name: "bank_accounts", label: "Bank Accounts", detail: "Add the accounts users transfer registration fees and wallet top-ups into" },
     ],
   },
   {
@@ -1643,6 +1651,14 @@ export default function SuperAdminDashboard() {
 
         {tab === "survey" && (
           <SurveyAdminPanel />
+        )}
+
+        {tab === "bank_transfers" && (
+          <BankTransfersTab />
+        )}
+
+        {tab === "bank_accounts" && (
+          <BankAccountsTab />
         )}
 
       <InputDialog

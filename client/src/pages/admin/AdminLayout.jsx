@@ -30,6 +30,7 @@ import {
   FaClipboardList,
   FaStar,
   FaWallet,
+  FaUniversity,
   FaHeadset,
   FaPhone,
   FaUserShield,
@@ -736,6 +737,16 @@ const AdminLayout = () => {
                 <NavLink to="/super-admin?tab=pricing" className={() => superAdminNavItem('pricing')}>
                   <FaMoneyBill className="mr-3" />
                   Pricing
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=bank_transfers" className={() => superAdminNavItem('bank_transfers')}>
+                  <FaMoneyBill className="mr-3" />
+                  Manual Payments
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=bank_accounts" className={() => superAdminNavItem('bank_accounts')}>
+                  <FaUniversity className="mr-3" />
+                  Bank Accounts
                 </NavLink>
 
                 <NavLink to="/super-admin?tab=flags" className={() => superAdminNavItem('flags')}>

@@ -270,9 +270,9 @@ const WhatsappMarketingTab = () => {
       }
 
       const res = await api.post('/whatsapp-marketing/contacts/import', { phones });
-      const { added, alreadyKnown, invalid, duplicates, total } = res.data.data;
+      const { added, alreadyKnown, invalid, duplicates, removedDuplicates, total } = res.data.data;
       toast.success(
-        `Imported ${added} new · Already in system: ${alreadyKnown} · Duplicates: ${duplicates} · Invalid: ${invalid} · Total now: ${total}`
+        `Imported ${added} new · Already in system: ${alreadyKnown} · Duplicates: ${duplicates} · Invalid: ${invalid} · Old duplicates removed: ${removedDuplicates || 0} · Total now: ${total}`
       );
       setCsvFile(null);
       setCsvPreview([]);
@@ -328,6 +328,19 @@ const WhatsappMarketingTab = () => {
       toast.error(err.response?.data?.message || 'Failed to delete invalid contacts');
     } finally {
       setDeletingInvalid(false);
+    }
+  };
+
+  const handleCleanDuplicates = async () => {
+    try {
+      const res = await api.delete('/whatsapp-marketing/contacts/duplicates', {
+        data: { note: 'Bulk duplicate cleanup' },
+      });
+      const { deleted = 0, normalized = 0 } = res.data.data || {};
+      toast.success(`Removed ${deleted} duplicate(s) and normalised ${normalized} number(s)`);
+      loadContacts(contactSearch, contactPage);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to clean duplicate contacts');
     }
   };
 
@@ -829,6 +842,10 @@ const WhatsappMarketingTab = () => {
             {deletingInvalid
               ? 'Deleting…'
               : `Delete all invalid contacts (${contactStats?.invalid ?? 0})`}
+          </GhostButton>
+          <GhostButton onClick={handleCleanDuplicates}>
+            <FaSyncAlt className="mr-2" />
+            Remove duplicates
           </GhostButton>
           <p className="text-xs text-gray-500">
             Removes every number Meta confirmed is not on WhatsApp. Unchecked numbers are kept.

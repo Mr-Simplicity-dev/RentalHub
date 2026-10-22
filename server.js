@@ -177,6 +177,8 @@ const { generateTitles } = require('./config/utils/pageGenerator');
 const { generateKeywords } = require('./config/utils/keywordGenerator');
 const { generateBacklinks } = require('./utils/backlinkEngine');
 const adminSeoRoutes = require('./routes/adminSeoRoutes');
+const bankTransferRoutes = require('./routes/bankTransfers');
+const adminBankTransfersRoutes = require('./routes/adminBankTransfers');
 const {
   runEvidenceIntegrityMonitor,
 } = require('./services/evidenceIntegrityMonitor.service');
@@ -720,6 +722,7 @@ const propertyOpsLimiter = buildRouteLimiter(isProduction ? 300 : 1000);
 app.use('/api/auth', authLimiter, authSensitiveLimiter, authRoutes);
 app.use('/api/properties', propertyOpsLimiter, propertyRoutes);
 app.use('/api/payments', paymentOpsLimiter, paymentRoutes);
+app.use('/api/bank-transfer', generalOpsLimiter, bankTransferRoutes);
 app.use('/api/applications', generalOpsLimiter, applicationRoutes);
 app.use('/api/tenancy-agreements', generalOpsLimiter, tenancyAgreementRoutes);
 app.use('/api/tenancy-agreement-templates', adminLimiter, tenancyAgreementTemplateRoutes);
@@ -730,6 +733,7 @@ app.use('/api/admin/diaspora', adminLimiter, diasporaAdminRoutes);
 app.use('/api/survey', generalOpsLimiter, surveyRoutes);
 app.use('/api/admin/survey', adminLimiter, adminSurveyRoutes);
 app.use('/api/admin/seo', adminLimiter, adminSeoRoutes);
+app.use('/api/admin/bank-transfers', adminLimiter, adminBankTransfersRoutes);
 app.use('/api/dashboard', generalOpsLimiter, dashboardRoutes);
 app.use('/api/notifications', generalOpsLimiter, notificationRoutes);
 app.use('/api/super', adminLimiter, superAdminRoutes);

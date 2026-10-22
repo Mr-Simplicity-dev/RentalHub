@@ -280,9 +280,9 @@ const EmailMarketingTab = () => {
       if (emails.length === 0) { toast.error('No valid email addresses found in the file'); return; }
 
       const res = await api.post('/email-marketing/subscribers/import', { emails });
-      const { added, alreadyKnown, invalid, duplicates } = res.data.data;
+      const { added, alreadyKnown, invalid, duplicates, removedDuplicates } = res.data.data;
       toast.success(
-        `Imported ${added} new · Already in system: ${alreadyKnown} · Duplicates: ${duplicates} · Invalid: ${invalid}`
+        `Imported ${added} new · Already in system: ${alreadyKnown} · Duplicates: ${duplicates} · Invalid: ${invalid} · Old duplicates removed: ${removedDuplicates || 0}`
       );
       setEmailCsvFile(null);
       setEmailCsvPreview([]);
@@ -292,6 +292,20 @@ const EmailMarketingTab = () => {
       toast.error(err.response?.data?.message || 'Import failed');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCleanDuplicates = async () => {
+    try {
+      const res = await api.delete('/email-marketing/subscribers/duplicates', {
+        data: { note: 'Bulk duplicate cleanup' },
+      });
+      const { deleted = 0, normalized = 0 } = res.data.data || {};
+      toast.success(`Removed ${deleted} duplicate(s) and normalised ${normalized} address(es)`);
+      loadSubscribers(subSearch, subPage);
+      loadStats();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to clean duplicates');
     }
   };
 
@@ -569,6 +583,9 @@ const EmailMarketingTab = () => {
             aria-label="Delete all unsubscribed email contacts"
           >
             <FaTrash /> Delete unsubscribed
+          </SecondaryButton>
+          <SecondaryButton onClick={handleCleanDuplicates} className="gap-2 text-amber-700 hover:bg-amber-50">
+            <FaSyncAlt /> Remove duplicates
           </SecondaryButton>
           <PrimaryButton onClick={() => setShowAddSubscriber(true)} className="gap-2">
             <FaPlus /> Add Contact
