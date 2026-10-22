@@ -20,7 +20,20 @@ router.get('/subscribers', authenticate, requireSuperAdmin, emailCtrl.listSubscr
 router.post('/subscribers/sync', authenticate, requireSuperAdmin, emailCtrl.syncSubscribers);
 router.post(
   '/subscribers/import',
-  [body('emails').isArray({ min: 1, max: 5000 })],
+  [
+    body('emails')
+      .custom((value) => {
+        if (Array.isArray(value)) {
+          if (value.length < 1 || value.length > 5000) throw new Error('emails must have between 1 and 5000 items');
+          return true;
+        }
+        if (typeof value === 'string') {
+          if (!value.trim()) throw new Error('emails cannot be empty');
+          return true;
+        }
+        throw new Error('emails must be an array or string');
+      }),
+  ],
   validateRequest,
   authenticate,
   requireSuperAdmin,
@@ -28,6 +41,7 @@ router.post(
 );
 // Registered before /subscribers/:id so the literal path is not read as an id.
 router.delete('/subscribers/unsubscribed', authenticate, requireSuperAdmin, emailCtrl.deleteUnsubscribedSubscribers);
+router.delete('/subscribers/duplicates', authenticate, requireSuperAdmin, emailCtrl.cleanDuplicateSubscribers);
 router.post('/subscribers', [body('email').isEmail().normalizeEmail(), body('full_name').optional().isString().trim().isLength({ max: 200 })], validateRequest, authenticate, requireSuperAdmin, emailCtrl.addSubscriber);
 router.patch('/subscribers/:id', [param('id').isInt(), body('email').optional().isEmail().normalizeEmail(), body('full_name').optional().isString().trim().isLength({ max: 200 })], validateRequest, authenticate, requireSuperAdmin, emailCtrl.updateSubscriber);
 router.delete('/subscribers/:id', [param('id').isInt()], validateRequest, authenticate, requireSuperAdmin, emailCtrl.deleteSubscriber);

@@ -313,12 +313,12 @@ const importSubscribers = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No email addresses provided' });
     }
 
-    const normalizedIncoming = incoming
-      .map((e) => {
-        if (typeof e !== 'string') return '';
-        return e.trim().toLowerCase();
-      })
-      .filter((e) => e.includes('@'));
+    // Keep malformed entries in the list so classifyNewEmails can count them
+    // as invalid instead of silently dropping them from the report.
+    const normalizedIncoming = incoming.map((e) => {
+      if (typeof e !== 'string') return '';
+      return e.trim().toLowerCase();
+    });
 
     if (normalizedIncoming.length === 0) {
       return res.status(400).json({ success: false, message: 'No valid email addresses found' });
@@ -335,6 +335,10 @@ const importSubscribers = async (req, res) => {
         data: { added: 0, alreadyKnown, invalid, duplicates },
       });
     }
+
+    // Collapse rows that already exist with different casing/whitespace
+    // before inserting, so an import never leaves the list with duplicates.
+    const { deleted: removedDuplicates } = await dedupeSubscribers();
 
     let added = 0;
     for (let i = 0; i < accepted.length; i += 250) {
@@ -362,12 +366,12 @@ const importSubscribers = async (req, res) => {
       entityType: 'subscriber',
       entityId: null,
       eventType: 'subscribers_imported',
-      metadata: { submitted: incoming.length, added, alreadyKnown, invalid, duplicates },
+      metadata: { submitted: incoming.length, added, alreadyKnown, invalid, duplicates, removedDuplicates },
     }).catch(() => {});
 
     res.status(201).json({
       success: true,
-      data: { added, alreadyKnown, invalid, duplicates, totalImport: total.rows[0].total },
+      data: { added, alreadyKnown, invalid, duplicates, removedDuplicates, totalImport: total.rows[0].total },
     });
   } catch (error) {
     req.logger.error('Import email subscribers error:', error.message);
@@ -492,6 +496,49 @@ const deleteUnsubscribedSubscribers = async (req, res) => {
   } catch (error) {
     req.logger.error('Delete unsubscribed email subscribers error:', error.message);
     res.status(500).json({ success: false, message: 'Failed to delete unsubscribed subscribers' });
+  }
+};
+
+const dedupeSubscribers = async () => {
+  const result = await db.query(
+    `WITH ranked AS (
+       SELECT id,
+              ROW_NUMBER() OVER (PARTITION BY lower(trim(email)) ORDER BY id ASC) AS rn
+       FROM email_subscribers
+       WHERE email IS NOT NULL AND trim(email) <> ''
+     )
+     DELETE FROM email_subscribers WHERE id IN (SELECT id FROM ranked WHERE rn > 1) RETURNING id`
+  );
+  const normalized = await db.query(
+    `UPDATE email_subscribers
+        SET email = lower(trim(email)), updated_at = CURRENT_TIMESTAMP
+      WHERE email <> lower(trim(email))
+      RETURNING id`
+  );
+  return { deleted: result.rowCount ?? 0, normalized: normalized.rowCount ?? 0 };
+};
+
+const cleanDuplicateSubscribers = async (req, res) => {
+  try {
+    await ensureSchema();
+    const reason = requireActionNote(req, res, 'A cleanup reason is required');
+    if (!reason) return;
+
+    const { deleted, normalized } = await dedupeSubscribers();
+
+    await recordOperation({
+      actor: req.user,
+      entityType: 'subscriber',
+      entityId: null,
+      eventType: 'duplicates_cleaned',
+      note: reason,
+      metadata: { deleted, normalized },
+    });
+
+    res.json({ success: true, data: { deleted, normalized } });
+  } catch (error) {
+    req.logger.error('Clean duplicate email subscribers error:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to clean duplicate email subscribers' });
   }
 };
 
@@ -996,6 +1043,7 @@ module.exports = {
   importSubscribers,
   addSubscriber,
   deleteUnsubscribedSubscribers,
+  cleanDuplicateSubscribers,
   updateSubscriber,
   deleteSubscriber,
   unsubscribe,

@@ -681,7 +681,7 @@ const importContacts = async (req, res) => {
     let incoming = req.body?.phones;
     if (typeof incoming === 'string') {
       incoming = incoming
-        .split(/[\n,;\t|,\r]+/)
+        .split(/[\n,;\t|\r]+/)
         .map((p) => String(p || '').replace(/[^0-9+]/g, ''))
         .filter((p) => p.replace(/^\+/, '').length >= 10);
     }
@@ -690,12 +690,12 @@ const importContacts = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No phone numbers provided' });
     }
 
-    const normalizedIncoming = incoming
-      .map((p) => {
-        if (typeof p !== 'string') return '';
-        return p.replace(/\D/g, '');
-      })
-      .filter((p) => p.length >= 10 && p.length <= 15);
+    // Keep malformed entries in the list so classifyNewPhones can count them
+    // as invalid instead of silently dropping them from the report.
+    const normalizedIncoming = incoming.map((p) => {
+      if (typeof p !== 'string') return '';
+      return p.replace(/\D/g, '');
+    });
 
     if (normalizedIncoming.length === 0) {
       return res.status(400).json({ success: false, message: 'No valid phone numbers found' });
@@ -727,6 +727,10 @@ const importContacts = async (req, res) => {
       });
     }
 
+    // Collapse rows that already exist in both shapes (0803… and 234803…)
+    // before inserting, so an import never leaves the list with duplicates.
+    const { deleted: removedDuplicates } = await dedupeContacts();
+
     let added = 0;
     for (let i = 0; i < normalized.length; i += 250) {
       const chunk = normalized.slice(i, i + 250);
@@ -753,7 +757,7 @@ const importContacts = async (req, res) => {
       entityType: 'whatsapp_contact',
       entityId: null,
       eventType: 'contacts_imported',
-      metadata: { submitted: incoming.length, added, alreadyKnown, invalid, duplicates, total: total.rows[0].total },
+      metadata: { submitted: incoming.length, added, alreadyKnown, invalid, duplicates, removedDuplicates, total: total.rows[0].total },
     });
 
     res.status(201).json({
@@ -763,6 +767,7 @@ const importContacts = async (req, res) => {
         alreadyKnown,
         invalid,
         duplicates,
+        removedDuplicates,
         total: total.rows[0].total,
       },
     });
@@ -811,20 +816,35 @@ const deleteInvalidContacts = async (req, res) => {
   }
 };
 
+const dedupeContacts = async () => {
+  const result = await db.query(
+    `WITH ranked AS (
+       SELECT id,
+              ROW_NUMBER() OVER (
+                PARTITION BY right(regexp_replace(phone, '\\D', '', 'g'), 10)
+                ORDER BY id ASC
+              ) AS rn
+       FROM whatsapp_contacts
+       WHERE regexp_replace(phone, '\\D', '', 'g') <> ''
+     )
+     DELETE FROM whatsapp_contacts WHERE id IN (SELECT id FROM ranked WHERE rn > 1) RETURNING id`
+  );
+  const normalized = await db.query(
+    `UPDATE whatsapp_contacts
+        SET phone = '234' || right(regexp_replace(phone, '\\D', '', 'g'), 10)
+      WHERE regexp_replace(phone, '\\D', '', 'g') ~ '^0[789][0-9]{9}$'
+      RETURNING id`
+  );
+  return { deleted: result.rowCount ?? 0, normalized: normalized.rowCount ?? 0 };
+};
+
 const cleanDuplicateContacts = async (req, res) => {
   try {
     await ensureSchema();
     const note = requireActionNote(req, res, 'A cleanup reason is required');
     if (!note) return;
 
-    const result = await db.query(
-      `WITH ranked AS (
-         SELECT id,
-                ROW_NUMBER() OVER (PARTITION BY regexp_replace(phone,'\\D','','g') ORDER BY id ASC) rn
-         FROM whatsapp_contacts
-       )
-       DELETE FROM whatsapp_contacts WHERE id IN (SELECT id FROM ranked WHERE rn > 1) RETURNING id`
-    );
+    const { deleted, normalized } = await dedupeContacts();
 
     await recordOperation({
       actor: req.user,
@@ -832,10 +852,10 @@ const cleanDuplicateContacts = async (req, res) => {
       entityId: null,
       eventType: 'duplicates_cleaned',
       note,
-      metadata: { deleted: result.rows.length },
+      metadata: { deleted, normalized },
     });
 
-    res.json({ success: true, data: { deleted: result.rows.length } });
+    res.json({ success: true, data: { deleted, normalized } });
   } catch (error) {
     req.logger.error('Clean duplicate WhatsApp contacts error:', error.message);
     res.status(500).json({ success: false, message: 'Failed to clean duplicate WhatsApp contacts' });
@@ -960,6 +980,7 @@ module.exports = {
   importContacts,
   deleteContact,
   deleteInvalidContacts,
+  cleanDuplicateContacts,
   checkContacts,
   normalizeAudienceScope,
   resolveAudience,

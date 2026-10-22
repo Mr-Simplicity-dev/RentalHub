@@ -375,20 +375,36 @@ const deleteUnsubscribedSubscribers = async (req, res) => {
   }
 };
 
+const dedupeSubscribers = async () => {
+  const result = await db.query(
+    `WITH ranked AS (
+       SELECT id,
+              ROW_NUMBER() OVER (
+                PARTITION BY right(regexp_replace(phone, '\\D', '', 'g'), 10)
+                ORDER BY id ASC
+              ) AS rn
+       FROM sms_subscribers
+       WHERE regexp_replace(phone, '\\D', '', 'g') <> ''
+     )
+     DELETE FROM sms_subscribers WHERE id IN (SELECT id FROM ranked WHERE rn > 1) RETURNING id`
+  );
+  const normalized = await db.query(
+    `UPDATE sms_subscribers
+        SET phone = '234' || right(regexp_replace(phone, '\\D', '', 'g'), 10),
+            updated_at = CURRENT_TIMESTAMP
+      WHERE regexp_replace(phone, '\\D', '', 'g') ~ '^0[789][0-9]{9}$'
+      RETURNING id`
+  );
+  return { deleted: result.rowCount ?? 0, normalized: normalized.rowCount ?? 0 };
+};
+
 const cleanDuplicateSubscribers = async (req, res) => {
   try {
     await ensureSchema();
     const reason = requireActionNote(req, res, 'A cleanup reason is required');
     if (!reason) return;
 
-    const result = await db.query(
-      `WITH ranked AS (
-         SELECT id,
-                ROW_NUMBER() OVER (PARTITION BY regexp_replace(phone,'\\D','','g') ORDER BY id ASC) rn
-         FROM sms_subscribers
-       )
-       DELETE FROM sms_subscribers WHERE id IN (SELECT id FROM ranked WHERE rn > 1) RETURNING id`
-    );
+    const { deleted, normalized } = await dedupeSubscribers();
 
     await recordOperation({
       actor: req.user,
@@ -396,10 +412,10 @@ const cleanDuplicateSubscribers = async (req, res) => {
       entityId: null,
       eventType: 'duplicates_cleaned',
       note: reason,
-      metadata: { deleted: result.rows.length },
+      metadata: { deleted, normalized },
     });
 
-    res.json({ success: true, data: { deleted: result.rows.length } });
+    res.json({ success: true, data: { deleted, normalized } });
   } catch (error) {
     req.logger.error('Clean duplicate SMS subscribers error:', error.message);
     res.status(500).json({ success: false, message: 'Failed to clean duplicate SMS subscribers' });
@@ -728,6 +744,10 @@ const importSubscribers = async (req, res) => {
       });
     }
 
+    // Collapse rows that already exist in both shapes (0803… and 234803…)
+    // before inserting, so an import never leaves the list with duplicates.
+    const { deleted: removedDuplicates } = await dedupeSubscribers();
+
     let added = 0;
     for (let i = 0; i < normalizedAccepted.length; i += 250) {
       const chunk = normalizedAccepted.slice(i, i + 250);
@@ -756,6 +776,7 @@ const importSubscribers = async (req, res) => {
         alreadyKnown,
         invalid,
         duplicates,
+        removedDuplicates,
         skipped: invalid + duplicates,
         totalImport: total.rows[0].total,
       },
@@ -989,6 +1010,7 @@ module.exports = {
   syncSubscribers,
   importSubscribers,
   deleteUnsubscribedSubscribers,
+  cleanDuplicateSubscribers,
   addSubscriber,
   updateSubscriber,
   deleteSubscriber,
