@@ -97,7 +97,20 @@ router.post(
 );
 router.post(
   '/contacts/import',
-  [body('phones').isArray({ min: 1, max: 5000 })],
+  [
+    body('phones')
+      .custom((value) => {
+        if (Array.isArray(value)) {
+          if (value.length < 1 || value.length > 5000) throw new Error('phones must have between 1 and 5000 items');
+          return true;
+        }
+        if (typeof value === 'string') {
+          if (!value.trim()) throw new Error('phones cannot be empty');
+          return true;
+        }
+        throw new Error('phones must be an array or string');
+      }),
+  ],
   validateRequest,
   authenticate,
   requireSuperAdmin,

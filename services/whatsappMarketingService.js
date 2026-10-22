@@ -681,9 +681,9 @@ const importContacts = async (req, res) => {
     let incoming = req.body?.phones;
     if (typeof incoming === 'string') {
       incoming = incoming
-        .split(/[\n,;\t|]+/)
-        .map((p) => p.replace(/[^0-9+]/g, '').replace(/^\+/, ''))
-        .filter((p) => p.length >= 10);
+        .split(/[\n,;\t|,\r]+/)
+        .map((p) => String(p || '').replace(/[^0-9+]/g, ''))
+        .filter((p) => p.replace(/^\+/, '').length >= 10);
     }
     incoming = Array.isArray(incoming) ? incoming : [];
     if (incoming.length === 0) {
@@ -716,7 +716,16 @@ const importContacts = async (req, res) => {
       });
     }
 
+    // Normalize to WhatsApp/E.164 format (+234...) for consistency
     const normalized = accepted.map((p) => normalizeWhatsphone(p)).filter(Boolean);
+
+    if (normalized.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No valid Nigerian phone numbers found',
+        data: { added: 0, alreadyKnown, invalid: invalid + accepted.length, duplicates },
+      });
+    }
 
     let added = 0;
     for (let i = 0; i < normalized.length; i += 250) {

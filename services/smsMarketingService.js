@@ -674,9 +674,32 @@ const importSubscribers = async (req, res) => {
       });
     }
 
+    // Normalize to 234... format for consistency with WhatsApp
+    const normalizeTo234 = (phone) => {
+      const digits = String(phone || '').replace(/\D/g, '');
+      if (!digits) return null;
+      let national = digits;
+      if (digits.startsWith('234')) national = digits.slice(3);
+      else if (digits.startsWith('0')) national = digits.slice(1);
+      if (national.length !== 10) return null;
+      return `234${national}`;
+    };
+
+    const normalizedAccepted = accepted
+      .map((p) => normalizeTo234(p))
+      .filter(Boolean);
+
+    if (normalizedAccepted.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No valid phone numbers found',
+        data: { added: 0, alreadyKnown, invalid: invalid + accepted.length, duplicates },
+      });
+    }
+
     let added = 0;
-    for (let i = 0; i < accepted.length; i += 250) {
-      const chunk = accepted.slice(i, i + 250);
+    for (let i = 0; i < normalizedAccepted.length; i += 250) {
+      const chunk = normalizedAccepted.slice(i, i + 250);
       const params = [];
       const values = chunk.map((phone) => {
         params.push(phone);
