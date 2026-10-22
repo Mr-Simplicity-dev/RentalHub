@@ -298,6 +298,39 @@ const SmsMarketingTab = () => {
     }
   };
 
+  const extractPhoneNumbers = (text = '') => {
+    if (!text) return [];
+    const normalized = String(text)
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n');
+    const tokens = normalized.split(/[\n,;\t|]+/);
+    const phones = [];
+    const seen = new Set();
+    for (let i = 0; i < tokens.length; i += 1) {
+      const raw = tokens[i];
+      if (!raw) continue;
+      // Extract sequences that look like phone numbers (including with +, spaces, dashes, parentheses)
+      const matches = raw.match(/\+?\d[\d\s\-\(\)]{7,}\d/g);
+      if (matches && matches.length > 0) {
+        for (let m = 0; m < matches.length; m += 1) {
+          const cleaned = matches[m].replace(/[\s\-\(\)\+]/g, '').trim();
+          if (cleaned.length >= 10 && cleaned.length <= 15 && !seen.has(cleaned)) {
+            seen.add(cleaned);
+            phones.push(cleaned);
+          }
+        }
+      } else {
+        // Fallback: strip non-digit except leading +
+        const cleaned = raw.replace(/[^0-9+]/g, '').replace(/^\+/, '');
+        if (cleaned.length >= 10 && cleaned.length <= 15 && !seen.has(cleaned)) {
+          seen.add(cleaned);
+          phones.push(cleaned);
+        }
+      }
+    }
+    return phones;
+  };
+
   const handleCsvFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -305,8 +338,7 @@ const SmsMarketingTab = () => {
 
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const lines = ev.target.result.split('\n').filter((l) => l.trim());
-      const phones = lines.map((l) => l.split(',')[0].replace(/[\s"']/g, '')).filter((p) => p.length >= 10);
+      const phones = extractPhoneNumbers(ev.target.result || '');
       setCsvPreview(phones.slice(0, 10));
     };
     reader.readAsText(file);
@@ -317,14 +349,18 @@ const SmsMarketingTab = () => {
     try {
       setLoading(true);
       const text = await csvFile.text();
-      const phones = text.split('\n')
-        .map((l) => l.split(',')[0].replace(/[\s"']/g, '').trim())
-        .filter((p) => p.length >= 10);
+      const phones = extractPhoneNumbers(text);
+
+      if (!phones.length) {
+        toast.error('No valid phone numbers found in the file');
+        setLoading(false);
+        return;
+      }
 
       const res = await api.post('/sms-marketing/subscribers/import', { phones });
-      const { added, alreadyKnown, invalid, duplicates } = res.data.data;
+      const { added, alreadyKnown, invalid, duplicates } = res.data.data || {};
       toast.success(
-        `Imported ${added} new · Already in system: ${alreadyKnown} · Duplicates: ${duplicates} · Invalid: ${invalid}`
+        `Imported ${added || 0} new · Already in system: ${alreadyKnown || 0} · Duplicates: ${duplicates || 0} · Invalid: ${invalid || 0}`
       );
       setCsvFile(null);
       setCsvPreview([]);
@@ -332,7 +368,7 @@ const SmsMarketingTab = () => {
       loadSubscribers(subSearch, subPage);
       loadStats();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Import failed');
+      toast.error(err.response?.data?.message || 'Failed to import SMS subscribers');
     } finally {
       setLoading(false);
     }

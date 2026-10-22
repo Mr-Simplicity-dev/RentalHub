@@ -653,9 +653,11 @@ const AdminLayout = () => {
                 <NavLink
                   to="/admin/super-support-dashboard?tab=voice"
                   className={() =>
-                    location.pathname.startsWith('/admin/super-support-dashboard')
-                      ? roleTheme.activeNav
-                      : roleTheme.hoverNav
+                    `flex items-center px-4 py-3 rounded-lg transition-colors ${
+                      location.pathname.startsWith('/admin/super-support-dashboard')
+                        ? roleTheme.activeNav
+                        : roleTheme.hoverNav
+                    }`
                   }
                 >
                   <FaPhone className="mr-3" />

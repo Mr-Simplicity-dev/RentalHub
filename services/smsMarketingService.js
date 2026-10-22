@@ -636,13 +636,33 @@ const getDashboardStats = async (req, res) => {
 const importSubscribers = async (req, res) => {
   try {
     await ensureSchema();
-    const { phones } = req.body;
+    let { phones } = req.body;
+
+    if (typeof phones === 'string') {
+      phones = phones
+        .split(/[\n,;\t|]+/)
+        .map((p) => p.replace(/[^0-9+]/g, '').replace(/^\+/, ''))
+        .filter((p) => p.length >= 10);
+    }
 
     if (!Array.isArray(phones) || phones.length === 0) {
       return res.status(400).json({ success: false, message: 'No phone numbers provided' });
     }
 
-    const { accepted, alreadyKnown, invalid, duplicates } = await classifyNewPhones(phones);
+    // Extract only digits/numbers and drop anything that is not clearly a phone number
+    const normalizedPhones = phones
+      .map((p) => {
+        if (typeof p !== 'string') return '';
+        const digits = p.replace(/\D/g, '');
+        return digits;
+      })
+      .filter((p) => p.length >= 10 && p.length <= 15);
+
+    if (normalizedPhones.length === 0) {
+      return res.status(400).json({ success: false, message: 'No valid phone numbers found' });
+    }
+
+    const { accepted, alreadyKnown, invalid, duplicates } = await classifyNewPhones(normalizedPhones);
 
     if (accepted.length === 0) {
       return res.status(400).json({
