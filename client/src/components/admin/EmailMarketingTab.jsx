@@ -637,15 +637,16 @@ const EmailMarketingTab = () => {
         )}
 
         <div className="rounded-2xl border border-gray-100">
-          <DataTable columns={['Email', 'Name', 'Source', 'Type', 'Status', 'Added', 'Actions']}>
+          <DataTable columns={['S/N', 'Email', 'Name', 'Source', 'Type', 'Status', 'Added', 'Actions']}>
             {subscribers.length === 0 ? (
               <tr>
-                <Td colSpan={7} className="px-4 py-6">
+                <Td colSpan={8} className="px-4 py-6">
                   <EmptyState title="No subscribers found" message="Sync contacts to get started." />
                 </Td>
               </tr>
-            ) : subscribers.map((sub) => (
+            ) : subscribers.map((sub, index) => (
               <tr key={sub.id} className="transition-colors hover:bg-gray-50/70">
+                <Td className="text-gray-600">{(subPage - 1) * 30 + index + 1}</Td>
                 <Td className="font-medium text-gray-900">{sub.email}</Td>
                 <Td className="text-gray-600">{sub.full_name || '—'}</Td>
                 <Td><span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{sub.source}</span></Td>
