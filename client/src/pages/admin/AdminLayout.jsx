@@ -601,7 +601,8 @@ const AdminLayout = () => {
                   Overview
                 </NavLink>
 
-                <p className="px-4 pt-3 text-[10px] font-bold uppercase tracking-wide text-gray-400">People & Trust</p>
+                <div className="border-t border-gray-200/70 mx-2 my-2" />
+                <p className="px-4 pt-2 text-[10px] font-bold uppercase tracking-wide text-gray-400">1. People & Trust</p>
 
                 <NavLink to="/super-admin?tab=users" className={() => superAdminNavItem('users')}>
                   <FaUsers className="mr-3" />
@@ -633,7 +634,8 @@ const AdminLayout = () => {
                   Lawyer Activity
                 </NavLink>
 
-                <p className="px-4 pt-3 text-[10px] font-bold uppercase tracking-wide text-gray-400">Operations</p>
+                <div className="border-t border-gray-200/70 mx-2 my-2" />
+                <p className="px-4 pt-2 text-[10px] font-bold uppercase tracking-wide text-gray-400">2. Operations</p>
 
                 <NavLink to="/super-admin?tab=properties" className={() => superAdminNavItem('properties')}>
                   <FaHome className="mr-3" />
@@ -664,7 +666,8 @@ const AdminLayout = () => {
                   Support &amp; Voice
                 </NavLink>
 
-                <p className="px-4 pt-3 text-[10px] font-bold uppercase tracking-wide text-gray-400">Intelligence</p>
+                <div className="border-t border-gray-200/70 mx-2 my-2" />
+                <p className="px-4 pt-2 text-[10px] font-bold uppercase tracking-wide text-gray-400">3. Intelligence</p>
 
                 <NavLink to="/super-admin?tab=analytics" className={() => superAdminNavItem('analytics')}>
                   <FaShieldAlt className="mr-3" />
@@ -686,7 +689,8 @@ const AdminLayout = () => {
                   Logs
                 </NavLink>
 
-                <p className="px-4 pt-3 text-[10px] font-bold uppercase tracking-wide text-gray-400">Growth</p>
+                <div className="border-t border-gray-200/70 mx-2 my-2" />
+                <p className="px-4 pt-2 text-[10px] font-bold uppercase tracking-wide text-gray-400">4. Growth</p>
 
                 <NavLink to="/super-admin?tab=broadcast" className={() => superAdminNavItem('broadcast')}>
                   <FaEnvelope className="mr-3" />
@@ -726,7 +730,8 @@ const AdminLayout = () => {
                   Recruitment
                 </NavLink>
 
-                <p className="px-4 pt-3 text-[10px] font-bold uppercase tracking-wide text-gray-400">Controls</p>
+                <div className="border-t border-gray-200/70 mx-2 my-2" />
+                <p className="px-4 pt-2 text-[10px] font-bold uppercase tracking-wide text-gray-400">5. Controls</p>
 
                 <NavLink to="/super-admin?tab=pricing" className={() => superAdminNavItem('pricing')}>
                   <FaMoneyBill className="mr-3" />
@@ -774,7 +779,8 @@ const AdminLayout = () => {
                   Admin Monitor
                 </NavLink>
 
-                <p className="px-4 pt-3 text-[10px] font-bold uppercase tracking-wide text-gray-400">Research &amp; Governance</p>
+                <div className="border-t border-gray-200/70 mx-2 my-2" />
+                <p className="px-4 pt-2 text-[10px] font-bold uppercase tracking-wide text-gray-400">6. Research &amp; Governance</p>
 
                 <NavLink to="/super-admin?tab=survey" className={() => superAdminNavItem('survey')}>
                   <FaChartLine className="mr-3" />
