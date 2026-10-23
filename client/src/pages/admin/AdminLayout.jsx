@@ -25,6 +25,7 @@ import {
   FaTruck,
   FaSprayCan,
   FaChartLine,
+  FaMusic,
   FaExclamationTriangle,
   FaBroadcastTower,
   FaClipboardList,
@@ -678,6 +679,11 @@ const AdminLayout = () => {
                 <NavLink to="/super-admin/tour-analytics" className={navItem}>
                   <FaChartLine className="mr-3" />
                   {t('tour.analytics.nav_label', 'Tour Analytics')}
+                </NavLink>
+
+                <NavLink to="/super-admin/tour-music" className={navItem}>
+                  <FaMusic className="mr-3" />
+                  {t('tour.music.nav_label', 'Tour Music')}
                 </NavLink>
 
                 <NavLink to="/super-admin?tab=reports" className={() => superAdminNavItem('reports')}>

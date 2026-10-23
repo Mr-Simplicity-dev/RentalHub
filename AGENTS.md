@@ -46,6 +46,7 @@ Other critical constraints:
 - `docs/twilio-voice-deployment.md` — full deploy + configuration guide
 - `docs/voice-system-rules.md` — the rules above (maintain this file)
 - `docs/voice-system-backlog.md` — outstanding work + known gaps
+- `docs/property-tour-media-pipeline.md` — tour renderer, narration, music, variants
 
 ## Style
 

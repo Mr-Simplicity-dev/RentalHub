@@ -9,11 +9,17 @@ const {
   isFfmpegAvailable,
   makeScratchDir,
   cleanupScratchDir,
+  buildNarrationTrack,
+  resolveFfmpegPath,
+  probeMediaDimensions,
   GUIDED_SHOTS,
   BRAND_PHONE,
   buildFactsLine,
 } = require('./propertyTourVideo');
-const { selectTrackForProperty } = require('../../controllers/propertyTourMusicController');
+const { selectTrackForProperty, getMusicSettings } = require('../../controllers/propertyTourMusicController');
+const { generateNarrationScript } = require('./propertyTourNarration');
+const { synthesizeSpeech, isVoiceConfigured } = require('./propertyTourVoiceService');
+const { buildFeatureHighlights } = require('./propertyFeatureSchema');
 
 /**
  * Builds the automatic tour video for a property.
@@ -169,7 +175,8 @@ const generatePropertyTour = async ({ propertyId, force = false, logger: reqLogg
 
     const existing = await db.query(
       `SELECT id, title, video_url, city, area, state,
-              property_type, bedrooms, bathrooms, rent_amount, payment_frequency
+              property_type, bedrooms, bathrooms, rent_amount, payment_frequency,
+              structured_features
        FROM properties WHERE id = $1 LIMIT 1`,
       [id]
     );
@@ -189,9 +196,28 @@ const generatePropertyTour = async ({ propertyId, force = false, logger: reqLogg
     const scratch = makeScratchDir();
     try {
       const downloaded = [];
+      const minWidth = Number(process.env.PROPERTY_TOUR_MIN_PHOTO_WIDTH) || 640;
+      const minHeight = Number(process.env.PROPERTY_TOUR_MIN_PHOTO_HEIGHT) || 480;
       for (let index = 0; index < photoUrls.length; index += 1) {
         try {
-          downloaded.push(await downloadPhoto(photoUrls[index], path.join(scratch, 'shot'), index));
+          const photoPath = await downloadPhoto(
+            photoUrls[index],
+            path.join(scratch, 'shot'),
+            index
+          );
+          // A thumbnail cannot fill a 4K frame without falling apart, so it is
+          // dropped rather than smeared across the whole video.
+          const dimensions = await probeMediaDimensions(resolveFfmpegPath(), photoPath);
+          if (dimensions && (dimensions.width < minWidth || dimensions.height < minHeight)) {
+            reqLogger.warn?.(
+              `Property tour: skipping photo ${index + 1} (${dimensions.width}x${dimensions.height} is below ${minWidth}x${minHeight})`
+            );
+            try {
+              fs.unlinkSync(photoPath);
+            } catch {}
+            continue;
+          }
+          downloaded.push(photoPath);
         } catch (downloadError) {
           reqLogger.warn?.(`Property tour: skipping unreadable photo ${index + 1}: ${downloadError.message}`);
         }
@@ -236,9 +262,81 @@ const generatePropertyTour = async ({ propertyId, force = false, logger: reqLogg
 
       // Music library selection (optional, never blocks)
       let musicTrack = null;
+      let musicPath = null;
+      let musicSettings = {};
       try {
+        musicSettings = await getMusicSettings();
         musicTrack = await selectTrackForProperty(property.property_type);
-      } catch {}
+        if (musicTrack?.file_url) {
+          if (/^https?:\/\//i.test(musicTrack.file_url)) {
+            musicPath = path.join(scratch, `music${extensionFor(musicTrack.file_url, '.mp3')}`);
+            await downloadMedia(musicTrack.file_url, musicPath, 0);
+          } else {
+            const candidate = path.isAbsolute(musicTrack.file_url)
+              ? musicTrack.file_url
+              : path.join(process.cwd(), musicTrack.file_url.replace(/^\/+/, ''));
+            if (fs.existsSync(candidate)) musicPath = candidate;
+          }
+        }
+      } catch (musicError) {
+        reqLogger.warn?.(`Property tour: music skipped: ${musicError.message}`);
+        musicTrack = null;
+        musicPath = null;
+      }
+
+      // Narration is generated from verified property data only. Voice is
+      // optional; when no provider is configured the script is still computed
+      // (so overlays/timings stay deterministic) but nothing is spoken.
+      let narrationPath = null;
+      let narrationSegments = [];
+      const parsedStructuredFeatures =
+        property.structured_features && typeof property.structured_features === 'object'
+          ? property.structured_features
+          : {};
+      const featureHighlights = buildFeatureHighlights(parsedStructuredFeatures, 4);
+
+      try {
+        narrationSegments = generateNarrationScript(
+          {
+            ...property,
+            area: property.area,
+            city: property.city,
+            state: property.state,
+          },
+          guidedShots.map((shot) => shot.key),
+          parsedStructuredFeatures
+        );
+      } catch (narrationError) {
+        reqLogger.warn?.(`Property tour: narration script skipped: ${narrationError.message}`);
+        narrationSegments = [];
+      }
+
+      if (isVoiceConfigured() && narrationSegments.length) {
+        try {
+          const voicePaths = [];
+          for (const segment of narrationSegments) {
+            const voicePath = await synthesizeSpeech({
+              text: segment.text,
+              outputPath: path.join(scratch, `voice_${segment.scene}.mp3`),
+              logger: reqLogger,
+            });
+            if (voicePath) voicePaths.push(voicePath);
+          }
+          if (voicePaths.length) {
+            narrationPath = await buildNarrationTrack({
+              binary: resolveFfmpegPath(),
+              segmentPaths: voicePaths,
+              outputPath: path.join(scratch, 'narration.mp3'),
+              logger: reqLogger,
+            });
+          }
+        } catch (voiceError) {
+          reqLogger.warn?.(`Property tour: voice skipped: ${voiceError.message}`);
+          narrationPath = null;
+        }
+      }
+
+      const uploadedVariants = [];
 
       const produced = await createTourVideo({
         photoPaths: downloaded,
@@ -249,11 +347,26 @@ const generatePropertyTour = async ({ propertyId, force = false, logger: reqLogg
         location,
         phone: resolvePhoneForState(property.state),
         facts,
+        featureHighlights,
         propertyType: property.property_type || '',
         clipPaths: downloadedClips,
         musicTrack,
-        narrationSegments: [],
-        voiceEnabled: false,
+        musicPath,
+        musicSettings,
+        narrationPath,
+        narrationSegments,
+        voiceEnabled: Boolean(narrationPath),
+        onVariant: async (variant) => {
+          const uploadedVariant = await uploadTourToCloudinary(variant.path);
+          const url = uploadedVariant?.secure_url || uploadedVariant?.url;
+          if (url) {
+            uploadedVariants.push({
+              format: variant.format,
+              label: variant.label,
+              url,
+            });
+          }
+        },
         logger: reqLogger,
       });
 
@@ -263,13 +376,29 @@ const generatePropertyTour = async ({ propertyId, force = false, logger: reqLogg
       const videoUrl = uploaded?.secure_url || uploaded?.url;
       if (!videoUrl) return false;
 
-      await db.query(
-        `UPDATE properties
-         SET video_url = $1,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = $2`,
-        [videoUrl, id]
-      );
+      await db
+        .query(`ALTER TABLE properties ADD COLUMN IF NOT EXISTS video_variants JSONB NOT NULL DEFAULT '[]'::jsonb`)
+        .catch(() => {});
+
+      try {
+        await db.query(
+          `UPDATE properties
+           SET video_url = $1,
+               video_variants = $2::jsonb,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $3`,
+          [videoUrl, JSON.stringify(uploadedVariants), id]
+        );
+      } catch (variantColumnError) {
+        reqLogger.warn?.(`Property tour variants not stored: ${variantColumnError.message}`);
+        await db.query(
+          `UPDATE properties
+           SET video_url = $1,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $2`,
+          [videoUrl, id]
+        );
+      }
 
       reqLogger.info?.(`Property tour video generated for #${id}`);
       return true;

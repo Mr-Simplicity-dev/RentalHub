@@ -824,6 +824,7 @@ export default function SuperAdminDashboard() {
     const routeDestinations = [
       { name: "route:seo", label: "SEO Dashboard", detail: "SEO settings and Google indexing", keywords: ["seo", "google", "sitemap", "indexing"], path: "/super-admin/seo" },
       { name: "route:tour-analytics", label: "Tour Analytics", detail: "Guided-tour adoption analytics", keywords: ["tour", "onboarding", "walkthrough"], path: "/super-admin/tour-analytics" },
+      { name: "route:tour-music", label: "Tour Music", detail: "Approved music library for property tours", keywords: ["tour", "music", "audio", "licence", "soundtrack"], path: "/super-admin/tour-music" },
       { name: "route:transportation", label: "Transportation Oversight", detail: "Transportation bookings and admins", keywords: ["transport", "vehicle", "driver", "ride"], path: "/super-admin/transportation" },
       { name: "route:fumigation", label: "Fumigation Oversight", detail: "Fumigation and cleaning services", keywords: ["fumigation", "cleaning", "pest"], path: "/super-admin/fumigation-cleaning" },
       { name: "route:support-governance", label: "Support Governance", detail: "Support policy and configuration", keywords: ["support", "policy", "sla"], path: "/super-admin/support-governance?tab=overview" },

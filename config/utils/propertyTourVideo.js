@@ -70,6 +70,23 @@ const SHOT_MOVEMENT = {
 };
 const DEFAULT_SHOT_MOVEMENT = { hold: SNAPPY_HOLD, zoom: SNAPPY_ZOOM, pan: 'ken_burns' };
 
+// Where the crop window sits when a photo's aspect does not match the output.
+// Exteriors bias upward so roofs are not cut and pavement is not wasted;
+// interiors bias slightly low so floors and furniture stay in frame.
+const CROP_BIAS = {
+  building_front: 0.32,
+  compound: 0.36,
+  street: 0.34,
+  sitting_room: 0.42,
+  kitchen: 0.44,
+  bedroom: 0.4,
+  bathroom: 0.46,
+  toilet: 0.46,
+};
+const DEFAULT_CROP_BIAS = 0.4;
+const ENHANCE_PHOTOS =
+  String(process.env.PROPERTY_TOUR_ENHANCE_PHOTOS || 'true').toLowerCase() !== 'false';
+
 const INTRO_SECONDS = Math.max(2, Number(process.env.PROPERTY_TOUR_INTRO_SECONDS) || 4.2);
 const OUTRO_SECONDS = Math.max(2, Number(process.env.PROPERTY_TOUR_OUTRO_SECONDS) || 5.2);
 
@@ -108,6 +125,8 @@ const GUIDED_SHOTS = [
   { key: 'toilet', label: 'Toilet', hint: 'Show the toilet area clearly and level.' },
   { key: 'street', label: 'Street outside', hint: 'Show the access road and immediate surroundings to show how the house is reached.' },
 ];
+
+const getCropBias = (shotKey) => CROP_BIAS[shotKey] ?? DEFAULT_CROP_BIAS;
 
 const getShotMovement = (shotKey, index) => {
   if (shotKey && SHOT_MOVEMENT[shotKey]) {
@@ -299,6 +318,251 @@ const runProcess = (binary, args, { timeoutMs = 300000 } = {}) =>
       clearTimeout(timer);
       if (code === 0) resolve({ stderr });
       else reject(new Error(`ffmpeg exited with code ${code}: ${stderr.slice(-600)}`));
+    });
+  });
+
+/**
+ * Concatenates the per-scene voice clips into one narration track, with a short
+ * pause between scenes. Returns null when there is nothing usable, because a
+ * missing voice track must never fail the tour.
+ */
+const buildNarrationTrack = async ({
+  binary,
+  segmentPaths,
+  outputPath,
+  gapSeconds = 0.35,
+  logger: reqLogger = logger,
+}) => {
+  const usable = (Array.isArray(segmentPaths) ? segmentPaths : []).filter(
+    (segment) => segment && fs.existsSync(segment)
+  );
+  if (!usable.length) return null;
+
+  const scratch = path.dirname(outputPath);
+  const gapPath = path.join(scratch, 'narration_gap.wav');
+
+  try {
+    await runProcess(binary, [
+      '-y',
+      '-f', 'lavfi',
+      '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
+      '-t', String(gapSeconds),
+      '-c:a', 'pcm_s16le',
+      gapPath,
+    ], { timeoutMs: 30000 });
+  } catch (error) {
+    reqLogger.warn?.(`Property tour voice: could not build scene pause: ${error.message}`);
+    return null;
+  }
+
+  const listFile = path.join(scratch, 'narration.txt');
+  const lines = [];
+  usable.forEach((segment, index) => {
+    lines.push(`file '${segment.replace(/\\/g, '/')}'`);
+    if (index < usable.length - 1) {
+      lines.push(`file '${gapPath.replace(/\\/g, '/')}'`);
+    }
+  });
+  fs.writeFileSync(listFile, lines.join('\n'));
+
+  try {
+    await runProcess(binary, [
+      '-y',
+      '-f', 'concat', '-safe', '0', '-i', listFile,
+      '-c:a', 'libmp3lame', '-b:a', '192k', '-ar', '44100', '-ac', '2',
+      outputPath,
+    ], { timeoutMs: 120000 });
+  } catch (error) {
+    reqLogger.warn?.(`Property tour voice: narration track could not be joined: ${error.message}`);
+    return null;
+  }
+
+  return fs.existsSync(outputPath) ? outputPath : null;
+};
+
+/**
+ * Mixes the approved music bed and (optionally) the narration over the finished
+ * silent tour. Music is ducked under the voice so the words stay intelligible.
+ * Any failure returns the silent master so the video still ships.
+ */
+const mixTourAudio = async ({
+  binary,
+  videoPath,
+  musicPath,
+  narrationPath,
+  settings = {},
+  duration = 0,
+  voiceDelaySeconds = 0,
+  outputPath,
+  logger: reqLogger = logger,
+}) => {
+  const hasMusic = Boolean(musicPath && fs.existsSync(musicPath));
+  const hasVoice = Boolean(narrationPath && fs.existsSync(narrationPath));
+  if (!hasMusic && !hasVoice) return videoPath;
+
+  const safeDuration = Number(duration) > 0 ? Number(duration) : 0;
+  const musicVolume = Number.isFinite(Number(settings.volume)) ? Number(settings.volume) : 0.25;
+  const duckingEnabled = settings.ducking !== false;
+  const fadeIn = Math.min(1.6, Math.max(0.4, safeDuration / 12));
+  const fadeOut = Math.min(2.4, Math.max(0.6, safeDuration / 8));
+  const fadeStart = Math.max(0, safeDuration - fadeOut);
+  const voiceDelayMs = Math.max(0, Math.round(Number(voiceDelaySeconds) * 1000));
+
+  const args = ['-y', '-i', videoPath];
+  let musicIndex = null;
+  let voiceIndex = null;
+  let nextIndex = 1;
+
+  if (hasMusic) {
+    args.push('-stream_loop', '-1', '-i', musicPath);
+    musicIndex = nextIndex;
+    nextIndex += 1;
+  }
+  if (hasVoice) {
+    args.push('-i', narrationPath);
+    voiceIndex = nextIndex;
+    nextIndex += 1;
+  }
+
+  const trim = safeDuration > 0 ? `,atrim=0:${safeDuration.toFixed(2)}` : '';
+  const filters = [];
+  const musicChain =
+    `[${musicIndex}:a]volume=${musicVolume.toFixed(3)}${trim},` +
+    `afade=t=in:st=0:d=${fadeIn.toFixed(2)}` +
+    (safeDuration > 0 ? `,afade=t=out:st=${fadeStart.toFixed(2)}:d=${fadeOut.toFixed(2)}` : '');
+
+  if (hasMusic && hasVoice) {
+    const pad = safeDuration > 0 ? `,apad=whole_dur=${safeDuration}` : '';
+    filters.push(`[${voiceIndex}:a]adelay=${voiceDelayMs}|${voiceDelayMs}${pad},asplit=2[voice][sidechain]`);
+    filters.push(`${musicChain}[musicraw]`);
+    if (duckingEnabled) {
+      filters.push(
+        `[musicraw][sidechain]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=400[musicducked]`
+      );
+      filters.push(
+        `[musicducked][voice]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,alimiter=limit=0.95[aout]`
+      );
+    } else {
+      filters.push(
+        `[musicraw][voice]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,alimiter=limit=0.95[aout]`
+      );
+    }
+  } else if (hasMusic) {
+    filters.push(`${musicChain}[aout]`);
+  } else {
+    filters.push(`[${voiceIndex}:a]adelay=${voiceDelayMs}|${voiceDelayMs},alimiter=limit=0.95[aout]`);
+  }
+
+  const mixArgs = [
+    ...args,
+    '-filter_complex', filters.join(';'),
+    '-map', '0:v:0',
+    '-map', '[aout]',
+    '-c:v', 'copy',
+    '-c:a', 'aac', '-b:a', '192k', '-ar', '44100', '-ac', '2',
+    '-movflags', '+faststart',
+  ];
+  if (safeDuration > 0) mixArgs.push('-t', safeDuration.toFixed(2));
+  mixArgs.push('-shortest', outputPath);
+
+  try {
+    await runProcess(binary, mixArgs, { timeoutMs: 240000 });
+  } catch (error) {
+    reqLogger.warn?.(`Property tour audio mix skipped: ${error.message}`);
+    return videoPath;
+  }
+
+  return fs.existsSync(outputPath) ? outputPath : videoPath;
+};
+
+/**
+ * Renders social-ready aspect variants from the finished master. Portrait
+ * formats get a blurred fill either side of the picture rather than a crop, so
+ * nothing the landlord filmed is lost. Failures are skipped, never fatal.
+ */
+const renderAspectVariants = async ({
+  binary,
+  masterPath,
+  formats = ENABLED_FORMATS,
+  outputDir,
+  logger: reqLogger = logger,
+}) => {
+  const targets = (Array.isArray(formats) ? formats : [])
+    .map((format) => String(format).trim())
+    .filter((format) => OUTPUT_PROFILES[format] && format !== '16:9');
+
+  const variants = [];
+  for (const format of targets) {
+    const profile = OUTPUT_PROFILES[format];
+    const { width, height } = profile;
+    const outputPath = path.join(outputDir, `tour_${format.replace(':', 'x')}.mp4`);
+    const fillScale = `scale=${width}:${height}:force_original_aspect_ratio=increase`;
+    const fitScale = `scale=${width}:${height}:force_original_aspect_ratio=decrease`;
+    const filters =
+      `[0:v]split=2[bgsrc][fgsrc];` +
+      `[bgsrc]${fillScale},crop=${width}:${height},gblur=sigma=32[bgtmp];` +
+      `[fgsrc]${fitScale}[fgtmp];` +
+      `[bgtmp][fgtmp]overlay=(W-w)/2:(H-h)/2,format=yuv420p[vout]`;
+
+    try {
+      await runProcess(
+        binary,
+        [
+          '-y',
+          '-i', masterPath,
+          '-filter_complex', filters,
+          '-map', '[vout]',
+          '-map', '0:a?',
+          '-c:v', 'libx264', '-preset', 'medium', '-crf', '21', '-pix_fmt', 'yuv420p',
+          '-c:a', 'aac', '-b:a', '160k',
+          '-movflags', '+faststart', '-r', String(OUTPUT_FPS),
+          outputPath,
+        ],
+        { timeoutMs: 600000 }
+      );
+      if (fs.existsSync(outputPath)) {
+        variants.push({ format, label: profile.label, path: outputPath });
+      }
+    } catch (error) {
+      reqLogger.warn?.(`Property tour ${format} variant skipped: ${error.message}`);
+    }
+  }
+
+  return variants;
+};
+
+/**
+ * Best-effort media probe. ffmpeg prints stream info to stderr even when it
+ * exits non-zero for a bare `-i`, so the exit code is ignored deliberately.
+ * Returns null when the dimensions cannot be read; callers treat that as
+ * "unknown" rather than "invalid".
+ */
+const probeMediaDimensions = (binary, filePath) =>
+  new Promise((resolve) => {
+    if (!binary || !filePath) return resolve(null);
+    const child = spawn(binary, ['-hide_banner', '-i', filePath], { windowsHide: true });
+    let stderr = '';
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      resolve(null);
+    }, 15000);
+
+    child.stderr?.on('data', (chunk) => {
+      stderr += chunk.toString();
+      if (stderr.length > 16000) stderr = stderr.slice(-8000);
+    });
+    child.on('error', () => {
+      clearTimeout(timer);
+      resolve(null);
+    });
+    child.on('close', () => {
+      clearTimeout(timer);
+      const match = stderr.match(/Video:.*?,\s*(\d{2,5})x(\d{2,5})/);
+      if (!match) return resolve(null);
+      const width = Number(match[1]);
+      const height = Number(match[2]);
+      if (!Number.isFinite(width) || !Number.isFinite(height)) return resolve(null);
+      resolve({ width, height });
     });
   });
 
@@ -535,6 +799,12 @@ const encodeSegment = async (binary, args, label, reqLogger) => {
 const CLIP_SLOWDOWN = 2; // half speed
 const CLIP_SLOT_SECONDS = 4;
 const CLIP_SLOT_FRAMES = CLIP_SLOT_SECONDS * OUTPUT_FPS;
+// A phone clip can be a minute long, but only the first few seconds can ever
+// reach the tour. Reading just that much keeps memory and encode time bounded.
+const CLIP_SOURCE_LIMIT_SECONDS =
+  Math.max(CLIP_SLOT_SECONDS, Number(process.env.PROPERTY_TOUR_CLIP_SOURCE_SECONDS) || 12);
+const STABILISE_CLIPS =
+  String(process.env.PROPERTY_TOUR_STABILISE_CLIPS || 'true').toLowerCase() !== 'false';
 
 const buildClipArgs = ({ outputPath, clipPaths, fontPath, facts = '', phone = BRAND_PHONE }) => {
   const uiScale = OUTPUT_HEIGHT / 2160;
@@ -545,18 +815,22 @@ const buildClipArgs = ({ outputPath, clipPaths, fontPath, facts = '', phone = BR
   const inputs = ['-y'];
 
   clipPaths.forEach((clipPath) => {
-    // Reading the whole clip, then trimming, keeps ffmpeg simple and avoids
+    // Reading only the head of the clip keeps ffmpeg simple and avoids
     // seek-accuracy surprises with clips from a phone.
-    inputs.push('-i', clipPath);
+    inputs.push('-t', String(CLIP_SOURCE_LIMIT_SECONDS), '-i', clipPath);
   });
 
-  // Each clip: scale to fill, slow to half speed, pad/trim to the slot length.
+  // Each clip: scale to fill, steady the handheld shake, slow to half speed,
+  // pad/trim to the slot length.
   clipPaths.forEach((clipPath, index) => {
+    const stabilise = STABILISE_CLIPS ? 'deshake=rx=24:ry=24,' : '';
     filters.push(
       `[${index}:v]scale=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:force_original_aspect_ratio=increase,` +
         `crop=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT},` +
-        `setpts=${(1 / CLIP_SLOWDOWN).toFixed(4)}*PTS,` +
         `fps=${OUTPUT_FPS},` +
+        stabilise +
+        `eq=brightness=0.01:contrast=1.03:saturation=1.03,` +
+        `setpts=${(1 / CLIP_SLOWDOWN).toFixed(4)}*PTS,` +
         `tpad=stop_mode=clone:stop_duration=${CLIP_SLOT_SECONDS},` +
         `trim=duration=${CLIP_SLOT_SECONDS},setpts=PTS-STARTPTS[clip${index}]`
     );
@@ -632,11 +906,17 @@ const createTourVideo = async ({
   location = '',
   phone = BRAND_PHONE,
   facts = '',
+  featureHighlights = [],
   propertyType = '',
   clipPaths = [],
   musicTrack = null,
+  musicPath = null,
+  musicSettings = {},
+  narrationPath = null,
   narrationSegments = [],
   voiceEnabled = false,
+  outputFormats = ENABLED_FORMATS,
+  onVariant = null,
   logger: reqLogger = logger,
 }) => {
   const binary = resolveFfmpegPath();
@@ -657,6 +937,7 @@ const createTourVideo = async ({
   try {
     const frames = photoPaths.length;
     const hasPhotos = frames >= 2;
+    let bodyDuration = 0;
 
     // 1. The tour body with watermark and crawl. With fewer than two photos the
     // clip reel carries the motion, so the body is skipped rather than faked.
@@ -681,10 +962,15 @@ const createTourVideo = async ({
       // Zoom rate is derived from the hold so both feels travel the same
       // distance; only the speed differs.
       const rate = (plan.zoom / (plan.hold * OUTPUT_FPS)).toFixed(8);
+      const cropBias = getCropBias(key);
+      const enhance = ENHANCE_PHOTOS
+        ? `eq=brightness=0.015:contrast=1.04:saturation=1.04,unsharp=3:3:0.25:3:3:0,`
+        : '';
 
       filters.push(
         `[${index}:v]scale=${overscanW}:${overscanH}:force_original_aspect_ratio=increase,` +
-          `crop=${overscanW}:${overscanH},` +
+          `crop=${overscanW}:${overscanH}:(iw-ow)/2:(ih-oh)*${cropBias},` +
+          enhance +
           `zoompan=z='min(1+${rate}*on,${zoomEnd})':` +
           `x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':` +
           `d=${Math.round(plan.hold * OUTPUT_FPS)}:s=${OUTPUT_WIDTH}x${OUTPUT_HEIGHT}:fps=${OUTPUT_FPS},` +
@@ -707,6 +993,7 @@ const createTourVideo = async ({
     }
 
     const tourDuration = totalTourSeconds(frames, labelObjects);
+    bodyDuration = tourDuration;
 
     // 2. Persistent layer: dark strip, per-shot label, contact crawl.
     const crawlOnce = [BRAND_NAME, BRAND_DOMAIN, BRAND_EMAIL, `Call or WhatsApp ${phone}`].join(
@@ -756,14 +1043,25 @@ const createTourVideo = async ({
     );
     layered = 'crawlout';
 
-    if (facts) {
+    const highlightLine = (Array.isArray(featureHighlights) ? featureHighlights : [])
+      .map((item) => String(item || '').trim())
+      .filter(Boolean)
+      .slice(0, 4)
+      .join('   \u2022   ');
+
+    const hasHighlights = Boolean(highlightLine);
+    const factBarHeight = Math.round((hasHighlights ? 230 : 150) * uiScale);
+
+    if (facts || hasHighlights) {
       // Price and size stay on screen for the whole tour: a viewer deciding
       // whether the place is affordable should not have to wait for the end.
       filters.push(
-        `[${layered}]drawbox=x=0:y=0:w=${OUTPUT_WIDTH}:h=${Math.round(150 * uiScale)}:color=0x0b1220@0.55:t=fill[factbar]`
+        `[${layered}]drawbox=x=0:y=0:w=${OUTPUT_WIDTH}:h=${factBarHeight}:color=0x0b1220@0.55:t=fill[factbar]`
       );
       layered = 'factbar';
+    }
 
+    if (facts) {
       filters.push(
         withFont(
           `[${layered}]drawtext=text='${escapeDrawText(facts)}':fontsize=${Math.round(58 * uiScale)}:fontcolor=white:` +
@@ -772,6 +1070,19 @@ const createTourVideo = async ({
         )
       );
       layered = 'facts';
+    }
+
+    if (hasHighlights) {
+      // Only features the landlord explicitly confirmed are passed in here, so
+      // the chip never implies something the listing did not state.
+      filters.push(
+        withFont(
+          `[${layered}]drawtext=text='${escapeDrawText(highlightLine)}':fontsize=${Math.round(48 * uiScale)}:fontcolor=0xfacc15:` +
+            `x=${Math.round(80 * uiScale)}:y=${Math.round(facts ? 158 : 60) * uiScale}:shadowcolor=black@0.75:shadowx=2:shadowy=2[highlights]`,
+          fontPath
+        )
+      );
+      layered = 'highlights';
     }
     if (markPath) {
       const markSize = Math.round(260 * (OUTPUT_HEIGHT / 2160));
@@ -845,12 +1156,64 @@ const createTourVideo = async ({
       }
     }
 
-    return await joinSegments({
+    const joined = await joinSegments({
       binary,
       outputPath,
       segments: [introPath, tourPath, clipPath, outroPath].filter(Boolean),
       reqLogger,
     });
+
+    if (!joined) return null;
+
+    // Audio is added last, on the finished film. Every step is optional: a
+    // property with no approved music, no voice provider or a broken mix still
+    // publishes with a silent video rather than no video.
+    const clipDuration = clipPath
+      ? Math.max(
+          0,
+          downloadedClips.length * CLIP_SLOT_SECONDS - Math.max(0, downloadedClips.length - 1) * CROSSFADE
+        )
+      : 0;
+    const estimatedDuration =
+      (introPath ? INTRO_SECONDS : 0) +
+      bodyDuration +
+      clipDuration +
+      (outroPath ? OUTRO_SECONDS : 0);
+
+    const resolvedMusicPath = musicPath || (musicTrack && musicTrack.local_path) || null;
+    const mixed = await mixTourAudio({
+      binary,
+      videoPath: joined,
+      musicPath: resolvedMusicPath,
+      narrationPath: voiceEnabled ? narrationPath : null,
+      settings: {
+        volume: musicTrack?.volume ?? musicSettings.volume,
+        ducking: musicTrack?.ducking ?? musicSettings.ducking,
+      },
+      duration: estimatedDuration,
+      voiceDelaySeconds: introPath ? INTRO_SECONDS : 0,
+      outputPath: path.join(scratch, 'tour_mixed.mp4'),
+      logger: reqLogger,
+    });
+
+    if (typeof onVariant === 'function' && mixed) {
+      const variants = await renderAspectVariants({
+        binary,
+        masterPath: mixed,
+        formats: outputFormats,
+        outputDir: scratch,
+        logger: reqLogger,
+      });
+      for (const variant of variants) {
+        try {
+          await onVariant(variant);
+        } catch (variantError) {
+          reqLogger.warn?.(`Property tour ${variant.format} variant upload skipped: ${variantError.message}`);
+        }
+      }
+    }
+
+    return mixed;
   } catch (error) {
     reqLogger.warn?.(`Property tour encoding failed: ${error.message}`);
     return null;
@@ -902,6 +1265,11 @@ module.exports = {
   buildIntroArgs,
   buildOutroArgs,
   buildClipArgs,
+  buildNarrationTrack,
+  mixTourAudio,
+  renderAspectVariants,
+  probeMediaDimensions,
+  getCropBias,
   shotPlan,
   labelWindows,
   totalTourSeconds,

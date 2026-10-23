@@ -10,6 +10,7 @@ import { toast } from 'react-toastify';
 import Loader from '../components/common/Loader';
 import Modal from '../components/common/Modal';
 import DisputeCreationModal from '../components/DisputeCreationModal';
+import PropertyFeaturesDisplay from '../components/properties/PropertyFeaturesDisplay';
 import { DamageReportCard } from '../components/damage';
 import OnlineStatusBadge from '../components/calls/OnlineStatusBadge';
 import {
@@ -552,6 +553,22 @@ const PropertyDetail = () => {
               </div>
             )}
 
+            {/* Structured Features - three-state, only when the landlord answered */}
+            {hasFullAccess && (() => {
+              const raw = property.structured_features;
+              let parsed = raw;
+              if (typeof raw === 'string') {
+                try {
+                  parsed = JSON.parse(raw);
+                } catch {
+                  parsed = null;
+                }
+              }
+              return parsed && typeof parsed === 'object' ? (
+                <PropertyFeaturesDisplay structuredFeatures={parsed} />
+              ) : null;
+            })()}
+
             {/* Property Video - unlocked details only */}
             {hasFullAccess && property.video_url && (
               <div className="mb-6">
@@ -561,6 +578,21 @@ const PropertyDetail = () => {
                   className="w-full rounded-lg"
                   src={property.video_url}
                 />
+                {Array.isArray(property.video_variants) && property.video_variants.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {property.video_variants.map((variant) => (
+                      <a
+                        key={variant.format || variant.url}
+                        href={variant.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-full border border-gray-300 px-3 py-1 text-xs text-gray-700 hover:border-blue-400"
+                      >
+                        {variant.label || variant.format} version
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 

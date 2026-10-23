@@ -10,6 +10,7 @@ const { getPropertyManagerContext } = require('../config/utils/agentSystem');
 const { resolveLocationSelection } = require('../config/utils/locationDirectory');
 const { resolveTenantPropertyLocationAccess } = require('../config/utils/tenantLocationAccess');
 const { statesMatch } = require('../config/utils/stateScope');
+const { validateStructuredFeatures } = require('../config/utils/propertyFeatureSchema');
 let propertySchemaReady = false;
 
 const PROPERTY_IMAGE_CAPTURE_TTL_MS =
@@ -143,7 +144,8 @@ const ensurePropertySchema = async () => {
     ADD COLUMN IF NOT EXISTS lga_name VARCHAR(120),
     ADD COLUMN IF NOT EXISTS latitude DECIMAL(10, 8),
     ADD COLUMN IF NOT EXISTS longitude DECIMAL(11, 8),
-    ADD COLUMN IF NOT EXISTS structured_features JSONB NOT NULL DEFAULT '{}'::jsonb;
+    ADD COLUMN IF NOT EXISTS structured_features JSONB NOT NULL DEFAULT '{}'::jsonb,
+    ADD COLUMN IF NOT EXISTS video_variants JSONB NOT NULL DEFAULT '[]'::jsonb;
 
     ALTER TABLE property_photos
     ADD COLUMN IF NOT EXISTS upload_order INTEGER DEFAULT 0;
@@ -447,8 +449,8 @@ exports.browseProperties = async (req, res) => {
     const result = await db.query(
       `SELECT 
         p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
-        p.rent_amount, p.payment_frequency, p.city, p.area,
-        p.featured, p.created_at,
+        p.rent_amount, p.payment_frequency, p.city, p.area, p.lga_name,
+        p.structured_features, p.featured, p.created_at,
         s.state_name, s.state_code,
         (SELECT photo_url FROM property_photos 
          WHERE property_id = p.id AND is_primary = TRUE LIMIT 1) AS primary_photo,
@@ -571,6 +573,7 @@ exports.searchProperties = async (req, res) => {
       bedrooms,
       bathrooms,
       amenities,
+      features,
       page = 1,
       limit = 20,
       sort_by = 'created_at',
@@ -707,6 +710,21 @@ exports.searchProperties = async (req, res) => {
       paramCount++;
     }
 
+    // Structured features filter (ALL requested features must be explicitly true)
+    if (features) {
+      const requested = (Array.isArray(features) ? features : String(features).split(','))
+        .map((key) => String(key).trim())
+        .filter((key) => /^[a-z0-9_]+$/.test(key));
+
+      for (const key of requested) {
+        whereConditions.push(
+          `COALESCE((p.structured_features -> $${paramCount} -> 'available')::text, 'null') = 'true'`
+        );
+        params.push(key);
+        paramCount++;
+      }
+    }
+
     const validSortFields = ['created_at', 'rent_amount', 'bedrooms'];
     const sortField = validSortFields.includes(sort_by) ? sort_by : 'created_at';
     const sortDirection = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
@@ -718,7 +736,7 @@ exports.searchProperties = async (req, res) => {
       SELECT 
         p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
         p.rent_amount, p.payment_frequency, p.city, p.area, p.lga_name,
-        p.amenities, p.featured, p.created_at,
+        p.amenities, p.structured_features, p.featured, p.created_at,
         s.state_name, s.state_code,
         (SELECT photo_url FROM property_photos 
          WHERE property_id = p.id AND is_primary = TRUE LIMIT 1) AS primary_photo,
@@ -1360,10 +1378,14 @@ exports.createProperty = async (req, res) => {
 
     const parsedStructuredFeatures = (() => {
       if (!structured_features) return {};
-      if (typeof structured_features === 'object') return structured_features;
+      if (typeof structured_features === 'object') {
+        return validateStructuredFeatures(structured_features).features;
+      }
       try {
         const parsed = JSON.parse(structured_features);
-        return parsed && typeof parsed === 'object' ? parsed : {};
+        return parsed && typeof parsed === 'object'
+          ? validateStructuredFeatures(parsed).features
+          : {};
       } catch {
         return {};
       }
@@ -1811,7 +1833,11 @@ exports.updateProperty = async (req, res) => {
         updates.push(`${field} = $${paramCount}`);
         params.push(
           field === 'amenities' || field === 'structured_features'
-            ? JSON.stringify(req.body[field])
+            ? JSON.stringify(
+                field === 'structured_features'
+                  ? validateStructuredFeatures(req.body[field]).features
+                  : req.body[field]
+              )
             : req.body[field]
         );
         paramCount++;

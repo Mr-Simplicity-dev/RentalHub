@@ -127,6 +127,7 @@ const StateSupportAdminDashboard = React.lazy(() => import('./admin/StateSupport
 const SuperSupportAdminDashboard = React.lazy(() => import('./admin/SuperSupportAdminDashboard'));
 const RecruitmentAdminDashboard = React.lazy(() => import('./admin/RecruitmentAdminDashboard'));
 const TourAnalytics = React.lazy(() => import('./admin/TourAnalytics'));
+const TourMusicLibrary = React.lazy(() => import('./admin/TourMusicLibrary'));
 
 const queryClient = new QueryClient();
 const LANGUAGE_OPTIONS = [
@@ -866,6 +867,7 @@ function App() {
                 <Route path="transportation" element={<TransportationSuperAdminDashboard />} />
                 <Route path="fumigation-cleaning" element={<FumigationOversightPanel />} />
                 <Route path="tour-analytics" element={<TourAnalyticsRoute><TourAnalytics /></TourAnalyticsRoute>} />
+                <Route path="tour-music" element={<TourMusicLibrary />} />
               </Route>
               <Route
                 path="/admin/seo"

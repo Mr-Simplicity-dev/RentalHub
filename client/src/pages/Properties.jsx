@@ -109,7 +109,8 @@ const Properties = () => {
           filterParams.min_price ||
           filterParams.max_price ||
           filterParams.bedrooms ||
-          filterParams.bathrooms
+          filterParams.bathrooms ||
+          filterParams.features
         );
 
         if (hasStateFilter && hasNarrowSearch) {

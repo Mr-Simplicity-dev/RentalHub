@@ -1,7 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { propertyService } from '../../services/propertyService';
-import { FaSearch } from 'react-icons/fa';
+import { FaSearch, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
+import { SEARCHABLE_FEATURES } from '../../data/propertyFeatureSchema';
+
+const QUICK_FEATURES = [
+  'water_board',
+  'borehole',
+  'electricity',
+  'prepaid_meter',
+  'generator',
+  'solar',
+  'internet',
+  'kitchen',
+  'air_conditioning',
+  'fence',
+  'gate',
+  'security_personnel',
+  'cctv',
+  'parking',
+  'balcony',
+  'estate',
+  'estate_security',
+  'fitted_kitchen',
+  'water_heater',
+  'elevator',
+];
+
+const QUICK_FEATURE_OPTIONS = QUICK_FEATURES.map((key) =>
+  SEARCHABLE_FEATURES.find((feature) => feature.key === key)
+).filter(Boolean);
 
 const FALLBACK_STATES = [
   'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa',
@@ -36,12 +64,28 @@ const PropertyFilters = ({ onFilterChange, initialFilters = {} }) => {
     max_price: '',
     bedrooms: '',
     bathrooms: '',
+    features: '',
     ...initialFilters,
   });
+  const [showFeatureFilters, setShowFeatureFilters] = useState(
+    Boolean(initialFilters?.features)
+  );
 
   useEffect(() => {
     loadStates();
   }, []);
+
+  const selectedFeatureKeys = String(filters.features || '')
+    .split(',')
+    .map((key) => key.trim())
+    .filter(Boolean);
+
+  const toggleFeature = (key) => {
+    const next = selectedFeatureKeys.includes(key)
+      ? selectedFeatureKeys.filter((item) => item !== key)
+      : [...selectedFeatureKeys, key];
+    setFilters((prev) => ({ ...prev, features: next.join(',') }));
+  };
 
   const loadStates = async () => {
     try {
@@ -79,8 +123,10 @@ const PropertyFilters = ({ onFilterChange, initialFilters = {} }) => {
       max_price: '',
       bedrooms: '',
       bathrooms: '',
+      features: '',
     };
     setFilters(reset);
+    setShowFeatureFilters(false);
     onFilterChange({});
   };
 
@@ -215,6 +261,55 @@ return (
             <option value="3">3+</option>
             <option value="4">4+</option>
           </select>
+        </div>
+
+        {/* Must-have features */}
+        <div className="min-w-0 md:col-span-2 lg:col-span-4">
+          <button
+            type="button"
+            onClick={() => setShowFeatureFilters((prev) => !prev)}
+            className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700"
+          >
+            <span>
+              {t('property_filters.must_have_features', 'Must-have features')}
+              {selectedFeatureKeys.length > 0 && (
+                <span className="ml-2 rounded-full bg-blue-600 px-2 py-0.5 text-xs text-white">
+                  {selectedFeatureKeys.length}
+                </span>
+              )}
+            </span>
+            {showFeatureFilters ? <FaChevronUp /> : <FaChevronDown />}
+          </button>
+          {showFeatureFilters && (
+            <>
+              <p className="mt-2 text-xs text-gray-500">
+                {t(
+                  'property_filters.features_hint',
+                  'Only properties where the landlord confirmed these features will match.'
+                )}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {QUICK_FEATURE_OPTIONS.map((feature) => {
+                  const active = selectedFeatureKeys.includes(feature.key);
+                  return (
+                    <button
+                      key={feature.key}
+                      type="button"
+                      onClick={() => toggleFeature(feature.key)}
+                      aria-pressed={active}
+                      className={`rounded-full border px-3 py-1 text-xs transition ${
+                        active
+                          ? 'border-blue-600 bg-blue-600 text-white'
+                          : 'border-gray-300 bg-white text-gray-700 hover:border-blue-400'
+                      }`}
+                    >
+                      {t(`property_features.${feature.key}`, feature.label)}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Buttons */}

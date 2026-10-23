@@ -179,8 +179,26 @@ exports.updateSettings = async (req, res) => {
   }
 };
 
+exports.getMusicSettings = async () => {
+  try {
+    const result = await db.query('SELECT * FROM property_tour_music_settings WHERE id = 1');
+    const row = result.rows[0] || {};
+    return {
+      enabled: row.music_enabled !== false,
+      volume: Number.isFinite(Number(row.default_volume)) ? Number(row.default_volume) : 0.25,
+      ducking: row.ducking_enabled !== false,
+      duckingVolume: Number.isFinite(Number(row.ducking_volume)) ? Number(row.ducking_volume) : 0.12,
+    };
+  } catch (error) {
+    logger.warn('Tour music settings unavailable:', error.message);
+    return { enabled: true, volume: 0.25, ducking: true, duckingVolume: 0.12 };
+  }
+};
+
 exports.selectTrackForProperty = async (propertyType) => {
   try {
+    const settings = await exports.getMusicSettings();
+    if (!settings.enabled) return null;
     const type = String(propertyType || '').toLowerCase();
     const result = await db.query(
       `SELECT * FROM property_tour_music 

@@ -189,10 +189,26 @@ const validateStructuredFeatures = (features = {}) => {
   return { valid: errors.length === 0, errors, features: sanitized };
 };
 
+const buildFeatureHighlights = (features = {}, max = 4) => {
+  if (!features || typeof features !== 'object') return [];
+  const highlights = [];
+  for (const feature of PROPERTY_FEATURES) {
+    if (!feature.narrationEligible && !feature.searchEligible) continue;
+    const raw = features[feature.key];
+    const available =
+      raw === true ? true : raw && typeof raw === 'object' ? raw.available === true : false;
+    if (!available) continue;
+    highlights.push(feature.label);
+    if (highlights.length >= max) break;
+  }
+  return highlights;
+};
+
 module.exports = {
   FEATURE_CATEGORIES,
   PROPERTY_FEATURES,
   getFeatureByKey,
   getFeaturesByCategory,
   validateStructuredFeatures,
+  buildFeatureHighlights,
 };
