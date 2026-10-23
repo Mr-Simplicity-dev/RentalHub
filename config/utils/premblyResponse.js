@@ -42,6 +42,31 @@ const firstValue = (containers, keys) => {
   return null;
 };
 
+const namePart = (value) => {
+  if (typeof value !== 'string') return null;
+  const text = value.replace(/\s+/g, ' ').trim();
+  if (!text || text.length < 2 || text.startsWith('[object')) return null;
+  return text;
+};
+
+// The official name on the identity record, not the name the applicant typed.
+// A bank will only open a collection account in a name that matches the record,
+// so this is the value used when a virtual account is created.
+const extractVerifiedIdentityName = (body = {}) => {
+  const containers = responseContainers(body);
+  const surname = namePart(firstValue(containers, ['surname', 'lastname', 'last_name', 'family_name']));
+  const firstName = namePart(firstValue(containers, ['firstname', 'first_name', 'givenname', 'given_name']));
+  const middleName = namePart(firstValue(containers, ['middlename', 'middle_name']));
+  const combined = [firstName, middleName, surname].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+
+  if (combined.length >= 3) return combined.slice(0, 200);
+
+  const direct = namePart(
+    firstValue(containers, ['full_name', 'fullName', 'customer_name', 'customerName', 'name'])
+  );
+  return direct ? direct.slice(0, 200) : null;
+};
+
 const normalizePremblyResponse = (body = {}, fallbackReference = null) => {
   const containers = responseContainers(body);
   const responseCode = cleanText(firstValue(containers, ['response_code', 'responseCode']));
@@ -110,6 +135,7 @@ const normalizePremblyResponse = (body = {}, fallbackReference = null) => {
     verification_status: verificationStatus,
     billing_status: billingStatus,
     document_country: documentCountry,
+    verified_name: extractVerifiedIdentityName(body),
   };
 };
 
@@ -157,6 +183,7 @@ const buildPremblyRequestKey = ({
 
 module.exports = {
   normalizePremblyResponse,
+  extractVerifiedIdentityName,
   verifyPremblyWebhookSignature,
   getPremblyBackoffMinutes,
   buildPremblyRequestKey,
