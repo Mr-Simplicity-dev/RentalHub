@@ -13,6 +13,7 @@ const {
   BRAND_PHONE,
   buildFactsLine,
 } = require('./propertyTourVideo');
+const { selectTrackForProperty } = require('../../controllers/propertyTourMusicController');
 
 /**
  * Builds the automatic tour video for a property.
@@ -233,6 +234,12 @@ const generatePropertyTour = async ({ propertyId, force = false, logger: reqLogg
         propertyType: property.property_type,
       });
 
+      // Music library selection (optional, never blocks)
+      let musicTrack = null;
+      try {
+        musicTrack = await selectTrackForProperty(property.property_type);
+      } catch {}
+
       const produced = await createTourVideo({
         photoPaths: downloaded,
         outputPath,
@@ -244,6 +251,7 @@ const generatePropertyTour = async ({ propertyId, force = false, logger: reqLogg
         facts,
         propertyType: property.property_type || '',
         clipPaths: downloadedClips,
+        musicTrack,
         logger: reqLogger,
       });
 
