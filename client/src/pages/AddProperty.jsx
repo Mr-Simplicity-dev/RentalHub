@@ -9,6 +9,7 @@ import { useAuth } from '../hooks/useAuth';
 import BackToDashboard from '../components/common/BackToDashboard';
 import LivePropertyPhotoCapture from '../components/properties/LivePropertyPhotoCapture';
 import LivePropertyClipCapture from '../components/properties/LivePropertyClipCapture';
+import PropertyFeaturesForm from '../components/properties/PropertyFeaturesForm';
 
 const PROPERTY_TYPES = ['apartment', 'house', 'bungalow', 'duplex', 'studio', 'flat', 'room'];
 
@@ -32,6 +33,7 @@ const AddProperty = () => {
   const [clips, setClips] = useState([]);
   const [clipCaptureTokens, setClipCaptureTokens] = useState([]);
   const [video, setVideo] = useState(null);
+  const [structuredFeatures, setStructuredFeatures] = useState({});
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const locationPrefillAppliedRef = useRef(false);
 
@@ -155,6 +157,7 @@ const AddProperty = () => {
       const fd = new FormData();
       Object.entries(form).forEach(([key, value]) => fd.append(key, value));
       fd.append('amenities', JSON.stringify(form.amenities ? form.amenities.split(',').map((item) => item.trim()).filter(Boolean) : []));
+      fd.append('structured_features', JSON.stringify(structuredFeatures || {}));
       fd.append('image_capture_source', 'live_camera');
       fd.append('image_capture_tokens', JSON.stringify(imageCaptureTokens));
       images.forEach((image) => fd.append('images', image));
@@ -233,6 +236,7 @@ const AddProperty = () => {
             <input type="number" name="bathrooms" value={form.bathrooms} onChange={handleChange} className="input" placeholder={t('add_property.form.bathrooms')} />
           </div>
           <input name="amenities" value={form.amenities} onChange={handleChange} className="input" placeholder={t('add_property.form.amenities')} />
+          <PropertyFeaturesForm value={structuredFeatures} onChange={setStructuredFeatures} />
           <div className="space-y-2">
             <label className="text-sm font-medium">{t('add_property.form.location')}</label>
             <MapPicker value={form.latitude && form.longitude ? { lat: Number(form.latitude), lng: Number(form.longitude) } : null} onChange={({ lat, lng }) => setForm((prev) => ({ ...prev, latitude: lat, longitude: lng }))} />
