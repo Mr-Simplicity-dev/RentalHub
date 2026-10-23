@@ -137,6 +137,17 @@ Super Admin → Automatic Transfers.
 Reconciliation is throttled by `VIRTUAL_ACCOUNT_RECONCILE_INTERVAL_MS`
 (default 30 s) per reference.
 
+## Mobile app
+
+`RentalHubMobile` (Android `1.0.42`, build 53) supports both rails from the
+same API. At registration the payer chooses card or bank transfer; at wallet
+funding the modal offers the same choice. When a virtual account is returned the
+app displays it and polls `/api/virtual-accounts/registration/:reference` (or
+`/api/virtual-accounts/wallet/credits`) until the partner confirms. When only
+manual accounts are available the app selects the account, asks for the payer
+name and bank, and submits a screenshot to `/api/bank-transfer/registration/proof`
+or `/api/bank-transfer/wallet/proof` for admin approval.
+
 ## Deploy checklist
 
 1. `npm run migrate` (creates `virtual_accounts` and `virtual_account_events`,
