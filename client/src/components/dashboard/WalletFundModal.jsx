@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import BankTransferCheckout from '../BankTransferCheckout';
+import VirtualAccountCheckout from '../VirtualAccountCheckout';
 
 const TYPE_LABELS = {
   wallet_funding: 'wallet_fund.type.wallet_funding',
@@ -40,6 +41,8 @@ export default function WalletFundModal({
   const [method, setMethod] = useState('');
   const [choiceOpen, setChoiceOpen] = useState(false);
   const [submitted, setSubmitted] = useState(null);
+  const [walletAccount, setWalletAccount] = useState(null);
+  const [walletAccountLoading, setWalletAccountLoading] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -48,6 +51,7 @@ export default function WalletFundModal({
     setMethod('');
     setChoiceOpen(false);
     setSubmitted(null);
+    setWalletAccount(null);
     setHistoryLoading(true);
     api.get('/payments/wallet/transactions', { params: { limit: 20 } })
       .then((res) => setTransactions(res.data?.data || []))
@@ -130,10 +134,21 @@ export default function WalletFundModal({
 
           {submitted ? (
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-800">
-              <p className="font-semibold">Transfer submitted for approval</p>
+              <p className="font-semibold">
+                {submitted.automatic ? 'Wallet funded' : 'Transfer submitted for approval'}
+              </p>
               <p className="mt-1">
-                Reference <span className="font-mono">{submitted.reference}</span>. A super admin confirms
-                the credit and your wallet is funded automatically — the receipt is emailed to you.
+                {submitted.automatic ? (
+                  <>
+                    ₦{Number(submitted.amount || 0).toLocaleString()} was added to your wallet. The receipt is
+                    emailed to you.
+                  </>
+                ) : (
+                  <>
+                    Reference <span className="font-mono">{submitted.reference}</span>. A super admin confirms
+                    the credit and your wallet is funded automatically — the receipt is emailed to you.
+                  </>
+                )}
               </p>
               <button
                 type="button"
@@ -147,6 +162,22 @@ export default function WalletFundModal({
                 Done
               </button>
             </div>
+          ) : method === 'virtual_account' && walletAccount ? (
+            <VirtualAccountCheckout
+              mode="wallet"
+              account={walletAccount}
+              onCredited={(credit) =>
+                setSubmitted({
+                  automatic: true,
+                  amount: credit?.amount,
+                  reference: credit?.reference,
+                })
+              }
+              onCancel={() => {
+                setMethod('');
+                setChoiceOpen(false);
+              }}
+            />
           ) : method === 'bank_transfer' ? (
             <BankTransferCheckout
               amount={Number(amount)}
@@ -176,15 +207,32 @@ export default function WalletFundModal({
               </button>
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   setChoiceOpen(false);
+                  setWalletAccountLoading(true);
+                  try {
+                    const response = await api.get('/virtual-accounts/wallet');
+                    const data = response.data?.data;
+                    if (data?.available && data.account) {
+                      setWalletAccount(data.account);
+                      setMethod('virtual_account');
+                      return;
+                    }
+                  } catch (error) {
+                    // Automatic accounts are optional; the manual rail still works.
+                  } finally {
+                    setWalletAccountLoading(false);
+                  }
                   setMethod('bank_transfer');
                 }}
-                className="w-full rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-left hover:border-indigo-400"
+                disabled={walletAccountLoading}
+                className="w-full rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-left hover:border-indigo-400 disabled:opacity-60"
               >
-                <span className="block text-sm font-semibold text-indigo-900">Pay by bank transfer</span>
+                <span className="block text-sm font-semibold text-indigo-900">
+                  {walletAccountLoading ? 'Preparing your account…' : 'Pay by bank transfer'}
+                </span>
                 <span className="block text-xs text-indigo-700">
-                  Transfer into a platform account and capture the confirmation
+                  Transfer into a dedicated account in your name — credited automatically
                 </span>
               </button>
               <button

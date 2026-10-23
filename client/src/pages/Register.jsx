@@ -1161,11 +1161,23 @@ return (
           ) : resumePayment.payment_method === 'bank_transfer' ? (
             <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
+                let virtualAccount = null;
+                try {
+                  const response = await api.post(
+                    '/virtual-accounts/registration',
+                    { reference: resumePayment.reference },
+                    { skipAuth: true, skipAuthRefresh: true }
+                  );
+                  virtualAccount = response.data?.data?.virtual_account || null;
+                } catch (error) {
+                  // Falls through to the manual transfer accounts below.
+                }
                 setBankTransfer({
                   reference: resumePayment.reference,
                   amount: resumePayment.amount,
                   bank_accounts: resumePayment.bank_accounts || [],
+                  virtual_account: virtualAccount,
                 });
                 setResumePayment(null);
               }}
@@ -1441,7 +1453,7 @@ return (
           >
             <span className="block text-sm font-semibold text-teal-900">Pay by bank transfer</span>
             <span className="block text-xs text-teal-700">
-              Transfer to an Amana RentalHub NG account and capture the confirmation
+              Transfer to an account in your name — confirmed automatically
             </span>
           </button>
         </div>
