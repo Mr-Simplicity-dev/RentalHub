@@ -179,6 +179,9 @@ const { generateBacklinks } = require('./utils/backlinkEngine');
 const adminSeoRoutes = require('./routes/adminSeoRoutes');
 const bankTransferRoutes = require('./routes/bankTransfers');
 const adminBankTransfersRoutes = require('./routes/adminBankTransfers');
+const virtualAccountRoutes = require('./routes/virtualAccounts');
+const adminVirtualAccountRoutes = require('./routes/adminVirtualAccounts');
+const virtualAccountWebhookRoutes = require('./routes/virtualAccountWebhook');
 const {
   runEvidenceIntegrityMonitor,
 } = require('./services/evidenceIntegrityMonitor.service');
@@ -569,6 +572,10 @@ app.use('/voice', voiceRoutes);
 // so like /voice this route must be mounted before the sanitizer chain.
 app.use('/api/whatsapp/webhook', whatsappWebhookRoutes);
 
+// Payment provider callbacks: no browser session and no CSRF token, and the
+// body has to reach the signature check byte-for-byte (req.rawBody).
+app.use('/api/virtual-accounts/webhook', virtualAccountWebhookRoutes);
+
 const hpp = require('hpp');
 app.use(hpp({
   whitelist: [
@@ -723,6 +730,7 @@ app.use('/api/auth', authLimiter, authSensitiveLimiter, authRoutes);
 app.use('/api/properties', propertyOpsLimiter, propertyRoutes);
 app.use('/api/payments', paymentOpsLimiter, paymentRoutes);
 app.use('/api/bank-transfer', generalOpsLimiter, bankTransferRoutes);
+app.use('/api/virtual-accounts', generalOpsLimiter, virtualAccountRoutes);
 app.use('/api/applications', generalOpsLimiter, applicationRoutes);
 app.use('/api/tenancy-agreements', generalOpsLimiter, tenancyAgreementRoutes);
 app.use('/api/tenancy-agreement-templates', adminLimiter, tenancyAgreementTemplateRoutes);
@@ -734,6 +742,7 @@ app.use('/api/survey', generalOpsLimiter, surveyRoutes);
 app.use('/api/admin/survey', adminLimiter, adminSurveyRoutes);
 app.use('/api/admin/seo', adminLimiter, adminSeoRoutes);
 app.use('/api/admin/bank-transfers', adminLimiter, adminBankTransfersRoutes);
+app.use('/api/admin/virtual-accounts', adminLimiter, adminVirtualAccountRoutes);
 app.use('/api/dashboard', generalOpsLimiter, dashboardRoutes);
 app.use('/api/notifications', generalOpsLimiter, notificationRoutes);
 app.use('/api/super', adminLimiter, superAdminRoutes);
