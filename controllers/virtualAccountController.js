@@ -110,7 +110,7 @@ exports.getRegistrationStatus = async (req, res) => {
           reference,
           logger: req.logger || console,
         });
-        if (reconciled.status !== 'unpaid' && reconciled.status !== 'query_failed') {
+        if (['credited', 'registration_completed', 'duplicate'].includes(reconciled.status)) {
           status = await virtualAccountService.getRegistrationAccountStatus({ reference });
         }
       } catch (error) {

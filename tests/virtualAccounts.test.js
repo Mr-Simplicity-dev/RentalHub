@@ -234,8 +234,8 @@ test('a successful registration transfer finalises the registration once', async
       return { rows: [account] };
     }
     if (text.includes('UPDATE virtual_account_events')) return { rows: [], rowCount: 1 };
-    if (text.includes("UPDATE virtual_accounts") && text.includes("status = 'paid'")) {
-      return { rows: [], rowCount: 1 };
+    if (text.includes('UPDATE virtual_accounts') && text.includes("status = 'paid'")) {
+      return { rows: [{ id: 3 }], rowCount: 1 };
     }
     return { rows: [], rowCount: 0 };
   });

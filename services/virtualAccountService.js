@@ -6,6 +6,8 @@ const { decryptNIN } = require('../config/utils/ninEncryption');
 const { getProvider, getProviderByName, resolveProviderName } = require('./virtualAccounts');
 
 const MIN_WALLET_FUNDING = 100;
+const RECONCILE_INTERVAL_MS = Number(process.env.VIRTUAL_ACCOUNT_RECONCILE_INTERVAL_MS) || 30000;
+const lastReconciledAt = new Map();
 let schemaReady = false;
 
 const ensureSchema = async () => {
@@ -246,6 +248,10 @@ const getWalletAccountForUser = async ({ userId, logger = console }) => {
 
     return { available: true, account: serializeAccount(result.rows[0]), instant: false };
   } catch (error) {
+    if (error.code === '23505') {
+      const raced = await findActiveAccount({ userId, kind: 'dva' });
+      if (raced) return { available: true, account: serializeAccount(raced), instant: true };
+    }
     logger.error('Virtual account creation failed:', error.message);
     return {
       available: false,
@@ -291,7 +297,9 @@ const createRegistrationAccount = async ({ registration, logger = console }) => 
   );
 
   const provider = getProvider();
-  const accountReference = oneTimeReferenceFor(reference);
+  // A fresh suffix per attempt: providers reject a repeated payment/order
+  // reference, and an expired one-time account may need replacing.
+  const accountReference = `${oneTimeReferenceFor(reference)}-${Date.now().toString(36).slice(-6)}`;
 
   try {
     const created = await provider.createOneTimeAccount({
@@ -459,32 +467,50 @@ const applyWalletCredit = async ({ account, event, providerName, logger }) => {
 const applyRegistrationCredit = async ({ account, event, providerName, logger }) => {
   const authService = require('./authService');
 
-  const result = await authService.finalizeVirtualAccountRegistration({
-    reference: account.registration_reference,
-    payment: {
-      provider: providerName,
-      virtual_account_id: account.id,
-      account_number: account.account_number,
-      transaction_reference: event.providerReference,
-      amount_confirmed: event.amount,
-      sender_name: event.senderName,
-      sender_bank: event.senderBank,
-      paid_at: event.paidAt,
-    },
-    logger,
-  });
-
-  await db.query(
+  // Only one caller may settle this transfer. A webhook and a status-poll
+  // reconciliation can arrive at the same time, and both would otherwise try to
+  // create the same account. An expired account still accepts a late credit.
+  const claim = await db.query(
     `UPDATE virtual_accounts
      SET status = 'paid', updated_at = CURRENT_TIMESTAMP
-     WHERE id = $1 AND kind = 'one_time'`,
+     WHERE id = $1 AND status IN ('active', 'expired')
+     RETURNING id`,
     [account.id]
   );
 
-  return {
-    status: 'registration_completed',
-    user_id: result?.data?.user?.id || result?.user_id || null,
-  };
+  if (!claim.rows.length) {
+    return { status: 'duplicate', message: 'This transfer was already applied' };
+  }
+
+  try {
+    const result = await authService.finalizeVirtualAccountRegistration({
+      reference: account.registration_reference,
+      payment: {
+        provider: providerName,
+        virtual_account_id: account.id,
+        account_number: account.account_number,
+        transaction_reference: event.providerReference,
+        amount_confirmed: event.amount,
+        sender_name: event.senderName,
+        sender_bank: event.senderBank,
+        paid_at: event.paidAt,
+      },
+      logger,
+    });
+
+    return {
+      status: 'registration_completed',
+      user_id: result?.data?.user?.id || result?.user_id || null,
+    };
+  } catch (error) {
+    await db.query(
+      `UPDATE virtual_accounts
+       SET status = 'active', updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND status = 'paid'`,
+      [account.id]
+    );
+    throw error;
+  }
 };
 
 const findAccountForEvent = async (event) => {
@@ -505,6 +531,12 @@ const findAccountForEvent = async (event) => {
   }
 
   if (event.paymentReference) {
+    const byProviderReference = await db.query(
+      `SELECT * FROM virtual_accounts WHERE account_reference = $1 ORDER BY id DESC LIMIT 1`,
+      [event.paymentReference]
+    );
+    if (byProviderReference.rows.length) return byProviderReference.rows[0];
+
     const result = await db.query(
       `SELECT * FROM virtual_accounts
        WHERE registration_reference = $1 AND kind = 'one_time'
@@ -655,6 +687,18 @@ const handleWebhook = async ({ providerName, rawBody, body, headers = {}, query 
 
 const reconcileRegistration = async ({ reference, logger = console }) => {
   if (!isEnabled()) return { status: 'disabled' };
+
+  // Status polling is frequent; the provider transaction query is not. One
+  // direct check per interval per reference is enough to cover a missed webhook.
+  const last = lastReconciledAt.get(reference) || 0;
+  if (Date.now() - last < RECONCILE_INTERVAL_MS) {
+    return { status: 'throttled' };
+  }
+  lastReconciledAt.set(reference, Date.now());
+  if (lastReconciledAt.size > 5000) {
+    lastReconciledAt.clear();
+    lastReconciledAt.set(reference, Date.now());
+  }
 
   await ensureSchema();
 

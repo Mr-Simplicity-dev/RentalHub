@@ -33,6 +33,13 @@ export default function VirtualAccountCheckout({
   const [countdown, setCountdown] = useState(timeLeft(account?.expires_at));
   const [checking, setChecking] = useState(false);
   const baselineRef = useRef(null);
+  const onPaidRef = useRef(onPaid);
+  const onCreditedRef = useRef(onCredited);
+
+  useEffect(() => {
+    onPaidRef.current = onPaid;
+    onCreditedRef.current = onCredited;
+  }, [onPaid, onCredited]);
 
   useEffect(() => {
     setCurrent(account || null);
@@ -59,7 +66,7 @@ export default function VirtualAccountCheckout({
           const data = response.data?.data;
           if (active && data?.paid) {
             setPaid(true);
-            if (onPaid) onPaid(data);
+            if (onPaidRef.current) onPaidRef.current(data);
           }
           return;
         }
@@ -76,7 +83,7 @@ export default function VirtualAccountCheckout({
         if (newest > baselineRef.current && active) {
           baselineRef.current = newest;
           setPaid(true);
-          if (onCredited) onCredited(credits[0]);
+          if (onCreditedRef.current) onCreditedRef.current(credits[0]);
         }
       } catch (error) {
         // Polling is best-effort; the next tick retries.
@@ -91,7 +98,7 @@ export default function VirtualAccountCheckout({
       active = false;
       clearInterval(timer);
     };
-  }, [mode, statusEndpoint, paid, onPaid, onCredited]);
+  }, [mode, statusEndpoint, paid]);
 
   const copyValue = async (value, label) => {
     try {

@@ -47,6 +47,7 @@ import AppealsTab from "../components/admin/AppealsTab";
 import VoiceSupportOverview from "../components/admin/VoiceSupportOverview";
 import BankAccountsTab from "../components/admin/BankAccountsTab";
 import BankTransfersTab from "../components/admin/BankTransfersTab";
+import VirtualAccountsTab from "../components/admin/VirtualAccountsTab";
 
 const tabs = [
   "overview",
@@ -84,6 +85,7 @@ const tabs = [
   "rent_savings_withdrawals",
   "bank_accounts",
   "bank_transfers",
+  "virtual_accounts",
 ];
 
 const tabLabels = {
@@ -122,6 +124,7 @@ const tabLabels = {
   rent_savings_withdrawals: "Rent Savings Withdrawals",
   bank_accounts: "Bank Accounts",
   bank_transfers: "Manual Payments",
+  virtual_accounts: "Automatic Transfers",
 };
 
 const shortcutCategories = [
@@ -182,6 +185,7 @@ const shortcutCategories = [
       { name: "pending_approvals", label: "Pending Approvals", detail: "Review pending admin account approvals" },
       { name: "commission_config", label: "Commission Config", detail: "Manage commission rates and fee distribution" },
       { name: "bank_transfers", label: "Manual Payments", detail: "Approve or reject bank-transfer payments and view the captured proof" },
+      { name: "virtual_accounts", label: "Automatic Transfers", detail: "Audit dedicated and one-time accounts confirmed automatically by the banking partner" },
       { name: "bank_accounts", label: "Bank Accounts", detail: "Add the accounts users transfer registration fees and wallet top-ups into" },
     ],
   },
@@ -1655,6 +1659,10 @@ export default function SuperAdminDashboard() {
 
         {tab === "bank_transfers" && (
           <BankTransfersTab />
+        )}
+
+        {tab === "virtual_accounts" && (
+          <VirtualAccountsTab />
         )}
 
         {tab === "bank_accounts" && (

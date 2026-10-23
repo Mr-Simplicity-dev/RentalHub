@@ -2150,7 +2150,9 @@ exports.initializeRegistrationPayment = async (req, res) => {
       }
 
       const { listActiveAccounts } = require('./bankTransferService');
-      const bankAccounts = virtualAccount ? [] : await listActiveAccounts();
+      // Manual accounts are still returned so older app builds (which ignore
+      // `virtual_account`) keep working while the flag is on.
+      const bankAccounts = await listActiveAccounts();
 
       return res.json({
         success: true,
