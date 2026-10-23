@@ -9,6 +9,7 @@ import FloatingContactWidget from '../components/common/FloatingContactWidget';
 import WhatsAppBotWidget from '../components/common/WhatsAppBotWidget';
 import TurnstileWidget from '../components/common/TurnstileWidget';
 import BankTransferCheckout from '../components/BankTransferCheckout';
+import VirtualAccountCheckout from '../components/VirtualAccountCheckout';
 import { setAuthSession } from '../services/authStorage';
 import { getStoredUtm } from '../hooks/useUtmParams';
 import { useTranslation } from 'react-i18next';
@@ -800,6 +801,7 @@ const Register = () => {
           reference: paymentResponse.data.data.reference,
           amount: paymentResponse.data.data.amount,
           bank_accounts: paymentResponse.data.data.bank_accounts || [],
+          virtual_account: paymentResponse.data.data.virtual_account || null,
         });
         return;
       }
@@ -1468,17 +1470,55 @@ return (
           </div>
 
           <div className="mt-4">
-            <BankTransferCheckout
-              amount={bankTransfer.amount}
-              reference={bankTransfer.reference}
-              accounts={bankTransfer.bank_accounts}
-              endpoint="/bank-transfer/registration/proof"
-              onSubmitted={() => setBankTransferSubmitted(true)}
-              onCancel={() => {
-                setBankTransfer(null);
-                setBankTransferSubmitted(false);
-              }}
-            />
+            {bankTransfer.virtual_account ? (
+              <VirtualAccountCheckout
+                mode="registration"
+                amount={bankTransfer.amount}
+                reference={bankTransfer.reference}
+                account={bankTransfer.virtual_account}
+                statusEndpoint={`/virtual-accounts/registration/${bankTransfer.reference}`}
+                onPaid={() => {
+                  setBankTransferStatus({
+                    status: 'approved',
+                    user_type: registrationData.user_type,
+                  });
+                  setBankTransfer(null);
+                }}
+                onRefresh={async () => {
+                  try {
+                    const response = await api.post(
+                      '/virtual-accounts/registration',
+                      { reference: bankTransfer.reference },
+                      { skipAuth: true, skipAuthRefresh: true }
+                    );
+                    const refreshAccount = response.data?.data?.virtual_account;
+                    if (refreshAccount) {
+                      setBankTransfer((prev) => ({ ...prev, virtual_account: refreshAccount }));
+                    }
+                  } catch (error) {
+                    toast.error(
+                      error.response?.data?.message || 'Could not create a new transfer account'
+                    );
+                  }
+                }}
+                onCancel={() => {
+                  setBankTransfer(null);
+                  setBankTransferSubmitted(false);
+                }}
+              />
+            ) : (
+              <BankTransferCheckout
+                amount={bankTransfer.amount}
+                reference={bankTransfer.reference}
+                accounts={bankTransfer.bank_accounts}
+                endpoint="/bank-transfer/registration/proof"
+                onSubmitted={() => setBankTransferSubmitted(true)}
+                onCancel={() => {
+                  setBankTransfer(null);
+                  setBankTransferSubmitted(false);
+                }}
+              />
+            )}
           </div>
         </div>
       </div>
