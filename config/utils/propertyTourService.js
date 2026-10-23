@@ -252,6 +252,8 @@ const generatePropertyTour = async ({ propertyId, force = false, logger: reqLogg
         propertyType: property.property_type || '',
         clipPaths: downloadedClips,
         musicTrack,
+        narrationSegments: [],
+        voiceEnabled: false,
         logger: reqLogger,
       });
 
