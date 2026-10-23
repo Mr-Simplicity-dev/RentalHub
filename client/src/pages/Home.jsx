@@ -31,6 +31,7 @@ const Home = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAppPrompt, setShowAppPrompt] = useState(false);
+  const [appPromptVersionKey, setAppPromptVersionKey] = useState('');
   const [heroLoaded, setHeroLoaded] = useState(false);
   const [featuresLoaded, setFeaturesLoaded] = useState(false);
   const [propertiesLoaded, setPropertiesLoaded] = useState(false);
@@ -43,6 +44,7 @@ const Home = () => {
   const locationsRef = useRef(null);
 
   const mobileAppPageUrl = '/mobile-app';
+  const appDownloadPageUrl = '/download';
   const iosAppUrl = process.env.REACT_APP_IOS_APP_URL || '';
 
   const loadData = useCallback(async () => {
@@ -92,11 +94,37 @@ const Home = () => {
   useEffect(() => {
     if (isAuthenticated) {
       setShowAppPrompt(false);
-      return;
+      return undefined;
     }
 
-    const dismissedUntil = Number(localStorage.getItem('home_app_prompt_dismissed_until') || 0);
-    setShowAppPrompt(Date.now() > dismissedUntil);
+    let active = true;
+
+    api
+      .get('/downloads/version')
+      .then((response) => {
+        if (!active) return;
+        const android = response?.data?.data?.android;
+        const versionKey =
+          android?.version && android?.buildNumber
+            ? `${android.version}-${android.buildNumber}`
+            : '';
+
+        if (!versionKey) {
+          setShowAppPrompt(false);
+          return;
+        }
+
+        setAppPromptVersionKey(versionKey);
+        const seenVersion = localStorage.getItem('home_app_prompt_seen_version');
+        setShowAppPrompt(seenVersion !== versionKey);
+      })
+      .catch(() => {
+        if (active) setShowAppPrompt(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, [isAuthenticated]);
 
   useEffect(() => {
@@ -132,10 +160,15 @@ const Home = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const dismissAppPrompt = () => {
-    const oneDayMs = 24 * 60 * 60 * 1000;
-    localStorage.setItem('home_app_prompt_dismissed_until', String(Date.now() + oneDayMs));
+  const markAppPromptSeen = useCallback(() => {
+    if (appPromptVersionKey) {
+      localStorage.setItem('home_app_prompt_seen_version', appPromptVersionKey);
+    }
     setShowAppPrompt(false);
+  }, [appPromptVersionKey]);
+
+  const dismissAppPrompt = () => {
+    markAppPromptSeen();
   };
 
   const shareAppUrl = typeof window !== 'undefined'
@@ -207,6 +240,7 @@ const Home = () => {
 
           <Link
             to={mobileAppPageUrl}
+            onClick={markAppPromptSeen}
             className="group block px-5 py-5 pr-12 text-center transition-colors duration-300 hover:bg-primary-50/60 sm:px-6"
             aria-label={t('home.app_prompt_title')}
           >
@@ -521,7 +555,7 @@ const Home = () => {
             <p className="mb-4 text-lg font-semibold text-white">{t('home.download_app_cta')}</p>
             <div className="flex flex-col justify-center gap-3 sm:flex-row sm:gap-4">
               <Link
-                to={mobileAppPageUrl}
+                to={appDownloadPageUrl}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-8 py-3 font-semibold text-primary-700 transition-all duration-300 hover:-translate-y-0.5 hover:bg-gray-100 hover:shadow-lg sm:w-auto"
               >
                 <FaMobileAlt />
