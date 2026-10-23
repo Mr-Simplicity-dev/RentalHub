@@ -358,6 +358,22 @@ test('a webhook for an unknown account is recorded but not credited', async (t) 
   assert.equal(result.status, 'unknown_account');
 });
 
+test('the official name is read from a nested Prembly identity payload', () => {
+  const { extractVerifiedIdentityName } = require('../config/utils/premblyResponse');
+
+  assert.equal(
+    extractVerifiedIdentityName({
+      data: { nin: { surname: 'MUSA', firstname: 'HARUNA', middlename: 'ABDULLAHI' } },
+    }),
+    'HARUNA ABDULLAHI MUSA'
+  );
+  assert.equal(
+    extractVerifiedIdentityName({ data: { full_name: 'Haruna Musa' } }),
+    'Haruna Musa'
+  );
+  assert.equal(extractVerifiedIdentityName({}), null);
+});
+
 test('Monnify webhook signatures are verified against the raw body', () => {
   process.env.MONNIFY_SECRET_KEY = 'test-secret';
   const rawBody = Buffer.from(JSON.stringify({ eventType: 'SUCCESSFUL_TRANSACTION' }));

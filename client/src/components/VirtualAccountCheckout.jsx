@@ -140,7 +140,9 @@ export default function VirtualAccountCheckout({
           {mode === 'registration' ? 'Amount to transfer' : 'Transfer any amount'}
         </p>
         <p className="mt-1 text-2xl font-bold text-teal-900">
-          ₦{formatNumber(amount || current.amount_expected)}
+          {mode === 'wallet' && !amount
+            ? 'Any amount from ₦100'
+            : `₦${formatNumber(amount || current.amount_expected)}`}
         </p>
         <p className="mt-1 text-xs text-teal-800">
           This account belongs to you. The bank confirms the transfer automatically — no screenshot needed.

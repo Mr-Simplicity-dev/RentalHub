@@ -4,7 +4,7 @@ const router = express.Router();
 const virtualAccountController = require('../controllers/virtualAccountController');
 const { authenticate } = require('../config/middleware/auth');
 const validateRequest = require('../config/middleware/validateRequest');
-const { registrationLimiter, generalOpsLimiter } = require('../config/middleware/securityRateLimiters');
+const { registrationLimiter } = require('../config/middleware/securityRateLimiters');
 
 router.get('/config', virtualAccountController.getConfig);
 
@@ -23,7 +23,6 @@ router.post(
 // the only identifier they hold at this stage.
 router.get(
   '/registration/:reference',
-  generalOpsLimiter,
   [param('reference').isString().trim().isLength({ min: 5, max: 120 })],
   validateRequest,
   virtualAccountController.getRegistrationStatus

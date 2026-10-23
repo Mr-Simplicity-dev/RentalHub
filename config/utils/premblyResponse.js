@@ -49,14 +49,35 @@ const namePart = (value) => {
   return text;
 };
 
+const deepNamePart = (node, keys, depth = 0) => {
+  if (!node || typeof node !== 'object' || depth > 4) return null;
+  for (const key of keys) {
+    const value = namePart(node[key]);
+    if (value) return value;
+  }
+  for (const value of Object.values(node)) {
+    if (value && typeof value === 'object') {
+      const found = deepNamePart(value, keys, depth + 1);
+      if (found) return found;
+    }
+  }
+  return null;
+};
+
 // The official name on the identity record, not the name the applicant typed.
 // A bank will only open a collection account in a name that matches the record,
 // so this is the value used when a virtual account is created.
 const extractVerifiedIdentityName = (body = {}) => {
   const containers = responseContainers(body);
-  const surname = namePart(firstValue(containers, ['surname', 'lastname', 'last_name', 'family_name']));
-  const firstName = namePart(firstValue(containers, ['firstname', 'first_name', 'givenname', 'given_name']));
-  const middleName = namePart(firstValue(containers, ['middlename', 'middle_name']));
+  const surname =
+    namePart(firstValue(containers, ['surname', 'lastname', 'last_name', 'family_name'])) ||
+    deepNamePart(body, ['surname', 'lastname', 'last_name', 'family_name']);
+  const firstName =
+    namePart(firstValue(containers, ['firstname', 'first_name', 'givenname', 'given_name'])) ||
+    deepNamePart(body, ['firstname', 'first_name', 'givenname', 'given_name']);
+  const middleName =
+    namePart(firstValue(containers, ['middlename', 'middle_name'])) ||
+    deepNamePart(body, ['middlename', 'middle_name']);
   const combined = [firstName, middleName, surname].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
 
   if (combined.length >= 3) return combined.slice(0, 200);
