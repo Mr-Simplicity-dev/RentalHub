@@ -146,8 +146,8 @@ const Privacy = () => {
       collect: t('privacy.data.payments.collect', 'Transaction reference, amount, currency, status, purpose, timestamp and related property/service identifiers. For refunds, settlements and withdrawals we may also collect bank name/code, account number and account name.'),
       source: t('privacy.data.payments.source', 'You, the relevant transaction workflow and Paystack or participating financial institutions.'),
       use: t('privacy.data.payments.use', 'Initiate and verify payments, provide subscriptions or paid access, maintain ledgers and wallets, issue refunds or payouts, reconcile transactions, prevent fraud and meet accounting requirements.'),
-      basis: t('privacy.data.payments.basis', 'Contract; legal obligations relating to financial records; legitimate interests in reconciliation, fraud prevention and transaction security.'),
-      share: t('privacy.data.payments.share', 'Paystack, participating banks, authorised financial administrators, transaction counterparties where necessary, auditors, regulators and authorities where required.'),
+      basis: t('privacy.data.payments.basis', 'Contract; legal obligations relating to financial records; legitimate interests in reconciliation, fraud prevention and transaction security; and, where identity details are shared with a partner bank solely to open a collection account in your name, that account-opening purpose.'),
+      share: t('privacy.data.payments.share', 'Paystack, participating banks, authorised financial administrators, transaction counterparties where necessary, auditors, regulators and authorities where required. Where a bank-transfer collection account is opened in your name, our regulated banking partner receives the account name taken from your verified identity record and, only where the partner bank requires it to open the account, your NIN. It receives no other account data and does not hold your wallet balance.'),
       retention: t('privacy.data.payments.retention', 'For the transaction lifecycle and the period required for accounting, tax, fraud prevention, audit, chargebacks, disputes and other legal obligations.'),
     },
     {
@@ -189,7 +189,7 @@ const Privacy = () => {
     },
     {
       name: t('privacy.recipients.processors.title', 'Identity and payment processors'),
-      detail: t('privacy.recipients.processors.detail', 'Prembly supports identity/liveness checks. Paystack supports checkout, payment verification, bank-account resolution, refunds, settlements and transfers.'),
+      detail: t('privacy.recipients.processors.detail', 'Prembly supports identity/liveness checks. Paystack supports checkout, payment verification, bank-account resolution, refunds, settlements and transfers. A regulated banking partner (for example Moniepoint through Monnify, or PalmPay) issues a dedicated collection account in your name for bank transfers; it uses your verified name and, only where required to open that account, your NIN, and it does not hold your wallet balance.'),
     },
     {
       name: t('privacy.recipients.infrastructure.title', 'Cloud, media and app infrastructure'),

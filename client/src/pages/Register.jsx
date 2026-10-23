@@ -2555,6 +2555,12 @@ return (
                   </label>
                 </div>
                 {errors.terms && <p className="text-red-500 text-sm mt-1">{errors.terms}</p>}
+                <p className="mt-2 text-xs leading-5 text-gray-500">
+                  {t(
+                    'register.identity_payment_notice',
+                    'If you choose bank transfer, a collection account may be opened in your name by our regulated banking partner. For that purpose only, it receives the name and, where the partner bank requires it, the NIN from your verified identity record. It does not hold your wallet balance.'
+                  )}
+                </p>
 
                 <TurnstileWidget
                   ref={turnstileRef}
