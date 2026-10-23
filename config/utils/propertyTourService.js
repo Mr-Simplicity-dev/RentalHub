@@ -218,7 +218,9 @@ const generatePropertyTour = async ({ propertyId, force = false, logger: reqLogg
         return false;
       }
 
-      const labels = GUIDED_SHOTS.slice(0, downloaded.length).map((shot) => shot.label);
+      const guidedShots = GUIDED_SHOTS.slice(0, downloaded.length);
+      const labels = guidedShots.map((shot) => shot.label);
+      const shotKeys = guidedShots.map((shot) => shot.key);
       const outputPath = path.join(scratch, `tour_${id}.mp4`);
 
       const property = existing.rows[0];
@@ -235,6 +237,7 @@ const generatePropertyTour = async ({ propertyId, force = false, logger: reqLogg
         photoPaths: downloaded,
         outputPath,
         labels,
+        shotKeys,
         title: property.title || '',
         location,
         phone: resolvePhoneForState(property.state),

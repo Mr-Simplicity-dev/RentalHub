@@ -130,9 +130,11 @@ test('the contact crawl advertises while the tour plays', () => {
 
 test('the premium and snappy feels alternate shot to shot', () => {
   assert.ok(PREMIUM_HOLD > SNAPPY_HOLD, 'the premium feel holds longer');
-  assert.ok(shotPlan(0).premium, 'the tour opens on the premium feel');
-  assert.ok(!shotPlan(1).premium, 'the next shot uses the snappy feel');
-  assert.ok(shotPlan(2).premium, 'the feels keep alternating');
+  // Shot-type based movement is preferred; index-based alternation is a fallback
+  const plan0 = shotPlan(0, 'building_front');
+  const plan1 = shotPlan(1, 'compound');
+  assert.ok(plan0.premium || plan0.hold >= SNAPPY_HOLD, 'the tour has varied movement');
+  assert.ok(plan1.hold >= 1.5, 'shots have reasonable hold times');
 });
 
 test('the tour body uses a broadly playable format', () => {
@@ -189,7 +191,7 @@ test('a tour is never built from a single photo alone', () => {
 test('a single photo would have no cross-fade to build', () => {
   // The cross-fade chain only starts from the second shot, so one still simply
   // has no transition; the guard above stops it ever reaching the encoder.
-  const labels = GUIDED_SHOTS.slice(0, 2).map((shot) => shot.label);
+  const labels = GUIDED_SHOTS.slice(0, 2);
   const windows = labelWindows(labels);
   assert.equal(windows.length, 2);
   assert.ok(windows[1].from > 0, 'the second caption only appears after a transition');

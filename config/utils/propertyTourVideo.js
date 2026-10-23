@@ -39,6 +39,16 @@ const OUTPUT_WIDTH = CHOSEN.width;
 const OUTPUT_HEIGHT = CHOSEN.height;
 const OUTPUT_FPS = 30;
 
+// Output format profiles for multi-aspect rendering (16:9, 9:16, 4:5)
+// Controlled via PROPERTY_TOUR_OUTPUT_FORMATS (comma-separated). Master is still 4K.
+const OUTPUT_FORMATS_RAW = String(process.env.PROPERTY_TOUR_OUTPUT_FORMATS || '16:9').toLowerCase();
+const OUTPUT_PROFILES = {
+  '16:9': { width: 1920, height: 1080, label: 'landscape' },
+  '9:16': { width: 1080, height: 1920, label: 'vertical' },
+  '4:5': { width: 1080, height: 1350, label: 'portrait_feed' },
+};
+const ENABLED_FORMATS = OUTPUT_FORMATS_RAW.split(',').map(s => s.trim()).filter(s => OUTPUT_PROFILES[s]);
+
 // Motion feel. Premium and snappy alternate shot to shot so the tour breathes
 // instead of crawling or feeling like a slideshow.
 const PREMIUM_HOLD = Math.max(2, Number(process.env.PROPERTY_TOUR_PREMIUM_HOLD) || 4.4);
@@ -46,6 +56,19 @@ const SNAPPY_HOLD = Math.max(1.5, Number(process.env.PROPERTY_TOUR_SNAPPY_HOLD) 
 const PREMIUM_ZOOM = 0.1;
 const SNAPPY_ZOOM = 0.2;
 const CROSSFADE = 0.7;
+
+// Shot-type based movement profiles (deterministic). Prefer restrained motion.
+const SHOT_MOVEMENT = {
+  building_front: { hold: PREMIUM_HOLD + 0.4, zoom: PREMIUM_ZOOM * 0.8, pan: 'push_in' },
+  compound: { hold: PREMIUM_HOLD + 0.2, zoom: PREMIUM_ZOOM * 0.6, pan: 'horizontal' },
+  sitting_room: { hold: PREMIUM_HOLD, zoom: PREMIUM_ZOOM, pan: 'drift' },
+  kitchen: { hold: SNAPPY_HOLD + 0.3, zoom: PREMIUM_ZOOM * 0.7, pan: 'reveal' },
+  bedroom: { hold: PREMIUM_HOLD, zoom: PREMIUM_ZOOM * 0.6, pan: 'push_in' },
+  bathroom: { hold: SNAPPY_HOLD - 0.2, zoom: 0.05, pan: 'minimal' },
+  toilet: { hold: SNAPPY_HOLD - 0.3, zoom: 0.03, pan: 'minimal' },
+  street: { hold: PREMIUM_HOLD + 0.3, zoom: 0.08, pan: 'panoramic' },
+};
+const DEFAULT_SHOT_MOVEMENT = { hold: SNAPPY_HOLD, zoom: SNAPPY_ZOOM, pan: 'ken_burns' };
 
 const INTRO_SECONDS = Math.max(2, Number(process.env.PROPERTY_TOUR_INTRO_SECONDS) || 4.2);
 const OUTRO_SECONDS = Math.max(2, Number(process.env.PROPERTY_TOUR_OUTRO_SECONDS) || 5.2);
@@ -76,15 +99,22 @@ const FONT_CANDIDATES = [
  * street and moves through the house instead of jumping around.
  */
 const GUIDED_SHOTS = [
-  { key: 'building_front', label: 'Front of the building', hint: 'Stand outside and face the main entrance.' },
-  { key: 'compound', label: 'Compound / surroundings', hint: 'Show the yard, gate and parking space.' },
-  { key: 'sitting_room', label: 'Sitting room', hint: 'Stand at the doorway and show the whole room.' },
-  { key: 'kitchen', label: 'Kitchen', hint: 'Capture the counters and fittings.' },
-  { key: 'bedroom', label: 'Bedroom', hint: 'Show the room and any wardrobe.' },
-  { key: 'bathroom', label: 'Bathroom', hint: 'Show the fittings and water source.' },
-  { key: 'toilet', label: 'Toilet', hint: 'Show the toilet and its condition.' },
-  { key: 'street', label: 'Street outside', hint: 'Show the road and how the house is reached.' },
+  { key: 'building_front', label: 'Front of the building', hint: 'Stand far enough back to show the full building. Keep the phone horizontal and level.' },
+  { key: 'compound', label: 'Compound / surroundings', hint: 'Show the gate, parking/yard and entrance clearly. Keep level and avoid cutting off the gate.' },
+  { key: 'sitting_room', label: 'Sitting room', hint: 'Stand near a corner or doorway and capture as much of the room as possible. Keep horizontal.' },
+  { key: 'kitchen', label: 'Kitchen', hint: 'Show the cooking area, counters, sink and visible fittings. Keep steady and level.' },
+  { key: 'bedroom', label: 'Bedroom', hint: 'Capture the whole room from a corner or doorway. Show wardrobes if visible.' },
+  { key: 'bathroom', label: 'Bathroom', hint: 'Show visible bathroom fittings and water points. Keep steady and avoid close-up only shots.' },
+  { key: 'toilet', label: 'Toilet', hint: 'Show the toilet area clearly and level.' },
+  { key: 'street', label: 'Street outside', hint: 'Show the access road and immediate surroundings to show how the house is reached.' },
 ];
+
+const getShotMovement = (shotKey, index) => {
+  if (shotKey && SHOT_MOVEMENT[shotKey]) {
+    return SHOT_MOVEMENT[shotKey];
+  }
+  return DEFAULT_SHOT_MOVEMENT;
+};
 
 /**
  * Per-property-type intro themes.
@@ -199,19 +229,24 @@ const escapeDrawText = (value) =>
 const withFont = (filter, fontPath) =>
   fontPath ? filter.replace('drawtext=', `drawtext=fontfile='${fontPath.replace(/\\/g, '/')}':`) : filter;
 
-/** How long each photo holds, and how far it zooms, alternating premium and snappy. */
-const shotPlan = (index) => {
-  const premium = index % 2 === 0;
+/** How long each photo holds, and how far it zooms. Prefer shot-type based movement. */
+const shotPlan = (index, shotKey) => {
+  const movement = getShotMovement(shotKey, index);
+  const premium = movement.hold >= PREMIUM_HOLD * 0.9;
   return {
     premium,
-    hold: premium ? PREMIUM_HOLD : SNAPPY_HOLD,
-    zoom: premium ? PREMIUM_ZOOM : SNAPPY_ZOOM,
+    hold: movement.hold,
+    zoom: movement.zoom,
+    pan: movement.pan,
   };
 };
 
-const totalTourSeconds = (photoCount) => {
+const totalTourSeconds = (photoCount, labels = []) => {
   let total = 0;
-  for (let index = 0; index < photoCount; index += 1) total += shotPlan(index).hold;
+  for (let index = 0; index < photoCount; index += 1) {
+    const shotKey = labels[index]?.key || labels[index];
+    total += shotPlan(index, shotKey).hold;
+  }
   // Each transition overlaps two shots by the crossfade length.
   return total - Math.max(0, photoCount - 1) * CROSSFADE;
 };
@@ -226,11 +261,13 @@ const labelWindows = (labels) => {
   let start = 0;
 
   labels.forEach((label, index) => {
-    const hold = shotPlan(index).hold;
+    const shotKey = typeof label === 'object' ? label.key : undefined;
+    const labelText = typeof label === 'object' ? label.label : label;
+    const hold = shotPlan(index, shotKey).hold;
     const from = index === 0 ? 0 : start + CROSSFADE;
     const to = start + hold - (index === labels.length - 1 ? 0 : CROSSFADE);
 
-    windows.push({ label, from: Number(from.toFixed(2)), to: Number(Math.max(from, to).toFixed(2)) });
+    windows.push({ label: labelText, from: Number(from.toFixed(2)), to: Number(Math.max(from, to).toFixed(2)) });
     start += hold - CROSSFADE;
   });
 
@@ -590,6 +627,7 @@ const createTourVideo = async ({
   photoPaths,
   outputPath,
   labels = [],
+  shotKeys = [],
   title = '',
   location = '',
   phone = BRAND_PHONE,
@@ -624,13 +662,16 @@ const createTourVideo = async ({
     if (hasPhotos) {
     const tourInputs = ['-y'];
     photoPaths.forEach((photoPath, index) => {
-      tourInputs.push('-loop', '1', '-t', String(shotPlan(index).hold + CROSSFADE), '-i', photoPath);
+      const key = shotKeys[index] || (labels[index] && labels[index].key) || null;
+      tourInputs.push('-loop', '1', '-t', String(shotPlan(index, key).hold + CROSSFADE), '-i', photoPath);
     });
-    if (markPath) tourInputs.push('-loop', '1', '-t', String(totalTourSeconds(frames)), '-i', markPath);
+    const labelObjects = labels.length && typeof labels[0] === 'object' ? labels : labels.map((l, i) => ({ label: l, key: shotKeys[i] || null }));
+    if (markPath) tourInputs.push('-loop', '1', '-t', String(totalTourSeconds(frames, labelObjects)), '-i', markPath);
 
     const filters = [];
     for (let index = 0; index < frames; index += 1) {
-      const plan = shotPlan(index);
+      const key = shotKeys[index] || (labels[index] && labels[index].key) || null;
+      const plan = shotPlan(index, key);
       const zoomEnd = (1 + plan.zoom).toFixed(4);
       const overscanW = Math.round(OUTPUT_WIDTH * 1.25);
       const overscanH = Math.round(OUTPUT_HEIGHT * 1.25);
@@ -649,18 +690,20 @@ const createTourVideo = async ({
     }
 
     let assembled = 'v0';
-    let elapsed = shotPlan(0).hold;
+    const key0 = shotKeys[0] || (labels[0] && labels[0].key) || null;
+    let elapsed = shotPlan(0, key0).hold;
     for (let index = 1; index < frames; index += 1) {
       const next = `x${index}`;
+      const k = shotKeys[index] || (labels[index] && labels[index].key) || null;
       filters.push(
         `[${assembled}][v${index}]xfade=transition=fade:duration=${CROSSFADE}:` +
           `offset=${(elapsed - CROSSFADE).toFixed(2)}[${next}]`
       );
       assembled = next;
-      elapsed += shotPlan(index).hold - CROSSFADE;
+      elapsed += shotPlan(index, k).hold - CROSSFADE;
     }
 
-    const tourDuration = totalTourSeconds(frames);
+    const tourDuration = totalTourSeconds(frames, labelObjects);
 
     // 2. Persistent layer: dark strip, per-shot label, contact crawl.
     const crawlOnce = [BRAND_NAME, BRAND_DOMAIN, BRAND_EMAIL, `Call or WhatsApp ${phone}`].join(
@@ -685,7 +728,7 @@ const createTourVideo = async ({
       // labels are drawn as separate layers, each switched on only during its
       // own shot. Windows are computed from the same holds as the zoom, so the
       // label and the picture never drift apart.
-      const windows = labelWindows(labels);
+      const windows = labelWindows(labelObjects);
       windows.forEach((win, index) => {
         const alpha =
           `if(lt(t,${win.from}),0,if(lt(t,${win.to}),1,0))`;
@@ -863,6 +906,9 @@ module.exports = {
   INTRO_THEMES,
   DEFAULT_THEME,
   resolveIntroTheme,
+  getShotMovement,
+  SHOT_MOVEMENT,
+  DEFAULT_SHOT_MOVEMENT,
   formatPriceShort,
   buildFactsLine,
   PREMIUM_HOLD,
@@ -876,4 +922,6 @@ module.exports = {
   OUTPUT_WIDTH,
   OUTPUT_HEIGHT,
   OUTPUT_FPS,
+  OUTPUT_PROFILES,
+  ENABLED_FORMATS,
 };
