@@ -917,6 +917,7 @@ const validateAndPrepareRegistration = async (payload) => {
         reference: nimcResult.reference_id || null,
         response_code: nimcResult.response_code || null,
         billing_status: nimcResult.billing_status,
+        verified_name: nimcResult.verified_name || null,
       };
 
       if (nimcResult.status === 'not_configured') {
@@ -2052,6 +2053,9 @@ exports.initializeRegistrationPayment = async (req, res) => {
       lga_name: registrationPricing.location?.lga_name || null,
       password_hash: passwordHash,
       kycResult: kycResult || null,
+      // Official name from the identity record. Used when the partner bank
+      // opens a collection account, because a name mismatch fails creation.
+      verified_identity_name: verificationMeta?.verified_name || null,
           base_registration_amount: baseAmountNgn,
           quote_amount_usd: quoteUsd,
           fx_rate: fxRate,
@@ -2120,12 +2124,39 @@ exports.initializeRegistrationPayment = async (req, res) => {
     );
 
     if (paymentMethod === 'bank_transfer') {
+      // Preferred: a one-time account the provider reconciles automatically, so
+      // the payer is not asked for a screenshot and no admin has to approve it.
+      // Any failure here falls back to the manual account list below.
+      let virtualAccount = null;
+      try {
+        const virtualAccountService = require('./virtualAccountService');
+        if (virtualAccountService.isEnabled()) {
+          const transfer = await virtualAccountService.createRegistrationAccount({
+            registration: {
+              transaction_reference: reference,
+              amount: chargeableAmountNgn,
+              email: preparedRegistration.email,
+              full_name: preparedRegistration.full_name,
+              registration_payload: registrationPayload,
+            },
+            logger: req.logger,
+          });
+          if (transfer?.available && transfer.account) {
+            virtualAccount = transfer.account;
+          }
+        }
+      } catch (virtualAccountError) {
+        req.logger.error('Automatic transfer account skipped:', virtualAccountError.message);
+      }
+
       const { listActiveAccounts } = require('./bankTransferService');
-      const bankAccounts = await listActiveAccounts();
+      const bankAccounts = virtualAccount ? [] : await listActiveAccounts();
 
       return res.json({
         success: true,
-        message: `${preparedRegistration.user_type === 'tenant' ? 'Tenant' : 'Landlord'} registration payment initialized`,
+        message: virtualAccount
+          ? 'Transfer to the account below. It is confirmed automatically within seconds of your transfer.'
+          : `${preparedRegistration.user_type === 'tenant' ? 'Tenant' : 'Landlord'} registration payment initialized`,
         data: {
           payment_method: 'bank_transfer',
           status: 'awaiting_transfer',
@@ -2136,6 +2167,8 @@ exports.initializeRegistrationPayment = async (req, res) => {
           quote_amount_usd: quoteUsd,
           reference,
           bank_accounts: bankAccounts,
+          virtual_account: virtualAccount,
+          auto_confirm: Boolean(virtualAccount),
         }
       });
     }
@@ -2535,6 +2568,19 @@ const finalizeRegistrationFromPayment = async ({ tenantRegistrationPayment, refe
       }
     });
 
+    // Store the name exactly as the identity provider returned it. Payment
+    // partners match it against the identity record, so it must not be replaced
+    // by the name typed during registration.
+    const verifiedIdentityName =
+      verificationMeta?.verified_name || storedPayload.verified_identity_name || null;
+    if (verifiedIdentityName && data?.user?.id) {
+      await db.query(
+        `UPDATE users SET identity_verified_name = $1
+         WHERE id = $2 AND (identity_verified_name IS NULL OR identity_verified_name = '')`,
+        [String(verifiedIdentityName).slice(0, 200), data.user.id]
+      );
+    }
+
     // Marketing agent attribution. Two routes in: the agent was signed in and opened
     // the account from their dashboard, or the person signed up themselves through
     // the agent's invite link (their referral code). Either way we record who it was
@@ -2655,6 +2701,70 @@ exports.finalizeBankTransferRegistration = async ({ reference, transfer, reviewe
 
   registrationPayment.payment_status = 'completed';
   registrationPayment.payment_method = 'bank_transfer';
+  registrationPayment.completed_at = registrationPayment.completed_at || new Date();
+  registrationPayment.gateway_response = gateway;
+
+  const { data } = await finalizeRegistrationFromPayment({
+    tenantRegistrationPayment: registrationPayment,
+    reference,
+    logger,
+  });
+
+  return { data };
+};
+
+// Called by the virtual-account webhook once the partner bank confirms the
+// registration fee actually landed. Same finalisation path as Paystack and as
+// manual approval, so the created account and receipt are identical.
+exports.finalizeVirtualAccountRegistration = async ({ reference, payment, logger = console }) => {
+  await ensureTenantRegistrationPaymentSchema();
+
+  const result = await db.query(
+    `SELECT * FROM tenant_registration_payments
+     WHERE transaction_reference = $1
+     LIMIT 1`,
+    [reference]
+  );
+
+  if (!result.rows.length) {
+    const error = new Error('Registration payment not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const registrationPayment = result.rows[0];
+
+  if (registrationPayment.registered_user_id) {
+    return { alreadyCompleted: true, user_id: registrationPayment.registered_user_id };
+  }
+
+  const gateway = {
+    gateway: 'virtual_account',
+    provider: payment?.provider || null,
+    virtual_account_id: payment?.virtual_account_id || null,
+    account_number: payment?.account_number || null,
+    transaction_reference: payment?.transaction_reference || null,
+    amount_confirmed: payment?.amount_confirmed === null || payment?.amount_confirmed === undefined
+      ? null
+      : Number(payment.amount_confirmed),
+    payer_name: payment?.sender_name || null,
+    payer_bank: payment?.sender_bank || null,
+    paid_at: payment?.paid_at || new Date().toISOString(),
+  };
+
+  await db.query(
+    `UPDATE tenant_registration_payments
+     SET payment_status = 'completed',
+         payment_method = 'virtual_account',
+         completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP),
+         gateway_response = $1
+     WHERE transaction_reference = $2
+       AND registered_user_id IS NULL`,
+    [JSON.stringify(gateway), reference]
+  );
+
+  registrationPayment.payment_status = 'completed';
+  registrationPayment.payment_method = 'virtual_account';
   registrationPayment.completed_at = registrationPayment.completed_at || new Date();
   registrationPayment.gateway_response = gateway;
 
