@@ -1634,25 +1634,46 @@ exports.initializePropertyUnlock = async (req, res) => {
     }
 
     if (payment_method === "bank_transfer") {
-      const reference = buildReference('UNLOCK', paymentId, Date.now());
-      await db.query(
-        "UPDATE payments SET transaction_reference = $1 WHERE id = $2",
-        [reference, paymentId]
-      );
-
-      return res.json({
-        success: true,
-        message: "Please transfer to unlock this property",
-        data: {
-          payment_id: paymentId,
-          property_id,
-          amount: PROPERTY_UNLOCK_PRICE_NGN,
-          reference,
-          bank_name: "Your Bank Name",
-          account_number: "1234567890",
-          account_name: "Rental Hub NG",
-        },
-      });
+      const bankTransferService = require('./bankTransferService');
+      try {
+        await bankTransferService.ensureSchema();
+        const accounts = await bankTransferService.listActiveAccounts ? bankTransferService.listActiveAccounts() : [];
+        if (!Array.isArray(accounts) || accounts.length === 0) {
+          return res.status(503).json({
+            success: false,
+            message: "Bank transfer is currently unavailable for this payment type",
+          });
+        }
+        const reference = buildReference('UNLOCK', paymentId, Date.now());
+        await db.query(
+          "UPDATE payments SET transaction_reference = $1 WHERE id = $2",
+          [reference, paymentId]
+        );
+        return res.json({
+          success: true,
+          message: "Please transfer to unlock this property",
+          data: {
+            payment_id: paymentId,
+            property_id,
+            amount: PROPERTY_UNLOCK_PRICE_NGN,
+            reference,
+            accounts: accounts.map(a => ({
+              id: a.id,
+              bank_name: a.bank_name,
+              account_name: a.account_name,
+              account_number: a.account_number,
+              sort_code: a.sort_code,
+              instructions: a.instructions,
+            })),
+          },
+        });
+      } catch (e) {
+        logger.error('Bank transfer accounts lookup failed for property unlock', e);
+        return res.status(503).json({
+          success: false,
+          message: "Bank transfer is currently unavailable for this payment type",
+        });
+      }
     }
 
     return res.status(400).json({
@@ -2806,18 +2827,40 @@ exports.initializeListingPayment = async (req, res) => {
     }
 
     if (payment_method === "bank_transfer") {
-      return res.json({
-        success: true,
-        message: "Please transfer to the account below",
-        data: {
-          payment_id: paymentId,
-          bank_name: "Your Bank Name",
-          account_number: "1234567890",
-          account_name: "Rental Hub NG",
-          amount: plan.price,
-          reference: buildReference('LIST', paymentId, Date.now())
+      const bankTransferService = require('./bankTransferService');
+      try {
+        await bankTransferService.ensureSchema();
+        const accounts = await bankTransferService.listActiveAccounts ? bankTransferService.listActiveAccounts() : [];
+        if (!Array.isArray(accounts) || accounts.length === 0) {
+          return res.status(503).json({
+            success: false,
+            message: "Bank transfer is currently unavailable for this payment type",
+          });
         }
-      });
+        return res.json({
+          success: true,
+          message: "Please transfer to the account below",
+          data: {
+            payment_id: paymentId,
+            amount: plan.price,
+            reference: buildReference('LIST', paymentId, Date.now()),
+            accounts: accounts.map(a => ({
+              id: a.id,
+              bank_name: a.bank_name,
+              account_name: a.account_name,
+              account_number: a.account_number,
+              sort_code: a.sort_code,
+              instructions: a.instructions,
+            })),
+          }
+        });
+      } catch (e) {
+        logger.error('Bank transfer accounts lookup failed for listing payment', e);
+        return res.status(503).json({
+          success: false,
+          message: "Bank transfer is currently unavailable for this payment type",
+        });
+      }
     }
   } catch (error) {
     req.logger.error("Listing payment initialization error:", error);
@@ -3207,20 +3250,42 @@ exports.initializeRentPayment = async (req, res) => {
     }
 
     if (payment_method === "bank_transfer") {
-      return res.json({
-        success: true,
-        message: "Please transfer to the account below",
-        data: {
-          payment_id: paymentId,
-          bank_name: "Your Bank Name",
-          account_number: "1234567890",
-          account_name: "Rental Hub NG",
-          amount,
-          reference: buildReference('RENT', paymentId, Date.now()),
-          platform_fee: platformFee,
-          landlord_receives: landlordAmount
+      const bankTransferService = require('./bankTransferService');
+      try {
+        await bankTransferService.ensureSchema();
+        const accounts = await bankTransferService.listActiveAccounts ? bankTransferService.listActiveAccounts() : [];
+        if (!Array.isArray(accounts) || accounts.length === 0) {
+          return res.status(503).json({
+            success: false,
+            message: "Bank transfer is currently unavailable for this payment type",
+          });
         }
-      });
+        return res.json({
+          success: true,
+          message: "Please transfer to the account below",
+          data: {
+            payment_id: paymentId,
+            amount,
+            reference: buildReference('RENT', paymentId, Date.now()),
+            platform_fee: platformFee,
+            landlord_receives: landlordAmount,
+            accounts: accounts.map(a => ({
+              id: a.id,
+              bank_name: a.bank_name,
+              account_name: a.account_name,
+              account_number: a.account_number,
+              sort_code: a.sort_code,
+              instructions: a.instructions,
+            })),
+          }
+        });
+      } catch (e) {
+        logger.error('Bank transfer accounts lookup failed for rent payment', e);
+        return res.status(503).json({
+          success: false,
+          message: "Bank transfer is currently unavailable for this payment type",
+        });
+      }
     }
   } catch (error) {
     req.logger.error("Rent payment initialization error:", error);
@@ -3489,22 +3554,47 @@ exports.initializeHelpRentPayment = async (req, res) => {
       });
     }
 
-    // bank_transfer: mirror the existing rent payment behaviour.
-    return res.json({
-      success: true,
-      message: 'Please transfer to the account below',
-      data: {
-        payment_id: paymentId,
-        bank_name: 'Your Bank Name',
-        account_number: '1234567890',
-        account_name: 'Rental Hub NG',
-        amount,
-        reference: buildReference('RENT', paymentId, Date.now()),
-        platform_fee: platformFee,
-        landlord_receives: landlordAmount,
-        paid_on_behalf_of: tenantUserId,
-      },
-    });
+    // bank_transfer
+    if (paymentMethod === 'bank_transfer') {
+      const bankTransferService = require('./bankTransferService');
+      try {
+        await bankTransferService.ensureSchema();
+        const accounts = await bankTransferService.listActiveAccounts ? bankTransferService.listActiveAccounts() : [];
+        if (!Array.isArray(accounts) || accounts.length === 0) {
+          return res.status(503).json({
+            success: false,
+            message: "Bank transfer is currently unavailable for this payment type",
+          });
+        }
+        return res.json({
+          success: true,
+          message: 'Please transfer to the account below',
+          data: {
+            payment_id: paymentId,
+            amount,
+            reference: buildReference('RENT', paymentId, Date.now()),
+            platform_fee: platformFee,
+            landlord_receives: landlordAmount,
+            paid_on_behalf_of: tenantUserId,
+            accounts: accounts.map(a => ({
+              id: a.id,
+              bank_name: a.bank_name,
+              account_name: a.account_name,
+              account_number: a.account_number,
+              sort_code: a.sort_code,
+              instructions: a.instructions,
+            })),
+          },
+        });
+      } catch (e) {
+        logger.error('Bank transfer accounts lookup failed for pay rent on behalf', e);
+        return res.status(503).json({
+          success: false,
+          message: "Bank transfer is currently unavailable for this payment type",
+        });
+      }
+    }
+    return res.status(400).json({ success: false, message: 'Unsupported payment method' });
   } catch (error) {
     req.logger.error('Pay rent on behalf error:', error);
     return res.status(500).json({
