@@ -34,7 +34,6 @@ const AddProperty = () => {
   const [clipCaptureTokens, setClipCaptureTokens] = useState([]);
   const [video, setVideo] = useState(null);
   const [structuredFeatures, setStructuredFeatures] = useState({});
-  const [code, setCode] = useState(['', '', '', '', '', '']);
   const locationPrefillAppliedRef = useRef(false);
 
   const selectedStateOption = useMemo(
@@ -130,15 +129,6 @@ const AddProperty = () => {
     }));
   };
 
-  const handleCodeChange = (index, value) => {
-    if (!/^\d?$/.test(value)) return;
-    const nextCode = [...code];
-    nextCode[index] = value;
-    setCode(nextCode);
-    const next = document.getElementById(`otp-${index + 1}`);
-    if (value && next) next.focus();
-  };
-
   const proceedToVerification = (e) => {
     e.preventDefault();
     if (!form.title || !form.state_id || !form.lga_name || !form.city || !form.area || !form.property_type || !form.rent_amount) {
@@ -151,7 +141,6 @@ const AddProperty = () => {
   };
 
   const submitProperty = async () => {
-    if (code.join('') !== '123456') return toast.error(t('add_property.invalid_code'));
     setLoading(true);
     try {
       const fd = new FormData();
@@ -282,7 +271,7 @@ const AddProperty = () => {
 
           <div className="rounded-lg bg-amber-50 p-4">
             <p className="text-sm text-amber-800">
-              <strong>Tip:</strong> You can add Property Maintenance Assessments after publishing the property. Click "Continue" now to verify and publish your listing.
+              <strong>Tip:</strong> You can add Property Maintenance Assessments after publishing the property.
             </p>
           </div>
 
@@ -290,8 +279,8 @@ const AddProperty = () => {
             <button type="button" onClick={() => setStep(1)} className="btn w-full">
               ← Back
             </button>
-            <button type="button" onClick={() => setStep(3)} className="btn btn-primary w-full">
-              Continue to Verification
+            <button type="button" onClick={submitProperty} disabled={loading} className="btn btn-primary w-full">
+              {loading ? t('add_property.submitting') : t('add_property.publish')}
             </button>
           </div>
         </div>
@@ -329,18 +318,7 @@ const AddProperty = () => {
         </div>
       )}
 
-      {step === 3 && (
-        <div className="card space-y-6 text-center">
-          <h2 className="text-xl font-semibold">{t('add_property.verify_title')}</h2>
-          <div className="flex flex-wrap justify-center gap-2">
-            {code.map((value, index) => <input key={index} id={`otp-${index}`} value={value} onChange={(e) => handleCodeChange(index, e.target.value)} maxLength="1" className="h-12 w-12 rounded border text-center text-xl" />)}
-          </div>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <button onClick={() => setStep(2)} className="btn btn-secondary w-full sm:flex-1">{t('add_property.back')}</button>
-            <button onClick={submitProperty} disabled={loading} className="btn btn-primary w-full sm:flex-1">{loading ? t('add_property.submitting') : t('add_property.publish')}</button>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 };
