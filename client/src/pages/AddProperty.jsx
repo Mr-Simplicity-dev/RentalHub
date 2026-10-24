@@ -155,13 +155,13 @@ const AddProperty = () => {
       if (!res.success) return toast.error(res.message || t('add_property.failed'));
 
       // Clips attach to the new property. They are optional, so a clips problem
-      // never fails a published listing.
+      // never fails a submitted listing.
       const createdId = res.data?.id;
       if (createdId && clips.length) {
         try {
           await propertyService.uploadClips(createdId, clips, clipCaptureTokens, []);
         } catch (clipError) {
-          toast.info('Your listing is live, but the clips could not be added. You can add them again from the property page.');
+          toast.info('Your property was submitted successfully, but the optional clips could not be added. You can add them again from the property page.');
         }
       }
 
@@ -289,8 +289,8 @@ const AddProperty = () => {
       {step === 2 && createdPropertyId && (
         <div className="card space-y-6">
           <div className="space-y-3 text-center">
-            <h2 className="text-xl font-semibold">🎉 Property Published!</h2>
-            <p className="text-sm text-gray-500">Your property is now live. You can add Property Maintenance Assessments now if needed.</p>
+            <h2 className="text-xl font-semibold">🎉 Property Submitted Successfully!</h2>
+            <p className="text-sm text-gray-500">Your property has been submitted successfully and is awaiting verification. It will become publicly visible after approval. You can add Property Maintenance Assessments while you wait.</p>
           </div>
 
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-center">
