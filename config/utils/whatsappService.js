@@ -1,5 +1,7 @@
 const axios = require('axios');
 
+const graphVersion = () => /^v\d+\.\d+$/.test(process.env.WHATSAPP_GRAPH_API_VERSION || '') ? process.env.WHATSAPP_GRAPH_API_VERSION : 'v20.0';
+
 const normalizePhone = (phone) => String(phone || '').replace(/[^\d]/g, '');
 
 exports.sendWhatsAppText = async ({ to, message }) => {
@@ -23,7 +25,7 @@ exports.sendWhatsAppText = async ({ to, message }) => {
 
   try {
     const { data } = await axios.post(
-      `https://graph.facebook.com/v20.0/${phoneNumberId}/messages`,
+      `https://graph.facebook.com/${graphVersion()}/${phoneNumberId}/messages`,
       {
         messaging_product: 'whatsapp',
         to: recipient,
@@ -91,7 +93,7 @@ exports.sendWhatsAppTemplate = async ({ to, templateName, language = 'en', param
 
   try {
     const { data } = await axios.post(
-      `https://graph.facebook.com/v20.0/${phoneNumberId}/messages`,
+      `https://graph.facebook.com/${graphVersion()}/${phoneNumberId}/messages`,
       {
         messaging_product: 'whatsapp',
         to: recipient,
@@ -152,7 +154,7 @@ exports.checkWhatsAppContacts = async (phones = []) => {
 
   try {
     const { data } = await axios.post(
-      `https://graph.facebook.com/v20.0/${phoneNumberId}/contacts`,
+      `https://graph.facebook.com/${graphVersion()}/${phoneNumberId}/contacts`,
       { blocking: 'wait', contacts, force_check: true },
       {
         timeout: Number(process.env.WHATSAPP_TIMEOUT_MS || 15000),
@@ -208,7 +210,7 @@ exports.sendWhatsAppMedia = async ({ to, mediaType, link, caption = '' }) => {
 
   try {
     const { data } = await axios.post(
-      `https://graph.facebook.com/v20.0/${phoneNumberId}/messages`,
+      `https://graph.facebook.com/${graphVersion()}/${phoneNumberId}/messages`,
       {
         messaging_product: 'whatsapp',
         to: recipient,

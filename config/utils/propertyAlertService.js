@@ -1,13 +1,11 @@
 const logger = require('./logger');
 const db = require('../middleware/database');
 const { sendEmail } = require('./mailer');
-const { getFrontendUrl } = require('./frontendUrl');
 const {enqueue: enqueuePropertyNotification} = require('../../services/propertyAlertDeliveryService');
 const { createNotification } = require('./notificationService');
 
 let schemaReady = false;
 const ALERT_REQUEST_FEE_NGN = 5000;
-const FRONTEND_URL = getFrontendUrl();
 const ACTIVE_MATCH_STATUSES = [
   'approved_assigned',
   'sourcing',
@@ -374,6 +372,22 @@ exports.notifyAlertsForProperty = async (property) => {
     for(const alert of alerts){const result=await enqueuePropertyNotification({alert,property});if(result.queued)queued++;}
     return {matched:alerts.length,queued,notified:0};
   } catch(error) {logger.error('Property alert queue error:',error.message);return {matched:0,queued:0,notified:0};}
+};
+
+exports.recoverPendingPropertyNotifications = async () => {
+  const manual=await db.query("SELECT a.*,s.state_name FROM tenant_property_alerts a LEFT JOIN states s ON s.id=a.state_id WHERE a.workflow_status='fulfilled' AND a.notified_at IS NULL AND NOT EXISTS(SELECT 1 FROM property_alert_deliveries d WHERE d.alert_id=a.id) ORDER BY a.id LIMIT 20");
+  for(const alert of manual.rows)await enqueuePropertyNotification({alert,note:alert.state_admin_note || ''});
+  const candidates=await db.query(`SELECT p.* FROM tenant_property_alerts a JOIN LATERAL (
+    SELECT p.* FROM properties p WHERE p.is_verified=TRUE AND p.is_available=TRUE AND p.property_type=a.property_type
+      AND (a.state_id IS NULL OR a.state_id=p.state_id)
+      AND (a.lga_name IS NULL OR LOWER(COALESCE(a.lga_name,''))=LOWER(COALESCE(p.lga_name,'')))
+      AND (a.city IS NULL OR LOWER(a.city)=LOWER(COALESCE(p.city,'')))
+      AND (a.min_price IS NULL OR a.min_price<=p.rent_amount) AND (a.max_price IS NULL OR a.max_price>=p.rent_amount)
+      AND (a.bedrooms IS NULL OR a.bedrooms<=COALESCE(p.bedrooms,0)) AND (a.bathrooms IS NULL OR a.bathrooms<=COALESCE(p.bathrooms,0))
+    ORDER BY p.created_at DESC,p.id DESC LIMIT 1
+  ) p ON TRUE WHERE a.is_active=TRUE AND a.notified_at IS NULL AND a.workflow_status=ANY($1)
+    AND NOT EXISTS(SELECT 1 FROM property_alert_deliveries d WHERE d.alert_id=a.id) ORDER BY a.id LIMIT 20`,[ACTIVE_MATCH_STATUSES]);
+  for(const property of candidates.rows)await exports.notifyAlertsForProperty(property);
 };
 
 const mapAlertRow = (row) => ({
