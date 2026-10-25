@@ -315,7 +315,7 @@ const Home = () => {
                 to="/legal-support"
                 className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-primary-700 shadow-card transition-all duration-300 hover:-translate-y-0.5 hover:shadow-cardHover"
               >
-                <FaShieldAlt /> {t('home.use_lawyers')}
+                <FaShieldAlt /> {t('legalCases.title')}
               </Link>
               <Link
                 to="/verify-case"
@@ -336,7 +336,7 @@ const Home = () => {
                 to="/legal-support"
                 className="text-primary-100 underline decoration-primary-300/60 underline-offset-4 transition-colors duration-300 hover:text-white"
               >
-                {t('home.legal_support_link')}
+                {t('legalCases.title')}
               </Link>
               <Link
                 to="/properties?request=1#tenant-request"
@@ -412,7 +412,7 @@ const Home = () => {
                   className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-primary-700"
                 >
                   <FaShieldAlt aria-hidden="true" />
-                  {t('home.use_lawyers')}
+                  {t('legalCases.title')}
                 </Link>
               </div>
             </div>
