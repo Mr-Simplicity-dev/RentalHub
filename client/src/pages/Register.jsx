@@ -1,3 +1,4 @@
+import {readRegistrationDraft,saveRegistrationDraft,clearRegistrationDraft} from '../utils/registrationDraft';
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -91,9 +92,11 @@ const Register = () => {
     ''
   ).trim().replace(/\s+/g, '').toUpperCase();
   const restartToken = searchParams.get('restart') || '';
-  const [formData, setFormData] = useState(() =>
-    buildInitialRegistrationForm(referralCode)
-  );
+  const [initialDraft]=useState(()=>restartToken?null:readRegistrationDraft());
+  const [formData,setFormData]=useState(()=>({...buildInitialRegistrationForm(referralCode),...(initialDraft?.form||{}),...(referralCode?{referral_code:referralCode}:{})}));
+  const draftCompletedRef=useRef(false);
+  const [draftSaved,setDraftSaved]=useState(Boolean(initialDraft));
+  const completeRegistrationDraft=()=>{draftCompletedRef.current=true;clearRegistrationDraft();setDraftSaved(false);};
   const [loading, setLoading] = useState(false);
   const [locationOptions, setLocationOptions] = useState([]);
   const [registrationFlags, setRegistrationFlags] = useState(initialRegistrationFlags);
@@ -129,18 +132,31 @@ const Register = () => {
   const { t } = useTranslation();
   const { register } = useAuth();
   const navigate = useNavigate();
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(initialDraft?.step||1);
   const [errors, setErrors] = useState({});
   const [termsAccepted, setTermsAccepted] = useState(false);
+
+  useEffect(()=>{
+    if(draftCompletedRef.current||registrationReference)return;
+    setDraftSaved(saveRegistrationDraft(formData,step));
+  },[formData,step,registrationReference]);
+
+  const discardRegistrationDraft=()=>{
+    clearRegistrationDraft();
+    setFormData(buildInitialRegistrationForm(referralCode));
+    setStep(1);setTermsAccepted(false);setDraftSaved(false);setErrors({});
+    resetTurnstile();
+  };
 
   const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const referralCodePattern = /^[A-Za-z0-9_-]+$/;
   const passportPattern = /^[A-Za-z0-9]{6,20}$/;
+  const passwordPattern=/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{10,}$/;
 
   const getPasswordStrength = (pwd) => {
     if (!pwd) return null;
     let score = 0;
-    if (pwd.length >= 8) score++;
+    if (pwd.length >= 10) score++;
     if (pwd.length >= 12) score++;
     if (/[A-Z]/.test(pwd)) score++;
     if (/[0-9]/.test(pwd)) score++;
@@ -435,6 +451,7 @@ const Register = () => {
         if (response.data?.success) {
           const { token, user } = response.data.data;
 
+          completeRegistrationDraft();
           setAuthSession(token, user);
           api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
@@ -525,6 +542,7 @@ const Register = () => {
         if (!data) return;
 
         if (data.status === 'approved' || data.registered) {
+          completeRegistrationDraft();
           setBankTransferStatus(data);
           setBankTransferSubmitted(false);
           setBankTransfer(null);
@@ -668,12 +686,12 @@ const Register = () => {
     return;
   }
 
-  if (formData.password.length < 8) {
-    toast.error(t('register.password_min'));
+  if (!passwordPattern.test(formData.password)) {
+    toast.error(t('registrationDraft.password_rule'));
     return;
   }
 
- if (!formData.use_rentalhub_lawyers && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.lawyer_email || "")) {
+ if (!emailPattern.test(String(formData.lawyer_email||'').trim())) {
     toast.error(t('register.lawyer_email_required'));
     return;
   }
@@ -828,6 +846,7 @@ return;
     const response = await register(registrationData);
 
     if (response.success) {
+  completeRegistrationDraft();
   toast.success(t('register.registration_success'));
 
   const role =
@@ -910,6 +929,8 @@ useEffect(() => {
     return;
   }
 
+  draftCompletedRef.current=false;
+  clearRegistrationDraft();
   setFormData(buildInitialRegistrationForm(referralCode));
   setRegistrationFlags(initialRegistrationFlags);
   setRegistrationPricing(buildInitialRegistrationPricing('tenant'));
@@ -1014,8 +1035,8 @@ const validateStep = () => {
 
   if (step === 4) {
     if (!formData.password) newErrors.password = t('register.password_required');
-    if (formData.password.length < 8)
-      newErrors.password = t('register.password_min');
+    if (!passwordPattern.test(formData.password))
+      newErrors.password = t('registrationDraft.password_rule');
     if (formData.password !== formData.confirm_password)
       newErrors.confirm = t('register.password_mismatch');
     if (!termsAccepted) newErrors.terms = t('register.terms_required');
@@ -1084,7 +1105,7 @@ const isStepThreeComplete = (() => {
 })();
 
 const isStepFourComplete =
-  String(formData.password || "").length >= 8 &&
+  passwordPattern.test(String(formData.password || "")) &&
   formData.password === formData.confirm_password &&
   termsAccepted;
 
@@ -1374,7 +1395,8 @@ return (
                 );
                 if (response.data?.success) {
                   const { token, user } = response.data.data;
-                  setAuthSession(token, user);
+                  completeRegistrationDraft();
+          setAuthSession(token, user);
                   api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
                   toast.success(t('register.registration_success'));
                   window.location.assign(
@@ -1490,6 +1512,7 @@ return (
                 account={bankTransfer.virtual_account}
                 statusEndpoint={`/virtual-accounts/registration/${bankTransfer.reference}`}
                 onPaid={() => {
+                  completeRegistrationDraft();
                   setBankTransferStatus({
                     status: 'approved',
                     user_type: registrationData.user_type,
@@ -1795,6 +1818,7 @@ return (
           <motion.div key={step} initial={{ opacity:0,x:40 }} animate={{ opacity:1,x:0 }} exit={{ opacity:0,x:-40 }}>
 
             {/* STEP 1 — Account Type */}
+            {draftSaved && <div role="status" className="mb-5 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-900"><p className="font-medium">{t(initialDraft?'registrationDraft.restored':'registrationDraft.saved')}</p><p className="mt-1">{t('registrationDraft.notice')}</p><button type="button" onClick={discardRegistrationDraft} className="mt-2 font-semibold underline underline-offset-4">{t('registrationDraft.clear')}</button></div>}
             {step === 1 && (
               <div className="space-y-6">
                 <h2 className="text-xl font-semibold text-center">{t('register.step_1_title')}</h2>
@@ -2017,9 +2041,9 @@ return (
                       type="email"
                       autoComplete="off"
                       value={formData.lawyer_email}
-                      disabled={formData.use_rentalhub_lawyers}
+                      
                       onChange={(e) => { handleChange(e); setErrors(p => ({ ...p, lawyer_email: null })); }}
-                      className={`input pl-10 ${errors.lawyer_email ? 'border-red-500' : ''} ${formData.use_rentalhub_lawyers ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      className={`input pl-10 ${errors.lawyer_email ? 'border-red-500' : ''} `}
                       placeholder={formData.use_rentalhub_lawyers ? t('register.lawyer_using_rentalhub') : t('register.lawyer_placeholder')}
                     />
                   </div>
@@ -2034,7 +2058,6 @@ return (
                         setFormData((prev) => ({
                           ...prev,
                           use_rentalhub_lawyers: checked,
-                          ...(checked ? { lawyer_email: '' } : {}),
                         }));
                         setErrors((prev) => ({ ...prev, lawyer_email: null }));
                       }}
