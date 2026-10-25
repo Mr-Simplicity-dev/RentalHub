@@ -58,17 +58,18 @@ const createDocumentsZipBuffer = async (docs) =>
 
 const buildApplicantsCsv = (applications) => {
   const rows = [
-    ['Reference', 'Name', 'Email', 'Phone', 'Role', 'State', 'LGA', 'Area', 'Payment', 'Status', 'Score'].join(','),
+    ['Reference', 'Name', 'Email', 'Phone', 'Role', 'Opportunity Type', 'State', 'LGA', 'Area', 'Payment', 'Status', 'Score'].join(','),
     ...applications.map((row) => [
       row.reference_number,
       row.full_name,
       row.email_address,
       row.phone_number,
       row.role_title,
+      row.opportunity_type || 'employment',
       row.state_name,
       row.lga_name,
       row.area_locality,
-      row.payment_status,
+      row.opportunity_type === 'volunteer' ? 'Not Applicable' : row.payment_status,
       row.status,
       row.interview_score,
     ].map(csvEscape).join(',')),
@@ -111,7 +112,7 @@ const deleteCycleRecordings = async (cycleId) => {
 
 const emailClosedCycleDocuments = async (cycle) => {
   const applications = await db.query(
-    `SELECT a.*, r.title AS role_title
+    `SELECT a.*, r.opportunity_type, r.title AS role_title
      FROM recruitment_applications a
      JOIN recruitment_roles r ON r.id = a.role_id
      WHERE a.cycle_id = $1

@@ -1,6 +1,7 @@
 const db = require('../config/middleware/database');
 const crypto = require('crypto');
 const net = require('net');
+const { logAction } = require('../config/utils/auditLogger');
 const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
@@ -215,6 +216,24 @@ const isAdmin = async (userId) => {
   return ['super_admin', 'admin', 'recruitment_admin'].includes(user.user_type);
 };
 
+const isVolunteer = (role) => role?.opportunity_type === 'volunteer';
+const isOpportunityOpen = (role, settings) => isVolunteer(role) ? settings.volunteer_applications_enabled === true : settings.is_active === true;
+const auditRecruitment = (req, action, targetType, targetId) => logAction({actorId: req.user.id, action, targetType, targetId, ip: req.ip});
+const validOpportunityType = (value) => ['employment', 'volunteer'].includes(value);
+
+const notifyVolunteerApplication = async (application) => {
+  try {
+    await sendEmail({to: application.email_address, subject: 'Volunteer Application Received — Amana RentalHub NG', html: '<p>Thank you for your interest in volunteering with Amana RentalHub NG. Your application has been received successfully. Our team will review your application and contact you if you are selected for the next stage.</p><p>Application reference: <strong>' + application.reference_number + '</strong></p>'});
+  } catch (error) { logger.warn('Volunteer acknowledgement could not be sent', {applicationId: application.id}); }
+  try {
+    const admins = await db.query("SELECT id FROM users WHERE user_type IN ('super_admin', 'recruitment_admin') OR (is_recruitment_admin = TRUE AND LOWER(TRIM(assigned_state)) = LOWER(TRIM($1)))", [application.state_name]);
+    if (admins.rows.length) {
+      const { createNotification } = require('../config/utils/notificationService');
+      await Promise.all(admins.rows.map(admin => createNotification(admin.id, 'recruitment', 'New volunteer application', 'A volunteer application is ready for review. Reference: ' + application.reference_number, '/admin/recruitment?tab=applicants')));
+    }
+  } catch (error) { logger.warn('Volunteer admin notification could not be sent', {applicationId: application.id}); }
+};
+
 // ==================== PUBLIC ROUTES ====================
 exports.getActiveCycles = async (req, res) => {
   try {
@@ -234,28 +253,18 @@ exports.getActiveCycles = async (req, res) => {
 
 exports.getActiveRoles = async (req, res) => {
   try {
-    const { cycle_id } = req.query;
-    let query;
-    let params;
-    
-    if (cycle_id) {
-      query = `SELECT * FROM recruitment_roles WHERE is_active = TRUE AND cycle_id = $1 ORDER BY title`;
-      params = [cycle_id];
-    } else {
-      query = `SELECT r.* FROM recruitment_roles r
-               JOIN recruitment_cycles c ON r.cycle_id = c.id
-               WHERE r.is_active = TRUE AND c.is_active = TRUE 
-               AND c.open_date <= CURRENT_DATE AND COALESCE(c.extension_date, c.close_date) >= CURRENT_DATE
-               ORDER BY r.title`;
-      params = [];
-    }
-    
-    const result = await db.query(query, params);
-    res.json({ success: true, data: result.rows });
-  } catch (err) {
-    req.logger.error('getActiveRoles error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
+    const settings = await fetchRecruitmentStatusRow();
+    const params = [settings.is_active === true, settings.volunteer_applications_enabled === true];
+    let cycleFilter = '';
+    if (req.query.cycle_id) { params.push(req.query.cycle_id); cycleFilter = 'AND r.cycle_id = $3'; }
+    const result = await db.query(
+      `SELECT r.* FROM recruitment_roles r JOIN recruitment_cycles c ON c.id = r.cycle_id
+       WHERE r.is_active = TRUE AND c.is_active = TRUE
+         AND c.open_date <= CURRENT_DATE AND COALESCE(c.extension_date, c.close_date) >= CURRENT_DATE
+         AND ((r.opportunity_type = 'employment' AND $1::boolean) OR (r.opportunity_type = 'volunteer' AND $2::boolean))
+         ${cycleFilter} ORDER BY r.opportunity_type, r.title`, params);
+    res.json({success:true, data:result.rows});
+  } catch (error) { req.logger.error('getActiveRoles error:', error); res.status(500).json({success:false,message:'Failed to load opportunities'}); }
 };
 
 exports.getStates = async (req, res) => {
@@ -301,7 +310,7 @@ exports.updateApplication = async (req, res) => {
     const { id } = req.params;
     
     const app = await db.query(
-      'SELECT * FROM recruitment_applications WHERE id = $1',
+      `SELECT a.*, r.opportunity_type FROM recruitment_applications a JOIN recruitment_roles r ON r.id=a.role_id WHERE a.id = $1`,
       [id]
     );
     if (!app.rows.length) {
@@ -357,7 +366,7 @@ exports.getMyApplication = async (req, res) => {
       });
     }
     const result = await db.query(
-      `SELECT a.*, r.title as role_title, r.type as role_type,
+      `SELECT a.*, r.title as role_title, r.opportunity_type, r.type as role_type,
               c.title as cycle_title, c.close_date as cycle_close_date
        FROM recruitment_applications a
        JOIN recruitment_roles r ON a.role_id = r.id
@@ -402,7 +411,7 @@ exports.getMyApplications = async (req, res) => {
       });
     }
     const result = await db.query(
-      `SELECT a.*, r.title as role_title, r.type as role_type,
+      `SELECT a.*, r.title as role_title, r.opportunity_type, r.type as role_type,
               c.title as cycle_title
        FROM recruitment_applications a
        JOIN recruitment_roles r ON a.role_id = r.id
@@ -431,7 +440,7 @@ exports.verifyAccessCode = async (req, res) => {
     }
     
     const app = await db.query(
-      'SELECT * FROM recruitment_applications WHERE id = $1',
+      `SELECT a.*, r.opportunity_type FROM recruitment_applications a JOIN recruitment_roles r ON r.id=a.role_id WHERE a.id = $1`,
       [application_id]
     );
     if (!app.rows.length) {
@@ -505,7 +514,7 @@ exports.uploadDocuments = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Applicant verification is required' });
     }
 
-    if (!application.access_code_used || application.payment_status !== 'paid') {
+    if (!isVolunteer(application) && (!application.access_code_used || application.payment_status !== 'paid')) {
       return res.status(403).json({ 
         success: false, 
         message: 'Please verify your access code before uploading documents' 
@@ -546,7 +555,7 @@ exports.submitApplication = async (req, res) => {
     const { id } = req.params;
     
     const app = await db.query(
-      'SELECT * FROM recruitment_applications WHERE id = $1',
+      `SELECT a.*, r.opportunity_type FROM recruitment_applications a JOIN recruitment_roles r ON r.id=a.role_id WHERE a.id = $1`,
       [id]
     );
     if (!app.rows.length) {
@@ -670,7 +679,7 @@ exports.generatePlatformCv = async (req, res) => {
     const { applicationId } = req.params;
 
     const appResult = await db.query(
-      `SELECT a.*, r.title AS role_title
+      `SELECT a.*, r.opportunity_type, r.title AS role_title
        FROM recruitment_applications a
        JOIN recruitment_roles r ON r.id = a.role_id
        WHERE a.id = $1`,
@@ -684,7 +693,7 @@ exports.generatePlatformCv = async (req, res) => {
     const application = appResult.rows[0];
     if (!requirePublicApplicationAccess(req, res, application)) return;
 
-    if (!application.access_code_used || application.payment_status !== 'paid') {
+    if (!isVolunteer(application) && (!application.access_code_used || application.payment_status !== 'paid')) {
       return res.status(403).json({
         success: false,
         message: 'Please pay and verify your access code before generating a CV',
@@ -1406,56 +1415,37 @@ exports.deleteCycle = async (req, res) => {
 // Roles CRUD
 exports.createRole = async (req, res) => {
   try {
-    if (!(await isRecruitmentAdmin(req.user.id))) {
-      return res.status(403).json({ success: false, message: 'Access denied' });
-    }
-    
-    const { title, type, description, application_fee, premium_fee, cycle_id } = req.body;
-    
-    const result = await db.query(
-      `INSERT INTO recruitment_roles (title, type, description, application_fee, premium_fee, cycle_id)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [title, type, description, application_fee || 5000, premium_fee || 8000, cycle_id]
-    );
-    
-    res.status(201).json({ success: true, data: result.rows[0] });
-  } catch (err) {
-    req.logger.error('createRole error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
+    if (!(await isRecruitmentAdmin(req.user.id))) return res.status(403).json({success:false,message:'Access denied'});
+    const {title, type, description, cycle_id, is_active = true, opportunity_type = 'employment'} = req.body;
+    if (!validOpportunityType(opportunity_type)) return res.status(400).json({success:false,message:'Invalid opportunity type'});
+    const applicationFee = opportunity_type === 'volunteer' ? 0 : Number(req.body.application_fee ?? 5000);
+    const premiumFee = opportunity_type === 'volunteer' ? 0 : Number(req.body.premium_fee ?? 8000);
+    if (![applicationFee,premiumFee].every(n => Number.isFinite(n) && n >= 0)) return res.status(400).json({success:false,message:'Invalid fees'});
+    const result = await db.query(`INSERT INTO recruitment_roles (title, type, description, application_fee, premium_fee, cycle_id, opportunity_type, is_active)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`, [title,type,description,applicationFee,premiumFee,cycle_id,opportunity_type,is_active]);
+    await auditRecruitment(req, opportunity_type === 'volunteer' ? 'VOLUNTEER_OPPORTUNITY_CREATED' : 'RECRUITMENT_ROLE_CREATED', 'recruitment_role', result.rows[0].id);
+    res.status(201).json({success:true,data:result.rows[0]});
+  } catch (error) { req.logger.error('createRole error:',error); res.status(500).json({success:false,message:'Failed to create opportunity'}); }
 };
 
 exports.updateRole = async (req, res) => {
   try {
-    if (!(await isRecruitmentAdmin(req.user.id))) {
-      return res.status(403).json({ success: false, message: 'Access denied' });
-    }
-    
-    const { id } = req.params;
-    const { title, type, description, application_fee, premium_fee, is_active } = req.body;
-    
-    const result = await db.query(
-      `UPDATE recruitment_roles 
-       SET title = COALESCE($1, title),
-           type = COALESCE($2, type),
-           description = COALESCE($3, description),
-           application_fee = COALESCE($4, application_fee),
-           premium_fee = COALESCE($5, premium_fee),
-           is_active = COALESCE($6, is_active),
-           updated_at = NOW()
-       WHERE id = $7 RETURNING *`,
-            [title, type, description, application_fee, premium_fee, is_active, id]
-    );
-    
-    if (!result.rows.length) {
-      return res.status(404).json({ success: false, message: 'Role not found' });
-    }
-    
-    res.json({ success: true, data: result.rows[0] });
-  } catch (err) {
-    req.logger.error('updateRole error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
+    if (!(await isRecruitmentAdmin(req.user.id))) return res.status(403).json({success:false,message:'Access denied'});
+    const existing = await db.query('SELECT * FROM recruitment_roles WHERE id = $1', [req.params.id]);
+    const role = existing.rows[0];
+    if (!role) return res.status(404).json({success:false,message:'Role not found'});
+    if (req.body.opportunity_type !== undefined && req.body.opportunity_type !== role.opportunity_type) return res.status(409).json({success:false,message:'Create a new opportunity to change its type and preserve application history'});
+    const volunteer = isVolunteer(role);
+    const applicationFee = volunteer ? 0 : req.body.application_fee;
+    const premiumFee = volunteer ? 0 : req.body.premium_fee;
+    if ([applicationFee,premiumFee].some(n => n != null && (!Number.isFinite(Number(n)) || Number(n) < 0))) return res.status(400).json({success:false,message:'Invalid fees'});
+    const { title, type, description, is_active } = req.body;
+    const result = await db.query(`UPDATE recruitment_roles SET title=COALESCE($1,title), type=COALESCE($2,type), description=COALESCE($3,description),
+      application_fee=COALESCE($4,application_fee), premium_fee=COALESCE($5,premium_fee), is_active=COALESCE($6,is_active), updated_at=NOW() WHERE id=$7 RETURNING *`,
+      [title,type,description,applicationFee,premiumFee,is_active,req.params.id]);
+    await auditRecruitment(req, volunteer ? 'VOLUNTEER_OPPORTUNITY_UPDATED' : 'RECRUITMENT_ROLE_UPDATED', 'recruitment_role', role.id);
+    res.json({success:true,data:result.rows[0]});
+  } catch (error) { req.logger.error('updateRole error:',error); res.status(500).json({success:false,message:'Failed to update opportunity'}); }
 };
 
 exports.getAllRoles = async (req, res) => {
@@ -1552,7 +1542,7 @@ exports.getAllApplications = async (req, res) => {
     params.push(offset);
     
     const result = await db.query(
-      `SELECT a.*, r.title as role_title, r.type as role_type, c.title as cycle_title
+      `SELECT a.*, r.title as role_title, r.opportunity_type, r.type as role_type, c.title as cycle_title
        FROM recruitment_applications a
        JOIN recruitment_roles r ON a.role_id = r.id
        JOIN recruitment_cycles c ON a.cycle_id = c.id
@@ -1588,7 +1578,7 @@ exports.getApplicationDetail = async (req, res) => {
     const { id } = req.params;
     
     const result = await db.query(
-      `SELECT a.*, r.title as role_title, r.type as role_type, r.description as role_description,
+      `SELECT a.*, r.title as role_title, r.opportunity_type, r.type as role_type, r.description as role_description,
               c.title as cycle_title, c.open_date, c.close_date,
               u.email as user_email, u.phone as user_phone
        FROM recruitment_applications a
@@ -2307,6 +2297,9 @@ const PUBLIC_APPLICATION_FIELDS = new Set([
   'current_employment_status',
   'skills_qualifications',
   'suitability_reason',
+  'opportunity_type',
+  'volunteer_motivation',
+  'availability',
   'application_fee',
   'payment_status',
   'payment_date',
@@ -2382,9 +2375,9 @@ const requireInterviewChallenge = (res, submittedToken, expectedToken) => {
 exports.authorizeDocumentUpload = async (req, res, next) => {
   try {
     const result = await db.query(
-      `SELECT id, email_address, reference_number, payment_status, access_code_used
-       FROM recruitment_applications
-       WHERE id = $1
+      `SELECT a.id, a.email_address, a.reference_number, a.payment_status, a.access_code_used, a.status, r.opportunity_type
+       FROM recruitment_applications a JOIN recruitment_roles r ON r.id=a.role_id
+       WHERE a.id = $1
        LIMIT 1`,
       [req.params.applicationId]
     );
@@ -2393,12 +2386,13 @@ exports.authorizeDocumentUpload = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Applicant verification failed' });
     }
     if (!requirePublicApplicationAccess(req, res, application)) return;
-    if (application.payment_status !== 'paid' || !application.access_code_used) {
+    if (!isVolunteer(application) && (application.payment_status !== 'paid' || !application.access_code_used)) {
       return res.status(403).json({
         success: false,
         message: 'Payment and access-code verification are required before uploading documents',
       });
     }
+    if(isVolunteer(application)&&!['submitted','under_review'].includes(application.status))return res.status(403).json({success:false,message:'Document updates are closed for this application'});
     req.recruitmentApplication = application;
     next();
   } catch (error) {
@@ -2461,6 +2455,7 @@ const getApplicantWhere = (query = {}, { stateScope = null } = {}) => {
     where.push(clause);
   };
 
+  if (query.opportunity_type) addClause('r.opportunity_type = ?', query.opportunity_type);
   if (query.status) addClause('a.status = ?', query.status);
   if (query.payment_status) addClause('a.payment_status = ?', query.payment_status);
   if (query.cycle_id) addClause('a.cycle_id = ?', query.cycle_id);
@@ -2510,7 +2505,7 @@ const getApplicationRows = async (query = {}, { paginate = false, user = null } 
   }
 
   const result = await db.query(
-    `SELECT a.*, r.title AS role_title, r.type AS role_type, c.title AS cycle_title,
+    `SELECT a.*, r.title AS role_title, r.opportunity_type, r.type AS role_type, c.title AS cycle_title,
             c.open_date, c.close_date, c.extension_date
      FROM recruitment_applications a
      JOIN recruitment_roles r ON r.id = a.role_id
@@ -2698,6 +2693,7 @@ const parseGatewayMetadata = (value) => {
 };
 
 const getApplicationFeeKobo = (application) => {
+  if (isVolunteer(application)) return null;
   const fee = Number(application?.application_fee);
   if (!Number.isFinite(fee) || fee <= 0) return null;
 
@@ -2910,8 +2906,8 @@ const markApplicationPaid = async ({ application, reference, gatewayPayload }) =
 
 const fetchRecruitmentStatusRow = async () => {
   const result = await db.query(
-    `INSERT INTO recruitment_settings (is_active)
-     SELECT FALSE
+    `INSERT INTO recruitment_settings (is_active, volunteer_applications_enabled)
+     SELECT FALSE, FALSE
      WHERE NOT EXISTS (SELECT 1 FROM recruitment_settings)
      RETURNING *`
   );
@@ -2924,14 +2920,27 @@ const fetchRecruitmentStatusRow = async () => {
   return settings.rows[0] || { is_active: false };
 };
 
-exports.getRecruitmentStatus = async (_req, res) => {
+exports.getRecruitmentStatus = async (req, res) => {
   try {
     const row = await fetchRecruitmentStatusRow();
-    res.json({ success: true, data: { is_active: Boolean(row.is_active) } });
+    res.json({ success: true, data: { is_active: Boolean(row.is_active), volunteer_applications_enabled: Boolean(row.volunteer_applications_enabled) } });
   } catch (error) {
     req.logger.error('getRecruitmentStatus error:', error);
     res.status(500).json({ success: false, message: 'Failed to load recruitment status' });
   }
+};
+
+exports.toggleVolunteerApplications = async (req, res) => {
+  try {
+    if (req.user?.user_type !== 'super_admin') return res.status(403).json({success:false,message:'Super Admin access required'});
+    if (typeof req.body?.volunteer_applications_enabled !== 'boolean') return res.status(400).json({success:false,message:'A boolean volunteer setting is required'});
+    await fetchRecruitmentStatusRow();
+    const enabled = req.body.volunteer_applications_enabled;
+    const result = await db.query(`UPDATE recruitment_settings SET volunteer_applications_enabled=$1, updated_by=$2, updated_at=NOW()
+      WHERE id=(SELECT id FROM recruitment_settings ORDER BY id DESC LIMIT 1) RETURNING *`, [enabled,req.user.id]);
+    await auditRecruitment(req, enabled ? 'VOLUNTEER_APPLICATIONS_ENABLED' : 'VOLUNTEER_APPLICATIONS_DISABLED', 'recruitment_settings', result.rows[0].id);
+    res.json({success:true,data:result.rows[0]});
+  } catch (error) { req.logger.error('toggleVolunteerApplications error:',error); res.status(500).json({success:false,message:'Failed to update volunteer applications'}); }
 };
 
 exports.toggleRecruitment = async (req, res) => {
@@ -3114,9 +3123,7 @@ exports.toggleRecruitment = async (req, res) => {
 exports.createApplication = async (req, res) => {
   try {
     const settings = await fetchRecruitmentStatusRow();
-    if (!settings.is_active) {
-      return res.status(403).json({ success: false, message: 'Recruitment is currently closed' });
-    }
+
     const {
       role_id,
       full_name,
@@ -3133,6 +3140,8 @@ exports.createApplication = async (req, res) => {
       skills_qualifications,
       suitability_reason,
       application_track = 'standard',
+      volunteer_motivation,
+      availability,
     } = req.body;
     const required = {
       role_id,
@@ -3170,6 +3179,11 @@ exports.createApplication = async (req, res) => {
     if (!roleResult.rows.length) {
       return res.status(404).json({ success: false, message: 'This recruitment role is not currently open' });
     }
+    const role = roleResult.rows[0];
+    const volunteer = isVolunteer(role);
+    if (!isOpportunityOpen(role, settings)) return res.status(403).json({success:false,message:volunteer ? 'Volunteer applications are currently closed' : 'Recruitment is currently closed'});
+    if (volunteer && (!normalizeText(volunteer_motivation) || !normalizeText(availability))) return res.status(400).json({success:false,message:'Volunteer motivation and availability are required'});
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeText(email_address)) || !/^\+?\d{10,15}$/.test(normalizeText(phone_number).replace(/[\s-]/g,''))) return res.status(400).json({success:false,message:'Enter a valid email and phone number'});
     const activationCount = await db.query(
       'SELECT COUNT(*)::INT AS count FROM recruitment_location_activation WHERE is_active = TRUE'
     );
@@ -3190,17 +3204,16 @@ exports.createApplication = async (req, res) => {
         });
       }
     }
-    const role = roleResult.rows[0];
-    const track = application_track === 'premium' ? 'premium' : 'standard';
-    const fee = track === 'premium' ? Number(role.premium_fee || 8000) : Number(role.application_fee || 5000);
+    const track = !volunteer && application_track === 'premium' ? 'premium' : 'standard';
+    const fee = volunteer ? 0 : track === 'premium' ? Number(role.premium_fee || 8000) : Number(role.application_fee || 5000);
     const result = await db.query(
       `INSERT INTO recruitment_applications (
         cycle_id, role_id, full_name, phone_number, email_address,
         state_name, lga_name, area_locality, residential_address, date_of_birth,
         highest_education, years_of_experience, current_employment_status,
         skills_qualifications, suitability_reason, application_fee,
-        application_track, reference_number, status
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'draft')
+        application_track, reference_number, status, payment_status, volunteer_motivation, availability
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
       RETURNING *`,
       [
         role.cycle_id,
@@ -3221,16 +3234,26 @@ exports.createApplication = async (req, res) => {
         fee,
         track,
         generateReferenceNumber(),
+        volunteer ? 'submitted' : 'draft',
+        volunteer ? 'not_applicable' : 'pending',
+        volunteer ? normalizeText(volunteer_motivation) : null,
+        volunteer ? normalizeText(availability) : null,
       ]
     );
+    if (volunteer) {
+      try { await createRecruitmentOperation({applicationId:result.rows[0].id,eventType:'volunteer_submitted',note:'Volunteer application received for manual review'}); }
+      catch (error) { req.logger.warn?.('Volunteer submission operation log failed'); }
+      void notifyVolunteerApplication(result.rows[0]);
+    }
     res.status(201).json({
       success: true,
       data: stripPublicApplicationSecrets({
         ...result.rows[0],
+        opportunity_type: role.opportunity_type,
         role_title: role.title,
         role_type: role.type,
       }),
-      message: 'Application started. Proceed to payment to receive your access code.',
+      message: volunteer ? 'Volunteer Application Received. Our team will review your application and contact you if selected for the next stage.' : 'Application started. Proceed to payment to receive your access code.',
     });
   } catch (error) {
     req.logger.error('createApplication error:', error);
@@ -3243,12 +3266,10 @@ exports.initiatePayment = async (req, res) => {
     const { application_id } = req.body;
     const secretKey = process.env.PAYSTACK_SECRET_KEY;
 
-    if (!secretKey) {
-      return res.status(503).json({ success: false, message: 'Payment gateway is not configured' });
-    }
+
 
     const appResult = await db.query(
-      `SELECT a.*, r.title AS role_title
+      `SELECT a.*, r.opportunity_type, r.title AS role_title
        FROM recruitment_applications a
        JOIN recruitment_roles r ON r.id = a.role_id
        WHERE a.id = $1`,
@@ -3261,6 +3282,11 @@ exports.initiatePayment = async (req, res) => {
 
     const application = appResult.rows[0];
     if (!requirePublicApplicationAccess(req, res, application)) return;
+
+    if (isVolunteer(application)) return res.status(400).json({success:false,message:'Volunteer applications are free; payment is not applicable'});
+    if (!secretKey) {
+      return res.status(503).json({ success: false, message: 'Payment gateway is not configured' });
+    }
 
     if (application.payment_status === 'paid') {
       return res.status(400).json({ success: false, message: 'Application Access Fee has already been paid' });
@@ -3743,8 +3769,8 @@ exports.triggerInterview = async (req, res) => {
     }
 
     const { cycle_id, role_id, interview_date } = req.body || {};
-    const where = ["status = 'shortlisted'"];
-    const params = [interview_date];
+    const where = ["status = 'shortlisted'", "(role_id IN (SELECT id FROM recruitment_roles WHERE opportunity_type = 'employment') OR ($2::integer IS NOT NULL AND role_id = $2))"];
+    const params = [interview_date, role_id || null];
     if (cycle_id) {
       params.push(cycle_id);
       where.push(`cycle_id = $${params.length}`);
@@ -3944,6 +3970,7 @@ const appendApplicationToPdf = async (doc, application, index) => {
   doc.fontSize(9).font('Helvetica');
   const rows = [
     ['Role', application.role_title],
+    ['Opportunity type', application.opportunity_type || 'employment'],
     ['Cycle', application.cycle_title],
     ['Phone', application.phone_number],
     ['Email', application.email_address],
@@ -4131,9 +4158,8 @@ exports.getAnalytics = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    const params = [];
-    const cycleFilter = req.query?.cycle_id ? 'WHERE a.cycle_id = $1' : '';
-    if (req.query?.cycle_id) params.push(req.query.cycle_id);
+    const {whereSQL: cycleFilter, params} = getApplicantWhere(req.query, {stateScope:getRecruitmentAdminStateScope(req.user)});
+    const applicationJoin = 'FROM recruitment_applications a JOIN recruitment_roles r ON r.id = a.role_id';
 
     const safeQuery = async (sql, p) => {
       try {
@@ -4145,20 +4171,15 @@ exports.getAnalytics = async (req, res) => {
     };
 
     const [total, fees, perRole, monthly, interview, funnel, completionTime, locationHeatmap] = await Promise.all([
-      safeQuery(`SELECT COUNT(*)::INT AS count FROM recruitment_applications a ${cycleFilter}`, params),
-      safeQuery(`SELECT COALESCE(SUM(application_fee), 0)::NUMERIC AS total FROM recruitment_applications a ${cycleFilter ? `${cycleFilter} AND` : 'WHERE'} payment_status = 'paid'`, params),
+      safeQuery(`SELECT COUNT(*)::INT AS count ${applicationJoin} ${cycleFilter}`, params),
+      safeQuery(`SELECT COALESCE(SUM(a.application_fee), 0)::NUMERIC AS total ${applicationJoin} ${cycleFilter ? `${cycleFilter} AND` : 'WHERE'} a.payment_status = 'paid' AND r.opportunity_type = 'employment'`, params),
       safeQuery(
-        `SELECT r.title, COUNT(a.id)::INT AS applicants,
-                COALESCE(SUM(CASE WHEN a.payment_status = 'paid' THEN a.application_fee ELSE 0 END), 0)::NUMERIC AS revenue
-         FROM recruitment_roles r
-         LEFT JOIN recruitment_applications a ON a.role_id = r.id ${req.query?.cycle_id ? 'AND a.cycle_id = $1' : ''}
-         GROUP BY r.id, r.title
-         ORDER BY applicants DESC`,
-        params
-      ),
+        `SELECT r.id, r.title, r.opportunity_type, COUNT(a.id)::INT AS applicants,
+          COALESCE(SUM(CASE WHEN r.opportunity_type = 'employment' AND a.payment_status = 'paid' THEN a.application_fee ELSE 0 END),0)::NUMERIC AS revenue
+          ${applicationJoin} ${cycleFilter} GROUP BY r.id,r.title,r.opportunity_type ORDER BY applicants DESC`, params),
       safeQuery(
         `SELECT TO_CHAR(DATE_TRUNC('month', a.created_at), 'YYYY-MM') AS month, COUNT(*)::INT AS applicants
-         FROM recruitment_applications a
+         ${applicationJoin}
          ${cycleFilter}
          GROUP BY DATE_TRUNC('month', a.created_at)
          ORDER BY month`,
@@ -4169,26 +4190,26 @@ exports.getAnalytics = async (req, res) => {
            COUNT(*) FILTER (WHERE interview_completed = TRUE)::INT AS completed,
            COUNT(*) FILTER (WHERE interview_passed = TRUE)::INT AS passed,
            COALESCE(AVG(interview_score), 0)::NUMERIC AS average_score
-         FROM recruitment_applications a
+         ${applicationJoin}
          ${cycleFilter}`,
         params
       ),
       safeQuery(
         `SELECT status, COUNT(*)::INT AS count
-         FROM recruitment_applications a
+         ${applicationJoin}
          ${cycleFilter}
          GROUP BY status`,
         params
       ),
       safeQuery(
-        `SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (updated_at - created_at)) / 3600), 0)::NUMERIC AS avg_hours
-         FROM recruitment_applications a
+        `SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (a.updated_at - a.created_at)) / 3600), 0)::NUMERIC AS avg_hours
+         ${applicationJoin}
          ${cycleFilter ? `${cycleFilter} AND` : 'WHERE'} status <> 'draft'`,
         params
       ),
       safeQuery(
         `SELECT state_name, lga_name, COUNT(*)::INT AS applicants
-         FROM recruitment_applications a
+         ${applicationJoin}
          ${cycleFilter}
          GROUP BY state_name, lga_name
          ORDER BY applicants DESC
@@ -4197,9 +4218,21 @@ exports.getAnalytics = async (req, res) => {
       ),
     ]);
 
+    const breakdown = await safeQuery(`SELECT r.opportunity_type, r.id AS role_id, r.title, a.status, a.state_name, a.lga_name, COUNT(*)::INT AS count
+      ${applicationJoin} ${cycleFilter} GROUP BY r.opportunity_type,r.id,r.title,a.status,a.state_name,a.lga_name`, params);
+    const volunteers = breakdown.rows.filter(row => row.opportunity_type === 'volunteer');
+    const summarize = (keys) => Object.values(volunteers.reduce((groups,row) => {
+      const key=JSON.stringify(keys.map(field=>row[field]));
+      if (!groups[key]) groups[key]=Object.fromEntries([...keys.map(field=>[field,row[field]]),['count',0]]);
+      groups[key].count += Number(row.count); return groups;
+    },{}));
     res.json({
       success: true,
       data: {
+        volunteer_applicants: volunteers.reduce((sum,row)=>sum+Number(row.count),0),
+        volunteer_by_role: summarize(['role_id','title']),
+        volunteer_by_status: summarize(['status']),
+        volunteer_by_location: summarize(['state_name','lga_name']),
         total_applicants: total.rows[0]?.count || 0,
         total_fees_collected: Number(fees.rows[0]?.total || 0),
         per_role: perRole.rows,
@@ -4223,17 +4256,18 @@ exports.emailDocuments = async (req, res) => {
     }
     const { rows } = await getApplicationRows(req.body || req.query || {}, { paginate: false, user: req.user });
     const csvRows = [
-      ['Reference', 'Name', 'Email', 'Phone', 'Role', 'State', 'LGA', 'Area', 'Payment', 'Status'].join(','),
+      ['Reference', 'Name', 'Email', 'Phone', 'Role', 'Opportunity Type', 'State', 'LGA', 'Area', 'Payment', 'Status'].join(','),
       ...rows.map((row) => [
         row.reference_number,
         row.full_name,
         row.email_address,
         row.phone_number,
         row.role_title,
+        row.opportunity_type || 'employment',
         row.state_name,
         row.lga_name,
         row.area_locality,
-        row.payment_status,
+        row.opportunity_type === 'volunteer' ? 'Not Applicable' : row.payment_status,
         row.status,
       ].map((value) => `"${String(value || '').replace(/"/g, '""')}"`).join(',')),
     ];

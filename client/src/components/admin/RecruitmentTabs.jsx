@@ -1,3 +1,4 @@
+import {OpportunityTypeField, OpportunityBadge} from './VolunteerRecruitmentControls';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import {
@@ -34,6 +35,7 @@ import {
 // ─── Shared helpers ─────────────────────────────────────
 
 const EMPTY_FILTERS = {
+  opportunity_type: '',
   search: '',
   state: '',
   lga: '',
@@ -44,7 +46,7 @@ const EMPTY_FILTERS = {
 };
 
 const statusOptions = ['', 'draft', 'submitted', 'under_review', 'shortlisted', 'approved', 'rejected', 'disqualified'];
-const paymentOptions = ['', 'pending', 'paid', 'failed', 'refunded'];
+const paymentOptions = ['', 'not_applicable', 'pending', 'paid', 'failed', 'refunded'];
 
 const ACTION_LABELS = {
   'reopen-interview': 'Interview session reopened',
@@ -513,6 +515,7 @@ export function RecruitmentCyclesTab({ cycles, onRefresh }) {
 // ─────────────────────────────────────────────────────────
 
 const EMPTY_ROLE = {
+  opportunity_type: 'employment',
   title: '',
   type: 'Administrative',
   description: '',
@@ -563,6 +566,7 @@ export function RecruitmentRolesTab({ roles, cycles, onRefresh }) {
     setEditForm({
       title: role.title || '',
       type: role.type || 'Administrative',
+      opportunity_type: role.opportunity_type || 'employment',
       description: role.description || '',
       application_fee: String(role.application_fee || ''),
       premium_fee: String(role.premium_fee || ''),
@@ -584,6 +588,7 @@ export function RecruitmentRolesTab({ roles, cycles, onRefresh }) {
         className="h-fit"
       >
         <form onSubmit={createRole} className="space-y-4">
+<OpportunityTypeField value={form.opportunity_type} onChange={value=>setForm(prev=>({...prev,opportunity_type:value,application_fee:value==='volunteer'?'0':'5000',premium_fee:value==='volunteer'?'0':'8000'}))} />
           <FormSelect
             label="Cycle"
             value={form.cycle_id}
@@ -614,13 +619,13 @@ export function RecruitmentRolesTab({ roles, cycles, onRefresh }) {
             <FormInput
               label="Standard Fee (₦)"
               type="number"
-              value={form.application_fee}
+              value={form.opportunity_type==='volunteer'?'0':form.application_fee} disabled={form.opportunity_type==='volunteer'}
               onChange={(v) => setForm((p) => ({ ...p, application_fee: v }))}
             />
             <FormInput
               label="Premium Fee (₦)"
               type="number"
-              value={form.premium_fee}
+              value={form.opportunity_type==='volunteer'?'0':form.premium_fee} disabled={form.opportunity_type==='volunteer'}
               onChange={(v) => setForm((p) => ({ ...p, premium_fee: v }))}
             />
           </div>
@@ -680,13 +685,13 @@ export function RecruitmentRolesTab({ roles, cycles, onRefresh }) {
                       <FormInput
                         label="Standard Fee (₦)"
                         type="number"
-                        value={editForm.application_fee}
+                        value={editForm.opportunity_type==='volunteer'?'0':editForm.application_fee} disabled={editForm.opportunity_type==='volunteer'}
                         onChange={(v) => setEditForm((p) => ({ ...p, application_fee: v }))}
                       />
                       <FormInput
                         label="Premium Fee (₦)"
                         type="number"
-                        value={editForm.premium_fee}
+                        value={editForm.opportunity_type==='volunteer'?'0':editForm.premium_fee} disabled={editForm.opportunity_type==='volunteer'}
                         onChange={(v) => setEditForm((p) => ({ ...p, premium_fee: v }))}
                       />
                     </div>
@@ -728,7 +733,7 @@ export function RecruitmentRolesTab({ roles, cycles, onRefresh }) {
                   <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-slate-900">{role.title}</p>
+                        <p className="font-semibold text-slate-900">{role.title} <OpportunityBadge type={role.opportunity_type} /></p>
                         <p className="mt-1 text-xs text-slate-500">
                           {role.type} &middot; {role.cycle_title || '—'}
                         </p>
@@ -1122,6 +1127,7 @@ export function RecruitmentApplicantsTab({ roles, onRefreshCore }) {
           onChange={(e) => handleFilterChange(e.target.name, e.target.value)}
           placeholder="Area / locality"
         />
+<select aria-label="Opportunity Type" name="opportunity_type" className="input w-full" value={filters.opportunity_type} onChange={e=>{handleFilterChange('opportunity_type',e.target.value);handleFilterChange('payment_status','');}}><option value="">All opportunity types</option><option value="employment">Employment</option><option value="volunteer">Volunteer</option></select>
         <select
           name="role_id"
           value={filters.role_id}
@@ -1271,9 +1277,9 @@ export function RecruitmentApplicantsTab({ roles, onRefreshCore }) {
                       <p className="text-xs text-slate-500 truncate max-w-[180px]">{applicant.email_address}</p>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="font-medium text-slate-800">{applicant.role_title}</p>
+                      <p className="font-medium text-slate-800">{applicant.role_title} <OpportunityBadge type={applicant.opportunity_type} /></p>{applicant.opportunity_type==='volunteer'&&<details className="mt-2 max-w-sm text-xs leading-5 text-slate-600"><summary className="cursor-pointer">Volunteer answers</summary><p className="whitespace-pre-wrap break-words">Motivation: {applicant.volunteer_motivation}</p><p className="whitespace-pre-wrap break-words">Suitability: {applicant.suitability_reason}</p><p className="whitespace-pre-wrap break-words">Availability: {applicant.availability}</p></details>}
                       <p className="text-[11px] text-slate-500">
-                        {applicant.application_track} &middot; {formatCurrency(applicant.application_fee)}
+                        {applicant.opportunity_type==='volunteer'?'Not Applicable':applicant.application_track} &middot; {formatCurrency(applicant.application_fee)}
                       </p>
                     </td>
                     <td className="px-4 py-3">
@@ -1282,7 +1288,7 @@ export function RecruitmentApplicantsTab({ roles, onRefreshCore }) {
                       <p className="text-[11px] font-semibold text-slate-600">{applicant.area_locality}</p>
                     </td>
                     <td className="px-4 py-3">
-                      <StatusPill value={applicant.payment_status} />
+                      <StatusPill value={applicant.opportunity_type==='volunteer'?'Not Applicable':applicant.payment_status} />
                     </td>
                     <td className="px-4 py-3">
                       <StatusPill value={applicant.status} />

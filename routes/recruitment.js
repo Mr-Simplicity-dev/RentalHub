@@ -247,7 +247,11 @@ router.post('/apply',
    body('phone').optional().isString().trim().isLength({ max: 20 }),
    body('state_id').optional().isInt(),
    body('lga_id').optional().isInt(),
-   body('role_id').optional().isInt()],
+   body('role_id').optional().isInt(),
+   ...['phone_number','email_address','state_name','lga_name','area_locality','highest_education','current_employment_status'].map(field => body(field).optional().isString().trim().isLength({max:255})),
+   ...['residential_address','skills_qualifications','suitability_reason','volunteer_motivation','availability'].map(field => body(field).optional().isString().trim().isLength({max:5000})),
+   body('email_address').optional().isEmail(),
+   body('opportunity_type').optional().isIn(['employment','volunteer'])],
   validateRequest,
   recruitmentController.createApplication);
 router.put(
@@ -429,17 +433,19 @@ router.post('/interview/recording',
 router.use('/admin', authenticate, requireRecruitmentAdmin);
 
 // Master toggle
+router.put('/admin/settings/volunteers', [body('volunteer_applications_enabled').isBoolean()], validateRequest, recruitmentController.toggleVolunteerApplications);
+
 router.put('/admin/settings/toggle', authenticate, [body('is_active').isBoolean()], validateRequest, recruitmentController.toggleRecruitment);
 
 // Cycles management
-router.post('/admin/cycles', authenticate, [body('name').isString().trim().isLength({ min: 1 }), body('start_date').optional().isString(), body('end_date').optional().isString()], validateRequest, recruitmentController.createCycle);
-router.put('/admin/cycles/:id', authenticate, [param('id').isInt(), body('name').optional().isString().trim().isLength({ min: 1 })], validateRequest, recruitmentController.updateCycle);
+router.post('/admin/cycles', authenticate, [body('title').isString().trim().isLength({min:1,max:255}), body('open_date').isISO8601(), body('close_date').isISO8601()], validateRequest, recruitmentController.createCycle);
+router.put('/admin/cycles/:id', authenticate, [param('id').isInt(), body('title').optional().isString().trim().isLength({min:1,max:255})], validateRequest, recruitmentController.updateCycle);
 router.get('/admin/cycles', authenticate, recruitmentController.getAllCycles);
 router.delete('/admin/cycles/:id', authenticate, [param('id').isInt()], validateRequest, recruitmentController.deleteCycle);
 
 // Roles management
-router.post('/admin/roles', authenticate, [body('title').isString().trim().isLength({ min: 1 })], validateRequest, recruitmentController.createRole);
-router.put('/admin/roles/:id', authenticate, [param('id').isInt(), body('title').optional().isString().trim().isLength({ min: 1 })], validateRequest, recruitmentController.updateRole);
+router.post('/admin/roles', authenticate, [body('title').isString().trim().isLength({ min: 1, max:255 }), body('opportunity_type').optional().isIn(['employment','volunteer']), body('type').isIn(['Administrative','Technical']), body('cycle_id').isInt({min:1}), body('is_active').optional().isBoolean()], validateRequest, recruitmentController.createRole);
+router.put('/admin/roles/:id', authenticate, [param('id').isInt(), body('title').optional().isString().trim().isLength({ min: 1,max:255 }), body('opportunity_type').optional().isIn(['employment','volunteer']), body('type').optional().isIn(['Administrative','Technical']), body('is_active').optional().isBoolean()], validateRequest, recruitmentController.updateRole);
 router.get('/admin/roles', authenticate, recruitmentController.getAllRoles);
 router.delete('/admin/roles/:id', authenticate, [param('id').isInt()], validateRequest, recruitmentController.deleteRole);
 

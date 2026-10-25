@@ -1,3 +1,4 @@
+import volunteerTranslations from './i18n/volunteerTranslations';
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 
@@ -25,14 +26,14 @@ const getInitialLanguage = () => {
 
 i18n.use(initReactI18next).init({
   resources: {
-    en: { translation: { ...en, ...dashboardUxTranslations.en, tour: tourTranslations.en } },
-    ru: { translation: { ...ru, ...dashboardUxTranslations.ru, tour: tourTranslations.ru } },
-    fr: { translation: { ...fr, ...dashboardUxTranslations.fr, tour: tourTranslations.fr } },
-    ar: { translation: { ...ar, ...dashboardUxTranslations.ar, tour: tourTranslations.ar } },
-    zh: { translation: { ...zh, ...dashboardUxTranslations.zh, tour: tourTranslations.zh } },
-    ha: { translation: { ...ha, ...dashboardUxTranslations.ha, tour: tourTranslations.ha } },
-    yo: { translation: { ...yo, ...dashboardUxTranslations.yo, tour: tourTranslations.yo } },
-    ig: { translation: { ...ig, ...dashboardUxTranslations.ig, tour: tourTranslations.ig } }
+    en: { translation: { ...en, careers: {...en.careers, ...volunteerTranslations.en}, ...dashboardUxTranslations.en, tour: tourTranslations.en } },
+    ru: { translation: { ...ru, careers: {...ru.careers, ...volunteerTranslations.ru}, ...dashboardUxTranslations.ru, tour: tourTranslations.ru } },
+    fr: { translation: { ...fr, careers: {...fr.careers, ...volunteerTranslations.fr}, ...dashboardUxTranslations.fr, tour: tourTranslations.fr } },
+    ar: { translation: { ...ar, careers: {...ar.careers, ...volunteerTranslations.ar}, ...dashboardUxTranslations.ar, tour: tourTranslations.ar } },
+    zh: { translation: { ...zh, careers: {...zh.careers, ...volunteerTranslations.zh}, ...dashboardUxTranslations.zh, tour: tourTranslations.zh } },
+    ha: { translation: { ...ha, careers: {...ha.careers, ...volunteerTranslations.ha}, ...dashboardUxTranslations.ha, tour: tourTranslations.ha } },
+    yo: { translation: { ...yo, careers: {...yo.careers, ...volunteerTranslations.yo}, ...dashboardUxTranslations.yo, tour: tourTranslations.yo } },
+    ig: { translation: { ...ig, careers: {...ig.careers, ...volunteerTranslations.ig}, ...dashboardUxTranslations.ig, tour: tourTranslations.ig } }
   },
   lng: getInitialLanguage(),
   fallbackLng: "en",

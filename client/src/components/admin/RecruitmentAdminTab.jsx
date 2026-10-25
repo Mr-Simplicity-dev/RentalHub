@@ -1,3 +1,4 @@
+import VolunteerRecruitmentControls, {OpportunityTypeField, OpportunityBadge} from './VolunteerRecruitmentControls';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import {
@@ -31,6 +32,7 @@ const EMPTY_CYCLE = {
 };
 
 const EMPTY_ROLE = {
+  opportunity_type: 'employment',
   title: '',
   type: 'Administrative',
   description: '',
@@ -46,6 +48,7 @@ const EMPTY_LOCATION = {
 };
 
 const EMPTY_FILTERS = {
+  opportunity_type: '',
   search: '',
   state: '',
   lga: '',
@@ -56,7 +59,7 @@ const EMPTY_FILTERS = {
 };
 
 const statusOptions = ['', 'draft', 'submitted', 'under_review', 'shortlisted', 'approved', 'rejected', 'disqualified'];
-const paymentOptions = ['', 'pending', 'paid', 'failed', 'refunded'];
+const paymentOptions = ['', 'not_applicable', 'pending', 'paid', 'failed', 'refunded'];
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat('en-NG', {
@@ -419,6 +422,8 @@ export default function RecruitmentAdminTab() {
 
   return (
     <div className="space-y-6">
+<VolunteerRecruitmentControls status={status} analytics={analytics} onUpdated={loadCore} disabled={loading} />
+
       {/* ─── Header ─────────────────────────────────────── */}
       <motion.section
         initial={{ opacity: 0, y: -10 }}
@@ -586,6 +591,7 @@ export default function RecruitmentAdminTab() {
             <h3 className="text-lg font-bold text-slate-900">Manage Roles</h3>
           </div>
           <form onSubmit={createRole} className="space-y-3">
+<OpportunityTypeField value={roleForm.opportunity_type} onChange={value=>setRoleForm(prev=>({...prev,opportunity_type:value,application_fee:value==='volunteer'?'0':'5000',premium_fee:value==='volunteer'?'0':'8000'}))} />
             <AdminSelect label="Cycle" value={roleForm.cycle_id} onChange={(v) => setRoleForm((p) => ({ ...p, cycle_id: v }))} required>
               <option value="">Select cycle</option>
               {cycles.map((cycle) => <option key={cycle.id} value={cycle.id}>{cycle.title}</option>)}
@@ -596,8 +602,8 @@ export default function RecruitmentAdminTab() {
               <option value="Technical">Technical</option>
             </AdminSelect>
             <div className="grid grid-cols-2 gap-3">
-              <AdminInput label="Standard Fee (₦)" type="number" value={roleForm.application_fee} onChange={(v) => setRoleForm((p) => ({ ...p, application_fee: v }))} />
-              <AdminInput label="Premium Fee (₦)" type="number" value={roleForm.premium_fee} onChange={(v) => setRoleForm((p) => ({ ...p, premium_fee: v }))} />
+              <AdminInput label="Standard Fee (₦)" type="number" value={roleForm.opportunity_type==='volunteer'?'0':roleForm.application_fee} disabled={roleForm.opportunity_type==='volunteer'} onChange={(v) => setRoleForm((p) => ({ ...p, application_fee: v }))} />
+              <AdminInput label="Premium Fee (₦)" type="number" value={roleForm.opportunity_type==='volunteer'?'0':roleForm.premium_fee} disabled={roleForm.opportunity_type==='volunteer'} onChange={(v) => setRoleForm((p) => ({ ...p, premium_fee: v }))} />
             </div>
             <label className="block">
               <span className="mb-1 block text-sm font-semibold text-slate-700">Description</span>
@@ -628,8 +634,8 @@ export default function RecruitmentAdminTab() {
                       <option value="Technical">Technical</option>
                     </AdminSelect>
                     <div className="grid grid-cols-2 gap-2">
-                      <AdminInput label="Standard Fee (₦)" type="number" value={editRoleForm.application_fee} onChange={(v) => setEditRoleForm((p) => ({ ...p, application_fee: v }))} />
-                      <AdminInput label="Premium Fee (₦)" type="number" value={editRoleForm.premium_fee} onChange={(v) => setEditRoleForm((p) => ({ ...p, premium_fee: v }))} />
+                      <AdminInput label="Standard Fee (₦)" type="number" value={editRoleForm.opportunity_type==='volunteer'?'0':editRoleForm.application_fee} disabled={editRoleForm.opportunity_type==='volunteer'} onChange={(v) => setEditRoleForm((p) => ({ ...p, application_fee: v }))} />
+                      <AdminInput label="Premium Fee (₦)" type="number" value={editRoleForm.opportunity_type==='volunteer'?'0':editRoleForm.premium_fee} disabled={editRoleForm.opportunity_type==='volunteer'} onChange={(v) => setEditRoleForm((p) => ({ ...p, premium_fee: v }))} />
                     </div>
                     <label className="block">
                       <span className="mb-1 block text-sm font-semibold text-slate-700">Description</span>
@@ -657,7 +663,7 @@ export default function RecruitmentAdminTab() {
                   <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-sm">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-slate-900 truncate">{role.title}</p>
+                        <p className="font-semibold text-slate-900 truncate">{role.title} <OpportunityBadge type={role.opportunity_type} /></p>
                         <p className="text-[11px] text-slate-500">{role.type} &middot; {role.cycle_title || '—'}</p>
                         <p className="text-[11px] text-slate-400">
                           {formatCurrency(role.application_fee)} / {formatCurrency(role.premium_fee)}
@@ -675,6 +681,7 @@ export default function RecruitmentAdminTab() {
                           setEditRoleForm({
                             title: role.title || '',
                             type: role.type || 'Administrative',
+                            opportunity_type: role.opportunity_type || 'employment',
                             description: role.description || '',
                             application_fee: String(role.application_fee || ''),
                             premium_fee: String(role.premium_fee || ''),
@@ -792,6 +799,7 @@ export default function RecruitmentAdminTab() {
           <FilterInput name="state" value={filters.state} onChange={handleFilterChange} placeholder="State" />
           <FilterInput name="lga" value={filters.lga} onChange={handleFilterChange} placeholder="LGA" />
           <FilterInput name="area" value={filters.area} onChange={handleFilterChange} placeholder="Area / locality" />
+<label className="block"><span className="sr-only">Opportunity Type</span><select aria-label="Opportunity Type" className="input w-full" value={filters.opportunity_type} onChange={e=>setFilters(prev=>({...prev,opportunity_type:e.target.value,payment_status:''}))}><option value="">All opportunity types</option><option value="employment">Employment</option><option value="volunteer">Volunteer</option></select></label>
           <select name="role_id" value={filters.role_id} onChange={handleFilterChange} className="input w-full text-sm">
             <option value="">All roles</option>
             {roles.map((role) => <option key={role.id} value={role.id}>{role.title}</option>)}
@@ -880,8 +888,8 @@ export default function RecruitmentAdminTab() {
                     <p className="text-xs text-slate-500 truncate max-w-[180px]">{applicant.email_address}</p>
                   </td>
                   <td className="px-4 py-3">
-                    <p className="font-medium text-slate-800">{applicant.role_title}</p>
-                    <p className="text-[11px] text-slate-500">{applicant.application_track} &middot; {formatCurrency(applicant.application_fee)}</p>
+                    <p className="font-medium text-slate-800">{applicant.role_title} <OpportunityBadge type={applicant.opportunity_type} /></p>{applicant.opportunity_type==='volunteer'&&<details className="mt-2 max-w-sm text-xs leading-5 text-slate-600"><summary className="cursor-pointer">Volunteer answers</summary><p className="whitespace-pre-wrap break-words">Motivation: {applicant.volunteer_motivation}</p><p className="whitespace-pre-wrap break-words">Suitability: {applicant.suitability_reason}</p><p className="whitespace-pre-wrap break-words">Availability: {applicant.availability}</p></details>}
+                    <p className="text-[11px] text-slate-500">{applicant.opportunity_type==='volunteer'?'Not Applicable':applicant.application_track} &middot; {formatCurrency(applicant.application_fee)}</p>
                   </td>
                   <td className="px-4 py-3">
                     <p className="text-slate-800 text-xs">{applicant.state_name}</p>
@@ -890,7 +898,7 @@ export default function RecruitmentAdminTab() {
                   </td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${paymentBadge(applicant.payment_status)}`}>
-                      {applicant.payment_status}
+                      {applicant.opportunity_type==='volunteer'?'Not Applicable':applicant.payment_status}
                     </span>
                   </td>
                   <td className="px-4 py-3">

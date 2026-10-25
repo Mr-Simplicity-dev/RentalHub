@@ -1,3 +1,4 @@
+import VolunteerRecruitmentControls from '../../components/admin/VolunteerRecruitmentControls';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -137,6 +138,8 @@ export default function RecruitmentAdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-100/40 p-6">
+<VolunteerRecruitmentControls status={status} analytics={analytics} onUpdated={loadCore} disabled={loading} />
+
       <div className="mx-auto max-w-7xl">
         <div className="space-y-6">
           {/* ── Page Header ────────────────────────────── */}

@@ -27,6 +27,8 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../services/api';
 import TurnstileWidget from '../components/common/TurnstileWidget';
+import OpportunityPicker from '../components/careers/OpportunityPicker';
+import VolunteerReceipt from '../components/careers/VolunteerReceipt';
 
 // ============================================================
 // Validation Constants
@@ -232,6 +234,8 @@ const EMPTY_FORM = {
   current_employment_status: '',
   skills_qualifications: '',
   suitability_reason: '',
+  volunteer_motivation: '',
+  availability: '',
   application_track: 'standard',
 };
 
@@ -294,6 +298,7 @@ export default function Careers() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [statusLoading, setStatusLoading] = useState(true);
   const [isActive, setIsActive] = useState(false);
+  const [opportunityFilter, setOpportunityFilter] = useState(()=>['employment','volunteer'].includes(searchParams.get('type'))?searchParams.get('type'):'all');
   const [statusError, setStatusError] = useState('');
   const [roles, setRoles] = useState([]);
   const [states, setStates] = useState([]);
@@ -417,8 +422,18 @@ export default function Careers() {
     [roles, form.role_id]
   );
 
+  const selectedVolunteer = selectedRole?.opportunity_type === 'volunteer';
+  const visibleRoles = roles.filter(role=>opportunityFilter==='all'||(role.opportunity_type||'employment')===opportunityFilter);
+  const changeOpportunityFilter = (type) => {
+    setOpportunityFilter(type);
+    setForm(prev=>({...prev,role_id:'',application_track:'standard'}));
+    const params=new URLSearchParams(searchParams);
+    if(type==='all')params.delete('type');else params.set('type',type);
+    setSearchParams(params,{replace:true});
+  };
+
   const effectiveFee = useMemo(() => {
-    if (!selectedRole) return 0;
+    if (!selectedRole || selectedRole.opportunity_type === 'volunteer') return 0;
     return form.application_track === 'premium'
       ? selectedRole.premium_fee
       : selectedRole.application_fee;
@@ -465,15 +480,17 @@ export default function Careers() {
         api.get('/recruitment/status'),
         api.get('/recruitment/locations/states'),
       ]);
-      const active = Boolean(statusRes.data?.data?.is_active);
+      const active = statusRes.data?.data?.is_active === true || statusRes.data?.data?.volunteer_applications_enabled === true;
       setIsActive(active);
       setStates(statesRes.data?.data || []);
       if (active) {
         const rolesRes = await api.get('/recruitment/roles/active');
         setRoles(rolesRes.data?.data || []);
-      }
+      } else { setRoles([]); }
     } catch (error) {
       const message = error.response?.data?.message || t('careers.recruitment_load_failed');
+      setIsActive(false);
+      setRoles([]);
       setStatusError(message);
       toast.error(message);
     } finally {
@@ -630,6 +647,7 @@ export default function Careers() {
       toast.error(validationError);
       return;
     }
+    if (selectedVolunteer && (!form.volunteer_motivation.trim() || !form.availability.trim())) { toast.error(t('careers.volunteer_fields_required')); return; }
     if (process.env.REACT_APP_TURNSTILE_SITE_KEY && !turnstileToken) {
       toast.error(t('careers.security_check_required'));
       return;
@@ -656,6 +674,7 @@ export default function Careers() {
   };
 
   const initiatePayment = async () => {
+    if (application?.opportunity_type === 'volunteer') return;
     if (!application?.id) return;
     setPaymentBusy(true);
     try {
@@ -1493,19 +1512,20 @@ export default function Careers() {
       onSubmit={startApplication}
       className="grid gap-5 lg:grid-cols-2"
     >
+      <OpportunityPicker roles={roles} filter={opportunityFilter} onFilter={changeOpportunityFilter} selected={form.role_id} onSelect={role=>setForm(prev=>({...prev,role_id:String(role.id),application_track:'standard'}))} />
       <SelectField label={t('careers.role_applying')} name="role_id" value={form.role_id} onChange={handleFormChange} required>
         <option value="">{t('careers.select_role')}</option>
-        {roles.map((role) => (
+        {visibleRoles.map((role) => (
           <option key={role.id} value={role.id}>
-            {role.title} - {formatCurrency(form.application_track === 'premium' ? role.premium_fee : role.application_fee)}
+            {role.title} - {role.opportunity_type==='volunteer'?t('careers.volunteer_free'):formatCurrency(form.application_track === 'premium' ? role.premium_fee : role.application_fee)}
           </option>
         ))}
       </SelectField>
 
-      <SelectField label={t('careers.application_track')} name="application_track" value={form.application_track} onChange={handleFormChange}>
+      {!selectedVolunteer && <SelectField label={t('careers.application_track')} name="application_track" value={form.application_track} onChange={handleFormChange}>
         <option value="standard">{t('careers.track_standard')}</option>
         <option value="premium">{t('careers.track_premium')}</option>
-      </SelectField>
+      </SelectField>}
 
       <div className="lg:col-span-2 border-b border-slate-100 pb-1">
         <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{t('careers.personal_info')}</h3>
@@ -1542,6 +1562,7 @@ export default function Careers() {
 
       <TextAreaField label={t('careers.residential_address')} name="residential_address" value={form.residential_address} onChange={handleFormChange} required />
       <TextAreaField label={t('careers.skills_qualifications')} name="skills_qualifications" value={form.skills_qualifications} onChange={handleFormChange} />
+      {selectedVolunteer && <><TextAreaField label={t('careers.volunteer_motivation')} name="volunteer_motivation" value={form.volunteer_motivation} onChange={handleFormChange} required className="lg:col-span-2" /><TextAreaField label={t('careers.volunteer_availability')} name="availability" value={form.availability} onChange={handleFormChange} required className="lg:col-span-2" /></>}
       <TextAreaField label={t('careers.suitability')} name="suitability_reason" value={form.suitability_reason} onChange={handleFormChange} required className="lg:col-span-2" />
 
       <div className="lg:col-span-2 rounded-2xl bg-gradient-to-br from-primary-50 to-blue-50 border border-primary-200/50 p-5">
@@ -1550,10 +1571,10 @@ export default function Careers() {
             <FaBriefcase className="text-sm" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-primary-900">{t('careers.access_fee_label')}</p>
-            <p className="mt-1 text-3xl font-black text-primary-950">{formatCurrency(effectiveFee || 5000)}</p>
+            <p className="text-sm font-semibold text-primary-900">{t(selectedVolunteer?'careers.volunteer_free':'careers.access_fee_label')}</p>
+            <p className="mt-1 text-3xl font-black text-primary-950">{formatCurrency(selectedVolunteer?0:(effectiveFee || 5000))}</p>
             <p className="mt-1 text-sm text-primary-700">
-              {t('careers.access_fee_desc')}
+              {t(selectedVolunteer?'careers.volunteer_notice':'careers.access_fee_desc')}
             </p>
           </div>
         </div>
@@ -1584,13 +1605,14 @@ export default function Careers() {
         {submitting ? (
           <><FaSpinner className="animate-spin mr-2" /> {t('careers.saving')}</>
         ) : (
-          t('careers.proceed_payment')
+          t(selectedVolunteer?'careers.apply_volunteer':'careers.proceed_payment')
         )}
       </button>
     </motion.form>
   );
 
   const renderDashboard = () => {
+    if (application?.opportunity_type === 'volunteer') return <VolunteerReceipt application={application} onFileChange={handleDocumentChange} onUpload={uploadDocuments} uploading={uploading} onInterview={startInterview} />;
     const docsByType = new Set((application?.documents || []).map((doc) => doc.document_type));
     const canUpload = application?.payment_status === 'paid' && application?.access_code_used;
     const isSubmitted = application?.status && application.status !== 'draft';
@@ -2315,7 +2337,7 @@ export default function Careers() {
   }
 
   if (statusError) return renderStatusError();
-  if (!isActive) return renderClosed();
+  if (!isActive && !application) return renderClosed();
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
       <section className="mx-auto max-w-6xl px-4 py-8 sm:py-12">

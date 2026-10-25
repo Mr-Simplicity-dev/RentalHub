@@ -39,7 +39,7 @@ const Footer = () => {
 
     api.get('/recruitment/status')
       .then((res) => {
-        if (active) setCareerLinkVisible(Boolean(res.data?.data?.is_active));
+        if (active) setCareerLinkVisible(Boolean(res.data?.data?.is_active || res.data?.data?.volunteer_applications_enabled));
       })
       .catch(() => {
         if (active) setCareerLinkVisible(false);
