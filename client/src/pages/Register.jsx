@@ -169,6 +169,7 @@ const Register = () => {
 
   const buildRegistrationData = () => {
     const { confirm_password, add_agent, ...registrationData } = formData;
+    registrationData.lawyer_email=String(formData.lawyer_email||'').trim().toLowerCase();
     registrationData.identity_document_type = registrationData.is_foreigner
       ? (registrationFlags.passport_number ? 'passport' : undefined)
       : (registrationFlags.nin_number ? 'nin' : undefined);
@@ -1054,7 +1055,7 @@ const isStepTwoComplete =
     !String(formData.referral_code || "").trim() ||
     referralCodePattern.test(String(formData.referral_code || "").trim())
   ) &&
-  (formData.use_rentalhub_lawyers || emailPattern.test(String(formData.lawyer_email || "").trim())) &&
+  emailPattern.test(String(formData.lawyer_email || "").trim()) &&
   (
         formData.user_type !== 'landlord' ||
       (!formData.add_agent && !formData.use_rentalhub_agents) ||

@@ -16,7 +16,7 @@ export const readRegistrationDraft=(now=Date.now())=>{
   const raw=storage()?.getItem(REGISTRATION_DRAFT_KEY);if(!raw)return null;
   const saved=JSON.parse(raw);
   if(saved.version!==1||!Number.isFinite(saved.savedAt)||saved.savedAt>now||now-saved.savedAt>=REGISTRATION_DRAFT_TTL||!saved.form||Array.isArray(saved.form)||typeof saved.form!=='object'){clearRegistrationDraft();return null;}
-  return{form:sanitize(saved.form),step:Math.min(3,Math.max(1,Number(saved.step)||1))};
+  return{form:sanitize(saved.form),step:Math.min(3,Math.max(1,Math.trunc(Number(saved.step))||1))};
  }catch{clearRegistrationDraft();return null;}
 };
 export const saveRegistrationDraft=(form,step,now=Date.now())=>{
@@ -25,6 +25,6 @@ export const saveRegistrationDraft=(form,step,now=Date.now())=>{
   const meaningful=stringFields.filter(f=>f!=='referral_code').some(f=>safe[f]?.trim())||safe.user_type==='landlord'||safe.is_foreigner===true;
   if(!meaningful){clearRegistrationDraft();return false;}
   const target=storage();if(!target)return false;
-  target.setItem(REGISTRATION_DRAFT_KEY,JSON.stringify({version:1,savedAt:now,step:Math.min(4,Math.max(1,Number(step)||1)),form:safe}));return true;
+  target.setItem(REGISTRATION_DRAFT_KEY,JSON.stringify({version:1,savedAt:now,step:Math.min(4,Math.max(1,Math.trunc(Number(step))||1)),form:safe}));return true;
  }catch{return false;}
 };
