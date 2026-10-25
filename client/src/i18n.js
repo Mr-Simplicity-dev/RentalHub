@@ -1,3 +1,4 @@
+import registrationDraftTranslations from './i18n/registrationDraftTranslations';
 import volunteerTranslations from './i18n/volunteerTranslations';
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
@@ -26,14 +27,14 @@ const getInitialLanguage = () => {
 
 i18n.use(initReactI18next).init({
   resources: {
-    en: { translation: { ...en, careers: {...en.careers, ...volunteerTranslations.en}, ...dashboardUxTranslations.en, tour: tourTranslations.en } },
-    ru: { translation: { ...ru, careers: {...ru.careers, ...volunteerTranslations.ru}, ...dashboardUxTranslations.ru, tour: tourTranslations.ru } },
-    fr: { translation: { ...fr, careers: {...fr.careers, ...volunteerTranslations.fr}, ...dashboardUxTranslations.fr, tour: tourTranslations.fr } },
-    ar: { translation: { ...ar, careers: {...ar.careers, ...volunteerTranslations.ar}, ...dashboardUxTranslations.ar, tour: tourTranslations.ar } },
-    zh: { translation: { ...zh, careers: {...zh.careers, ...volunteerTranslations.zh}, ...dashboardUxTranslations.zh, tour: tourTranslations.zh } },
-    ha: { translation: { ...ha, careers: {...ha.careers, ...volunteerTranslations.ha}, ...dashboardUxTranslations.ha, tour: tourTranslations.ha } },
-    yo: { translation: { ...yo, careers: {...yo.careers, ...volunteerTranslations.yo}, ...dashboardUxTranslations.yo, tour: tourTranslations.yo } },
-    ig: { translation: { ...ig, careers: {...ig.careers, ...volunteerTranslations.ig}, ...dashboardUxTranslations.ig, tour: tourTranslations.ig } }
+    en: { translation: { ...en, registrationDraft:registrationDraftTranslations.en, careers: {...en.careers, ...volunteerTranslations.en}, ...dashboardUxTranslations.en, tour: tourTranslations.en } },
+    ru: { translation: { ...ru, registrationDraft:registrationDraftTranslations.ru, careers: {...ru.careers, ...volunteerTranslations.ru}, ...dashboardUxTranslations.ru, tour: tourTranslations.ru } },
+    fr: { translation: { ...fr, registrationDraft:registrationDraftTranslations.fr, careers: {...fr.careers, ...volunteerTranslations.fr}, ...dashboardUxTranslations.fr, tour: tourTranslations.fr } },
+    ar: { translation: { ...ar, registrationDraft:registrationDraftTranslations.ar, careers: {...ar.careers, ...volunteerTranslations.ar}, ...dashboardUxTranslations.ar, tour: tourTranslations.ar } },
+    zh: { translation: { ...zh, registrationDraft:registrationDraftTranslations.zh, careers: {...zh.careers, ...volunteerTranslations.zh}, ...dashboardUxTranslations.zh, tour: tourTranslations.zh } },
+    ha: { translation: { ...ha, registrationDraft:registrationDraftTranslations.ha, careers: {...ha.careers, ...volunteerTranslations.ha}, ...dashboardUxTranslations.ha, tour: tourTranslations.ha } },
+    yo: { translation: { ...yo, registrationDraft:registrationDraftTranslations.yo, careers: {...yo.careers, ...volunteerTranslations.yo}, ...dashboardUxTranslations.yo, tour: tourTranslations.yo } },
+    ig: { translation: { ...ig, registrationDraft:registrationDraftTranslations.ig, careers: {...ig.careers, ...volunteerTranslations.ig}, ...dashboardUxTranslations.ig, tour: tourTranslations.ig } }
   },
   lng: getInitialLanguage(),
   fallbackLng: "en",
