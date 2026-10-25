@@ -78,3 +78,10 @@ test('employment fees remain available only for selected employment roles and di
  await act(async()=>fireEvent.click(within(container).getAllByRole('button',{name:'Apply as Volunteer'})[0]));
  expect(container.textContent).not.toContain('Application Access Fee');expect(container.textContent).toContain(copy.en.volunteer_free);
 });
+
+test('a saved employment draft cannot show a fee or submit an employment application from the volunteer category',async()=>{
+ window.localStorage.setItem('rentalhub_careers_application_draft',JSON.stringify({role_id:'1',full_name:'Returning Applicant',email_address:'returning@example.test',phone_number:'08012345678',application_track:'premium'}));
+ mockPublic({is_active:true,volunteer_applications_enabled:true});await mount('/careers?type=volunteer');
+ expect(container.textContent).not.toContain('Application Access Fee');expect(container.textContent).not.toContain('5,000');expect(container.querySelector('select[name="application_track"]')).toBeNull();
+ await act(async()=>fireEvent.submit(container.querySelector('form')));expect(api.post).not.toHaveBeenCalled();
+});

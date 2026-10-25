@@ -418,8 +418,8 @@ export default function Careers() {
   }, []);
 
   const selectedRole = useMemo(
-    () => roles.find((role) => String(role.id) === String(form.role_id)),
-    [roles, form.role_id]
+    () => roles.find((role) => String(role.id) === String(form.role_id) && (opportunityFilter === 'all' || (role.opportunity_type || 'employment') === opportunityFilter)),
+    [roles, form.role_id, opportunityFilter]
   );
 
   const selectedVolunteer = selectedRole?.opportunity_type === 'volunteer';
@@ -643,6 +643,7 @@ export default function Careers() {
 
   const startApplication = async (event) => {
     event.preventDefault();
+    if (!selectedRole) { toast.error(t('careers.select_role')); return; }
     const validationError = validateApplicationForm(form);
     if (validationError) {
       toast.error(validationError);
@@ -1575,7 +1576,7 @@ export default function Careers() {
           </div>
           <div>
             <p className="text-sm font-semibold text-primary-900">{t('careers.access_fee_label')}</p>
-            <p className="mt-1 text-3xl font-black text-primary-950">{formatCurrency(effectiveFee)}</p>
+            <p className="mt-1 text-3xl font-black text-primary-950">{formatCurrency(effectiveFee || 5000)}</p>
             <p className="mt-1 text-sm text-primary-700">
               {t('careers.access_fee_desc')}
             </p>
@@ -2355,7 +2356,7 @@ export default function Careers() {
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-300">Amana RentalHub NG Careers</p>
           <h1 className="mt-3 text-3xl font-black sm:text-4xl">Recruitment Portal</h1>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300">
-            Fill in your details below to apply. Pay the Application Access Fee, unlock your document upload with the access code, and track your application from draft to final decision.
+            {t('careers.portal_intro')}
           </p>
           {application && (
             <div className="mt-4 flex flex-wrap gap-2">
