@@ -236,7 +236,7 @@ router.get(
 router.post(
   '/request-help',
   authenticate,
-  [body('message').isString().trim().isLength({ min: 1, max: 5000 }), body('subject').optional().isString().trim().isLength({ max: 500 })],
+  [body('description').customSanitizer((value, { req }) => value ?? req.body.message).isString().trim().isLength({ min: 1, max: 5000 }), body('subject').optional().isString().trim().isLength({ max: 500 })],
   validateRequest,
   legalController.submitSupportRequest
 );

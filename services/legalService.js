@@ -1418,7 +1418,7 @@ exports.submitSupportRequest = async (req, res) => {
     if (coverageCheck.rows.length === 0) {
       return res.status(403).json({
         success: false,
-        message: 'You do not have Legal Protection Coverage. Subscribe during registration or from your dashboard.',
+        message: 'Paid assistance coverage is required before submitting a request.',
       });
     }
 

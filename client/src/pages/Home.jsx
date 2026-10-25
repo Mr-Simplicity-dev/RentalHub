@@ -312,7 +312,7 @@ const Home = () => {
 
             <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-3 animate-fadeInUp">
               <Link
-                to="/legal-support"
+                to="/cases"
                 className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-primary-700 shadow-card transition-all duration-300 hover:-translate-y-0.5 hover:shadow-cardHover"
               >
                 <FaShieldAlt /> {t('legalCases.title')}
@@ -333,7 +333,7 @@ const Home = () => {
 
             <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
               <Link
-                to="/legal-support"
+                to="/cases"
                 className="text-primary-100 underline decoration-primary-300/60 underline-offset-4 transition-colors duration-300 hover:text-white"
               >
                 {t('legalCases.title')}
@@ -408,7 +408,7 @@ const Home = () => {
 
               <div className="mt-8 text-center">
                 <Link
-                  to="/legal-support"
+                  to="/cases"
                   className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-primary-700"
                 >
                   <FaShieldAlt aria-hidden="true" />

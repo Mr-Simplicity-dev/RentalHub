@@ -116,7 +116,7 @@ const LawyerLayout = () => {
         dataTourId: 'sidebar-messages',
       },
       {
-        to: '/legal-support',
+        to: '/assistance',
         label: t('lawyer_layout.legal_support'),
         icon: FaGavel,
         dataTourId: 'sidebar-legal-support',

@@ -105,6 +105,7 @@ const LocationPage = React.lazy(() => import('./LocationPage'));
 const NigeriaPage = React.lazy(() => import('./NigeriaPage'));
 const AreaPage = React.lazy(() => import('./AreaPage'));
 const LegalSupport = React.lazy(() => import('./LawyersDirectory'));
+const Cases = React.lazy(() => import('./Cases'));
 const MobileAppPage = React.lazy(() => import('./MobileAppPage'));
 const AgentEarningsPage = React.lazy(() => import('./agent/AgentEarningsPage'));
 const AdminAgentManagement = React.lazy(() => import('./admin/AdminAgentManagement'));
@@ -818,8 +819,11 @@ function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/lawyer/accept-invite" element={<AcceptLawyerInvite />} />
               <Route path="/agent/accept-invite" element={<AcceptAgentInvite />} />
-              <Route path="/lawyers" element={<LegalSupport />} />
-              <Route path="/legal-support" element={<LegalSupport />} />
+              <Route path="/cases" element={<Cases />} />
+              <Route path="/legal-cases" element={<Navigate to="/cases" replace />} />
+              <Route path="/assistance" element={<ProtectedRoute><LegalSupport /></ProtectedRoute>} />
+              <Route path="/lawyers" element={<ProtectedRoute><Navigate to="/assistance" replace /></ProtectedRoute>} />
+              <Route path="/legal-support" element={<ProtectedRoute><Navigate to="/assistance" replace /></ProtectedRoute>} />
               <Route path="/mobile-app" element={<MobileAppPage />} />
               <Route path="/download" element={<React.Suspense fallback={<div />}><AppLanding /></React.Suspense>} />
               <Route path="/qr-code" element={<React.Suspense fallback={<div />}><QrCodePage /></React.Suspense>} />

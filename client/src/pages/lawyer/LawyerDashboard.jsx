@@ -509,7 +509,7 @@ const LawyerDashboardContent = ({
         description: t('lawyer_dashboard.messages_desc'),
       },
       {
-        to: '/legal-support',
+        to: '/assistance',
         label: t('lawyer_dashboard.legal_support'),
         description: t('lawyer_dashboard.legal_support_desc'),
       },

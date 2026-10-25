@@ -2004,9 +2004,9 @@ const Dashboard = () => {
               />
               <QuickActionCard
                 title={t('dashboardUx.legal_help')}
-                description="Get qualified legal assistance for your rental issues"
+                description="Request private assistance with paid coverage"
                 icon={<FaGavel />}
-                onClick={() => navigate('/legal-support')}
+                onClick={() => navigate('/assistance')}
                 className="tour-legal-help"
               />
               <QuickActionCard
@@ -2151,9 +2151,9 @@ const Dashboard = () => {
               />
               <QuickActionCard
                 title={t('dashboardUx.legal_help')}
-                description="Get qualified legal assistance for your rental issues"
+                description="Request private assistance with paid coverage"
                 icon={<FaGavel />}
-                onClick={() => navigate('/legal-support')}
+                onClick={() => navigate('/assistance')}
                 className="tour-legal-help"
               />
               <QuickActionCard
