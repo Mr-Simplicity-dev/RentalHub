@@ -1,6 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 
+const createWebhookRouter = ({processEvents=body=>require('../services/propertyAlertDeliveryService').handleWebhook(body)}={}) => {
 const router = express.Router();
 
 const timingSafeEqualStrings = (a, b) => {
@@ -33,13 +34,13 @@ router.get('/', (req, res) => {
 
 // X-Hub-Signature-256 is HMAC-SHA256 over the raw body keyed with the
 // Facebook app secret. Enforced whenever WHATSAPP_APP_SECRET is configured;
-// without it the delivery is still acknowledged so Meta never disables the
-// subscription over timeouts.
+// Missing configuration or invalid signatures never mutate delivery or consent records.
 const hasValidSignature = (req) => {
   const appSecret = process.env.WHATSAPP_APP_SECRET;
-  if (!appSecret) return true;
+  if (!appSecret) return false;
 
   const header = String(req.headers['x-hub-signature-256'] || '');
+  if(!/^sha256=[a-f0-9]{64}$/i.test(header))return false;
   const separator = header.indexOf('=');
   if (separator < 1 || !Buffer.isBuffer(req.rawBody)) return false;
 
@@ -55,25 +56,20 @@ const hasValidSignature = (req) => {
   return crypto.timingSafeEqual(bufDigest, bufExpected);
 };
 
-router.post('/', (req, res) => {
-  if (!hasValidSignature(req)) {
-    return res.status(401).json({ success: false, message: 'Invalid webhook signature' });
+router.post('/', async (req,res) => {
+  if(!process.env.WHATSAPP_APP_SECRET)return res.status(503).json({success:false,message:'Webhook verification is not configured'});
+  if(!hasValidSignature(req))return res.status(401).json({success:false,message:'Invalid webhook signature'});
+  try {
+    const body=req.body || {};
+    if(Array.isArray(body.entry) && body.entry.length)await processEvents(body);
+    return res.status(200).json({success:true});
+  } catch(error) {
+    req.logger?.error('WhatsApp event persistence failed',{code:error.code || 'webhook_storage_failed'});
+    return res.status(503).json({success:false,message:'Event processing unavailable; retry later'});
   }
-
-  const body = req.body || {};
-  const entry = Array.isArray(body.entry) ? body.entry[0] || {} : {};
-  const change = Array.isArray(entry.changes) ? entry.changes[0] || {} : {};
-  const value = change.value || {};
-  const statuses = Array.isArray(value.statuses) ? value.statuses : [];
-  const messages = Array.isArray(value.messages) ? value.messages : [];
-
-  if (req.logger) {
-    req.logger.info(
-      `WhatsApp webhook delivered: ${statuses.length} status(es), ${messages.length} message(s)`
-    );
-  }
-
-  return res.status(200).json({ success: true });
 });
-
-module.exports = router;
+return router;
+};
+const router=createWebhookRouter();
+router.createWebhookRouter=createWebhookRouter;
+module.exports=router;

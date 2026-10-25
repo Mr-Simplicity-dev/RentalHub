@@ -1575,6 +1575,22 @@ router.post('/contact', contactFormLimiter, [
 
 // ─── Authenticated ticket CRUD ─────────────────────────────────────────────
 
+router.post('/assistant', authenticate, require('../config/middleware/securityRateLimiters').assistantReadLimiter, [
+  body('message').isString().trim().isLength({min:1,max:2000}),
+  body('mode').optional().isIn(['ticket']),
+  body('previousTopic').optional().isString().isLength({max:32}),
+  validateRequest,
+], async (req,res) => {
+  res.set('Cache-Control','no-store');
+  try {
+    const answer = await require('../services/accountAssistantService').createAccountAssistant({query:db.query.bind(db)})({user:req.user,message:req.body.message,mode:req.body.mode,previousTopic:req.body.previousTopic});
+    res.json({success:true,data:answer});
+  } catch(error) {
+    req.logger?.error('Account assistant request failed', {code:error.code || 'assistant_unavailable'});
+    res.status(error.status || 503).json({success:false,message:error.status?error.message:'I could not verify your account records. Please try again or open support.'});
+  }
+});
+
 router.post('/tickets', authenticate, [
   body('subject').trim().notEmpty().customSanitizer(stripTags).isLength({ max: 255 }),
   body('description').optional({ checkFalsy: true }).trim().customSanitizer(stripTags).isLength({ max: 10000 }),

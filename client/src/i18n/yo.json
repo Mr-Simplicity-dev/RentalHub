@@ -396,7 +396,8 @@
     "request_success": "Wọ́n ti fi ìbéèrè rẹ sílẹ̀ pẹ̀lú àṣeyọrí. Alákòóso ìrànwọ́ yóò ṣe àtúnyẹ̀wò rẹ̀ kí ẹgbẹ́ ìpínlẹ̀ tó bẹ̀rẹ̀ síí wá.",
     "request_submit_failed": "Ìbéèrè ìkìlọ̀ kò ṣeé fi sílẹ̀",
     "prev": "← Ṣáájú",
-    "next": "Tó Kàn →"
+    "next": "Tó Kàn →",
+    "request_whatsapp_consent": "Mo gba lati gba ìfitónilétí WhatsApp láti Amana RentalHub NG nípa ìbéèrè ilé yìí sí nọ́ńbà tí mo pèsè. Ó jẹ́ àṣàyàn; ìfitónilétí í-meèlì ṣì wà. Dáhùn STOP láti dá WhatsApp dúró."
   },
   "property_detail": {
     "load_failed": "Àwọn ìsọfúnni ohun-inì kò ṣeé gbàjáde",

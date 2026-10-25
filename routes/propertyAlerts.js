@@ -24,6 +24,8 @@ const {
   updateTenantPropertyRequestStateAction,
 } = require('../config/utils/propertyAlertService');
 
+const {normalizeWhatsAppPhone}=require('../config/utils/whatsappPolicy');
+
 const allowedPropertyTypes = [
   'apartment',
   'house',
@@ -43,6 +45,8 @@ const requestValidators = [
   body('full_name').trim().notEmpty(),
   body('email').isEmail().normalizeEmail(),
   body('phone').optional().isString(),
+  body('whatsapp_opt_in').optional().isBoolean({strict:true}),
+  body('whatsapp_opt_in').custom((value,{req})=>value!==true || !!normalizeWhatsAppPhone(req.body.phone)).withMessage('Enter a valid WhatsApp number to receive WhatsApp updates.'),
   body('property_type').isIn(allowedPropertyTypes),
   body('state_id').optional({ checkFalsy: true }).isInt(),
   body('lga_name')
@@ -95,9 +99,10 @@ router.post(
       }
 
       const payload = {
+        whatsapp_opt_in: req.body.whatsapp_opt_in === true,
         full_name: req.body.full_name.trim(),
         email: req.body.email.trim().toLowerCase(),
-        phone: req.body.phone?.trim() || null,
+        phone: normalizeWhatsAppPhone(req.body.phone) || req.body.phone?.trim() || null,
         property_type: req.body.property_type,
         state_id: req.body.state_id ? Number(req.body.state_id) : null,
         lga_name: req.body.lga_name?.trim() || null,

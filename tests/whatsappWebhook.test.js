@@ -22,7 +22,7 @@ const restoreEnv = () => {
   }
 };
 
-const startServer = async () => {
+const startServer = async (processEvents=async()=>{}) => {
   const app = express();
   app.use(
     express.json({
@@ -31,7 +31,7 @@ const startServer = async () => {
       },
     })
   );
-  app.use('/api/whatsapp/webhook', whatsappWebhookRoutes);
+  app.use('/api/whatsapp/webhook', whatsappWebhookRoutes.createWebhookRouter({processEvents}));
 
   const server = http.createServer(app);
   await new Promise((resolve) => server.listen(0, resolve));
@@ -127,7 +127,7 @@ test('handshake works with the global input sanitizer in the chain', async (t) =
   );
 });
 
-test('event deliveries are acknowledged and optionally signature-checked', async (t) => {
+test('event deliveries require configured signature verification', async (t) => {
   process.env.WHATSAPP_VERIFY_TOKEN = VERIFY_TOKEN;
   delete process.env.WHATSAPP_APP_SECRET;
   const server = await startServer();
@@ -157,8 +157,8 @@ test('event deliveries are acknowledged and optionally signature-checked', async
     headers: jsonHeaders,
     body: payload,
   });
-  assert.equal(open.status, 200, 'acknowledged without an app secret configured');
-  assert.match(open.body, /"success":true/);
+  assert.equal(open.status, 503, 'unconfigured signature verification fails closed');
+  assert.match(open.body, /"success":false/);
 
   const empty = await request(port, {
     path: '/api/whatsapp/webhook',
@@ -166,7 +166,7 @@ test('event deliveries are acknowledged and optionally signature-checked', async
     headers: jsonHeaders,
     body: '{}',
   });
-  assert.equal(empty.status, 200, 'empty payloads never fail the subscription');
+  assert.equal(empty.status, 503, 'missing secret also blocks empty event processing');
 
   process.env.WHATSAPP_APP_SECRET = APP_SECRET;
 
@@ -194,4 +194,15 @@ test('event deliveries are acknowledged and optionally signature-checked', async
     body: payload,
   });
   assert.equal(missing.status, 401, 'missing signature is rejected once a secret exists');
+});
+
+
+test('valid signed events are not acknowledged until durable processing succeeds',async(t)=>{
+ process.env.WHATSAPP_APP_SECRET=APP_SECRET;const seen=[];const server=await startServer(async body=>{seen.push(body);throw Error('database unavailable');});t.after(()=>new Promise(resolve=>server.close(resolve)));t.after(restoreEnv);
+ const body=JSON.stringify({entry:[{changes:[{value:{metadata:{phone_number_id:'phone-id'},statuses:[{id:'wamid.3',status:'delivered',timestamp:'1792972800'}]}}]}]});
+ const signature=crypto.createHmac('sha256',APP_SECRET).update(body).digest('hex');const result=await request(server.address().port,{path:'/api/whatsapp/webhook',method:'POST',headers:{'Content-Type':'application/json','x-hub-signature-256':'sha256='+signature},body});assert.equal(result.status,503);assert.equal(seen.length,1);
+});
+test('forged receipt cannot call the delivery processor',async(t)=>{
+ process.env.WHATSAPP_APP_SECRET=APP_SECRET;let writes=0;const server=await startServer(async()=>{writes++;});t.after(()=>new Promise(resolve=>server.close(resolve)));t.after(restoreEnv);
+ const result=await request(server.address().port,{path:'/api/whatsapp/webhook',method:'POST',headers:{'Content-Type':'application/json','x-hub-signature-256':'sha256='+'0'.repeat(64)},body:'{"entry":[{}]}'});assert.equal(result.status,401);assert.equal(writes,0);
 });

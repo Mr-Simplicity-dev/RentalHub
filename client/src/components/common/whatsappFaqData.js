@@ -23,7 +23,7 @@ const whatsappFaqData = [
   {
     id: 'legal',
     keywords: ['legal', 'lawyer', 'attorney', 'protection', 'coverage', 'law', 'document', 'agreement', 'dispute', 'nba', 'access fee', '2000'],
-    answer: 'For a one-time fee of ₦2,000 at registration, you get the needed assistance . We ensures that all processes are delegently observed and due assistance is given right from your dashboard anytime. This covers document reviews, agreements, and advisory.',
+    answer: 'Paid coverage is required for private assistance requests. Check your coverage status from your dashboard; registration shows any applicable coverage fee before payment.',
     link: null,
     linkText: null,
   },
@@ -58,7 +58,7 @@ const whatsappFaqData = [
   {
     id: 'registration',
     keywords: ['register', 'sign up', 'create account', 'join', 'tenant', 'landlord', 'signup', 'how to join'],
-    answer: 'Registration is quick and free. Choose whether you\'re a tenant or landlord, fill in your details, and you\'re in. Tenants pay a ₦3,000 registration fee and landlords pay ₦5,000. You can also opt for Legal Protection Coverage (₦2,000) during signup.',
+    answer: 'Choose a tenant or landlord account and complete the registration form. The current registration and optional coverage fees are shown before payment.',
     link: '/register',
     linkText: 'Sign up now',
   },

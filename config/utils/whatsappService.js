@@ -50,7 +50,7 @@ exports.sendWhatsAppText = async ({ to, message }) => {
 
 // Campaigns and cold messages can ONLY go out as Meta-approved templates;
 // free-form text is rejected outside the 24-hour customer window.
-exports.sendWhatsAppTemplate = async ({ to, templateName, language = 'en', params = [], headerMedia = null }) => {
+exports.sendWhatsAppTemplate = async ({ to, templateName, language = 'en', params = [], headerMedia = null, callbackData = null }) => {
   const provider = (process.env.WHATSAPP_PROVIDER || 'meta').toLowerCase();
 
   if (provider !== 'meta') {
@@ -96,6 +96,7 @@ exports.sendWhatsAppTemplate = async ({ to, templateName, language = 'en', param
         messaging_product: 'whatsapp',
         to: recipient,
         type: 'template',
+        ...(callbackData ? {biz_opaque_callback_data:String(callbackData).slice(0,512)} : {}),
         template: {
           name: templateName,
           language: { code: language },
@@ -115,6 +116,9 @@ exports.sendWhatsAppTemplate = async ({ to, templateName, language = 'en', param
   } catch (error) {
     return {
       success: false,
+      code: error.response?.data?.error?.code,
+      httpStatus: error.response?.status,
+      uncertain: !error.response,
       message: error.response?.data?.error?.message || error.message,
     };
   }

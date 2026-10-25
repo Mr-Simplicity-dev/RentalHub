@@ -70,6 +70,7 @@ const Properties = () => {
     full_name: '',
     email: '',
     phone: '',
+    whatsapp_opt_in: false,
     property_type: '',
     state_id: '',
     lga_name: '',
@@ -320,6 +321,7 @@ const Properties = () => {
     setRequestForm((prev) => ({
       ...prev,
       phone: '',
+    whatsapp_opt_in: false,
       location: '',
       min_price: '',
       max_price: '',
@@ -473,6 +475,7 @@ const Properties = () => {
         full_name: requestForm.full_name,
         email: requestForm.email,
         phone: requestForm.phone || undefined,
+        whatsapp_opt_in: requestForm.whatsapp_opt_in === true,
         property_type: requestForm.property_type,
         state_id: requestForm.state_id ? Number(requestForm.state_id) : undefined,
         lga_name: requestForm.lga_name || undefined,
@@ -676,6 +679,7 @@ const Properties = () => {
                 value={requestForm.phone}
                 onChange={handleRequestChange}
               />
+              <label className="flex items-start gap-3 text-sm text-slate-700 sm:col-span-2"><input type="checkbox" checked={requestForm.whatsapp_opt_in === true} onChange={e=>setRequestForm(prev=>({...prev,whatsapp_opt_in:e.target.checked}))} className="mt-1 h-4 w-4 shrink-0" /><span>{t('properties.request_whatsapp_consent')}</span></label>
               <select
                 name="property_type"
                 className="input"

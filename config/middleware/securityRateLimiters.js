@@ -210,7 +210,10 @@ const voiceTokenLimiter = buildLimiter({
   message: 'Too many voice token requests. Please wait and retry.',
 });
 
+const assistantReadLimiter = buildLimiter({name:'account-assistant',windowMs:60 * 1000,max:30,message:'Please wait a moment before asking another question.'});
+
 module.exports = {
+  assistantReadLimiter,
   authSensitiveLimiter,
   paymentOpsLimiter,
   verificationOpsLimiter,

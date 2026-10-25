@@ -396,7 +396,8 @@
     "request_success": "Ezigarawo arịrịọ nke ọma. Onye nchịkwa nkwado ga-enyocha ya tupu otu steeti amalite ịchọ.",
     "request_submit_failed": "Iziga arịrịọ ọkwa dara",
     "prev": "← Nke Gara Aga",
-    "next": "Na-Esote →"
+    "next": "Na-Esote →",
+    "request_whatsapp_consent": "Ekwenyere m ịnata ozi WhatsApp sitere na Amana RentalHub NG gbasara arịrịọ ụlọ a na nọmba m nyere. Ọ bụ nhọrọ; ozi email ka dị. Zaa STOP iji kwụsị ozi WhatsApp."
   },
   "property_detail": {
     "load_failed": "Ibudata nkọwa ụlọ dara",

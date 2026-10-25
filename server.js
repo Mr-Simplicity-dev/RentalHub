@@ -889,6 +889,7 @@ startMarketingCommissionJobs();
   startSmsDeliveryJobs();
   startSmsMarketingJobs();
   startWhatsappMarketingJobs();
+  require('./jobs/propertyAlertDeliveryJobs').startPropertyAlertDeliveryJobs();
   startRecruitmentJobs();
   startPremblyRecoveryJobs();
   startRegistrationReminderJobs();

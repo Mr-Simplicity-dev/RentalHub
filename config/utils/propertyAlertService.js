@@ -2,7 +2,7 @@ const logger = require('./logger');
 const db = require('../middleware/database');
 const { sendEmail } = require('./mailer');
 const { getFrontendUrl } = require('./frontendUrl');
-const { sendWhatsAppText } = require('./whatsappService');
+const {enqueue: enqueuePropertyNotification} = require('../../services/propertyAlertDeliveryService');
 const { createNotification } = require('./notificationService');
 
 let schemaReady = false;
@@ -141,6 +141,8 @@ const ensureAlertSchema = async () => {
 };
 
 const buildAlertPayloadFromPayment = (payment) => ({
+  whatsapp_opt_in: payment.whatsapp_opt_in === true,
+  whatsapp_consented_at: payment.whatsapp_consented_at,
   full_name: payment.full_name,
   email: payment.email,
   phone: payment.phone,
@@ -178,9 +180,9 @@ exports.createTenantAlert = async (payload) => {
     `INSERT INTO tenant_property_alerts (
       user_id, full_name, email, phone, property_type,
       state_id, lga_name, city, min_price, max_price, bedrooms, bathrooms,
-      workflow_status, is_active
+      workflow_status, is_active, whatsapp_opt_in, whatsapp_consented_at, whatsapp_consent_version
     )
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,CASE WHEN $15 THEN COALESCE($16::timestamptz,NOW()) ELSE NULL END,CASE WHEN $15 THEN 'property-request-v1' ELSE NULL END)
     RETURNING *`,
     [
       user_id,
@@ -197,6 +199,8 @@ exports.createTenantAlert = async (payload) => {
       bathrooms || null,
       workflow_status,
       is_active === true,
+      payload.whatsapp_opt_in === true,
+      payload.whatsapp_consented_at || null,
     ]
   );
 
@@ -229,9 +233,9 @@ exports.createTenantAlertPayment = async (payload) => {
     `INSERT INTO tenant_property_alert_payments (
       full_name, email, phone, property_type, state_id, lga_name, city,
       min_price, max_price, bedrooms, bathrooms, amount,
-      payment_method, transaction_reference
+      payment_method, transaction_reference, whatsapp_opt_in, whatsapp_consented_at, whatsapp_consent_version
     )
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,CASE WHEN $15 THEN COALESCE($16::timestamptz,NOW()) ELSE NULL END,CASE WHEN $15 THEN 'property-request-v1' ELSE NULL END)
     RETURNING *`,
     [
       full_name,
@@ -248,6 +252,8 @@ exports.createTenantAlertPayment = async (payload) => {
       amount,
       payment_method,
       transaction_reference,
+      payload.whatsapp_opt_in === true,
+      payload.whatsapp_consented_at || null,
     ]
   );
 
@@ -359,124 +365,15 @@ const findMatchingAlerts = async (property) => {
   return result.rows;
 };
 
-const buildMessage = (property, alert) => {
-  const lines = [
-    `Hi ${alert.full_name},`,
-    `A ${property.property_type} matching your request is now available.`,
-    `Title: ${property.title}`,
-    `Location: ${property.area || ''}, ${property.city || ''}`,
-    `Rent: NGN ${property.rent_amount}`,
-    `${FRONTEND_URL}/properties/${property.id}`,
-  ];
-  return lines.filter(Boolean).join('\n');
-};
-
-const buildRequestSearchUrl = (alert) => {
-  const url = new URL('/properties', FRONTEND_URL);
-
-  if (alert.property_type) url.searchParams.set('property_type', alert.property_type);
-  if (alert.state_id) url.searchParams.set('state_id', alert.state_id);
-  if (alert.lga_name) url.searchParams.set('lga_name', alert.lga_name);
-  if (alert.city) url.searchParams.set('city', alert.city);
-
-  return url.toString();
-};
-
-const sendManualFulfillmentNotification = async (alert, note = '') => {
-  const searchUrl = buildRequestSearchUrl(alert);
-  const locationLabel = [alert.state_name, alert.lga_name, alert.city]
-    .filter(Boolean)
-    .join(', ');
-  const message = [
-    `Hi ${alert.full_name},`,
-    `Your ${alert.property_type} property request has been completed by the RentalHub state team.`,
-    locationLabel ? `Requested location: ${locationLabel}` : null,
-    note ? `Update: ${note}` : null,
-    `You can now check matching properties here: ${searchUrl}`,
-  ].filter(Boolean).join('\n');
-
-  try {
-    await sendEmail({
-      to: alert.email,
-      subject: 'Your property request has been completed',
-      html: `
-        <p>Hi ${alert.full_name},</p>
-        <p>Your <strong>${alert.property_type}</strong> property request has been completed by the RentalHub state team.</p>
-        ${locationLabel ? `<p><strong>Requested location:</strong> ${locationLabel}</p>` : ''}
-        ${note ? `<p><strong>Update:</strong> ${note}</p>` : ''}
-        <p><a href="${searchUrl}">Check matching properties</a></p>
-      `,
-    });
-  } catch (error) {
-    logger.error('Manual property request fulfillment email failed:', error.message);
-  }
-
-  if (alert.phone) {
-    const waResult = await sendWhatsAppText({
-      to: alert.phone,
-      message,
-    });
-    if (!waResult.success) {
-      logger.error('Manual property request fulfillment WhatsApp failed:', waResult.message);
-    }
-  }
-};
+const sendManualFulfillmentNotification = (alert,note='') => enqueuePropertyNotification({alert,note});
 
 exports.notifyAlertsForProperty = async (property) => {
   try {
-    const alerts = await findMatchingAlerts(property);
-    if (!alerts.length) return { matched: 0, notified: 0 };
-
-    let notified = 0;
-
-    for (const alert of alerts) {
-      const message = buildMessage(property, alert);
-
-      try {
-        await sendEmail({
-          to: alert.email,
-          subject: 'A property matching your request is now available',
-          html: `
-            <p>Hi ${alert.full_name},</p>
-            <p>A <strong>${property.property_type}</strong> matching your request is now available.</p>
-            <p><strong>${property.title}</strong></p>
-            <p>Location: ${property.area || ''}, ${property.city || ''}</p>
-            <p>Rent: NGN ${property.rent_amount}</p>
-            <p><a href="${FRONTEND_URL}/properties/${property.id}">View Property</a></p>
-          `,
-        });
-      } catch (error) {
-        logger.error('Property alert email failed:', error.message);
-      }
-
-      if (alert.phone) {
-        const waResult = await sendWhatsAppText({
-          to: alert.phone,
-          message,
-        });
-        if (!waResult.success) {
-          logger.error('Property alert WhatsApp failed:', waResult.message);
-        }
-      }
-
-      await db.query(
-        `UPDATE tenant_property_alerts
-         SET notified_at = NOW(),
-             matched_property_id = $2,
-             workflow_status = 'fulfilled',
-             fulfilled_at = NOW(),
-             is_active = FALSE
-         WHERE id = $1`,
-        [alert.id, property.id]
-      );
-      notified++;
-    }
-
-    return { matched: alerts.length, notified };
-  } catch (error) {
-    logger.error('Property alert dispatch error:', error.message);
-    return { matched: 0, notified: 0 };
-  }
+    const alerts=await findMatchingAlerts(property);
+    let queued=0;
+    for(const alert of alerts){const result=await enqueuePropertyNotification({alert,property});if(result.queued)queued++;}
+    return {matched:alerts.length,queued,notified:0};
+  } catch(error) {logger.error('Property alert queue error:',error.message);return {matched:0,queued:0,notified:0};}
 };
 
 const mapAlertRow = (row) => ({
@@ -1138,7 +1035,7 @@ exports.updateTenantPropertyRequestStateAction = async ({
          state_admin_updated_at = NOW(),
          lga_coverage_missing_at = CASE WHEN $3 = 'lga_coverage_missing' THEN NOW() ELSE lga_coverage_missing_at END,
          fulfilled_at = CASE WHEN $3 = 'fulfilled' THEN NOW() ELSE fulfilled_at END,
-         notified_at = CASE WHEN $3 = 'fulfilled' AND notified_at IS NULL THEN NOW() ELSE notified_at END,
+
          is_active = $6
      WHERE id = $1
      RETURNING *`,

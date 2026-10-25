@@ -391,7 +391,8 @@
     "request_success": "请求提交成功。支持管理员将在州团队开始采购前进行审核。",
     "request_submit_failed": "提交通知请求失败",
     "prev": "← 上一页",
-    "next": "下一页 →"
+    "next": "下一页 →",
+    "request_whatsapp_consent": "我同意 Amana RentalHub NG 通过所填号码发送与本次房源请求有关的 WhatsApp 更新。此项可选，仍可接收电子邮件更新。随时回复 STOP 可停止 WhatsApp 更新。"
   },
   "property_detail": {
     "load_failed": "加载房产详情失败",

@@ -391,7 +391,8 @@
     "request_success": "Demande envoyée avec succès. Le support admin l'examinera avant que l'équipe de l'État commence la recherche.",
     "request_submit_failed": "Échec de l'envoi de la demande de notification",
     "prev": "← Précédent",
-    "next": "Suivant →"
+    "next": "Suivant →",
+    "request_whatsapp_consent": "J’accepte de recevoir sur le numéro indiqué des mises à jour WhatsApp d’Amana RentalHub NG concernant cette demande de logement. Facultatif ; les mises à jour par e-mail restent disponibles. Répondez STOP pour vous désinscrire."
   },
   "property_detail": {
     "load_failed": "Échec du chargement des détails du bien",

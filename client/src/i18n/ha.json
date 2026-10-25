@@ -396,7 +396,8 @@
     "request_success": "An aika buƙatar cikin nasara. Admin ɗin tallafi zai duba ta kafin tawagar jiha ta fara neman gida.",
     "request_submit_failed": "An kasa aika buƙatar sanarwa",
     "prev": "← Baya",
-    "next": "Gaba →"
+    "next": "Gaba →",
+    "request_whatsapp_consent": "Na yarda Amana RentalHub NG ta aika sabuntawar WhatsApp game da wannan neman gida zuwa lambar da na bayar. Na zaɓi ne; za a iya samun saƙon imel. Amsa STOP don dakatar da WhatsApp."
   },
   "property_detail": {
     "load_failed": "An kasa lodawa bayanan gida",
