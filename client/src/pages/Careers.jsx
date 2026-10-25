@@ -424,6 +424,7 @@ export default function Careers() {
 
   const selectedVolunteer = selectedRole?.opportunity_type === 'volunteer';
   const visibleRoles = roles.filter(role=>opportunityFilter==='all'||(role.opportunity_type||'employment')===opportunityFilter);
+  const volunteerForm = selectedVolunteer || (!selectedRole && (opportunityFilter === 'volunteer' || (visibleRoles.length > 0 && visibleRoles.every(role => role.opportunity_type === 'volunteer'))));
   const changeOpportunityFilter = (type) => {
     setOpportunityFilter(type);
     setForm(prev=>({...prev,role_id:'',application_track:'standard'}));
@@ -1522,7 +1523,7 @@ export default function Careers() {
         ))}
       </SelectField>
 
-      {!selectedVolunteer && <SelectField label={t('careers.application_track')} name="application_track" value={form.application_track} onChange={handleFormChange}>
+      {selectedRole && !selectedVolunteer && <SelectField label={t('careers.application_track')} name="application_track" value={form.application_track} onChange={handleFormChange}>
         <option value="standard">{t('careers.track_standard')}</option>
         <option value="premium">{t('careers.track_premium')}</option>
       </SelectField>}
@@ -1565,20 +1566,23 @@ export default function Careers() {
       {selectedVolunteer && <><TextAreaField label={t('careers.volunteer_motivation')} name="volunteer_motivation" value={form.volunteer_motivation} onChange={handleFormChange} required className="lg:col-span-2" /><TextAreaField label={t('careers.volunteer_availability')} name="availability" value={form.availability} onChange={handleFormChange} required className="lg:col-span-2" /></>}
       <TextAreaField label={t('careers.suitability')} name="suitability_reason" value={form.suitability_reason} onChange={handleFormChange} required className="lg:col-span-2" />
 
+      {volunteerForm && <div className="lg:col-span-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-5"><p className="text-sm font-semibold text-emerald-900">{t('careers.volunteer_free')}</p><p className="mt-2 text-sm leading-6 text-emerald-800">{t('careers.volunteer_notice')}</p></div>}
+      {selectedRole && !selectedVolunteer && (
       <div className="lg:col-span-2 rounded-2xl bg-gradient-to-br from-primary-50 to-blue-50 border border-primary-200/50 p-5">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-white shadow-sm">
             <FaBriefcase className="text-sm" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-primary-900">{t(selectedVolunteer?'careers.volunteer_free':'careers.access_fee_label')}</p>
-            <p className="mt-1 text-3xl font-black text-primary-950">{formatCurrency(selectedVolunteer?0:(effectiveFee || 5000))}</p>
+            <p className="text-sm font-semibold text-primary-900">{t('careers.access_fee_label')}</p>
+            <p className="mt-1 text-3xl font-black text-primary-950">{formatCurrency(effectiveFee)}</p>
             <p className="mt-1 text-sm text-primary-700">
-              {t(selectedVolunteer?'careers.volunteer_notice':'careers.access_fee_desc')}
+              {t('careers.access_fee_desc')}
             </p>
           </div>
         </div>
       </div>
+      )}
 
       {process.env.REACT_APP_TURNSTILE_SITE_KEY && (
         <div className="lg:col-span-2 flex flex-col items-center gap-2">
@@ -1605,7 +1609,7 @@ export default function Careers() {
         {submitting ? (
           <><FaSpinner className="animate-spin mr-2" /> {t('careers.saving')}</>
         ) : (
-          t(selectedVolunteer?'careers.apply_volunteer':'careers.proceed_payment')
+          t(volunteerForm?'careers.apply_volunteer':'careers.proceed_payment')
         )}
       </button>
     </motion.form>

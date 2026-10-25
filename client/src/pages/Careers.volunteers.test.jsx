@@ -36,7 +36,7 @@ test('both toggles OFF shows no application form',async()=>{mockPublic({is_activ
 test('volunteer deep link focuses the volunteer category and selection removes the premium track',async()=>{
  mockPublic({is_active:true,volunteer_applications_enabled:true});await mount('/careers?type=volunteer');
  const ui=within(container);expect(container.textContent).toContain('Community Volunteer');expect(container.textContent).not.toContain('Paid Employment Role');
- await act(async()=>fireEvent.click(ui.getByRole('button',{name:'Apply as Volunteer'})));
+ await act(async()=>fireEvent.click(ui.getAllByRole('button',{name:'Apply as Volunteer'})[0]));
  expect(container.querySelector('select[name="application_track"]')).toBeNull();expect(container.textContent).toContain(copy.en.volunteer_motivation);expect(container.textContent).toContain(copy.en.volunteer_availability);expect(container.textContent).toContain(copy.en.volunteer_free);
  expect(api.post).not.toHaveBeenCalled();
 });
@@ -54,11 +54,27 @@ test('submitting a volunteer form shows the receipt and never initializes paymen
  api.get.mockImplementation(url=>url.startsWith('/recruitment/my-application')?Promise.resolve({data:{data:application}}):url.includes('/locations/lgas/')?Promise.resolve({data:{data:['Gwagwalada']}}):get(url));
  api.post.mockResolvedValue({data:{success:true,data:application}});
  await mount('/careers?type=volunteer');
- await act(async()=>fireEvent.click(within(container).getByRole('button',{name:'Apply as Volunteer'})));
+ await act(async()=>fireEvent.click(within(container).getAllByRole('button',{name:'Apply as Volunteer'})[0]));
  const set=async(name,value)=>{await act(async()=>fireEvent.change(container.querySelector('[name="'+name+'"]'),{target:{value}}));};
  for(const[name,value]of Object.entries({full_name:'Community Applicant',phone_number:'08012345678',email_address:'community@example.test',highest_education:'University',area_locality:'Kutunku',residential_address:'Local address',suitability_reason:'Relevant experience',volunteer_motivation:'Community support',availability:'Saturdays'}))await set(name,value);
  await set('state_name','Abuja');await waitFor(()=>expect(container.querySelector('select[name="lga_name"]').options.length).toBe(2));await set('lga_name','Gwagwalada');
  await act(async()=>fireEvent.submit(container.querySelector('form')));
  await waitFor(()=>expect(container.textContent).toContain(copy.en.volunteer_received));
  expect(api.post.mock.calls.map(([url])=>url)).toEqual(['/recruitment/apply']);expect(container.textContent).not.toContain('Pay Application Access Fee');
+});
+
+test.each(['/careers','/careers?type=volunteer'])('volunteer-only intake never shows an employment fee before or after selection: %s',async(url)=>{
+ mockPublic({is_active:false,volunteer_applications_enabled:true});await mount(url);
+ const assertFree=()=>{expect(container.textContent).not.toContain('Application Access Fee');expect(container.textContent).not.toContain('5,000');expect(container.textContent).not.toContain('This fee unlocks');expect(container.querySelector('select[name="application_track"]')).toBeNull();expect(container.textContent).toContain(copy.en.volunteer_free);};
+ assertFree();await act(async()=>fireEvent.click(within(container).getAllByRole('button',{name:'Apply as Volunteer'})[0]));assertFree();expect(api.post).not.toHaveBeenCalled();
+});
+test('employment fees remain available only for selected employment roles and disappear when switching to volunteers',async()=>{
+ mockPublic({is_active:true,volunteer_applications_enabled:true});await mount();
+ expect(container.textContent).not.toContain('Application Access Fee');
+ await act(async()=>fireEvent.click(within(container).getByRole('button',{name:'Apply for Employment'})));
+ expect(container.textContent).toContain('Application Access Fee');expect(container.querySelector('select[name="application_track"]')).toBeTruthy();
+ await act(async()=>fireEvent.click(within(container).getByRole('button',{name:copy.en.opportunity_volunteer})));
+ expect(container.textContent).not.toContain('Application Access Fee');expect(container.textContent).not.toContain('5,000');expect(container.querySelector('select[name="application_track"]')).toBeNull();
+ await act(async()=>fireEvent.click(within(container).getAllByRole('button',{name:'Apply as Volunteer'})[0]));
+ expect(container.textContent).not.toContain('Application Access Fee');expect(container.textContent).toContain(copy.en.volunteer_free);
 });
