@@ -962,7 +962,7 @@ const validateStep = () => {
     ) {
       newErrors.referral_code = t('register.referral_code_invalid');
     }
-    if (!formData.use_rentalhub_lawyers) {
+    {
       if (!String(formData.lawyer_email || "").trim()) {
         newErrors.lawyer_email = t('register.lawyer_email_required');
       } else if (!emailPattern.test(String(formData.lawyer_email || "").trim())) {
@@ -2031,7 +2031,7 @@ return (
 
                 {/* Lawyer Email */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.lawyer_email')} {formData.use_rentalhub_lawyers ? '' : '*'}</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.lawyer_email')} *</label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <FaEnvelope className="text-gray-400" />
@@ -2044,7 +2044,7 @@ return (
                       
                       onChange={(e) => { handleChange(e); setErrors(p => ({ ...p, lawyer_email: null })); }}
                       className={`input pl-10 ${errors.lawyer_email ? 'border-red-500' : ''} `}
-                      placeholder={formData.use_rentalhub_lawyers ? t('register.lawyer_using_rentalhub') : t('register.lawyer_placeholder')}
+                      placeholder={t('register.lawyer_placeholder')}
                     />
                   </div>
                   {errors.lawyer_email && <p className="text-red-500 text-sm mt-1">{errors.lawyer_email}</p>}
@@ -2489,7 +2489,7 @@ return (
                       value={formData.password}
                       onChange={(e) => { handleChange(e); setErrors(p => ({ ...p, password: null })); }}
                       className={`input pl-10 pr-10 ${errors.password ? 'border-red-500' : ''}`}
-                      placeholder={t('register.password_placeholder')}
+                      placeholder={t('registrationDraft.password_placeholder')}
                       autoFocus
                     />
                     <button
