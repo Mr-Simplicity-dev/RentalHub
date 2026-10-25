@@ -1,6 +1,6 @@
-import PublicResolvedCases from '../components/legal/PublicResolvedCases';
+
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { FaCheckCircle, FaGavel, FaShieldAlt, FaClipboardList } from 'react-icons/fa';
 import api from '../services/api';
@@ -60,7 +60,7 @@ const LegalSupport = () => {
     }
     setSubmitting(true);
     try {
-      await api.post('/legal/request-help', form);
+      await api.post('/legal/request-help', {...form, message: form.description});
       toast.success(t('lawyers_directory.request_submitted'));
       setShowForm(false);
       setForm({ subject: '', description: '', urgency: 'normal' });
@@ -72,6 +72,7 @@ const LegalSupport = () => {
     }
   };
 
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Hero */}
@@ -80,30 +81,30 @@ const LegalSupport = () => {
           <div className="mx-auto max-w-4xl text-center">
             <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-primary-100">
               <FaShieldAlt />
-{t('legalCases.title')}
+{t('legalCases.assistance_title')}
             </p>
             <h1 className="mt-6 text-4xl font-extrabold md:text-5xl">
-              {t('legalCases.title')}
+              {t('legalCases.assistance_title')}
             </h1>
             <p className="mx-auto mt-4 max-w-3xl text-lg text-slate-200">
-              {t('legalCases.intro')}
+              {t('legalCases.assistance_intro')}
             </p>
           </div>
         </div>
       </section>
 
       <section className="container mx-auto px-4 py-10">
-        <PublicResolvedCases />
 
-        {!isAuthenticated ? <div className="rounded-2xl border border-blue-200 bg-blue-50 p-6"><h2 className="text-lg font-semibold text-slate-900">{t('legalCases.assistance')}</h2><Link to="/login?redirect=/legal-support" className="btn btn-primary mt-4">{t('legalCases.sign_in')}</Link></div> : loading ? <p role="status">{t('lawyers_directory.loading','Loading…')}</p> : !hasCoverage ? (
+
+        {loading ? <p role="status">{t('lawyers_directory.loading','Loading…')}</p> : !hasCoverage ? (
           <div className="max-w-lg mx-auto rounded-2xl border border-amber-200 bg-amber-50 px-6 py-8 text-center">
             <FaGavel className="mx-auto text-4xl text-amber-600 mb-3" />
-            <h2 className="text-xl font-bold text-amber-900 mb-2">{t('lawyers_directory.no_coverage_title')}</h2>
+            <h2 className="text-xl font-bold text-amber-900 mb-2">{t('legalCases.coverage_required')}</h2>
             <p className="text-amber-800 text-sm mb-6">
-              {t('lawyers_directory.no_coverage_desc')}
+              {t('legalCases.coverage_required_desc')}
             </p>
-            <Link to="/dashboard" className="inline-block bg-amber-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-amber-700">
-              {t('lawyers_directory.go_to_dashboard')}
+            <Link to="/support" className="inline-block bg-amber-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-amber-700">
+              {t('legalCases.coverage_enquiry')}
             </Link>
           </div>
         ) : (
@@ -113,9 +114,9 @@ const LegalSupport = () => {
               <div className="flex items-start gap-3">
                 <FaCheckCircle className="mt-1 text-green-600" />
                 <div>
-                  <p className="font-semibold">{t('lawyers_directory.coverage_active')}</p>
+                  <p className="font-semibold">{t('legalCases.coverage_active')}</p>
                   <p className="mt-1 text-sm text-green-700">
-                    {t('lawyers_directory.coverage_active_desc')}
+                    {t('legalCases.coverage_active_desc')}
                   </p>
                 </div>
               </div>
@@ -129,11 +130,11 @@ const LegalSupport = () => {
                   className="inline-flex items-center gap-2 bg-primary-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-primary-700 transition"
                 >
                   <FaClipboardList />
-                  {t('lawyers_directory.request_btn')}
+                  {t('legalCases.request')}
                 </button>
               ) : (
                 <form onSubmit={handleSubmitRequest} className="max-w-2xl mx-auto bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
-                  <h3 className="text-lg font-bold text-slate-900">{t('lawyers_directory.request_title')}</h3>
+                  <h3 className="text-lg font-bold text-slate-900">{t('legalCases.request')}</h3>
 
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">{t('lawyers_directory.subject_label')}</label>

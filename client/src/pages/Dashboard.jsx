@@ -2003,7 +2003,7 @@ const Dashboard = () => {
                 dataTourId="action-subscribed"
               />
               <QuickActionCard
-                title={t('dashboardUx.legal_help')}
+                title={t('legalCases.request')}
                 description="Request private assistance with paid coverage"
                 icon={<FaGavel />}
                 onClick={() => navigate('/assistance')}
@@ -2150,7 +2150,7 @@ const Dashboard = () => {
                 onClick={() => navigate('/tenancy-agreements')}
               />
               <QuickActionCard
-                title={t('dashboardUx.legal_help')}
+                title={t('legalCases.request')}
                 description="Request private assistance with paid coverage"
                 icon={<FaGavel />}
                 onClick={() => navigate('/assistance')}

@@ -5,7 +5,8 @@ import {MemoryRouter} from 'react-router-dom';
 import {fireEvent,waitFor,within} from '@testing-library/dom';
 import {vi} from 'vitest';
 import '../i18n';
-import LegalSupport from './LawyersDirectory';
+import LegalSupport from './Cases';
+import Assistance from './LawyersDirectory';
 import api from '../services/api';
 const auth=vi.hoisted(()=>({isAuthenticated:false}));
 vi.mock('../hooks/useAuth',()=>({useAuth:()=>auth}));
@@ -23,7 +24,7 @@ test('guests see resolved disputes with correct nested totals, without requestin
  for(const text of ['12','7','5','Lagos','Abuja','Landlord → tenant'])expect(container.textContent).toContain(text);
  expect(api.get.mock.calls.map(([url])=>url)).toEqual(['/legal/treated-cases']);
  expect(container.textContent).not.toMatch(/PRIVATE PERSON|private@example.test|PRIVATE CASE DETAILS|Lawyer Directory/);
- expect(container.querySelector('a[href="/login?redirect=/legal-support"]')).toBeTruthy();
+ expect(container.querySelector('a[href="/login"]')).toBeTruthy();
 });
 test('zero real cases produces an honest empty state rather than lawyer listings or invented cases',async()=>{
  api.get.mockResolvedValue({data:{data:{stats:{total_resolved:0,tenant_against_landlord:0,landlord_against_tenant:0},cases:[]}}});await mount();
@@ -36,8 +37,9 @@ test('case API errors are visible and retry succeeds without showing fake zero t
  await act(async()=>fireEvent.click(within(container).getByRole('button',{name:'Try again'})));
  await waitFor(()=>expect(container.textContent).toContain('Lagos'));expect(container.querySelectorAll('article')).toHaveLength(2);
 });
-test('signed-in legal assistance remains available and private request details disappear on sign-out',async()=>{
- auth.isAuthenticated=true;api.get.mockImplementation(async url=>({data:{data:url==='/legal/treated-cases'?cases:url==='/legal/coverage-status'?{has_coverage:true}:[{id:4,subject:'PRIVATE REQUEST',description:'Protected details',status:'pending'}]}}));
- await mount();await waitFor(()=>expect(container.textContent).toContain('PRIVATE REQUEST'));expect(container.textContent).toContain('Resolved dispute cases');expect(container.textContent).not.toContain('lawyers_directory.');
- auth.isAuthenticated=false;await mount();await waitFor(()=>expect(container.textContent).not.toContain('PRIVATE REQUEST'));expect(container.textContent).toContain('Lagos');
+test('signed-in public cases only request public data and link to private assistance',async()=>{
+ auth.isAuthenticated=true;api.get.mockResolvedValue({data:{data:cases}});await mount();await waitFor(()=>expect(container.textContent).toContain('Lagos'));expect(api.get.mock.calls.map(([url])=>url)).toEqual(['/legal/treated-cases']);expect(container.querySelector('a[href="/assistance"]')).toBeTruthy();
+});
+test('paid coverage remains required for private assistance',async()=>{
+ auth.isAuthenticated=true;api.get.mockImplementation(async url=>({data:{data:url==='/legal/coverage-status'?{has_coverage:false}:[]}}));await act(async()=>root.render(<MemoryRouter><Assistance/></MemoryRouter>));await waitFor(()=>expect(container.textContent).toContain('Paid coverage is required'));expect(container.querySelector('form')).toBeNull();expect(container.querySelector('a[href="/support"]')).toBeTruthy();expect(api.post).not.toHaveBeenCalled();
 });
