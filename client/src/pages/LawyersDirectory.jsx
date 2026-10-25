@@ -1,3 +1,4 @@
+import PublicResolvedCases from '../components/legal/PublicResolvedCases';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -12,7 +13,6 @@ const LegalSupport = () => {
   const [loading, setLoading] = useState(true);
   const [hasCoverage, setHasCoverage] = useState(false);
   const [requests, setRequests] = useState([]);
-  const [treatedCases, setTreatedCases] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
@@ -24,6 +24,7 @@ const LegalSupport = () => {
   const loadCoverageStatus = useCallback(async () => {
     if (!isAuthenticated) {
       setHasCoverage(false);
+      setRequests([]);
       setLoading(false);
       return;
     }
@@ -46,25 +47,15 @@ const LegalSupport = () => {
     }
   }, []);
 
-  const loadTreatedCases = useCallback(async () => {
-    try {
-      const res = await api.get('/legal/treated-cases');
-      setTreatedCases(res.data?.data || null);
-    } catch {
-      // public showcase is optional
-    }
-  }, []);
-
   useEffect(() => {
     loadCoverageStatus();
-    loadTreatedCases();
     if (isAuthenticated) loadRequests();
-  }, [isAuthenticated, loadCoverageStatus, loadRequests, loadTreatedCases]);
+  }, [isAuthenticated, loadCoverageStatus, loadRequests]);
 
   const handleSubmitRequest = async (e) => {
     e.preventDefault();
     if (!form.subject.trim() || !form.description.trim()) {
-      toast.error(t('lawyers_directory.fill_required'));
+      toast.error(t('lawyers_directory.validation_error'));
       return;
     }
     setSubmitting(true);
@@ -75,34 +66,11 @@ const LegalSupport = () => {
       setForm({ subject: '', description: '', urgency: 'normal' });
       await loadRequests();
     } catch (err) {
-      toast.error(err.response?.data?.message || t('lawyers_directory.submit_failed'));
+      toast.error(err.response?.data?.message || t('lawyers_directory.submit_error'));
     } finally {
       setSubmitting(false);
     }
   };
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-center max-w-lg mx-auto p-8">
-          <FaShieldAlt className="mx-auto text-5xl text-primary-600 mb-4" />
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">{t('lawyers_directory.title')}</h1>
-          <p className="text-slate-600 mb-6">{t('lawyers_directory.not_auth_desc')}</p>
-          <Link to="/login?redirect=/legal-support" className="inline-block bg-primary-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-primary-700">
-            {t('lawyers_directory.login_cta')}
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <p className="text-slate-500">{t('lawyers_directory.loading')}</p>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -112,57 +80,22 @@ const LegalSupport = () => {
           <div className="mx-auto max-w-4xl text-center">
             <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-primary-100">
               <FaShieldAlt />
-{t('lawyers_directory.title')}
+{t('legalCases.title')}
             </p>
             <h1 className="mt-6 text-4xl font-extrabold md:text-5xl">
-              {t('lawyers_directory.hero_title')}
+              {t('legalCases.title')}
             </h1>
             <p className="mx-auto mt-4 max-w-3xl text-lg text-slate-200">
-              {t('lawyers_directory.hero_desc')}
+              {t('legalCases.intro')}
             </p>
           </div>
         </div>
       </section>
 
       <section className="container mx-auto px-4 py-10">
-        {treatedCases && (
-          <div className="mb-10">
-            <h2 className="text-2xl font-bold text-slate-900 mb-6 text-center">{t('lawyers_directory.treated_cases_title', 'Disputes we have treated')}</h2>
-            <div className="mb-6 grid grid-cols-3 gap-4 text-center">
-              <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <p className="text-2xl font-bold text-primary-600">{treatedCases.stats?.total_resolved || 0}</p>
-                <p className="text-sm text-slate-500">{t('lawyers_directory.resolved', 'Resolved')}</p>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <p className="text-2xl font-bold text-primary-600">{treatedCases.stats?.tenant_against_landlord || 0}</p>
-                <p className="text-sm text-slate-500">{t('lawyers_directory.tenant_cases', 'Tenant cases')}</p>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <p className="text-2xl font-bold text-primary-600">{treatedCases.stats?.landlord_against_tenant || 0}</p>
-                <p className="text-sm text-slate-500">{t('lawyers_directory.landlord_cases', 'Landlord cases')}</p>
-              </div>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {(treatedCases.cases || []).map((c) => (
-                <div key={c.id} className="rounded-xl border border-slate-200 bg-white p-4 flex items-start gap-3">
-                  <FaCheckCircle className="mt-0.5 text-green-500" />
-                  <div>
-                    <p className="font-semibold text-slate-900">
-                      {c.direction === 'tenant_landlord'
-                        ? t('lawyers_directory.tenant_to_landlord', 'Tenant → landlord')
-                        : t('lawyers_directory.landlord_to_tenant', 'Landlord → tenant')}
-                    </p>
-                    <p className="text-sm text-slate-500 mt-1">
-                      {[c.state, c.resolved_at ? new Date(c.resolved_at).toLocaleDateString() : null].filter(Boolean).join(' · ') || t('lawyers_directory.resolved_matter', 'Resolved matter')}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        <PublicResolvedCases />
 
-        {!hasCoverage ? (
+        {!isAuthenticated ? <div className="rounded-2xl border border-blue-200 bg-blue-50 p-6"><h2 className="text-lg font-semibold text-slate-900">{t('legalCases.assistance')}</h2><Link to="/login?redirect=/legal-support" className="btn btn-primary mt-4">{t('legalCases.sign_in')}</Link></div> : loading ? <p role="status">{t('lawyers_directory.loading','Loading…')}</p> : !hasCoverage ? (
           <div className="max-w-lg mx-auto rounded-2xl border border-amber-200 bg-amber-50 px-6 py-8 text-center">
             <FaGavel className="mx-auto text-4xl text-amber-600 mb-3" />
             <h2 className="text-xl font-bold text-amber-900 mb-2">{t('lawyers_directory.no_coverage_title')}</h2>
@@ -170,7 +103,7 @@ const LegalSupport = () => {
               {t('lawyers_directory.no_coverage_desc')}
             </p>
             <Link to="/dashboard" className="inline-block bg-amber-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-amber-700">
-              {t('lawyers_directory.go_dashboard')}
+              {t('lawyers_directory.go_to_dashboard')}
             </Link>
           </div>
         ) : (
@@ -182,7 +115,7 @@ const LegalSupport = () => {
                 <div>
                   <p className="font-semibold">{t('lawyers_directory.coverage_active')}</p>
                   <p className="mt-1 text-sm text-green-700">
-                    {t('lawyers_directory.coverage_desc')}
+                    {t('lawyers_directory.coverage_active_desc')}
                   </p>
                 </div>
               </div>
@@ -196,11 +129,11 @@ const LegalSupport = () => {
                   className="inline-flex items-center gap-2 bg-primary-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-primary-700 transition"
                 >
                   <FaClipboardList />
-                  {t('lawyers_directory.request_assistance')}
+                  {t('lawyers_directory.request_btn')}
                 </button>
               ) : (
                 <form onSubmit={handleSubmitRequest} className="max-w-2xl mx-auto bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
-                  <h3 className="text-lg font-bold text-slate-900">{t('lawyers_directory.form_title')}</h3>
+                  <h3 className="text-lg font-bold text-slate-900">{t('lawyers_directory.request_title')}</h3>
 
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">{t('lawyers_directory.subject_label')}</label>
@@ -233,9 +166,9 @@ const LegalSupport = () => {
                       onChange={(e) => setForm((p) => ({ ...p, urgency: e.target.value }))}
                       className="w-full rounded-xl border border-slate-300 px-4 py-2 text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
                     >
-                      <option value="normal">{t('lawyers_directory.normal')}</option>
-                      <option value="urgent">{t('lawyers_directory.urgent')}</option>
-                      <option value="emergency">{t('lawyers_directory.emergency')}</option>
+                      <option value="normal">{t('lawyers_directory.urgency_normal')}</option>
+                      <option value="urgent">{t('lawyers_directory.urgency_urgent')}</option>
+                      <option value="emergency">{t('lawyers_directory.urgency_emergency')}</option>
                     </select>
                   </div>
 
@@ -245,7 +178,7 @@ const LegalSupport = () => {
                       disabled={submitting}
                       className="bg-primary-600 text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-primary-700 disabled:opacity-50 transition"
                     >
-                      {submitting ? t('lawyers_directory.submitting') : t('lawyers_directory.submit_request')}
+                      {submitting ? t('lawyers_directory.submitting') : t('lawyers_directory.submit_btn')}
                     </button>
                     <button
                       type="button"
@@ -260,7 +193,7 @@ const LegalSupport = () => {
             </div>
 
             {/* Previous requests */}
-            {requests.length > 0 && (
+            {isAuthenticated && requests.length > 0 && (
               <div className="max-w-2xl mx-auto">
                 <h3 className="text-lg font-bold text-slate-900 mb-4">{t('lawyers_directory.previous_requests')}</h3>
                 <div className="space-y-3">
@@ -277,10 +210,10 @@ const LegalSupport = () => {
                           req.status === 'cancelled' ? 'bg-red-100 text-red-700' :
                           'bg-amber-100 text-amber-700'
                         }`}>
-                          {req.status === 'in_progress' ? t('lawyers_directory.in_progress') :
-                           req.status === 'resolved' ? t('lawyers_directory.resolved') :
-                           req.status === 'cancelled' ? t('lawyers_directory.cancelled') :
-                           t('lawyers_directory.pending')}
+                          {req.status === 'in_progress' ? t('lawyers_directory.status_in_progress') :
+                           req.status === 'resolved' ? t('lawyers_directory.status_resolved') :
+                           req.status === 'cancelled' ? t('lawyers_directory.status_cancelled') :
+                           t('lawyers_directory.status_pending')}
                         </span>
                       </div>
                       {req.assigned_lawyer_name && (
