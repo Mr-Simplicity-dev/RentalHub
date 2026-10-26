@@ -11,6 +11,7 @@ const { sendSMS } = require('../config/utils/smsService');
 const { getFrontendUrl } = require('../config/utils/frontendUrl');
 const logger = require('../config/utils/logger');
 const { buildHyphenReference, buildReference } = require('../config/utils/referenceGenerator');
+const { VOLUNTEER_OPPORTUNITY_TEMPLATES } = require('./volunteerOpportunityCatalog');
 
 const optionalRequire = (moduleName, featureName) => {
   try {
@@ -1490,6 +1491,100 @@ exports.deleteRole = async (req, res) => {
   } catch (err) {
     req.logger.error('deleteRole error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.getVolunteerOpportunityTemplates = async (req, res) => {
+  try {
+    if (!(await isRecruitmentAdmin(req.user.id))) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    res.json({
+      success: true,
+      data: VOLUNTEER_OPPORTUNITY_TEMPLATES.map(({ title, type, description }) => ({
+        title,
+        type,
+        description,
+      })),
+    });
+  } catch (error) {
+    req.logger.error('getVolunteerOpportunityTemplates error:', error);
+    res.status(500).json({ success: false, message: 'Failed to load volunteer templates' });
+  }
+};
+
+exports.applyVolunteerOpportunityTemplates = async (req, res) => {
+  try {
+    if (!(await isRecruitmentAdmin(req.user.id))) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const cycleId = Number(req.body.cycle_id);
+    if (!Number.isInteger(cycleId) || cycleId < 1) {
+      return res.status(400).json({ success: false, message: 'Select a valid recruitment cycle' });
+    }
+
+    const cycleResult = await db.query(
+      `SELECT id, title
+       FROM recruitment_cycles
+       WHERE id = $1
+         AND is_active = TRUE
+         AND COALESCE(extension_date, close_date) >= CURRENT_DATE
+       LIMIT 1`,
+      [cycleId]
+    );
+    if (!cycleResult.rows.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'Select an active or upcoming recruitment cycle that has not closed',
+      });
+    }
+
+    const cycle = cycleResult.rows[0];
+    const created = [];
+    const skipped = [];
+
+    for (const template of VOLUNTEER_OPPORTUNITY_TEMPLATES) {
+      const inserted = await db.query(
+        `INSERT INTO recruitment_roles
+           (title, type, description, application_fee, premium_fee, cycle_id, opportunity_type, is_active)
+         SELECT $1, $2, $3, 0, 0, $4, 'volunteer', TRUE
+         WHERE NOT EXISTS (
+           SELECT 1
+           FROM recruitment_roles
+           WHERE cycle_id = $4
+             AND opportunity_type = 'volunteer'
+             AND LOWER(TRIM(title)) = LOWER(TRIM($1))
+         )
+         RETURNING *`,
+        [template.title, template.type, template.description, cycleId]
+      );
+
+      if (inserted.rows.length) {
+        created.push(inserted.rows[0]);
+        await auditRecruitment(req, 'VOLUNTEER_OPPORTUNITY_CREATED', 'recruitment_role', inserted.rows[0].id);
+      } else {
+        skipped.push(template.title);
+      }
+    }
+
+    await auditRecruitment(req, 'VOLUNTEER_OPPORTUNITY_TEMPLATES_APPLIED', 'recruitment_cycle', cycle.id);
+
+    res.json({
+      success: true,
+      data: {
+        cycle: { id: cycle.id, title: cycle.title },
+        created: created.map((role) => role.title),
+        skipped,
+      },
+      message: created.length
+        ? `${created.length} volunteer opportunities created${skipped.length ? `; ${skipped.length} already existed` : ''}.`
+        : 'All eight volunteer opportunities already exist in this cycle.',
+    });
+  } catch (error) {
+    req.logger.error('applyVolunteerOpportunityTemplates error:', error);
+    res.status(500).json({ success: false, message: 'Failed to create volunteer opportunities' });
   }
 };
 
@@ -3153,7 +3248,6 @@ exports.createApplication = async (req, res) => {
       lga_name,
       area_locality,
       residential_address,
-      highest_education,
       suitability_reason,
     };
     const missing = Object.entries(required)
@@ -3182,6 +3276,9 @@ exports.createApplication = async (req, res) => {
     }
     const role = roleResult.rows[0];
     const volunteer = isVolunteer(role);
+    if (!volunteer && !normalizeText(highest_education)) {
+      return res.status(400).json({ success: false, message: 'Missing required fields: highest education' });
+    }
     if (!isOpportunityOpen(role, settings)) return res.status(403).json({success:false,message:volunteer ? 'Volunteer applications are currently closed' : 'Recruitment is currently closed'});
     if (volunteer && (!normalizeText(volunteer_motivation) || !normalizeText(availability))) return res.status(400).json({success:false,message:'Volunteer motivation and availability are required'});
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeText(email_address)) || !/^\+?\d{10,15}$/.test(normalizeText(phone_number).replace(/[\s-]/g,''))) return res.status(400).json({success:false,message:'Enter a valid email and phone number'});
@@ -3365,6 +3462,13 @@ exports.verifyPayment = async (req, res) => {
 
     const application = appResult.rows[0];
     if (!requirePublicApplicationAccess(req, res, application)) return;
+
+    if (isVolunteer(application)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Volunteer applications are free and do not require payment verification',
+      });
+    }
 
     if (application.payment_status === 'paid' && (application.access_code || application.access_code_encrypted)) {
       return res.json({

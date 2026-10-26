@@ -424,7 +424,7 @@ export default function Careers() {
 
   const selectedVolunteer = selectedRole?.opportunity_type === 'volunteer';
   const visibleRoles = roles.filter(role=>opportunityFilter==='all'||(role.opportunity_type||'employment')===opportunityFilter);
-  const volunteerForm = selectedVolunteer || (!selectedRole && (opportunityFilter === 'volunteer' || (visibleRoles.length > 0 && visibleRoles.every(role => role.opportunity_type === 'volunteer'))));
+  const volunteerForm = selectedVolunteer || (!selectedRole && visibleRoles.length > 0 && visibleRoles.every(role => role.opportunity_type === 'volunteer'));
   const changeOpportunityFilter = (type) => {
     setOpportunityFilter(type);
     setForm(prev=>({...prev,role_id:'',application_track:'standard'}));
@@ -1506,7 +1506,23 @@ export default function Careers() {
     </motion.section>
   );
 
-  const renderApplicationForm = () => (
+  const renderApplicationForm = () => {
+    if (!visibleRoles.length) {
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+          className="grid gap-5 lg:grid-cols-2"
+        >
+          <OpportunityPicker roles={roles} filter={opportunityFilter} onFilter={changeOpportunityFilter} selected={form.role_id} onSelect={role=>setForm(prev=>({...prev,role_id:String(role.id),application_track:'standard'}))} />
+          <div role="status" className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm leading-6 text-slate-600 lg:col-span-2">
+            <p className="font-semibold text-slate-800">{t('careers.no_opportunities')}</p>
+          </div>
+        </motion.div>
+      );
+    }
+    return (
     <motion.form
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
@@ -1553,21 +1569,22 @@ export default function Careers() {
         ))}
       </SelectField>
 
-      <InputField label={t('careers.area_locality')} name="area_locality" value={form.area_locality} onChange={handleFormChange} placeholder={t('careers.area_locality_placeholder')} required />
+      <InputField label={t(volunteerForm?'careers.area_locality_volunteer':'careers.area_locality')} name="area_locality" value={form.area_locality} onChange={handleFormChange} placeholder={t(volunteerForm?'careers.area_locality_volunteer_placeholder':'careers.area_locality_placeholder')} required />
 
       <div className="lg:col-span-2 border-b border-slate-100 pb-1 mt-2">
         <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{t('careers.professional_bg')}</h3>
       </div>
-      <InputField label={t('careers.highest_education')} name="highest_education" value={form.highest_education} onChange={handleFormChange} required />
+      {volunteerForm && <div className="lg:col-span-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-5"><p className="text-sm font-semibold text-emerald-900">{t('careers.volunteer_experience_welcome')}</p><p className="mt-2 text-sm leading-6 text-emerald-800">{t('careers.volunteer_no_degree')}</p></div>}
+      <InputField label={t(volunteerForm?'careers.highest_education_optional':'careers.highest_education')} name="highest_education" value={form.highest_education} onChange={handleFormChange} required={!volunteerForm} />
       <InputField label={t('careers.years_experience')} type="number" name="years_of_experience" value={form.years_of_experience} onChange={handleFormChange} min="0" />
-      <InputField label={t('careers.employment_status')} name="current_employment_status" value={form.current_employment_status} onChange={handleFormChange} />
+      <InputField label={t(volunteerForm?'careers.employment_status_optional':'careers.employment_status')} name="current_employment_status" value={form.current_employment_status} onChange={handleFormChange} />
 
       <TextAreaField label={t('careers.residential_address')} name="residential_address" value={form.residential_address} onChange={handleFormChange} required />
-      <TextAreaField label={t('careers.skills_qualifications')} name="skills_qualifications" value={form.skills_qualifications} onChange={handleFormChange} />
+      <TextAreaField label={t(volunteerForm?'careers.skills_volunteer':'careers.skills_qualifications')} name="skills_qualifications" value={form.skills_qualifications} onChange={handleFormChange} placeholder={volunteerForm?t('careers.skills_volunteer_placeholder'):undefined} />
       {selectedVolunteer && <><TextAreaField label={t('careers.volunteer_motivation')} name="volunteer_motivation" value={form.volunteer_motivation} onChange={handleFormChange} required className="lg:col-span-2" /><TextAreaField label={t('careers.volunteer_availability')} name="availability" value={form.availability} onChange={handleFormChange} required className="lg:col-span-2" /></>}
-      <TextAreaField label={t('careers.suitability')} name="suitability_reason" value={form.suitability_reason} onChange={handleFormChange} required className="lg:col-span-2" />
+      <TextAreaField label={t(volunteerForm?'careers.suitability_volunteer':'careers.suitability')} name="suitability_reason" value={form.suitability_reason} onChange={handleFormChange} required className="lg:col-span-2" />
 
-      {volunteerForm && <div className="lg:col-span-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-5"><p className="text-sm font-semibold text-emerald-900">{t('careers.volunteer_free')}</p><p className="mt-2 text-sm leading-6 text-emerald-800">{t('careers.volunteer_notice')}</p></div>}
+      {volunteerForm && <div className="lg:col-span-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-5"><p className="text-sm font-semibold text-emerald-900">{t('careers.volunteer_free')}</p><p className="mt-2 text-sm leading-6 text-emerald-800">{t('careers.volunteer_notice')}</p><p className="mt-2 text-sm leading-6 text-emerald-800">{t('careers.volunteer_selection_notice')}</p></div>}
       {selectedRole && !selectedVolunteer && (
       <div className="lg:col-span-2 rounded-2xl bg-gradient-to-br from-primary-50 to-blue-50 border border-primary-200/50 p-5">
         <div className="flex items-start gap-3">
@@ -1614,7 +1631,8 @@ export default function Careers() {
         )}
       </button>
     </motion.form>
-  );
+    );
+  };
 
   const renderDashboard = () => {
     if (application?.opportunity_type === 'volunteer') return <VolunteerReceipt application={application} onFileChange={handleDocumentChange} onUpload={uploadDocuments} uploading={uploading} onInterview={startInterview} />;

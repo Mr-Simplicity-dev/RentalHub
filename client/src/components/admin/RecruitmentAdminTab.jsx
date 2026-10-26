@@ -1,4 +1,5 @@
 import VolunteerRecruitmentControls, {OpportunityTypeField, OpportunityBadge} from './VolunteerRecruitmentControls';
+import VolunteerOpportunityTemplates from './VolunteerOpportunityTemplates';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import {
@@ -590,6 +591,7 @@ export default function RecruitmentAdminTab() {
             </div>
             <h3 className="text-lg font-bold text-slate-900">Manage Roles</h3>
           </div>
+          <VolunteerOpportunityTemplates cycles={cycles} onCreated={loadCore} className="mb-4" />
           <form onSubmit={createRole} className="space-y-3">
 <OpportunityTypeField value={roleForm.opportunity_type} onChange={value=>setRoleForm(prev=>({...prev,opportunity_type:value,application_fee:value==='volunteer'?'0':'5000',premium_fee:value==='volunteer'?'0':'8000'}))} />
             <AdminSelect label="Cycle" value={roleForm.cycle_id} onChange={(v) => setRoleForm((p) => ({ ...p, cycle_id: v }))} required>

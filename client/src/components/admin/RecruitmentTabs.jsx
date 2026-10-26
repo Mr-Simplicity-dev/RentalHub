@@ -1,4 +1,5 @@
 import {OpportunityTypeField, OpportunityBadge} from './VolunteerRecruitmentControls';
+import VolunteerOpportunityTemplates from './VolunteerOpportunityTemplates';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import {
@@ -582,6 +583,11 @@ export function RecruitmentRolesTab({ roles, cycles, onRefresh }) {
 
   return (
     <div className="grid gap-6 xl:grid-cols-[0.85fr,1.15fr]">
+      <VolunteerOpportunityTemplates
+        cycles={cycles}
+        onCreated={onRefresh}
+        className="xl:col-span-2"
+      />
       <SectionCard
         title="Create role"
         description="Add a position with fee structure for a recruitment cycle."

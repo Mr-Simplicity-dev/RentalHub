@@ -449,6 +449,10 @@ router.put('/admin/roles/:id', authenticate, [param('id').isInt(), body('title')
 router.get('/admin/roles', authenticate, recruitmentController.getAllRoles);
 router.delete('/admin/roles/:id', authenticate, [param('id').isInt()], validateRequest, recruitmentController.deleteRole);
 
+// Volunteer opportunity templates (admin-controlled, idempotent creation in an existing cycle)
+router.get('/admin/volunteer-templates', authenticate, recruitmentController.getVolunteerOpportunityTemplates);
+router.post('/admin/volunteer-templates/apply', authenticate, [body('cycle_id').isInt({ min: 1 })], validateRequest, recruitmentController.applyVolunteerOpportunityTemplates);
+
 // Location activation
 router.put('/admin/locations/toggle', authenticate, [body('state_id').isInt(), body('lga_id').optional().isInt()], validateRequest, recruitmentController.toggleLocation);
 router.get('/admin/locations', authenticate, recruitmentController.getLocationActivations);
