@@ -16,7 +16,7 @@ const whatsappFaqData = [
   {
     id: 'payment',
     keywords: ['payment', 'pay', 'fee', 'escrow', 'money', 'cost', 'price', 'charge', 'transaction', 'secure', 'safe'],
-    answer: 'Amana RentalHub NG uses a secure escrow system for all transactions. Your payment is held safely until you confirm satisfaction with the service or property. This protects both tenants and landlords throughout the rental process.',
+    answer: 'The available payment options and fees are shown before confirmation. Sign in and check Payment History for the exact status and reference. Avoid repeating a payment while its status is uncertain.',
     link: null,
     linkText: null,
   },
@@ -51,7 +51,7 @@ const whatsappFaqData = [
   {
     id: 'support',
     keywords: ['support', 'help', 'contact', 'agent', 'human', 'person', 'talk', 'speak', 'customer service', 'representative', 'issue', 'problem', 'complaint'],
-    answer: 'Our support team is ready to help. You can submit a ticket using the "Contact Support" button below, and we\'ll get back to you quickly. For urgent matters, you can also reach us directly on WhatsApp.',
+    answer: 'Tell me which screen you are using and what went wrong. I can help narrow the problem and check records after you sign in. If it remains unresolved, we can prepare a support ticket or request a person.',
     link: null,
     linkText: null,
   },

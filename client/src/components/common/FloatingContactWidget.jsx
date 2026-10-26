@@ -758,7 +758,7 @@ const FloatingContactWidget = () => {
   const renderHeader = () => (
     <div className="flex items-center justify-between bg-gradient-to-r from-indigo-600 to-indigo-700 px-4 py-3 text-white">
       <div className="flex items-center gap-2">
-        {view !== 'assistant' && view !== 'form' && view !== 'success' && (
+        {view !== 'assistant' && view !== 'success' && (
           <button onClick={() => { setView('assistant'); setActiveTicket(null); setConversation([]); setContactConv([]); setViewingContactTicket(null); }} className="text-white/80 hover:text-white p-0.5" aria-label={t('messages.widget.back', 'Back')}>
             <FaArrowLeft size={14} />
           </button>
@@ -769,7 +769,7 @@ const FloatingContactWidget = () => {
           <p className="text-[10px] text-indigo-200">{t('messages.widget.assistant_first', 'Guided help first. A person when you need one.')}</p>
         </div>
       </div>
-      <button onClick={handleClose} className="text-white/80 hover:text-white p-1" aria-label={t('messages.widget.close', 'Close')}><FaTimes /></button>
+      <button onClick={handleClose} className="text-white/80 hover:text-white p-1 min-h-11 min-w-11" aria-label={t('messages.widget.close', 'Close')}><FaTimes /></button>
     </div>
   );
 
@@ -814,18 +814,18 @@ const FloatingContactWidget = () => {
             exit={prefersReducedMotion ? undefined : { opacity: 0, y: 20 }}
             transition={{ duration: 0.5, ease: 'easeOut' }}
             className="support-widget-shell fixed bottom-24 right-4 sm:right-6 z-50 w-[calc(100vw-2rem)] max-w-sm sm:w-96 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-gray-700 overflow-hidden flex flex-col"
-            style={{ maxHeight: '480px' }}
+            style={{height:'min(680px, calc(100dvh - 120px))',maxHeight:'calc(100dvh - 120px)'}}
           >
           {renderHeader()}
 
-          {isAuthenticated && !connected && (
+          {isAuthenticated && !connected && view!=='assistant' && (
             <div className="flex items-center gap-2 bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-700">
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500" />
               {t('messages.widget.reconnecting', 'Reconnecting...')}
             </div>
           )}
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-3" ref={listRef}>
+          <div className={view==='assistant'?'flex min-h-0 flex-1 flex-col':'flex-1 overflow-y-auto p-4 space-y-3'} ref={listRef}>
             {/* ─── FORM VIEW (anonymous/fallback) ─── */}
             {view === 'assistant' && <><WhatsAppBotWidget embedded onHumanRequest={({summary})=>{setForm(prev=>({...prev,subject:'Support follow-up',message:summary || ''}));setView('form');}}/><div className="flex flex-wrap gap-2 border-t border-slate-200 p-3"><button onClick={()=>setView(isAuthenticated?'tickets':'check-status')} className="min-h-11 rounded-xl border px-3 text-sm">My tickets</button><button data-tour-id="support-new-ticket-workflow" onClick={()=>setView('form')} className="min-h-11 rounded-xl border px-3 text-sm">Submit a ticket</button></div></>}
             {view === 'form' && !isAuthenticated && (

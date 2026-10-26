@@ -642,10 +642,10 @@ const Properties = () => {
             <h2 className="text-xl font-bold text-gray-900 mb-2 text-center">
               {t('properties.request_title')}
             </h2>
-            <p className="text-gray-600 mb-4">
+            <p className="text-gray-600 mb-4 text-center mx-auto max-w-3xl leading-relaxed">
               {t('properties.request_intro')}
             </p>
-            <p className={`text-sm mb-4 ${alertPaymentEnabled ? 'text-primary-700' : 'text-green-700'}`}>
+            <p className={`text-sm mb-4 text-center mx-auto max-w-3xl leading-relaxed ${alertPaymentEnabled ? 'text-primary-700' : 'text-green-700'}`}>
               {alertPaymentEnabled
                 ? t('properties.request_fee_text', { amount: alertRequestFeeLabel })
                 : t('properties.request_free_text')}

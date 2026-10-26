@@ -60,13 +60,13 @@ export const WORKFLOW_TOURS = {
       },
       {
         id: 'tenant_workflow_support',
-        target: '[data-tour-id="support-new-ticket-workflow"]',
+        target: '.tour-support-widget',
         route: '/support',
         title: 'Ask for help safely',
-        description: 'Open a support request, choose the correct category and priority, and track every response here.',
+        description: 'Start with the assistant for guided troubleshooting. If the problem remains unresolved, review a support ticket or request human follow-up.',
         placement: 'left',
         advanceOn: 'click',
-        actionHint: 'Open the support form to finish this tour.',
+        actionHint: 'Open the assistant to continue.',
       },
     ],
   },
@@ -130,10 +130,10 @@ export const WORKFLOW_TOURS = {
       },
       {
         id: 'landlord_workflow_support',
-        target: '[data-tour-id="support-new-ticket-workflow"]',
+        target: '.tour-support-widget',
         route: '/support',
         title: 'Escalate an issue with context',
-        description: 'Open the ticket form and link your request to the correct service area.',
+        description: 'Start with guided troubleshooting, then open a ticket with the correct service area if the issue remains unresolved.',
         placement: 'left',
         advanceOn: 'click',
         actionHint: 'Open the support form to finish this tour.',
@@ -188,7 +188,7 @@ export const WORKFLOW_TOURS = {
       },
       {
         id: 'agent_workflow_support',
-        target: '[data-tour-id="support-new-ticket-workflow"]',
+        target: '.tour-support-widget',
         route: '/support',
         title: 'Escalate operational blockers',
         description: 'Open a categorized ticket so the correct support team receives the issue.',
@@ -238,7 +238,7 @@ export const WORKFLOW_TOURS = {
       },
       {
         id: 'lawyer_workflow_support',
-        target: '[data-tour-id="support-new-ticket-workflow"]',
+        target: '.tour-support-widget',
         route: '/support',
         title: 'Request operational support',
         description: 'Open a legal or technical ticket with enough context for the correct team to respond.',
@@ -272,7 +272,7 @@ export const WORKFLOW_TOURS = {
       },
       {
         id: 'services_workflow_support',
-        target: '[data-tour-id="support-new-ticket-workflow"]',
+        target: '.tour-support-widget',
         route: '/support',
         title: 'Get service support',
         description: 'Open a categorized ticket when a booking, provider, or payment needs attention.',
@@ -364,7 +364,7 @@ export const getWorkflowToursByUserRole = (userRole, t) => {
       id: adminMeta[0],
       title: adminMeta[1],
       description: adminMeta[2],
-      steps: getTourStepsByUserRole(userRole, t).map((step) => ({
+      steps: getTourStepsByUserRole(userRole, t, { user: { user_type: userRole } }).map((step) => ({
         ...step,
         workflowKey: `${userRole}_operations_workflow`,
       })),

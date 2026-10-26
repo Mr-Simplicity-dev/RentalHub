@@ -384,7 +384,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
       </div>
 
       {activeTab === 'property_requests' && (
-        <div className="space-y-6">
+          <div data-tour-id="state-property-requests" className="space-y-6">
           <PropertyRequestWorkflowPanel
             mode="state"
             title="Assigned Tenant Property Requests"

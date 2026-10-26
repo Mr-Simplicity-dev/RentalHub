@@ -225,14 +225,16 @@ export const TOUR_STEPS = {
     {
       id: 'admin_1',
       target: '.admin-users-section',
+      route: '/admin?tab=overview',
       title: 'User Management',
-      description: 'Manage all platform users, verify identities, and handle user-related issues.',
+      description: 'Manage users within your assigned jurisdiction, verify identities, and resolve account issues using the authorized controls.',
       placement: 'right',
       highlight: true,
     },
     {
       id: 'admin_2',
       target: '.admin-properties-section',
+      route: '/admin?tab=overview',
       title: 'Properties Management',
       description: 'Monitor and moderate all property listings. Handle compliance and approvals.',
       placement: 'left',
@@ -241,6 +243,7 @@ export const TOUR_STEPS = {
     {
       id: 'admin_3',
       target: '.admin-disputes-section',
+      route: '/admin?tab=overview',
       title: 'Applications',
       description: 'See the application workload for properties within your administrative scope.',
       placement: 'left',
@@ -249,6 +252,7 @@ export const TOUR_STEPS = {
     {
       id: 'admin_4',
       target: '.admin-payments-section',
+      route: '/admin?tab=overview',
       title: 'Pending Verifications',
       description: 'Monitor identity and document verifications that still require administrative review.',
       placement: 'left',
@@ -257,11 +261,13 @@ export const TOUR_STEPS = {
     {
       id: 'admin_5',
       target: '.admin-reports-section',
+      route: '/admin?tab=overview',
       title: 'Administration Tools',
       description: 'Jump directly to users, properties, applications, verification, lawyer, and agent workflows.',
       placement: 'top',
       highlight: true,
     },
+    { id: 'admin_property_requests', target: '[data-tour-id="admin-property-requests"]', route: '/admin?tab=property_requests', title: 'Property Requests', description: 'Review tenant requests assigned to your area after support review. Record follow-up and match progress in the existing request workflow.', placement: 'top', highlight: true, roles: ["admin","lga_admin"] },
   ],
 
   // Financial Admin Dashboard
@@ -453,6 +459,7 @@ export const TOUR_STEPS = {
       highlight: true,
       optional: true,
     },
+    { id: 'state_property_requests', target: '[data-tour-id="state-property-requests"]', route: '/admin?tab=property_requests', title: 'Property Requests', description: 'Review requests assigned to your state, coordinate follow-up, and record matching progress within your jurisdiction.', placement: 'top', highlight: true },
   ],
 
   // Super Financial Admin Dashboard
@@ -808,7 +815,7 @@ export const TOUR_STEPS = {
       target: '.recruitment-admin-applicants-section',
       route: '/admin/recruitment?tab=applicants',
       title: 'Candidate Management',
-      description: 'Filter applicants, review candidate records, export results, and move applications through hiring stages.',
+      description: 'Filter by Employment or Volunteer, review candidate answers, shortlist or reject, and export results. Volunteers use manual follow-up; payment is Not Applicable and interviews are not automatic.',
       placement: 'left',
       highlight: true,
     },
@@ -817,7 +824,7 @@ export const TOUR_STEPS = {
       target: '.recruitment-admin-roles-section',
       route: '/admin/recruitment?tab=roles',
       title: 'Roles & Fees',
-      description: 'Configure recruitment roles, application fees, and their availability across cycles.',
+      description: 'Create employment or volunteer opportunities and manage cycle availability. Volunteer fees are always zero; opportunity type is fixed after creation.',
       placement: 'top',
       highlight: true,
       optional: true,
@@ -837,7 +844,7 @@ export const TOUR_STEPS = {
       target: '.recruitment-admin-interviews-section',
       route: '/admin/recruitment?tab=interviews',
       title: 'Interviews',
-      description: 'Review scheduled interviews, interview outcomes, and candidate progress.',
+      description: 'Review intentionally scheduled interviews and their outcomes. Volunteers start with application review and manual follow-up; do not force them into proctored interviews.',
       placement: 'top',
       highlight: true,
       optional: true,
@@ -860,7 +867,7 @@ export const TOUR_STEPS = {
       target: '.lga-support-property-requests-section',
       route: '/admin/lga-support-dashboard?tab=property_requests',
       title: 'Property Requests',
-      description: 'Review and approve property listing requests from landlords and agents in your LGA.',
+      description: 'Review tenant property requests assigned to your LGA after support review, then record follow-up and matching progress.',
       placement: 'left',
       highlight: true,
     },
@@ -900,7 +907,7 @@ export const TOUR_STEPS = {
       target: '.state-support-property-requests-section',
       route: '/admin/state-support-dashboard?tab=property_requests',
       title: 'Property Requests',
-      description: 'Review property listing requests and tenancy operations for your state.',
+      description: 'Review tenant property requests, check their details and coordinate assignment and matching within your state.',
       placement: 'left',
       highlight: true,
     },
@@ -1031,6 +1038,7 @@ export const TOUR_STEPS = {
     {
       id: 'super_1',
       target: '.super-admin-hero-section',
+      route: '/super-admin?tab=overview',
       title: 'Control Center',
       description: 'Your platform command layer — withdrawable earnings, role scope, and live moderation status at a glance.',
       placement: 'bottom',
@@ -1039,6 +1047,7 @@ export const TOUR_STEPS = {
     {
       id: 'super_2',
       target: '.super-admin-management-section',
+      route: '/super-admin?tab=overview',
       title: 'Platform Management',
       description: 'Full control over users, verifications, properties, pricing, and registration access.',
       placement: 'right',
@@ -1047,6 +1056,7 @@ export const TOUR_STEPS = {
     {
       id: 'super_3',
       target: '.super-admin-system-section',
+      route: '/super-admin?tab=overview',
       title: 'Data & System',
       description: 'Access analytics, reports, logs, recruitment, admin management, and pending approvals.',
       placement: 'left',
@@ -1055,6 +1065,7 @@ export const TOUR_STEPS = {
     {
       id: 'super_4',
       target: '.super-admin-platform-section',
+      route: '/super-admin?tab=overview',
       title: 'Quick Navigation',
       description: 'Jump to any admin section instantly using these categorized shortcut buttons.',
       placement: 'bottom',
@@ -1063,6 +1074,7 @@ export const TOUR_STEPS = {
     {
       id: 'super_5',
       target: '.super-admin-marketing-section',
+      route: '/super-admin?tab=overview',
       title: 'Marketing & Content',
       description: 'Manage broadcasts, ad spaces, email marketing, SMS campaigns, and service ratings.',
       placement: 'left',
@@ -1071,6 +1083,7 @@ export const TOUR_STEPS = {
     {
       id: 'super_6',
       target: '.super-admin-trust-section',
+      route: '/super-admin?tab=overview',
       title: 'Legal & Trust',
       description: 'Handle flags, fraud reports, lawyer invites, and manage legal professionals.',
       placement: 'left',
@@ -1107,11 +1120,16 @@ export const TOUR_STEPS = {
       id: 'super_10',
       target: '.super-admin-admins-section',
       route: '/super-admin?tab=recruitment',
-      title: 'Recruitment & Admins',
-      description: 'Manage recruitment, pricing, flags, platform lawyers and agents, and admin monitoring.',
+      title: 'Recruitment Overview',
+      description: 'Manage employment and volunteer recruitment in this workspace. Volunteer intake has its own switch, free opportunities and manual candidate review. Other administrative tools have their own tabs.',
       placement: 'top',
       highlight: true,
     },
+    { id: 'super_request_review', target: '[data-tour-id="super-property-requests"]', route: '/super-admin?tab=property_requests', title: 'Property Requests', description: 'Review incoming tenant requests before state assignment. Check payment and request details, follow matching progress, and keep the review history.', placement: 'top', highlight: true },
+    { id: 'super_volunteer_control', target: '[data-tour-id="volunteer-applications-control"]', route: '/super-admin?tab=recruitment', title: 'Recruitment Overview', description: 'Volunteer Applications is independent of employment recruitment. Only Super Admin changes this setting. Volunteers apply free, enter manual review, and receive no staff account automatically.', placement: 'top', highlight: true },
+    { id: 'super_pricing_current', target: '[data-tour-id="super-pricing"]', route: '/super-admin?tab=pricing', title: 'Platform Management', description: 'Review location-specific pricing and access rules before changing them. The property-request form confirms the fee after State and LGA selection.', placement: 'top', highlight: true },
+    { id: 'super_admin_accounts_current', target: '[data-tour-id="super-admin-accounts"]', route: '/super-admin?tab=admin', title: 'Administration Tools', description: 'Manage authorized administrative accounts and assigned jurisdictions. Volunteer selection does not create an administrative account.', placement: 'top', highlight: true },
+    { id: 'super_pending_current', target: '[data-tour-id="super-pending-approvals"]', route: '/super-admin?tab=pending_approvals', title: 'Pending Verifications', description: 'Review pending administrative account requests before granting access. Check the requested role, jurisdiction and supporting details.', placement: 'top', highlight: true },
   ],
 
   // Marketing Agent Dashboard
@@ -1160,7 +1178,7 @@ export const TOUR_STEPS = {
   ],
 };
 
-for(const [role,steps] of [['tenant',TOUR_STEPS.TENANT_DASHBOARD],['landlord',TOUR_STEPS.LANDLORD_DASHBOARD]]){steps.push({id:role+'_disputes_current',target:'[data-tour-id="action-disputes"]',title:'Disputes',description:'Open the separate Disputes card to submit and follow a dispute.',placement:'bottom'},{id:role+'_reports_current',target:'[data-tour-id="action-damage"]',title:'Property Reports',description:'Open Property Reports to report a property issue and track its progress.',placement:'bottom'});for(const step of steps){if(step.target==='.tour-legal-help'){step.title='Coverage assistance';step.description='Paid coverage is required for private assistance. Check your coverage and submit a request from your dashboard.';}if(step.target==='.tour-wallet'){step.title='Wallet';step.description='Open Wallet to fund it or withdraw available funds. Payments and Rent Savings remain separate options.';}if(step.target==='.tour-support-widget'){step.title='Assistant and support';step.description='Start with the assistant for guided troubleshooting, review a support ticket if needed, and ask for a person when the issue remains unresolved.';}}}
+for(const [role,steps] of [['tenant',TOUR_STEPS.TENANT_DASHBOARD],['landlord',TOUR_STEPS.LANDLORD_DASHBOARD]]){const addedSteps=[{id:'dashboard_disputes_current',target:'[data-tour-id="action-disputes"]',title:'Disputes',description:'Open the separate Disputes card to submit and follow a dispute.',placement:'bottom'},{id:'dashboard_reports_current',target:'[data-tour-id="action-damage"]',title:'Property Reports',description:'Open Property Reports to report a property issue and track its progress.',placement:'bottom'}];steps.push(...addedSteps.map(step=>({...step,id:role+'_'+step.id})));for(const step of steps){if(step.target==='.tour-legal-help'){step.title='Coverage assistance';step.description='Paid coverage is required for private assistance. Check your coverage and submit a request from your dashboard.';}if(step.target==='.tour-wallet'){step.title='Wallet';step.description='Open Wallet to fund it or withdraw available funds. Payments and Rent Savings remain separate options.';}if(step.target==='.tour-support-widget'){step.title='Assistant and support';step.description='Start with the assistant for guided troubleshooting, review a support ticket if needed, and ask for a person when the issue remains unresolved.';}}}
 
 export const SHARED_HEADER_STEPS = [
   {

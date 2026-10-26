@@ -2115,6 +2115,8 @@ const Dashboard = () => {
                 icon={<FaFileAlt />}
                 onClick={() => navigate('/applications')}
               />
+              <QuickActionCard title={t('dashboardUx.my_disputes')} description="Open and track disputes connected to your account." icon={<FaBalanceScale />} onClick={()=>navigate('/my-disputes')} dataTourId="action-disputes" />
+              <QuickActionCard title={t('dashboardUx.damage_reports')} description="Review property issues and submitted reports." icon={<FaHome />} onClick={()=>navigate('/my-damage-reports')} dataTourId="action-damage" />
               <QuickActionCard
                 title={t('dashboardUx.refund_requests')}
                 description="Review and approve or reject tenant refund requests"

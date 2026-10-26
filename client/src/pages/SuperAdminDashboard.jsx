@@ -1576,7 +1576,7 @@ export default function SuperAdminDashboard() {
       )}
 
       {tab === "pricing" && (
-        <PricingRulesTab />
+        <div data-tour-id="super-pricing"><PricingRulesTab /></div>
       )}
 
       {tab === "calculator_fees" && (
@@ -1631,7 +1631,7 @@ export default function SuperAdminDashboard() {
         )}
 
         {tab === "admin" && (
-          <AdminManagementTab />
+          <div data-tour-id="super-admin-accounts"><AdminManagementTab /></div>
         )}
 
         {tab === "admin_monitor" && (
@@ -1639,7 +1639,7 @@ export default function SuperAdminDashboard() {
         )}
 
         {tab === "pending_approvals" && (
-          <AdminManagementTab initialTab="pending" />
+          <div data-tour-id="super-pending-approvals"><AdminManagementTab initialTab="pending" /></div>
         )}
 
         {tab === "commission_config" && (

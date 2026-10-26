@@ -55,6 +55,7 @@ const WhatsAppBotWidget = ({embedded=false,onHumanRequest}) => {
   const [awaitingResponse, setAwaitingResponse] = useState(null);
 
   const messagesEndRef = useRef(null);
+  const messageListRef=useRef(null);
   const inputRef = useRef(null);
   const greetingTimerRef = useRef(null);
   const mountedRef = useRef(true);
@@ -71,9 +72,9 @@ const WhatsAppBotWidget = ({embedded=false,onHumanRequest}) => {
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      if(messageListRef.current)messageListRef.current.scrollTop=messages.length<=1?0:messageListRef.current.scrollHeight;
     });
-  }, []);
+  }, [messages.length]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -312,7 +313,7 @@ const WhatsAppBotWidget = ({embedded=false,onHumanRequest}) => {
       if(await tryAccountReply(msg))return;
       setAwaitingResponse(null);
 
-      const match = findBestMatch(msg);
+      const match = /\b(error|failed|cannot|can.t|not work|not working|problem|issue|charged|stuck|502)\b/i.test(msg)?null:findBestMatch(msg);
       if (match) {
         botReplyWithTyping(() => {
           const reply=isAuthenticated && match.id==='list-property'?{answer:user?.user_type==='landlord'?'You are already signed in. Add and manage property listings from your dashboard.':'You are signed in as a tenant. Property listing requires an authorized property manager account.',link:'/dashboard',linkText:'Open my dashboard'}:isAuthenticated && match.id==='registration'?{answer:'You are already signed in. You can manage your account from your dashboard.',link:'/dashboard',linkText:'Open my dashboard'}:match;
@@ -393,7 +394,7 @@ const WhatsAppBotWidget = ({embedded=false,onHumanRequest}) => {
             exit={prefersReducedMotion ? undefined : { opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
             className={embedded?'rentalhub-assistant flex min-h-0 flex-1 flex-col overflow-hidden bg-white':'rentalhub-assistant fixed bottom-24 left-4 sm:left-6 z-50 w-[calc(100vw-2rem)] max-w-sm sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col'}
-            style={embedded?{minHeight:360,maxHeight:560}:{maxHeight:'min(640px, calc(100dvh - 120px))'}}
+            style={embedded?{minHeight:0}:{maxHeight:'min(640px, calc(100dvh - 120px))'}}
           >
             <div className={embedded?'hidden':'bg-gradient-to-r from-green-600 to-green-700 px-4 py-3 flex items-center gap-3 shrink-0'}>
               <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
@@ -417,13 +418,13 @@ const WhatsAppBotWidget = ({embedded=false,onHumanRequest}) => {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+            <div ref={messageListRef} className="min-h-0 flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
               {messages.filter(message=>!message.owner || message.owner===authKey).map((msg) => (
                 <div key={msg.id} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div
                     className={`max-w-[90%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-line ${
                       msg.type === 'user'
-                        ? 'bg-green-500 text-white rounded-br-sm'
+                        ? 'bg-green-700 text-white rounded-br-sm'
                         : 'bg-white text-gray-800 shadow-sm border border-gray-100 rounded-bl-sm'
                     }`}
                   >
@@ -437,7 +438,7 @@ const WhatsAppBotWidget = ({embedded=false,onHumanRequest}) => {
                     )}
                     <p className="whitespace-pre-line break-words text-sm">{msg.text}</p>
                     {msg.created_at && (
-                      <p className={`text-[10px] mt-1 ${msg.type === 'user' ? 'text-green-200' : 'text-gray-400'}`}>
+                      <p className={`text-[10px] mt-1 ${msg.type === 'user' ? 'text-green-100' : 'text-slate-500'}`}>
                         {formatTime(new Date(msg.created_at))}
                       </p>
                     )}
@@ -524,7 +525,7 @@ const WhatsAppBotWidget = ({embedded=false,onHumanRequest}) => {
                 </button>
               </div>
 
-              {!connectedToAgent && (
+              {!connectedToAgent && !embedded && (
                 <div className="mt-2 text-center">
                   <button
                     type="button"

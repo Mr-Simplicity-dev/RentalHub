@@ -205,7 +205,7 @@ const AdminDashboard = () => {
         </div>}
 
         {!isZonalAdmin && activeTab === 'property_requests' && (
-          <div className="space-y-6">
+          <div data-tour-id="admin-property-requests" className="space-y-6">
             <PropertyRequestWorkflowPanel
               mode="state"
               title="LGA Tenant Property Requests"

@@ -1,7 +1,7 @@
 const clean = value => String(value || '').replace(/<[^>]*>/g, '').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '').trim();
 const money = value => '₦' + Number(value || 0).toLocaleString('en-NG', {maximumFractionDigits: 2});
 const card = (text, link, linkText, extra = {}) => ({handled: true, text, link, linkText, ...extra});
-const ownQuestion = text => /\b(my|mine|who am i|status|pending|balance|withdrawal|withdrawals|ticket|tickets)\b/i.test(text);
+const ownQuestion = text => /\b(my|mine|who am i|do i have|am i|have i|i paid|i was charged|i submitted|i applied|status|pending|balance|withdrawal|withdrawals|ticket|tickets)\b/i.test(text);
 const ticketIntent = text => /\b(open|raise|create|submit|file|lodge|send)\b.{0,45}\b(ticket|complaint|support request)\b/i.test(text);
 const TOPICS = [
  ['withdrawals', /\b(withdraw\w*|payout\w*)\b/i],
