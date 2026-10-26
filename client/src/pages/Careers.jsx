@@ -2344,7 +2344,7 @@ export default function Careers() {
   if (statusError) return renderStatusError();
   if (!isActive && !application) return renderClosed();
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+    <div data-tour-id="public-careers-overview" className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
       <section className="mx-auto max-w-6xl px-4 py-8 sm:py-12">
         {/* Hero Banner */}
         <motion.div

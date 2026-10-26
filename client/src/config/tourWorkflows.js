@@ -378,3 +378,7 @@ export const getWorkflowToursByUserRole = (userRole, t) => {
     steps: localizeTourSteps(workflow.steps, t),
   }));
 };
+
+const publicUpdateSteps=[{id:'public_careers_current',route:'/careers',target:'[data-tour-id="public-careers-overview"]',title:'Careers and volunteering',description:'Careers is public. Volunteer applications are free when enabled; applying does not create a staff account.',placement:'bottom'},{id:'public_cases_current',route:'/cases',target:'[data-tour-id="public-cases-overview"]',title:'Resolved dispute cases',description:'Only anonymized resolved cases appear publicly. Account assistance stays private and requires paid coverage.',placement:'bottom'}];
+WORKFLOW_TOURS.TENANT_RENTAL.steps.push(...publicUpdateSteps);
+WORKFLOW_TOURS.LANDLORD_LISTING.steps.push(...publicUpdateSteps.map(step=>({...step})));

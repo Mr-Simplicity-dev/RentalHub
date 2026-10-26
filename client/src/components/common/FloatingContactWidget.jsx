@@ -792,7 +792,7 @@ const FloatingContactWidget = () => {
         </AnimatePresence>
         <button
           onClick={() => { setOpen((p) => !p); setShowGreeting(false); }}
-          className={`tour-support-widget flex items-center justify-center w-14 h-14 rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 transition-all duration-300 hover:scale-110 hover:shadow-xl active:scale-95 ${!open ? 'animate-bounce' : ''}`}
+          className={`tour-support-widget flex items-center justify-center w-14 h-14 rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 transition-all duration-300 hover:scale-110 hover:shadow-xl active:scale-95 ${''}`}
           aria-label={t('messages.widget.contact_support', 'Contact support')}
         >
           {unreadCount > 0 && !open && (

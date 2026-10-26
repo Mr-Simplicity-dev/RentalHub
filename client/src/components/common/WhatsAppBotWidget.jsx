@@ -369,7 +369,7 @@ const WhatsAppBotWidget = ({embedded=false,onHumanRequest}) => {
           onClick={() => setOpen((p) => !p)}
           aria-label={t('messages.whatsapp.open', 'Open WhatsApp assistant')}
           className={`flex items-center justify-center w-14 h-14 rounded-full bg-green-500 text-white shadow-lg hover:bg-green-600 transition-all duration-300 hover:scale-110 hover:shadow-xl active:scale-95 ${
-            !open ? 'animate-bounce' : ''
+            ''
           }`}
         >
           {open ? (
