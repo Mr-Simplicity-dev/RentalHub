@@ -3203,7 +3203,7 @@ exports.login = async (req, res) => {
     if (!email || !password) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: 'Invalid email, phone number or password'
       });
     }
 
@@ -3241,7 +3241,7 @@ exports.login = async (req, res) => {
       await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1500));
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: 'Invalid email, phone number or password'
       });
     }
 
@@ -3291,7 +3291,7 @@ exports.login = async (req, res) => {
       await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1500));
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: 'Invalid email, phone number or password'
       });
     }
 
