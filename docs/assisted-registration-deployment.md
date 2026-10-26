@@ -1,16 +1,16 @@
 # Assisted registration: release notes and deployment
 
-Support staff can create Nigerian tenant and landlord accounts directly, using the existing registration, NIN checks, location pricing, lawyer selection, bank transfer and virtual-account infrastructure. Ordinary self-registration continues to require email. Assisted customers may omit email. In the mobile app they can sign in with a code sent to their own phone; the website keeps one sign-in field that accepts email or a verified phone number plus the customer's password.
+Support staff can create Nigerian tenant and landlord accounts directly, using the existing registration, NIN checks, location pricing, lawyer selection, bank transfer and virtual-account infrastructure. Ordinary self-registration continues to require email. Assisted customers may omit email. The website and mobile app each keep one sign-in field that accepts email or a verified phone number plus the customer's password.
 
 ## Customer and staff workflow
 
 1. Authorized support staff open **Assisted account registration & receipts** on the website, or **Assisted registration** in the mobile support workspace. Super Admin and Zonal Admin have entries too.
 2. Staff enter the customer's details, select a state/LGA, explain the account and fee, obtain consent and review the server-calculated quote. A changed quote must be reviewed again.
 3. The account is created unpaid unless the authoritative fee is zero. Retrying the same creation request does not create another account.
-4. The customer signs in with the mobile phone-code flow, or with the website's single email/verified-phone field and their password. Unpaid accounts open the registration-payment screen. Private APIs and realtime connections also enforce payment status.
+4. The customer signs in with the single email/verified-phone field and their password. Unpaid accounts open the registration-payment screen. Private APIs and realtime connections also enforce payment status.
 5. The customer can use the existing generated receiving account or manual bank-transfer review. Card payments require the customer's actual email address. After an external card checkout on mobile, return to the app and select **Check card payment**.
 6. Staff may record actual cash collected. This produces a paid payment record and downloadable PDF receipt, identifies the collector and creates an outstanding remittance obligation. A different Super Admin/Super Support Admin acknowledges cash remittance. Commission distribution waits for remittance; paid provider assignments are retried when necessary.
-7. The customer can set a personal password from Profile or the registration-payment screen after a fresh phone code. Older sessions are revoked. Staff never receive a customer password or login session.
+7. The customer can change their password from Profile or the registration-payment screen after a fresh phone code. Older sessions are revoked. Staff never receive a customer password or login session.
 
 A captured transfer screenshot is evidence for review, not payment confirmation. Zero-fee accounts complete within the account transaction without invoking Paystack. Existing verified customers can also use phone codes; privileged staff accounts cannot sign in through this customer phone-code flow.
 
@@ -104,7 +104,7 @@ Before rollout, exercise one scoped support registration on staging, SMS deliver
 - Focused assisted-registration tests cover scoped authorization, fee integrity, cash remittance, OTP rejection, password re-verification, revoked sessions, email guards, zero-fee completion and mobile routing.
 - Three earlier existing frontend tests hit timeouts during concurrent builds. Their isolated rerun passed, and the final full web suite also passed.
 - Android JavaScript/Hermes bundle: passed (final export).
-- Android release APK 1.0.44 (versionCode 55) built, signed, zipaligned and deployed to `/api/downloads/app` on 2026-10-26. Live `/api/downloads/version` reports `apkAvailable: true`.
+- Android release APK 1.0.45 (versionCode 56) built, signed, zipaligned and deployed to `/api/downloads/app` on 2026-10-26. Live `/api/downloads/version` reports `apkAvailable: true`.
 - iOS JavaScript/Hermes bundle: passed (final export).
 - Mobile language round-trip checks: passed for all 8 languages and both old native direction states.
 - Mobile tour checks: passed for 87 steps, 21 administrative roles and 32 role-navigation audits.
