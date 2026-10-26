@@ -728,6 +728,7 @@ const generalOpsLimiter = buildRouteLimiter(isProduction ? 500 : 2000);
 const propertyOpsLimiter = buildRouteLimiter(isProduction ? 300 : 1000);
 
 app.use('/api/auth', authLimiter, authSensitiveLimiter, authRoutes);
+app.use('/api/assisted-registration', require('./routes/assistedRegistration'));
 app.use('/api/properties', propertyOpsLimiter, propertyRoutes);
 app.use('/api/payments', paymentOpsLimiter, paymentRoutes);
 app.use('/api/bank-transfer', generalOpsLimiter, bankTransferRoutes);
@@ -1018,6 +1019,7 @@ io.use(async (socket, next) => {
       return next(new Error('Session expired. Please log in again.'));
     }
 
+    if(userData.assisted_registration){const payment=await db.query('SELECT status FROM assisted_registrations WHERE user_id=$1',[userId]);if(payment.rows[0]?.status!=='paid')return next(new Error('Registration payment required'));}
     socket.userId = userId;
     socket.userType = userData.user_type || userType;
     next();

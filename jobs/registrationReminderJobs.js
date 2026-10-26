@@ -47,6 +47,7 @@ const reconcileRegisteredUsers = async () => {
            completed_at = COALESCE(trp.completed_at, u.created_at)
        FROM users u
        WHERE trp.payment_status = 'pending'
+         AND COALESCE(trp.registration_payload->>'assisted_registration','false') <> 'true'
          AND trp.registered_user_id IS NULL
          AND LOWER(TRIM(trp.email)) = LOWER(TRIM(u.email))
        RETURNING trp.id`
@@ -71,6 +72,7 @@ const expireAbandonedRegistrations = async () => {
        SET payment_status = 'abandoned',
            abandoned_at = COALESCE(abandoned_at, CURRENT_TIMESTAMP)
        WHERE payment_status = 'pending'
+         AND COALESCE(registration_payload->>'assisted_registration','false') <> 'true'
          AND registered_user_id IS NULL
          AND (
            created_at < NOW() - ($1::int * INTERVAL '1 day')
@@ -116,6 +118,7 @@ const runRegistrationReminders = async () => {
               COALESCE(reminder_count, 0) AS reminder_count
        FROM tenant_registration_payments trp
        WHERE trp.payment_status = 'pending'
+         AND COALESCE(trp.registration_payload->>'assisted_registration','false') <> 'true'
          AND trp.registered_user_id IS NULL
          AND trp.created_at >= NOW() - ($1::int * INTERVAL '1 day')
          AND COALESCE(trp.reminder_count, 0) < $2
@@ -193,8 +196,10 @@ const getAbandonedRegistrationsSummary = async () => {
     await ensureRegistrationReminderSchema();
     const stats = await db.query(`
       SELECT 
-        COUNT(*) FILTER (WHERE payment_status = 'pending' AND registered_user_id IS NULL) AS pending_total,
-        COUNT(*) FILTER (WHERE payment_status = 'pending' AND registered_user_id IS NULL AND created_at < NOW() - INTERVAL '12 hours') AS pending_over_12h,
+        COUNT(*) FILTER (WHERE payment_status = 'pending'
+         AND COALESCE(registration_payload->>'assisted_registration','false') <> 'true' AND registered_user_id IS NULL) AS pending_total,
+        COUNT(*) FILTER (WHERE payment_status = 'pending'
+         AND COALESCE(registration_payload->>'assisted_registration','false') <> 'true' AND registered_user_id IS NULL AND created_at < NOW() - INTERVAL '12 hours') AS pending_over_12h,
         COUNT(*) FILTER (WHERE payment_status = 'abandoned') AS abandoned_total,
         COUNT(*) FILTER (WHERE payment_status = 'completed') AS completed_total,
         COUNT(*) FILTER (WHERE reminder_count > 0) AS reminders_sent_total

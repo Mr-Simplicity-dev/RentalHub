@@ -27,6 +27,8 @@ import Login from './Login';
 import Register from './Register';
 import NotFound from './NotFound';
 
+const AssistedRegistration = React.lazy(() => import('./admin/AssistedRegistration'));
+const RegistrationPayment = React.lazy(() => import('./RegistrationPayment'));
 const Properties = React.lazy(() => import('./Properties'));
 const PropertyDetail = React.lazy(() => import('./PropertyDetail'));
 const Dashboard = React.lazy(() => import('./Dashboard'));
@@ -802,6 +804,16 @@ function Layout({ children }) {
   );
 }
 
+function AssistedSessionGate({children}) {
+ const {user,loading}=useAuth();const location=useLocation();
+ if(!loading&&user?.registration_payment_required&&location.pathname!=='/registration-payment')return <Navigate to="/registration-payment" replace />;
+ return children;
+}
+function AssistedRegistrationEntry(){
+ const {user}=useAuth();
+ if(!['super_admin','super_support_admin','zonal_admin','state_support_admin','lga_support_admin'].includes(user?.user_type))return null;
+ return <div className="mx-auto max-w-7xl px-4 pt-4"><Link to="/admin/assisted-registration" className="inline-flex rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 font-semibold text-blue-900">Assisted account registration & receipts →</Link></div>;
+}
 function App() {
   return (
     <ErrorBoundary>
@@ -812,7 +824,9 @@ function App() {
             <SocketProvider>
             <Layout>
               <Suspense fallback={<Loader />}>
-              <Routes>
+              <AssistedRegistrationEntry /><AssistedSessionGate><Routes>
+              <Route path="/registration-payment" element={<ProtectedRoute><RegistrationPayment /></ProtectedRoute>} />
+              <Route path="/admin/assisted-registration" element={<ProtectedRoute><AssistedRegistration /></ProtectedRoute>} />
               {/* Public Routes */}
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
@@ -1063,7 +1077,7 @@ function App() {
 
               {/* 404 */}
               <Route path="*" element={<NotFound />} />
-              </Routes>
+              </Routes></AssistedSessionGate>
               </Suspense>
             </Layout>
 

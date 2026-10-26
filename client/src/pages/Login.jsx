@@ -8,6 +8,8 @@ import { toast } from 'react-toastify';
 import { FaEnvelope, FaEye, FaEyeSlash, FaLock } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 
+import PhoneAccountAccess from '../components/common/PhoneAccountAccess';
+
 const LOGIN_EMAIL_HISTORY_KEY = 'loginEmailHistory';
 const MAX_LOGIN_EMAIL_SUGGESTIONS = 8;
 const REMEMBERED_EMAIL_KEY = 'rememberedEmail';
@@ -268,7 +270,7 @@ const Login = () => {
           <div className="relative">
             <FaEnvelope className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
-              type="email"
+              type="text"
               name="email"
               required
               value={email}
@@ -276,7 +278,7 @@ const Login = () => {
               autoComplete="email"
               list="login-email-suggestions"
               className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-slate-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-              placeholder={t('login.email_placeholder')}
+              placeholder="Email or verified phone number" aria-label="Email or verified phone number"
             />
             <datalist id="login-email-suggestions">
               {matchingEmailSuggestions.map((item) => (
@@ -341,6 +343,7 @@ const Login = () => {
             {loading ? t('login.signing') : t('login.submit')}
           </button>
         </form>
+        <PhoneAccountAccess />
       </div>
     </div>
       <FloatingContactWidget />

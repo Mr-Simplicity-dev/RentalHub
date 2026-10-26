@@ -1,6 +1,7 @@
-import React, { createContext, useEffect, useState } from 'react';
+import React, { createContext, useEffect, useState, useCallback } from 'react';
 import { authService } from '../services/authService';
-import { setAuthUser } from '../services/authStorage';
+import api from '../services/api';
+import { setAuthSession, setAuthUser } from '../services/authStorage';
 
 export const AuthContext = createContext();
 
@@ -65,12 +66,19 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(false);
   };
 
-  const updateUser = (userData) => {
+  const updateUser = useCallback((userData) => {
     setUser(userData);
     setAuthUser(userData);
-  };
+  }, []);
 
+  const establishSession = async (data) => {
+    setAuthSession(data.token,data.user);
+    if(data.token)api.defaults.headers.common.Authorization='Bearer '+data.token;
+    const current=await authService.getCurrentUser();
+    setUser(current.data);setIsAuthenticated(true);
+  };
   const value = {
+    establishSession,
     user,
     isAuthenticated,
     loading,

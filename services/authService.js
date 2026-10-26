@@ -717,7 +717,7 @@ const assertUniqueUserFields = async (executor, {
   cleanNIN,
   cleanPassportNumber
 }) => {
-  const duplicateConditions = ['email = $1', 'phone = $2'];
+  const duplicateConditions = ['email = $1', '(phone = $2 OR rentalhub_phone_key(phone) = rentalhub_phone_key($2))'];
   const duplicateParams = [email, phone];
   let paramIndex = 3;
 
@@ -753,7 +753,7 @@ const assertUniqueUserFields = async (executor, {
   }
 };
 
-const validateAndPrepareRegistration = async (payload) => {
+const validateAndPrepareRegistration = async (payload, options = {}) => {
   await ensureIdentitySchema();
   const flags = await getFeatureFlagsMap();
 
@@ -778,7 +778,7 @@ const validateAndPrepareRegistration = async (payload) => {
     referral_code,
     } = payload;
 
-  const cleanEmail = String(email || '').trim().toLowerCase();
+  const cleanEmail = String(email || '').trim().toLowerCase() || (options.allowMissingEmail ? null : '');
   const cleanPhone = String(phone || '').replace(/\s+/g, '');
   const cleanFullName = String(full_name || '').trim();
   const cleanLawyerEmail = lawyer_email
@@ -1079,7 +1079,7 @@ const validateAndPrepareRegistration = async (payload) => {
         );
       }
     } catch (kycError) {
-      req.logger.warn('Non-blocking KYC check failed:', kycError.message);
+      (options.logger || console).warn('Non-blocking KYC check failed:', kycError.message);
     }
   }
 
@@ -1179,7 +1179,7 @@ const assignLawyerRoundRobin = async ({ clientUserId, stateId, lgaName }) => {
   }
 
   if (!lawyersResult || lawyersResult.rows.length === 0) {
-    req.logger.error(`No available lawyers found for state_id ${stateId} / LGA ${lgaName}`);
+    console.error(`No available lawyers found for state_id ${stateId} / LGA ${lgaName}`);
     return null;
   }
 
@@ -1228,7 +1228,7 @@ const assignLawyerRoundRobin = async ({ clientUserId, stateId, lgaName }) => {
       'client'
     );
   } catch (notifError) {
-    req.logger.error('Lawyer assignment notification error:', notifError);
+    console.error('Lawyer assignment notification error:', notifError);
   }
 
   return {
@@ -1279,7 +1279,7 @@ const assignAgentRoundRobin = async ({ landlordUserId, stateId, lgaName }) => {
   }
 
   if (agentsResult.rows.length === 0) {
-    req.logger.error(`No available platform agents found for state_id ${stateId} / LGA ${lgaName}`);
+    console.error(`No available platform agents found for state_id ${stateId} / LGA ${lgaName}`);
     return null;
   }
 
@@ -1336,7 +1336,7 @@ const assignAgentRoundRobin = async ({ landlordUserId, stateId, lgaName }) => {
       'landlord'
     );
   } catch (notifError) {
-    req.logger.error('Agent assignment notification error:', notifError);
+    console.error('Agent assignment notification error:', notifError);
   }
 
   return {
@@ -1352,7 +1352,10 @@ const createUserFromPreparedRegistration = async ({
   verificationMeta,
   kycResult,
   tenantRegistrationPayment,
-  utm
+  utm,
+  beforeCommit,
+  deferPaidBenefits = false,
+  logger = console
 }) => {
   await ensureTenantRegistrationPaymentSchema();
   const crypto = require('crypto');
@@ -1503,6 +1506,7 @@ const createUserFromPreparedRegistration = async ({
       );
     }
 
+    if (beforeCommit) await beforeCommit(client, newUser);
     await client.query('COMMIT');
 
     let referralReward = null;
@@ -1516,7 +1520,7 @@ const createUserFromPreparedRegistration = async ({
           referredUserId: newUser.id,
         });
       } catch (referralError) {
-        req.logger.error('Referral reward credit error (non-fatal):', referralError);
+        logger.error('Referral reward credit error (non-fatal):', referralError);
       }
     }
 
@@ -1529,7 +1533,7 @@ const createUserFromPreparedRegistration = async ({
           clientRole: newUser.user_type,
         });
       } catch (inviteError) {
-        req.logger.error('Lawyer invite creation error:', inviteError);
+        logger.error('Lawyer invite creation error:', inviteError);
       }
     }
 
@@ -1546,7 +1550,7 @@ const createUserFromPreparedRegistration = async ({
           sendAgentAssignmentNoticeEmail,
         });
       } catch (agentInviteError) {
-        req.logger.error('Agent invite creation error:', agentInviteError);
+        logger.error('Agent invite creation error:', agentInviteError);
       }
     }
 
@@ -1558,7 +1562,7 @@ const createUserFromPreparedRegistration = async ({
     //   2. Create a separate lawyer_access_fee payment record
     //   3. Distribute the N2000 to eligible admins
     // ====================================================================
-    if (preparedRegistration.useRentalhubLawyers) {
+    if (preparedRegistration.useRentalhubLawyers && !deferPaidBenefits) {
       let assignedLawyerId = null;
       let assignedAgentId = null;
 
@@ -1574,7 +1578,7 @@ const createUserFromPreparedRegistration = async ({
           assignedLawyerId = roundRobinResult.assignedLawyer.id;
         }
       } catch (roundRobinError) {
-        req.logger.error('Round-robin lawyer assignment error (non-fatal):', roundRobinError);
+        logger.error('Round-robin lawyer assignment error (non-fatal):', roundRobinError);
       }
 
       // Create a separate payment record for the lawyer access fee (the
@@ -1620,11 +1624,11 @@ const createUserFromPreparedRegistration = async ({
           lgaName: preparedRegistration.preferredLgaName,
         });
 
-        req.logger.info(
+        logger.info(
           `Lawyer access fee distributed: ₦2000 across ${Object.keys(distributionResult.distribution).length} admins`
         );
       } catch (distError) {
-        req.logger.error('Lawyer access fee distribution error (non-fatal):', distError);
+        logger.error('Lawyer access fee distribution error (non-fatal):', distError);
         }
       }
 
@@ -1636,7 +1640,7 @@ const createUserFromPreparedRegistration = async ({
     //   2. Create a separate agent_access_fee payment record
     //   3. Distribute the N5000 to eligible recipients
     // ====================================================================
-    if (preparedRegistration.useRentalhubAgents && tenantRegistrationPayment) {
+    if (!deferPaidBenefits && preparedRegistration.useRentalhubAgents && tenantRegistrationPayment) {
       let assignedAgentId = null;
       let assignedLawyerId = null;
 
@@ -1659,7 +1663,7 @@ const createUserFromPreparedRegistration = async ({
             assignedLawyerId = legalAuthResult.rows[0].lawyer_user_id;
           }
         } catch (lookupError) {
-          req.logger.error('Error looking up assigned lawyer for agent fee:', lookupError);
+          logger.error('Error looking up assigned lawyer for agent fee:', lookupError);
         }
       }
 
@@ -1675,7 +1679,7 @@ const createUserFromPreparedRegistration = async ({
           assignedAgentId = roundRobinResult.assignedAgent.id;
         }
       } catch (roundRobinError) {
-        req.logger.error('Round-robin agent assignment error (non-fatal):', roundRobinError);
+        logger.error('Round-robin agent assignment error (non-fatal):', roundRobinError);
       }
 
       // Create a separate payment record for the N5000 agent access fee
@@ -1718,11 +1722,11 @@ const createUserFromPreparedRegistration = async ({
           lgaName: preparedRegistration.preferredLgaName,
         });
 
-        req.logger.info(
+        logger.info(
           `Agent access fee distributed: N5000 across ${Object.keys(distributionResult.distribution).length} recipients`
         );
       } catch (distError) {
-        req.logger.error('Agent access fee distribution error (non-fatal):', distError);
+        logger.error('Agent access fee distribution error (non-fatal):', distError);
       }
     }
 
@@ -1736,8 +1740,8 @@ const createUserFromPreparedRegistration = async ({
       { expiresIn: '24h' }
     );
 
-    await sendVerificationEmail(newUser.email, verificationToken);
-    await sendWelcomeEmail(
+    if (newUser.email) await sendVerificationEmail(newUser.email, verificationToken);
+    if (newUser.email) await sendWelcomeEmail(
       newUser.email,
       newUser.full_name,
       newUser.user_type
@@ -2450,6 +2454,10 @@ exports.getRegistrationPaymentStatus = async (req, res) => {
 // approval so both paths create the account, the ledger rows and the receipt
 // identically.
 const finalizeRegistrationFromPayment = async ({ tenantRegistrationPayment, reference, logger }) => {
+    if (tenantRegistrationPayment.registration_payload?.assisted_registration === true) {
+      const data = await require('./assistedRegistrationService').settleVerifiedPayment({ reference, payment: tenantRegistrationPayment, logger });
+      return { data };
+    }
     // Diaspora tier: a Nigerian-funded card is only a review flag unless the
     // super admin enables diaspora_require_foreign_card, which hard-blocks it.
     const storedPayload = tenantRegistrationPayment.registration_payload || {};
@@ -3185,7 +3193,8 @@ exports.login = async (req, res) => {
     await ensureIdentitySchema();
     await ensureUserSuspensionSchema();
 
-    const { email, password } = req.body;
+    const { password } = req.body;
+    const email = req.body.identifier || req.body.email || req.body.phone;
 
     if (!email || !password) {
       return res.status(401).json({
@@ -3195,10 +3204,13 @@ exports.login = async (req, res) => {
     }
 
     const cleanEmail = String(email || '').trim().toLowerCase();
+    const phoneLogin = !cleanEmail.includes('@');
+    const phoneKey = require('./assistedRegistrationPolicy').phoneKey(cleanEmail);
+    if(phoneLogin && !phoneKey)return res.status(401).json({success:false,message:'Invalid email, phone number or password'});
 
     // Find user (case-insensitive email lookup)
     const result = await db.query(
-      `SELECT u.id, u.email, u.password_hash, u.full_name, u.user_type,
+      `SELECT u.id, u.email, u.phone, u.assisted_registration, u.password_hash, u.full_name, u.user_type,
               u.email_verified, u.phone_verified, u.identity_verified,
               u.identity_verification_status, u.passport_photo_url,
               u.subscription_active, u.subscription_expires_at,
@@ -3216,11 +3228,11 @@ exports.login = async (req, res) => {
               u.locked_until
        FROM users u
        LEFT JOIN states s ON s.id = u.preferred_state_id
-       WHERE LOWER(u.email) = LOWER($1)`,
-      [cleanEmail]
+       WHERE ${phoneLogin ? 'rentalhub_phone_key(u.phone) = $1 AND u.phone_verified = TRUE' : 'LOWER(u.email) = LOWER($1)'}`,
+      [phoneLogin ? phoneKey : cleanEmail]
     );
 
-    if (result.rows.length === 0) {
+    if (result.rows.length !== 1) {
       // Delay on unknown email too — prevents email enumeration timing attack
       await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1500));
       return res.status(401).json({
@@ -3325,12 +3337,14 @@ exports.login = async (req, res) => {
     }
 
     // Enforce email verification
-    if (user.email_verified === false || user.email_verified === null) {
+    if ((!user.assisted_registration && (user.email_verified === false || user.email_verified === null)) || (user.assisted_registration && user.phone_verified !== true)) {
       return res.status(403).json({
         success: false,
         message: 'Please verify your email before logging in. Check your inbox for the verification link.',
       });
     }
+
+    await require('./assistedRegistrationService').decorateUser(user);
 
     // Generate token with current token_version
     const token = generateToken(user.id, user.user_type, { tokenVersion: user.token_version || 1 });
@@ -5066,7 +5080,7 @@ exports.getCurrentUser = async (req, res) => {
     const userId = req.user.id;
 
     const result = await db.query(
-      `SELECT u.id, u.email, u.full_name, u.user_type,
+      `SELECT u.id, u.email, u.phone, u.assisted_registration, u.full_name, u.user_type,
               u.email_verified, u.phone_verified, u.identity_verified,
               u.identity_verification_status, u.passport_photo_url,
               u.subscription_active, u.subscription_expires_at,
@@ -5095,6 +5109,7 @@ exports.getCurrentUser = async (req, res) => {
     }
 
     const user = result.rows[0];
+    await require('./assistedRegistrationService').decorateUser(user);
 
     // Decrypt NIN before returning — then mask it. The full national ID must
     // never leave the server; the client only needs it for display/revalidation.
@@ -5339,3 +5354,5 @@ exports.resetPassword = async (req, res) => {
     });
   }
 };
+
+exports.assistedRegistrationInternals = { validateAndPrepareRegistration, createUserFromPreparedRegistration, buildRegistrationPricingQuote, withPreparedRegistrationLocation, assignLawyerRoundRobin, assignAgentRoundRobin, generateToken, attachAuthSession };
