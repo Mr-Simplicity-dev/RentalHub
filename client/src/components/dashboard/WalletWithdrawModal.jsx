@@ -49,7 +49,7 @@ export default function WalletWithdrawModal({
                 <div>
                   <p className="text-xs text-teal-600">{t('wallet_withdraw.available_balance', 'Available Wallet Balance')}</p>
                   <p className="text-2xl font-bold text-teal-800">
-                    {walletBalance !== null ? `â‚¦${Number(walletBalance).toLocaleString()}` : 'â€”'}
+                    {walletBalance !== null ? `₦${Number(walletBalance).toLocaleString()}` : '—'}
                   </p>
                 </div>
                 <FaWallet className="text-teal-400 text-3xl" />
@@ -63,11 +63,11 @@ export default function WalletWithdrawModal({
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
                     <p className="text-xs text-green-600">{t('wallet_withdraw.available_to_withdraw', 'Available to Withdraw')}</p>
-                    <p className="text-xl font-bold text-green-800">â‚¦{Number(landlordWallet.available_to_withdraw).toLocaleString()}</p>
+                    <p className="text-xl font-bold text-green-800">₦{Number(landlordWallet.available_to_withdraw).toLocaleString()}</p>
                   </div>
                   <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3">
                     <p className="text-xs text-yellow-600">{t('wallet_withdraw.pending_hold', 'Pending (14-day hold)')}</p>
-                    <p className="text-xl font-bold text-yellow-800">â‚¦{Number(landlordWallet.pending_balance).toLocaleString()}</p>
+                    <p className="text-xl font-bold text-yellow-800">₦{Number(landlordWallet.pending_balance).toLocaleString()}</p>
                   </div>
                 </div>
               ) : (
@@ -86,7 +86,7 @@ export default function WalletWithdrawModal({
 
           <form onSubmit={onSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Amount (â‚¦) *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Amount (₦) *</label>
               <input
                 type="number"
                 required
@@ -202,7 +202,7 @@ export default function WalletWithdrawModal({
                 <div key={w.id} className="text-sm border rounded-lg px-3 py-2">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium text-gray-800">â‚¦{Number(w.amount).toLocaleString()}</p>
+                      <p className="font-medium text-gray-800">₦{Number(w.amount).toLocaleString()}</p>
                       <p className="text-xs text-gray-500">{w.bank_name} Â· {w.account_number}</p>
                       <p className="text-xs text-gray-400">{new Date(w.requested_at).toLocaleDateString()}</p>
                     </div>
