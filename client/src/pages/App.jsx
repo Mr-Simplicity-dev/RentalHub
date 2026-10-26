@@ -809,11 +809,6 @@ function AssistedSessionGate({children}) {
  if(!loading&&user?.registration_payment_required&&location.pathname!=='/registration-payment')return <Navigate to="/registration-payment" replace />;
  return children;
 }
-function AssistedRegistrationEntry(){
- const {user}=useAuth();
- if(!['super_admin','super_support_admin','zonal_admin','state_support_admin','lga_support_admin'].includes(user?.user_type))return null;
- return <div className="mx-auto max-w-7xl px-4 pt-4"><Link to="/admin/assisted-registration" className="inline-flex rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 font-semibold text-blue-900">Assisted account registration & receipts →</Link></div>;
-}
 function App() {
   return (
     <ErrorBoundary>
@@ -824,7 +819,7 @@ function App() {
             <SocketProvider>
             <Layout>
               <Suspense fallback={<Loader />}>
-              <AssistedRegistrationEntry /><AssistedSessionGate><Routes>
+              <AssistedSessionGate><Routes>
               <Route path="/registration-payment" element={<ProtectedRoute><RegistrationPayment /></ProtectedRoute>} />
               <Route path="/admin/assisted-registration" element={<ProtectedRoute><AssistedRegistration /></ProtectedRoute>} />
               {/* Public Routes */}

@@ -1,3 +1,4 @@
+import AssistedRegistrationCard from '../../components/admin/AssistedRegistrationCard';
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { FaArrowDown, FaArrowUp, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
 import { Link, useLocation } from 'react-router-dom';
@@ -219,6 +220,7 @@ const StateSupportAdminDashboard = () => {
         <div className="mb-8 text-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">State Support Admin Dashboard</h1>
+<AssistedRegistrationCard />
             <p className="mt-1 text-gray-600">
               Outgoing and incoming migration decisions for {user?.assigned_state || 'your assigned state'}.
             </p>

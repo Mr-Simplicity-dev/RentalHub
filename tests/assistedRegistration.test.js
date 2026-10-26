@@ -507,7 +507,7 @@ test('stale quotes cannot silently change the fee agreed by the customer', async
   await assert.rejects(service.create(actor, {
     ...base,
     expected_amount: 1
-  }), /fee has changed/);
+  }), error => error.code === 'REGISTRATION_QUOTE_CHANGED' && error.statusCode === 409);
 });
 test('a successful cash settlement uses the database amount and leaves an outstanding remittance', async () => {
   let writes = [];
@@ -676,7 +676,7 @@ test('staff endpoints enforce authentication, support roles and privileged MFA',
       otpSendLimiter: pass,
       otpLimiter: pass,
       sensitiveActionLimiter: pass,
-      registrationLimiter: pass
+      assistedRegistrationQuoteLimiter: pass, assistedRegistrationCreateLimiter: pass
     },
     '../config/utils/twoFactor': {
       requirePrivilegedMfa: (req, res, next) => {
@@ -738,7 +738,7 @@ test('password setup requires a fresh recovery code for the same customer and re
       otpSendLimiter: pass,
       otpLimiter: pass,
       sensitiveActionLimiter: pass,
-      registrationLimiter: pass
+      assistedRegistrationQuoteLimiter: pass, assistedRegistrationCreateLimiter: pass
     },
     '../config/utils/twoFactor': {
       requirePrivilegedMfa: pass
@@ -810,3 +810,47 @@ test('missing payment email is rejected before card initialization, while a real
 test('mailer skips absent recipients and refuses invalid recipients without contacting the provider',async()=>{let sends=0;const mailer=load('config/utils/mailer.js',{'./logger':{warn:()=>{},error:()=>{}},resend:{Resend:class{constructor(){this.emails={send:async()=>{sends++;return{};}};}}}});assert.equal((await mailer.sendEmail({to:null,subject:'Receipt',html:'Receipt'})).skipped,true);assert.equal((await mailer.sendEmail({to:[],subject:'Receipt',html:'Receipt'})).skipped,true);await assert.rejects(mailer.sendEmail({to:'invalid',subject:'Receipt',html:'Receipt'}),/valid recipient/);assert.equal(sends,0);});
 test('native staff entry points resolve to a registered screen and unpaid users receive a payment screen',()=>{const root=path.join(__dirname,'../RentalHubMobile/src');const navigator=fs.readFileSync(path.join(root,'navigation/AppNavigator.js'),'utf8');assert.match(navigator,/name="AssistedRegistration" component=\{AssistedRegistrationScreen\}/);assert.match(navigator,/registration_payment_required/);assert.match(navigator,/name="RegistrationPayment" component=\{RegistrationPaymentScreen\}/);for(const file of ['screens/admin/SuperAdminDashboardScreen.js','screens/service-admin/ServiceOperationsDashboardScreen.js','screens/shared/ZonalAdminScreen.js'])assert.match(fs.readFileSync(path.join(root,file),'utf8'),/AssistedRegistration/);});
 test('zero-fee accounts are completed in the account transaction without contacting a payment provider',async()=>{const queries=[];const db={query:async sql=>({rows:sql.startsWith('INSERT INTO assisted_registration_requests')?[{request_id:base.request_id}]:[{reference:'zero',state_name:'Lagos',lga_name:'Ikeja',status:'paid'}]})};const internal={buildRegistrationPricingQuote:async()=>({enabled:false,amount:3000}),validateAndPrepareRegistration:async input=>({preparedRegistration:input,verificationMeta:{}}),withPreparedRegistrationLocation:input=>input,createUserFromPreparedRegistration:async args=>{assert.equal(args.assistedRegistration,true);await args.beforeCommit({query:async sql=>{queries.push(sql);return{rows:[]};}},{id:1,email:null,user_type:'tenant',full_name:base.full_name});}};const service=serviceWith(db,{'./authService':{assistedRegistrationInternals:internal},axios:{post:async()=>assert.fail('Zero fee must not initialize payment')}});const result=await service.create(actor,{...base,expected_amount:0,lawyer_email:'lawyer@rentalhub.com.ng'});assert.equal(result.status,'paid');assert.ok(queries.some(sql=>sql.includes("status='paid',collection_method='waived'")));});
+
+
+test('office quote/create limits are independent and staff-specific on a shared IP', async () => {
+  const rateLimit=require('express-rate-limit');
+  const limits=load('config/middleware/securityRateLimiters.js',{'../utils/redis':null,'express-rate-limit':Object.assign(options=>rateLimit({...options,validate:false}),{MemoryStore:rateLimit.MemoryStore})});
+  const express=require('express');const app=express();
+  app.use((req,res,next)=>{req.user={id:req.headers['x-staff']};next();});
+  app.post('/quote',limits.assistedRegistrationQuoteLimiter,(req,res)=>res.sendStatus(200));
+  app.post('/create',limits.assistedRegistrationCreateLimiter,(req,res)=>res.sendStatus(200));
+  const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
+  const base='http://127.0.0.1:'+server.address().port;
+  const post=(route,id='1')=>fetch(base+route,{method:'POST',headers:{'x-staff':id}});
+  try {
+    for(let i=0;i<60;i++)assert.equal((await post('/create')).status,200);
+    assert.equal((await post('/create')).status,429);
+    assert.equal((await post('/quote')).status,200);
+    assert.equal((await post('/create','2')).status,200);
+  } finally {server.closeAllConnections();await new Promise(r=>server.close(r));}
+});
+
+test('receipt route acknowledges a waived fee but rejects unpaid or missing payment records', async () => {
+  const pass=(req,res,next)=>next();let record;let text=[];
+  class PDF {pipe(res){this.res=res;return this;}fontSize(){return this;}text(value){text.push(value);return this;}moveDown(){return this;}font(){return this;}end(){this.res.end('document');}}
+  const router=load('routes/assistedRegistration.js',{
+    '../config/middleware/auth':{authenticate:(req,res,next)=>{req.user={id:1,user_type:'super_admin'};next();}},
+    '../config/middleware/turnstileVerify':{requireTurnstile:()=>pass},
+    '../config/middleware/securityRateLimiters':{otpSendLimiter:pass,otpLimiter:pass,sensitiveActionLimiter:pass,assistedRegistrationQuoteLimiter:pass,assistedRegistrationCreateLimiter:pass},
+    '../config/utils/twoFactor':{requirePrivilegedMfa:pass},
+    '../services/assistedRegistrationService':{recordForStaff:async()=>record},
+    '../config/utils/paymentReceipt':{formatNgn:n=>'NGN '+n},
+    '../config/utils/pdfMoneyFont':{registerMoneyFont:()=> 'Helvetica'},
+    '../config/utils/referenceGenerator':{paymentReceiptNumber:id=>'RECEIPT-'+id},
+    pdfkit:PDF
+  });
+  const app=require('express')();app.use(router);const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
+  const url='http://127.0.0.1:'+server.address().port+'/staff/ref/receipt';
+  try {
+    record={status:'paid',collection_method:'waived',amount_due:0,paid_at:new Date()};
+    assert.equal((await fetch(url)).status,200);assert.ok(text.includes('REGISTRATION ACKNOWLEDGEMENT'));
+    record={...record,status:'unpaid'};assert.equal((await fetch(url)).status,409);
+    record={...record,status:'paid',collection_method:'cash',amount_due:5000};assert.equal((await fetch(url)).status,409);
+    record.payment_id=12;text=[];assert.equal((await fetch(url)).status,200);assert.ok(text.includes('REGISTRATION PAYMENT RECEIPT'));
+  } finally {server.closeAllConnections();await new Promise(r=>server.close(r));}
+});

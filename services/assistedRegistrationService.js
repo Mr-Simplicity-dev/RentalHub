@@ -120,7 +120,7 @@ const quote = async (actor, body) => {
 const create = async (actor, body) => {
   validateAccount(body);
   const pricing = await quote(actor, body);
-  if (Number(body.expected_amount) !== pricing.amount) throw fail(409, 'The fee has changed. Review the latest registration fee before creating the account.');
+  if (Number(body.expected_amount) !== pricing.amount) throw Object.assign(fail(409, 'The fee has changed. Review the latest registration fee before creating the account.'), { code: 'REGISTRATION_QUOTE_CHANGED' });
   const claimed = await db.query(`INSERT INTO assisted_registration_requests(staff_id,request_id) VALUES($1,$2) ON CONFLICT(staff_id,request_id) DO UPDATE SET state='processing',lease_expires_at=NOW()+INTERVAL '10 minutes' WHERE assisted_registration_requests.state='failed' OR (assisted_registration_requests.state='processing' AND assisted_registration_requests.lease_expires_at<NOW()) RETURNING request_id`, [actor.id, body.request_id]);
   if (!claimed.rows.length) {
     const previous = (await db.query('SELECT registration_reference FROM assisted_registration_requests WHERE staff_id=$1 AND request_id=$2', [actor.id, body.request_id])).rows[0];

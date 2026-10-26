@@ -1,3 +1,4 @@
+import AssistedRegistrationCard from '../../components/admin/AssistedRegistrationCard';
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdrawalBanner';
 import TwoFactorStep from '../../components/common/TwoFactorStep';
@@ -706,6 +707,7 @@ const SuperSupportAdminDashboard = () => {
         <div className="space-y-6">
       <div className="mb-8 text-center">
         <h1 className="text-3xl font-bold text-gray-900">Super Support Dashboard</h1>
+<AssistedRegistrationCard />
         <p className="mt-1 text-gray-600">
           Operational overview for queue approvals, ticket resolution, and system alert monitoring.
         </p>

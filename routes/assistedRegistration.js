@@ -13,7 +13,8 @@ const {
   otpSendLimiter,
   otpLimiter,
   sensitiveActionLimiter,
-  registrationLimiter
+  assistedRegistrationQuoteLimiter,
+  assistedRegistrationCreateLimiter
 } = require('../config/middleware/securityRateLimiters');
 const {
   requirePrivilegedMfa
@@ -37,6 +38,7 @@ const run = fn => async (req, res) => {
     });
     res.status(error.statusCode === 202 ? 409 : error.statusCode || 500).json({
       success: false,
+      ...(error.code === 'REGISTRATION_QUOTE_CHANGED' ? { code: error.code } : {}),
       message: error.statusCode && error.statusCode < 500 ? error.message : 'The request could not be completed. Please try again.'
     });
   }
@@ -111,15 +113,16 @@ router.get('/staff/biometric-status', run(() => ({
   reason: 'Fingerprint matching is unavailable. The installed reader software supports capture only. A licensed matching engine and secure enrollment service are required. No fingerprints are stored.'
 })));
 router.get('/staff', run(req => service.list(req.user, req.query.search)));
-router.post('/staff/quote', registrationLimiter, run(req => service.quote(req.user, req.body)));
-router.post('/staff', registrationLimiter, run(req => service.create(req.user, req.body)));
+router.post('/staff/quote', assistedRegistrationQuoteLimiter, run(req => service.quote(req.user, req.body)));
+router.post('/staff', assistedRegistrationCreateLimiter, run(req => service.create(req.user, req.body)));
 router.get('/staff/:reference', run(req => service.recordForStaff(req.user, req.params.reference)));
 router.post('/staff/:reference/cash', sensitiveActionLimiter, run(req => service.collectCash(req.user, req.params.reference, req.body)));
 router.post('/staff/:reference/remittance', sensitiveActionLimiter, run(req => service.remit(req.user, req.params.reference)));
 router.get('/staff/:reference/receipt', async (req, res) => {
   try {
     const record = await service.recordForStaff(req.user, req.params.reference);
-    if (record.status !== 'paid' || !record.payment_id) return res.status(409).json({
+    const waived = record.status === 'paid' && record.collection_method === 'waived' && Number(record.amount_due) === 0;
+    if (record.status !== 'paid' || (!record.payment_id && !waived)) return res.status(409).json({
       success: false,
       message: 'A confirmed payment is required before generating a receipt'
     });
@@ -135,14 +138,14 @@ router.get('/staff/:reference/receipt', async (req, res) => {
     pdf.pipe(res);
     pdf.fontSize(20).text('Amana RentalHub NG');
     pdf.moveDown();
-    pdf.fontSize(15).text('REGISTRATION PAYMENT RECEIPT');
+    pdf.fontSize(15).text(waived ? 'REGISTRATION ACKNOWLEDGEMENT' : 'REGISTRATION PAYMENT RECEIPT');
     pdf.moveDown();
-    const lines = [['Customer', record.full_name], ['Account type', record.user_type], ['Reference', record.reference], ['Receipt', require('../config/utils/referenceGenerator').paymentReceiptNumber(record.payment_id)], ['Amount', receipt.formatNgn(record.amount_due)], ['Payment method', record.collection_method], ['Paid', new Date(record.paid_at).toISOString()], ['Collected by staff ID', record.collected_by || 'Automatic confirmation']];
+    const lines = [['Customer', record.full_name], ['Account type', record.user_type], ['Reference', record.reference], ['Receipt', waived ? 'Fee waived - no payment collected' : require('../config/utils/referenceGenerator').paymentReceiptNumber(record.payment_id)], ['Amount', receipt.formatNgn(record.amount_due)], ['Payment method', record.collection_method], ['Paid', new Date(record.paid_at).toISOString()], ['Collected by staff ID', record.collected_by || 'Automatic confirmation']];
     const moneyFont = require('../config/utils/pdfMoneyFont').registerMoneyFont(pdf);
     pdf.font(moneyFont).fontSize(11);
     for (const [label, value] of lines) pdf.text(label + ': ' + String(value));
     pdf.moveDown();
-    pdf.text('Keep this receipt as confirmation of the registration payment.');
+    pdf.text(waived ? 'Your registration fee was waived. This acknowledgement does not represent a payment.' : 'Keep this receipt as confirmation of the registration payment.');
     pdf.end();
   } catch (error) {
     if (!res.headersSent) res.status(error.statusCode || 500).json({

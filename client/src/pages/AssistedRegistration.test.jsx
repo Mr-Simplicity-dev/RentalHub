@@ -6,6 +6,8 @@ import '../i18n';
 import api from '../services/api';
 import PhoneAccountAccess from '../components/common/PhoneAccountAccess';
 import RegistrationPayment from './RegistrationPayment';
+import AssistedRegistration from './admin/AssistedRegistration';
+import AssistedRegistrationCard from '../components/admin/AssistedRegistrationCard';
 const auth = vi.hoisted(() => ({
   user: {
     id: 1,
@@ -27,7 +29,8 @@ vi.mock('../services/api', () => ({
   }
 }));
 vi.mock('react-router-dom', () => ({
-  useNavigate: () => navigate
+  useNavigate: () => navigate,
+  Link: ({ to, children, ...props }) => <a href={to} {...props}>{children}</a>
 }));
 vi.mock('../components/common/TurnstileWidget', async () => {
   const React = await import('react');
@@ -209,4 +212,39 @@ test('payment lookup failure does not manufacture a fee or grant dashboard acces
   expect(container.textContent).not.toContain('₦0');
   expect(auth.updateUser).not.toHaveBeenCalled();
   expect(navigate).not.toHaveBeenCalled();
+});
+
+
+test('staff can review a fresh quote after the fee changes without losing customer details', async () => {
+  auth.user = { id: 9, user_type: 'super_admin' };
+  api.get.mockImplementation(url => Promise.resolve({data:{data:url.endsWith('/config') ? {nin_enabled:false}:[]}}));
+  api.post.mockResolvedValueOnce({data:{data:{amount:3000}}}).mockRejectedValueOnce({response:{data:{code:'REGISTRATION_QUOTE_CHANGED',message:'The fee has changed'}}}).mockResolvedValueOnce({data:{data:{amount:4000}}});
+  await mount(<AssistedRegistration />);
+  fireEvent.change(within(container).getByLabelText('Full name'), {target:{value:'Customer Name'}});
+  await act(async () => fireEvent.submit(container.querySelector('form')));
+  expect(container.textContent).toContain('Create customer account');
+  await act(async () => fireEvent.submit(container.querySelector('form')));
+  expect(container.textContent).toContain('Review registration fee');
+  expect(within(container).getByLabelText('Full name').value).toBe('Customer Name');
+  await act(async () => fireEvent.submit(container.querySelector('form')));
+  expect(api.post.mock.calls[2][0]).toBe('/assisted-registration/staff/quote');
+  expect(container.textContent).toContain('4,000');
+});
+
+test('waived registration offers an acknowledgement instead of a payment receipt', async () => {
+  auth.user={id:9,user_type:'super_admin'};
+  api.get.mockImplementation(url => Promise.resolve({data:{data:url.endsWith('/config')?{nin_enabled:false}:url.endsWith('/staff')?[{reference:'waived',status:'paid',collection_method:'waived',amount_due:0,full_name:'Customer'}]:[]}}));
+  await mount(<AssistedRegistration />);
+  expect(container.textContent).toContain('Fee waived');
+  expect(within(container).getByText('Download acknowledgement')).toBeTruthy();
+  expect(within(container).queryByText('Generate receipt')).toBeNull();
+});
+
+test('assisted registration dashboard card is restricted to authorised staff', async () => {
+  for(const role of ['tenant','landlord','marketing_agent','recruitment_admin']) {
+    auth.user={user_type:role};await mount(<AssistedRegistrationCard />);expect(container.textContent).toBe('');
+  }
+  for(const role of ['super_admin','super_support_admin','zonal_admin','state_support_admin','lga_support_admin']) {
+    auth.user={user_type:role};await mount(<AssistedRegistrationCard />);expect(within(container).getByRole('link').getAttribute('href')).toBe('/admin/assisted-registration');
+  }
 });

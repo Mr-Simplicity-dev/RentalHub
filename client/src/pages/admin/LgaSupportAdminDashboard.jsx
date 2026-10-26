@@ -1,3 +1,4 @@
+import AssistedRegistrationCard from '../../components/admin/AssistedRegistrationCard';
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { FaSyncAlt } from 'react-icons/fa';
 import { Link, useLocation } from 'react-router-dom';
@@ -116,6 +117,7 @@ const LgaSupportAdminDashboard = () => {
       <div className="mx-auto max-w-7xl space-y-6">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-gray-900">LGA Support Dashboard</h1>
+<AssistedRegistrationCard />
           <p className="mt-1 text-gray-600">
             Manage property requests, tenancy operations, and support tickets for{' '}
             <span className="font-semibold text-admin-700">{user?.assigned_city || user?.assigned_state || 'your LGA'}</span>.

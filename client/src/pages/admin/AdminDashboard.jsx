@@ -1,3 +1,4 @@
+import AssistedRegistrationCard from '../../components/admin/AssistedRegistrationCard';
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -107,6 +108,7 @@ const AdminDashboard = () => {
           <h1 className="text-3xl font-bold text-gray-900">
             {dashboardTitle}
           </h1>
+<AssistedRegistrationCard />
           <p className="mt-1 text-gray-600">
             Welcome, {user?.full_name || 'Administrator'}
           </p>

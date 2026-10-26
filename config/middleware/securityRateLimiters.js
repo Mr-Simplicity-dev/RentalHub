@@ -64,10 +64,11 @@ class RedisRateLimitStore {
   }
 }
 
-const buildLimiter = ({ name, windowMs, max, message }) =>
+const buildLimiter = ({ name, windowMs, max, message, keyGenerator }) =>
   rateLimit({
     windowMs,
     max,
+    ...(keyGenerator ? { keyGenerator } : {}),
     store: new RedisRateLimitStore(name || message),
     standardHeaders: true,
     legacyHeaders: false,
@@ -212,7 +213,11 @@ const voiceTokenLimiter = buildLimiter({
 
 const assistantReadLimiter = buildLimiter({name:'account-assistant',windowMs:60 * 1000,max:30,message:'Please wait a moment before asking another question.'});
 
+const assistedRegistrationQuoteLimiter = buildLimiter({ name: 'assisted-registration-quote', windowMs: 60 * 60 * 1000, max: 120, keyGenerator: req => String(req.user.id), message: 'Too many fee reviews. Please try again later.' });
+const assistedRegistrationCreateLimiter = buildLimiter({ name: 'assisted-registration-create', windowMs: 60 * 60 * 1000, max: 60, keyGenerator: req => String(req.user.id), message: 'Too many assisted registrations. Please try again later.' });
 module.exports = {
+  assistedRegistrationQuoteLimiter,
+  assistedRegistrationCreateLimiter,
   assistantReadLimiter,
   authSensitiveLimiter,
   paymentOpsLimiter,

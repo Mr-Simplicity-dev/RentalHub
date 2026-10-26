@@ -1,3 +1,4 @@
+import AssistedRegistrationCard from '../components/admin/AssistedRegistrationCard';
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { FaEye, FaEyeSlash, FaSearch, FaStar } from "react-icons/fa";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -1276,6 +1277,7 @@ export default function SuperAdminDashboard() {
             </div>
           </div>
         </section>
+        <AssistedRegistrationCard />
 
         {/* Quick-navigation search */}
         <div className="relative mb-6">
