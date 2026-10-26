@@ -208,12 +208,14 @@ test('volunteer applications do not require formal education while employment ap
   emails = [];
   const volunteerResponse = result();
   await service.createApplication({ body: { ...applicationPayload }, query: {}, params: {}, logger }, volunteerResponse);
+  await new Promise((resolve) => setImmediate(resolve));
   assert.equal(volunteerResponse.statusCode, 201);
   assert.equal(volunteerResponse.body.data.application_fee, 0);
   assert.equal(volunteerResponse.body.data.payment_status, 'not_applicable');
   assert.ok(!queries.some((query) => query.text.includes('INSERT INTO recruitment_applications')
     && query.params[10] !== ''));
 
+  queries.length = 0;
   const employmentResponse = result();
   db.query = async (text, params = []) => {
     queries.push({ text, params });
@@ -233,16 +235,18 @@ test('volunteer applications do not require formal education while employment ap
 test('a volunteer row found during payment verification is rejected before any Paystack call', async (t) => {
   const originalQuery = db.query;
   const originalGet = axios.get;
-  const application = {
+  const reference = `ARH-APP-${'D'.repeat(32)}`;
+  let application = {
     id: 123,
-    opportunity_type: 'volunteer',
     payment_status: 'not_applicable',
     email_address: applicationPayload.email_address,
-    reference_number: `ARH-APP-${'D'.repeat(32)}`,
+    reference_number: reference,
   };
+  const queries = [];
   let gatewayCalls = 0;
   t.after(() => { db.query = originalQuery; axios.get = originalGet; });
   db.query = async (text) => {
+    queries.push(text);
     if (text.includes('FROM recruitment_applications')) return { rows: [application] };
     return { rows: [] };
   };
@@ -257,13 +261,29 @@ test('a volunteer row found during payment verification is rejected before any P
     else process.env.PAYSTACK_SECRET_KEY = oldKey;
   });
 
-  const res = result();
+  const notApplicable = result();
   await service.verifyPayment({
-    params: { reference: application.reference_number },
-    query: { email: application.email_address, reference_number: application.reference_number },
+    params: { reference },
+    query: { email: application.email_address, reference_number: reference },
     logger,
-  }, res);
-  assert.equal(res.statusCode, 400);
-  assert.match(res.body.message, /free/i);
+  }, notApplicable);
+  assert.equal(notApplicable.statusCode, 400);
+  assert.match(notApplicable.body.message, /free/i);
+
+  application = {
+    ...application,
+    id: 124,
+    payment_status: 'pending',
+    opportunity_type: 'volunteer',
+  };
+  const joinedVolunteer = result();
+  await service.verifyPayment({
+    params: { reference },
+    query: { email: application.email_address, reference_number: reference },
+    logger,
+  }, joinedVolunteer);
+  assert.equal(joinedVolunteer.statusCode, 400);
+  assert.match(joinedVolunteer.body.message, /free/i);
   assert.equal(gatewayCalls, 0);
+  assert.ok(queries.some((query) => query.includes('JOIN recruitment_roles') && query.includes('r.opportunity_type')));
 });

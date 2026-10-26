@@ -56,7 +56,7 @@ test('submitting a volunteer form shows the receipt and never initializes paymen
  await mount('/careers?type=volunteer');
  await act(async()=>fireEvent.click(within(container).getAllByRole('button',{name:'Apply as Volunteer'})[0]));
  const set=async(name,value)=>{await act(async()=>fireEvent.change(container.querySelector('[name="'+name+'"]'),{target:{value}}));};
- for(const[name,value]of Object.entries({full_name:'Community Applicant',phone_number:'08012345678',email_address:'community@example.test',highest_education:'University',area_locality:'Kutunku',residential_address:'Local address',suitability_reason:'Relevant experience',volunteer_motivation:'Community support',availability:'Saturdays'}))await set(name,value);
+ for(const[name,value]of Object.entries({full_name:'Community Applicant',phone_number:'08012345678',email_address:'community@example.test',area_locality:'Kutunku',residential_address:'Local address',suitability_reason:'Relevant experience',volunteer_motivation:'Community support',availability:'Saturdays'}))await set(name,value);
  await set('state_name','Abuja');await waitFor(()=>expect(container.querySelector('select[name="lga_name"]').options.length).toBe(2));await set('lga_name','Gwagwalada');
  await act(async()=>fireEvent.submit(container.querySelector('form')));
  await waitFor(()=>expect(container.textContent).toContain(copy.en.volunteer_received));
@@ -84,4 +84,33 @@ test('a saved employment draft cannot show a fee or submit an employment applica
  mockPublic({is_active:true,volunteer_applications_enabled:true});await mount('/careers?type=volunteer');
  expect(container.textContent).not.toContain('Application Access Fee');expect(container.textContent).not.toContain('5,000');expect(container.querySelector('select[name="application_track"]')).toBeNull();
  await act(async()=>fireEvent.submit(container.querySelector('form')));expect(api.post).not.toHaveBeenCalled();
+});
+
+test('volunteer role cards show complete responsibilities and learning-friendly eligibility before applying',async()=>{
+ const description='About this opportunity\nThis is an unpaid volunteer role supporting Amana RentalHub NG users.\n\nWhat you will do\n- Answer first-line support questions through approved channels.\n- Record clear notes and escalate payment, identity and ownership decisions.\n\nWhat we are looking for\n- Practical customer-service experience or a genuine willingness to learn.\n- No degree, HND, OND or formal certificate is required.\n\nRole boundaries\n- Volunteers are first-line helpers, not support administrators.';
+ const longRole={...roles[1],description};
+ mockPublic({is_active:false,volunteer_applications_enabled:true});
+ const get=api.get.getMockImplementation();
+ api.get.mockImplementation(url=>url==='/recruitment/roles/active'?Promise.resolve({data:{data:[longRole]}}):get(url));
+ await mount('/careers?type=volunteer');
+ await waitFor(()=>expect(container.textContent).toContain('No degree, HND, OND or formal certificate is required.'));
+ expect(container.textContent).toContain(copy.en.volunteer_open_to_all);
+ await act(async()=>fireEvent.click(within(container).getByRole('button',{name:copy.en.role_details_show})));
+ expect(within(container).getByRole('button',{name:copy.en.role_details_hide})).toBeTruthy();
+});
+
+test('education is optional for volunteer roles and remains required for employment',async()=>{
+ mockPublic({is_active:true,volunteer_applications_enabled:true});await mount();
+ await act(async()=>fireEvent.click(within(container).getAllByRole('button',{name:'Apply as Volunteer'})[0]));
+ expect(container.querySelector('[name="highest_education"]').required).toBe(false);
+ expect(container.textContent).toContain(copy.en.volunteer_no_degree);
+ await act(async()=>fireEvent.click(within(container).getByRole('button',{name:'Apply for Employment'})));
+ expect(container.querySelector('[name="highest_education"]').required).toBe(true);
+});
+
+test('deep link to a category with no available roles shows an empty state instead of an unusable form',async()=>{
+ mockPublic({is_active:true,volunteer_applications_enabled:false});await mount('/careers?type=volunteer');
+ await waitFor(()=>expect(container.textContent).toContain(copy.en.no_opportunities));
+ expect(container.querySelector('form')).toBeNull();
+ expect(container.textContent).not.toContain('Apply as Volunteer');
 });

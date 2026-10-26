@@ -173,4 +173,73 @@ Run the migrations before exposing the new server code to traffic. Both pending 
 - SMTP/push delivery depends on the existing server configuration. No real campaign applicant messages were sent during tests.
 - Opportunity type is deliberately immutable after creation. Create a new opportunity when changing between volunteering and employment.
 - CV upload uses the existing web document and mobile media-selection capabilities. Volunteer applicants are not forced to provide the employment document bundle or enter the interview flow.
-- No opportunities were hard-coded or seeded, and neither intake was enabled on a live system by this task.
+- No opportunities are auto-seeded during deployment. The eight standard volunteer opportunities are created on demand through the admin-controlled template action described in the 26 October 2026 addendum below. Neither intake is enabled automatically by that action.
+
+## 13. Addendum (26 October 2026): eight standard volunteer opportunities
+
+### Audit finding
+
+The existing schema stores an opportunity's public content in the free-text `recruitment_roles.description`; there is no structured responsibilities/requirements table and no role seed mechanism. Roles are created through the existing admin role endpoints and become publicly visible only when attached to an active, date-valid cycle and the relevant intake toggle is ON. The volunteer toggle, zero-fee enforcement, payment guard, audit trail and applicant workflow from migrations 2027/2028 were already present and were preserved.
+
+### Decision: admin-controlled templates, no migration
+
+The smallest production-safe approach is an admin-controlled template catalog. It does not invent cycle dates, does not silently add roles to production, and does not bypass the volunteer toggle. The full descriptions are stored in the existing `recruitment_roles.description` column when an authorised recruitment administrator applies the templates to an existing active or upcoming cycle. The action is idempotent by volunteer type + case-insensitive title + cycle.
+
+No migration was required: `recruitment_roles.description` already holds long text, and the volunteer type/fee constraints already exist in migrations 2027 and 2028. No already-applied migration was edited.
+
+### Files created/changed for this addendum
+
+- `services/volunteerOpportunityCatalog.js` (new): eight complete role descriptions.
+- `services/recruitmentService.js`: template read/apply handlers; volunteer education is optional while employment education remains required; defensive volunteer rejection in `verifyPayment` before any Paystack call.
+- `routes/recruitment.js`: `GET /api/recruitment/admin/volunteer-templates` and `POST /api/recruitment/admin/volunteer-templates/apply`.
+- `client/src/components/admin/VolunteerOpportunityTemplates.jsx` (new): admin cycle picker and idempotent creation action.
+- `client/src/components/admin/RecruitmentTabs.jsx` and `RecruitmentAdminTab.jsx`: template panel in both existing role-management surfaces.
+- `client/src/components/careers/OpportunityPicker.jsx`: expandable full role details, volunteer learning-friendly note, mobile-safe wrapping.
+- `client/src/pages/Careers.jsx`: volunteer-specific education/skills/suitability/location labels, optional education for volunteers, unpaid/no-guarantee/official-contact notices.
+- `client/src/i18n/volunteerTranslations.js`: 13 new UI keys in all eight locales with key parity preserved.
+- `tests/recruitmentVolunteerOpportunities.test.js` (new) and `client/src/pages/Careers.volunteers.test.jsx`: coverage described below.
+- `docs/recruitment-volunteer-implementation.md`: this addendum.
+
+### Opportunity titles
+
+1. Volunteer Customer Support Agent
+2. Volunteer Field Operations Assistant
+3. Volunteer Community Outreach Representative
+4. Volunteer Campus Representative
+5. Volunteer Property Media Assistant
+6. Volunteer Business Development & Partnerships Assistant
+7. Volunteer Creative & Social Media Assistant
+8. Volunteer Operations & Administrative Assistant
+
+Each description contains: About this opportunity, What you will do, What we are looking for, Role boundaries, Availability and location, and Selection and contact. Every description states that no degree, HND, OND or formal certificate is required and that practical experience, self-taught skills, community involvement or a genuine willingness to learn are welcome. Role boundaries explicitly preserve the existing specialist systems: support volunteers are first-line helpers, field/media volunteers do not certify ownership or condition, outreach/campus volunteers make no guarantees, business development volunteers cannot bind the company, creative volunteers use approved claims, and operations volunteers receive least-privilege access only.
+
+### API and administration
+
+- `GET /api/recruitment/admin/volunteer-templates` returns the eight templates to authorised recruitment administrators.
+- `POST /api/recruitment/admin/volunteer-templates/apply` accepts `{ cycle_id }`, rejects missing/closed cycles, inserts only missing volunteer roles with `application_fee=0`, `premium_fee=0`, `opportunity_type='volunteer'` and `is_active=TRUE`, and returns created/skipped titles.
+- The action is available to the same recruitment administrators who already manage roles. It does not change `recruitment_settings.volunteer_applications_enabled`.
+- Audit entries: one `VOLUNTEER_OPPORTUNITY_CREATED` per created role plus `VOLUNTEER_OPPORTUNITY_TEMPLATES_APPLIED` for the cycle.
+- No user, staff, agent, support-admin or super-admin account is created by applying a template or by an application.
+
+### Public form and eligibility
+
+Volunteers use the existing `/careers` page, application endpoint, reference, Turnstile, rate limits, upload checks and admin review queue. The volunteer form now treats formal education as optional, keeps current occupation/study optional, and labels skills/suitability/location with practical, experience-friendly prompts. The public cards expose responsibilities and requirements through the full-details control before application. The form and cards state that volunteering is unpaid, does not create employment or salary entitlement, does not guarantee selection or future employment, and that shortlisted applicants are contacted through official Amana RentalHub NG channels.
+
+### Verification evidence
+
+- Backend full suite: 527 tests passed, 0 failed.
+- New volunteer-opportunity backend file: 5 tests passed (catalog content, idempotent creation, closed-cycle/authorization rejection, optional volunteer education vs required employment education, volunteer payment-verification guard).
+- Existing volunteer backend file: 16 tests passed.
+- Client full suite: 12 files, 116 tests passed.
+- Client volunteer file: 16 tests passed (including full role details, optional volunteer education vs required employment education, empty deep-link category, free submission without education).
+- Production client build: passed with only the existing large-chunk advisory.
+- `node --check` passed on the changed backend files and the new test file.
+- No new environment variables or dependencies.
+
+### Remaining manual activation
+
+1. Ensure migrations 2027 and 2028 are applied (`npm run migrate:dry-run`, then `npm run migrate`).
+2. Create or select an active/upcoming recruitment cycle with valid dates. The template action refuses missing or closed cycles.
+3. In Super Admin/Recruitment role management, open “Volunteer opportunity templates”, select the cycle and click “Create volunteer opportunities”. Review/edit the descriptions if local wording is required. Re-running is safe and skips existing roles.
+4. Keep the unpaid Volunteer Applications toggle OFF until launch. A Super Admin must turn it ON; the template action never does.
+5. Confirm state/LGA activation rules allow the intended volunteer coverage, then submit one controlled application and verify zero payment, receipt, admin queue and acknowledgement.

@@ -5,11 +5,10 @@ import FloatingContactWidget from '../components/common/FloatingContactWidget';
 import WhatsAppBotWidget from '../components/common/WhatsAppBotWidget';
 import TurnstileWidget from '../components/common/TurnstileWidget';
 import { toast } from 'react-toastify';
-import { FaEnvelope, FaEye, FaEyeSlash, FaLock } from 'react-icons/fa';
+import { FaEye, FaEyeSlash, FaLock, FaUser } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 
 import assistedCopy from '../i18n/assistedRegistration.json';
-import PhoneAccountAccess from '../components/common/PhoneAccountAccess';
 
 const LOGIN_EMAIL_HISTORY_KEY = 'loginEmailHistory';
 const MAX_LOGIN_EMAIL_SUGGESTIONS = 8;
@@ -268,16 +267,17 @@ const Login = () => {
 
         <form className="space-y-5" onSubmit={handleSubmit}>
 
-          {/* EMAIL */}
+          {/* EMAIL OR PHONE */}
           <div className="relative">
-            <FaEnvelope className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <FaUser className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              name="email"
+              name="identifier"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
+              autoComplete="username"
+              inputMode="text"
               list="login-email-suggestions"
               className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-slate-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
               placeholder={identityLabel} aria-label={identityLabel}
@@ -345,7 +345,6 @@ const Login = () => {
             {loading ? t('login.signing') : t('login.submit')}
           </button>
         </form>
-        <PhoneAccountAccess />
       </div>
     </div>
       <FloatingContactWidget />

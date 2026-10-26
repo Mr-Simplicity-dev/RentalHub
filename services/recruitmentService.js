@@ -1549,13 +1549,13 @@ exports.applyVolunteerOpportunityTemplates = async (req, res) => {
       const inserted = await db.query(
         `INSERT INTO recruitment_roles
            (title, type, description, application_fee, premium_fee, cycle_id, opportunity_type, is_active)
-         SELECT $1, $2, $3, 0, 0, $4, 'volunteer', TRUE
+         SELECT $1::varchar, $2::varchar, $3::text, 0, 0, $4::int, 'volunteer', TRUE
          WHERE NOT EXISTS (
            SELECT 1
            FROM recruitment_roles
            WHERE cycle_id = $4
              AND opportunity_type = 'volunteer'
-             AND LOWER(TRIM(title)) = LOWER(TRIM($1))
+             AND LOWER(TRIM(title)) = LOWER(TRIM($1::text))
          )
          RETURNING *`,
         [template.title, template.type, template.description, cycleId]
@@ -3450,8 +3450,10 @@ exports.verifyPayment = async (req, res) => {
     }
 
     const appResult = await db.query(
-      `SELECT * FROM recruitment_applications
-       WHERE payment_reference = $1
+      `SELECT a.*, r.opportunity_type
+       FROM recruitment_applications a
+       JOIN recruitment_roles r ON r.id = a.role_id
+       WHERE a.payment_reference = $1
        LIMIT 1`,
       [reference]
     );
@@ -3463,7 +3465,7 @@ exports.verifyPayment = async (req, res) => {
     const application = appResult.rows[0];
     if (!requirePublicApplicationAccess(req, res, application)) return;
 
-    if (isVolunteer(application)) {
+    if (isVolunteer(application) || application.payment_status === 'not_applicable') {
       return res.status(400).json({
         success: false,
         message: 'Volunteer applications are free and do not require payment verification',
