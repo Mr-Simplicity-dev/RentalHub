@@ -336,3 +336,11 @@
 .amana-mark--on-dark {
   color: #a12a40;
 }
+
+@layer utilities {
+  .text-\[8px\], .text-\[9px\], .text-\[10px\], .text-\[11px\], .text-\[12px\] { font-size: 0.8125rem; line-height: 1.45; }
+}
+.rentalhub-assistant { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+.rentalhub-assistant input, .rentalhub-assistant textarea { font-size: 1rem; min-height: 44px; }
+.rentalhub-assistant p.whitespace-pre-line { font-size: 0.9375rem; line-height: 1.65; }
+.rentalhub-assistant button, .rentalhub-assistant a { white-space: normal; overflow-wrap: anywhere; }

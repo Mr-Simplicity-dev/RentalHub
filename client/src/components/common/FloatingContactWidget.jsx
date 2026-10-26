@@ -1,3 +1,4 @@
+import WhatsAppBotWidget from './WhatsAppBotWidget';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { io as socketIO } from 'socket.io-client';
@@ -84,12 +85,15 @@ const ChatBubble = ({ msg, isOwn, onRetry }) => {
 const FloatingContactWidget = () => {
   const { t } = useTranslation();
   const { user, isAuthenticated } = useAuth();
+  const identityKey=isAuthenticated?String(user?.id || ''):'guest';
+  const identityRef=useRef(identityKey);identityRef.current=identityKey;
+  useEffect(()=>{setTickets([]);setActiveTicket(null);setConversation([]);setReplyText('');setContactConv([]);setViewingContactTicket(null);setView('assistant');},[identityKey]);
   const { socket, connected, startSupportCall } = useSocket();
   const authRecorder = useVoiceRecorder();
   const contactRecorder = useVoiceRecorder();
 
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState('form');
+  const [view, setView] = useState('assistant');
   const [form, setForm] = useState({ name: '', email: '', state: '', lga: '', subject: '', message: '', priority: 'medium' });
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
@@ -215,7 +219,7 @@ const FloatingContactWidget = () => {
     }
     setForm({ name: '', email: '', state: '', lga: '', subject: '', message: '', priority: 'medium' });
     setError('');
-    setView('form');
+    setView('assistant');
     setActiveTicket(null);
     setConversation([]);
     setReplyText('');
@@ -315,10 +319,11 @@ const FloatingContactWidget = () => {
   // Fetch tickets on open for authenticated users
   const fetchMyTickets = useCallback(async () => {
     if (!isAuthenticated) return;
+    const identity=identityRef.current;
     setLoadingTickets(true);
     try {
       const res = await api.get('/support/tickets/my');
-      setTickets(res.data?.data || []);
+      if(identity===identityRef.current)setTickets(res.data?.data || []);
     } catch {} finally { setLoadingTickets(false); }
   }, [isAuthenticated]);
 
@@ -376,10 +381,11 @@ const FloatingContactWidget = () => {
   }, [socket, isAuthenticated, fetchMyTickets, playNotification]);
 
   const loadConversation = useCallback(async (ticketId) => {
+    const identity=identityRef.current;
     setLoadingConv(true);
     try {
       const res = await api.get(`/support/tickets/${ticketId}/conversation?limit=200`);
-      setConversation(res.data?.data || []);
+      if(identity===identityRef.current)setConversation(res.data?.data || []);
     } catch { setConversation([]); } finally { setLoadingConv(false); }
   }, []);
 
@@ -752,15 +758,15 @@ const FloatingContactWidget = () => {
   const renderHeader = () => (
     <div className="flex items-center justify-between bg-gradient-to-r from-indigo-600 to-indigo-700 px-4 py-3 text-white">
       <div className="flex items-center gap-2">
-        {view !== 'form' && view !== 'success' && (
-          <button onClick={() => { setView(isAuthenticated ? 'tickets' : 'form'); setActiveTicket(null); setConversation([]); setContactConv([]); setViewingContactTicket(null); }} className="text-white/80 hover:text-white p-0.5" aria-label={t('messages.widget.back', 'Back')}>
+        {view !== 'assistant' && view !== 'form' && view !== 'success' && (
+          <button onClick={() => { setView('assistant'); setActiveTicket(null); setConversation([]); setContactConv([]); setViewingContactTicket(null); }} className="text-white/80 hover:text-white p-0.5" aria-label={t('messages.widget.back', 'Back')}>
             <FaArrowLeft size={14} />
           </button>
         )}
         <FaHeadset size={16} />
         <div>
           <p className="text-sm font-semibold">{t('messages.widget.support_title', 'Amana RentalHub NGSupport')}</p>
-          <p className="text-[10px] text-indigo-200">{t('messages.widget.reply_minutes', 'We typically reply within minutes')}</p>
+          <p className="text-[10px] text-indigo-200">{t('messages.widget.assistant_first', 'Guided help first. A person when you need one.')}</p>
         </div>
       </div>
       <button onClick={handleClose} className="text-white/80 hover:text-white p-1" aria-label={t('messages.widget.close', 'Close')}><FaTimes /></button>
@@ -807,7 +813,7 @@ const FloatingContactWidget = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={prefersReducedMotion ? undefined : { opacity: 0, y: 20 }}
             transition={{ duration: 0.5, ease: 'easeOut' }}
-            className="fixed bottom-24 right-6 z-50 w-80 sm:w-96 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-gray-700 overflow-hidden flex flex-col"
+            className="fixed bottom-24 right-4 sm:right-6 z-50 w-[calc(100vw-2rem)] max-w-sm sm:w-96 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-gray-700 overflow-hidden flex flex-col"
             style={{ maxHeight: '480px' }}
           >
           {renderHeader()}
@@ -821,6 +827,7 @@ const FloatingContactWidget = () => {
 
           <div className="flex-1 overflow-y-auto p-4 space-y-3" ref={listRef}>
             {/* ─── FORM VIEW (anonymous/fallback) ─── */}
+            {view === 'assistant' && <><WhatsAppBotWidget embedded onHumanRequest={({summary})=>{setForm(prev=>({...prev,subject:'Support follow-up',message:summary || ''}));setView('form');}}/><div className="flex flex-wrap gap-2 border-t border-slate-200 p-3"><button onClick={()=>setView(isAuthenticated?'tickets':'check-status')} className="min-h-11 rounded-xl border px-3 text-sm">My tickets</button><button data-tour-id="support-new-ticket-workflow" onClick={()=>setView('form')} className="min-h-11 rounded-xl border px-3 text-sm">Submit a ticket</button></div></>}
             {view === 'form' && !isAuthenticated && (
               <form onSubmit={handleSubmit} className="space-y-3">
                 <p className="text-xs text-slate-500 dark:text-gray-400">{t('messages.widget.fill_form', "Fill this form and we'll get back to you via email.")}</p>

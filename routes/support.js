@@ -1575,15 +1575,25 @@ router.post('/contact', contactFormLimiter, [
 
 // ─── Authenticated ticket CRUD ─────────────────────────────────────────────
 
+router.post('/assistant/public', require('../config/middleware/securityRateLimiters').assistantReadLimiter, [body('message').isString().trim().isLength({min:1,max:2000}),body('history').optional().isArray({max:6}),body('history.*.role').optional().isIn(['user','assistant']),body('history.*.content').optional().isString().isLength({max:1000}),validateRequest],async(req,res)=>{
+ res.set('Cache-Control','no-store');
+ const answer=await require('../services/supportAssistantService').createSupportAssistant({post:require('axios').post})({message:req.body.message,history:req.body.history});
+ res.json({success:true,data:answer});
+});
+
 router.post('/assistant', authenticate, require('../config/middleware/securityRateLimiters').assistantReadLimiter, [
   body('message').isString().trim().isLength({min:1,max:2000}),
   body('mode').optional().isIn(['ticket']),
   body('previousTopic').optional().isString().isLength({max:32}),
+  body('history').optional().isArray({max:6}),
+  body('history.*.role').optional().isIn(['user','assistant']),
+  body('history.*.content').optional().isString().isLength({max:1000}),
   validateRequest,
 ], async (req,res) => {
   res.set('Cache-Control','no-store');
   try {
-    const answer = await require('../services/accountAssistantService').createAccountAssistant({query:db.query.bind(db)})({user:req.user,message:req.body.message,mode:req.body.mode,previousTopic:req.body.previousTopic});
+    const accountAssistant=require('../services/accountAssistantService').createAccountAssistant({query:db.query.bind(db)});
+    const answer=await require('../services/supportAssistantService').createSupportAssistant({accountAssistant,post:require('axios').post})({user:req.user,message:req.body.message,mode:req.body.mode,previousTopic:req.body.previousTopic,history:req.body.history});
     res.json({success:true,data:answer});
   } catch(error) {
     req.logger?.error('Account assistant request failed', {code:error.code || 'assistant_unavailable'});

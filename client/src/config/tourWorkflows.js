@@ -107,10 +107,10 @@ export const WORKFLOW_TOURS = {
         target: '.tour-wallet',
         route: '/dashboard',
         title: 'Withdraw available rent securely',
-        description: 'Open the withdrawal workspace, confirm your available balance, and use only verified bank details.',
+        description: 'Open Wallet to choose funding or withdrawal. Review your balance before continuing; the tour never submits a financial action.',
         placement: 'bottom',
         advanceOn: 'click',
-        actionHint: 'Open the withdrawal workspace to continue automatically.',
+        actionHint: 'Open Wallet to continue automatically.',
       },
       {
         id: 'landlord_workflow_messages',

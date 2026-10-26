@@ -2,7 +2,14 @@ const axios = require('axios');
 
 const graphVersion = () => /^v\d+\.\d+$/.test(process.env.WHATSAPP_GRAPH_API_VERSION || '') ? process.env.WHATSAPP_GRAPH_API_VERSION : 'v20.0';
 
-const normalizePhone = (phone) => String(phone || '').replace(/[^\d]/g, '');
+const {normalizeWhatsAppPhone}=require('./whatsappPolicy');
+const normalizePhone = phone => normalizeWhatsAppPhone(phone) || '';
+const recipientPolicy = async phone => {
+  try {
+    const result=await require('../middleware/database').query('SELECT opted_out FROM property_alert_whatsapp_preferences WHERE phone=$1',[phone]);
+    return result.rows[0]?.opted_out?{success:false,optedOut:true,message:'Recipient opted out of WhatsApp messages'}:null;
+  } catch {return {success:false,policyBlocked:true,message:'WhatsApp opt-out check unavailable'};}
+};
 
 exports.sendWhatsAppText = async ({ to, message }) => {
   const provider = (process.env.WHATSAPP_PROVIDER || 'meta').toLowerCase();
@@ -22,6 +29,7 @@ exports.sendWhatsAppText = async ({ to, message }) => {
   if (!recipient) {
     return { success: false, message: 'Invalid recipient phone number' };
   }
+  const policy=await recipientPolicy(recipient);if(policy)return policy;
 
   try {
     const { data } = await axios.post(
@@ -70,6 +78,7 @@ exports.sendWhatsAppTemplate = async ({ to, templateName, language = 'en', param
   if (!recipient) {
     return { success: false, message: 'Invalid recipient phone number' };
   }
+  const policy=await recipientPolicy(recipient);if(policy)return policy;
 
   const parameters = (Array.isArray(params) ? params : [])
     .slice(0, 10)
@@ -199,6 +208,7 @@ exports.sendWhatsAppMedia = async ({ to, mediaType, link, caption = '' }) => {
   if (!recipient) {
     return { success: false, message: 'Invalid recipient phone number' };
   }
+  const policy=await recipientPolicy(recipient);if(policy)return policy;
 
   const type = String(mediaType || '').toLowerCase();
   if (!['image', 'video', 'document'].includes(type)) {

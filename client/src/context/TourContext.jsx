@@ -15,7 +15,7 @@ export const TourContext = createContext();
 
 const TOUR_CONFIG = {
   INACTIVITY_THRESHOLD_DAYS: 7,
-  VERSION: '4',
+  VERSION: '5',
   LOCAL_STORAGE_KEYS: {
     LAST_TOUR_DISMISSAL: 'tour_last_dismissal',
     TOUR_COMPLETED: 'tour_completed',

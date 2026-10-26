@@ -28,6 +28,8 @@ const createPropertyAlertDeliveryService=({db,sendEmail,sendWhatsAppTemplate,fro
   if(suppressed.rows[0]?.opted_out)return finish(job,'cancelled','recipient_opted_out');
   if((env.WHATSAPP_PROVIDER || 'meta').toLowerCase()!=='meta' || !/^v\d+\.\d+$/.test(env.WHATSAPP_GRAPH_API_VERSION || '') || !env.WHATSAPP_PROPERTY_MATCH_TEMPLATE || !env.WHATSAPP_META_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID || !env.WHATSAPP_APP_SECRET)return finish(job,'blocked','whatsapp_configuration_required',null,3600);
   const result=await sendWhatsAppTemplate({to:phone,templateName:env.WHATSAPP_PROPERTY_MATCH_TEMPLATE,language:env.WHATSAPP_PROPERTY_MATCH_LANGUAGE || 'en',params:[String(job.full_name).slice(0,100),payload.title,payload.location || 'Your requested location',payload.detail,payload.url],callbackData:job.correlation_token});
+  if(result.optedOut)return finish(job,'cancelled','recipient_opted_out');
+  if(result.policyBlocked)return finish(job,'blocked','opt_out_check_unavailable',null,3600);
   if(result.success && result.messageId)return finish(job,'accepted',null,result.messageId);
   if(result.success || result.uncertain)return finish(job,'uncertain','provider_acceptance_uncertain');
   if([190,131005,132001,132015,132016].includes(Number(result.code)))return finish(job,'blocked','whatsapp_configuration_'+result.code,null,3600);

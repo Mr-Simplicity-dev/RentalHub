@@ -4,7 +4,7 @@ import { FaWhatsapp, FaTimes, FaPaperPlane, FaHeadset, FaExternalLinkAlt, FaList
 import { useTranslation } from 'react-i18next';
 import { findBestMatch } from './whatsappFaqData';
 import {useAuth} from '../../hooks/useAuth';
-import {askAccountAssistant, submitAssistantTicket, needsAccount} from '../../services/accountAssistant';
+import {askAccountAssistant, askPublicAssistant, submitAssistantTicket, needsAccount} from '../../services/accountAssistant';
 import WidgetErrorBoundary from './WidgetErrorBoundary';
 
 const WHATSAPP_NUMBER = '2348030601238';
@@ -36,7 +36,7 @@ const isAcknowledgment = (text) => {
   return THANKS_WORDS.some((w) => clean === w || clean.startsWith(w + ' ') || clean.endsWith(' ' + w));
 };
 
-const WhatsAppBotWidget = () => {
+const WhatsAppBotWidget = ({embedded=false,onHumanRequest}) => {
   const { t } = useTranslation();
   const {user,isAuthenticated}=useAuth();
   const authKey=isAuthenticated?String(user?.id || '')+':'+user?.user_type:'guest';
@@ -45,7 +45,7 @@ const WhatsAppBotWidget = () => {
   const topicRef=useRef(null);
   const [requestPending,setRequestPending]=useState(false);
   useEffect(()=>{setMessages([]);setInput('');setAskedQuestion(false);setAwaitingResponse(null);setConnectedToAgent(false);topicRef.current=null;},[authKey]);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(embedded);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [showGreeting, setShowGreeting] = useState(false);
@@ -124,7 +124,7 @@ const WhatsAppBotWidget = () => {
   // Close other widget on mobile when this opens
   const widgetInstanceId = useRef(`wbw-${Date.now()}`);
   useEffect(() => {
-    if (!open) return;
+    if (!open || embedded) return;
     if (window.innerWidth < 640) {
       window.dispatchEvent(new CustomEvent('widget:close-other', { detail: { id: widgetInstanceId.current } }));
     }
@@ -222,12 +222,13 @@ const WhatsAppBotWidget = () => {
   }, [addBotMessage, t]);
 
   const handleTalkToAgent = useCallback(() => {
+    if(onHumanRequest){onHumanRequest({summary:messages.filter(m=>m.type==='user' && (!m.owner || m.owner===authKeyRef.current)).slice(-3).map(m=>m.text).join('\n')});return;}
     setConnectedToAgent(true);
     setAwaitingResponse(null);
     const waMsg = t('home.whatsapp_message', 'Hello Amana RentalHub NG, I need help finding a home.');
     const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(waMsg)}%0A%0A${encodeURIComponent(window.location.origin + window.location.pathname)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
-  }, [t]);
+  }, [t,onHumanRequest,messages]);
 
   const tryAccountReply = useCallback(async msg => {
     if(!isAuthenticated || !['tenant','landlord'].includes(user?.user_type)) {
@@ -236,7 +237,7 @@ const WhatsAppBotWidget = () => {
     }
     const key=authKeyRef.current;requestBusy.current=true;setRequestPending(true);setIsBotTyping(true);
     try {
-      const answer=await askAccountAssistant(msg,{...(awaitingRef.current==='ticket_details'?{mode:'ticket'}:{}),...(topicRef.current?{previousTopic:topicRef.current}:{})});
+      const answer=await askAccountAssistant(msg,{history:messages.filter(m=>m.type==='user').slice(-4).map(m=>({role:'user',content:m.text.slice(0,1000)})),...(awaitingRef.current==='ticket_details'?{mode:'ticket'}:{}),...(topicRef.current?{previousTopic:topicRef.current}:{})});
       if(!mountedRef.current || key!==authKeyRef.current)return true;
       if(!answer || typeof answer.handled!=='boolean')throw new Error('Invalid assistant response');
       if(!answer.handled)return false;
@@ -245,7 +246,7 @@ const WhatsAppBotWidget = () => {
       addBotMessage(answer.text,answer);return true;
     } catch {if(!needsAccount(msg) && findBestMatch(msg) && awaitingRef.current!=='ticket_details' && !/^(why|when|what about)\b/i.test(msg))return false;if(mountedRef.current && key===authKeyRef.current)addBotMessage('I could not verify your account records. Please try again or open support. No ticket has been submitted by this question.',{link:'/support',linkText:'Open support'});return true;}
     finally {requestBusy.current=false;if(mountedRef.current){setRequestPending(false);setIsBotTyping(false);}}
-  },[isAuthenticated,user?.user_type,addBotMessage]);
+  },[isAuthenticated,user?.user_type,addBotMessage,messages]);
   const submitTicket = useCallback(async message => {
     if(requestBusy.current || !message.ticketDraft || (message.owner && message.owner!==authKeyRef.current) || !isAuthenticated)return;
     const key=authKeyRef.current;requestBusy.current=true;setRequestPending(true);
@@ -263,6 +264,7 @@ const WhatsAppBotWidget = () => {
       if (!msg) return;
       setInput('');
       addUserMessage(msg);
+      if(/\b(human|person|agent|representative)\b/i.test(msg) && /\b(talk|speak|connect|want|need)\b/i.test(msg)){handleTalkToAgent();return;}
 
       const currentAwaiting = awaitingRef.current;
 
@@ -316,15 +318,13 @@ const WhatsAppBotWidget = () => {
           askAnythingElse();
         });
       } else {
-        setAwaitingResponse('handoff');
-        botReplyWithTyping(() => {
-          addBotMessage(
-            t('messages.whatsapp.no_match', "I\u2019m not sure I have the answer to that. Would you like to speak with a human agent? Just say yes.")
-          );
-        });
+        const key=authKeyRef.current;requestBusy.current=true;setRequestPending(true);setIsBotTyping(true);
+        try {const answer=await askPublicAssistant(msg,{history:messages.filter(m=>m.type==='user').slice(-4).map(m=>({role:'user',content:m.text.slice(0,1000)}))});if(mountedRef.current && key===authKeyRef.current)addBotMessage(answer.text,answer);}
+        catch {if(mountedRef.current && key===authKeyRef.current)addBotMessage('Tell me which screen you are using and the error shown. Check Payment History before retrying a payment. If this remains unresolved, I can help prepare a support ticket.',{link:'/support',linkText:'Support options'});}
+        finally {requestBusy.current=false;if(mountedRef.current){setRequestPending(false);setIsBotTyping(false);}}
       }
     },
-    [input, addUserMessage, addBotMessage, botReplyWithTyping, t, askAnythingElse, handleTalkToAgent, tryAccountReply, isAuthenticated, user?.user_type]
+    [input, addUserMessage, addBotMessage, botReplyWithTyping, t, askAnythingElse, handleTalkToAgent, tryAccountReply, isAuthenticated, user?.user_type,messages]
   );
 
   const handleQuickReply = question => handleSend(question);
@@ -345,7 +345,7 @@ const WhatsAppBotWidget = () => {
 
   return (
     <WidgetErrorBoundary name="WhatsAppBotWidget">
-      <div className="fixed bottom-6 left-6 z-50 flex flex-col items-start gap-2">
+      {!embedded && <div className="fixed bottom-6 left-6 z-50 flex flex-col items-start gap-2">
         <AnimatePresence>
           {showGreeting && (
             <motion.div
@@ -377,23 +377,23 @@ const WhatsAppBotWidget = () => {
             <FaWhatsapp className="w-7 h-7" />
           )}
         </button>
-      </div>
+      </div>}
 
       <AnimatePresence>
         {open && (
           <motion.div
             ref={widgetRef}
-            role="dialog"
-            aria-modal="true"
+            role={embedded?'region':'dialog'}
+            aria-modal={embedded?undefined:true}
             aria-label={t('messages.whatsapp.title', 'Amana RentalHub Assistant')}
             initial={prefersReducedMotion ? false : { opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={prefersReducedMotion ? undefined : { opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
-            className="fixed bottom-24 left-4 sm:left-6 z-50 w-[calc(100vw-2rem)] max-w-sm sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col"
-            style={{ maxHeight: '480px' }}
+            className={embedded?'rentalhub-assistant flex min-h-0 flex-1 flex-col overflow-hidden bg-white':'rentalhub-assistant fixed bottom-24 left-4 sm:left-6 z-50 w-[calc(100vw-2rem)] max-w-sm sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col'}
+            style={embedded?{minHeight:360,maxHeight:560}:{maxHeight:'min(640px, calc(100dvh - 120px))'}}
           >
-            <div className="bg-gradient-to-r from-green-600 to-green-700 px-4 py-3 flex items-center gap-3 shrink-0">
+            <div className={embedded?'hidden':'bg-gradient-to-r from-green-600 to-green-700 px-4 py-3 flex items-center gap-3 shrink-0'}>
               <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
                 <FaWhatsapp className="w-4 h-4 text-white" />
               </div>
@@ -495,6 +495,7 @@ const WhatsAppBotWidget = () => {
                 </div>
               )}
 
+              <button type="button" onClick={handleTalkToAgent} className="mt-4 min-h-11 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700">Talk to a person</button>
               <div ref={messagesEndRef} />
             </div>
 
@@ -508,12 +509,12 @@ const WhatsAppBotWidget = () => {
                   onKeyDown={handleKeyDown}
                   placeholder={t('messages.whatsapp.input_placeholder', 'Type your question...')}
                   className="flex-1 h-[36px] px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  disabled={connectedToAgent || requestPending}
+                  disabled={requestPending}
                 />
                 <button
                   type="button"
                   onClick={() => handleSend()}
-                  disabled={!input.trim() || connectedToAgent || requestPending}
+                  disabled={!input.trim() || requestPending}
                   className="h-[36px] w-[36px] flex items-center justify-center bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                   aria-label={t('messages.whatsapp.send', 'Send')}
                 >

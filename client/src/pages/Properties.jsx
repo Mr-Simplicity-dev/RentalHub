@@ -679,7 +679,7 @@ const Properties = () => {
                 value={requestForm.phone}
                 onChange={handleRequestChange}
               />
-              <label className="flex items-start gap-3 text-sm text-slate-700 sm:col-span-2"><input type="checkbox" checked={requestForm.whatsapp_opt_in === true} onChange={e=>setRequestForm(prev=>({...prev,whatsapp_opt_in:e.target.checked}))} className="mt-1 h-4 w-4 shrink-0" /><span>{t('properties.request_whatsapp_consent')}</span></label>
+              <label className="flex items-start gap-3 text-sm text-slate-700 md:col-span-2"><input type="checkbox" checked={requestForm.whatsapp_opt_in === true} onChange={e=>setRequestForm(prev=>({...prev,whatsapp_opt_in:e.target.checked}))} className="mt-1 h-4 w-4 shrink-0" /><span>{t('properties.request_whatsapp_consent')}</span></label>
               <select
                 name="property_type"
                 className="input"

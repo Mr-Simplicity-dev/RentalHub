@@ -1160,6 +1160,8 @@ export const TOUR_STEPS = {
   ],
 };
 
+for(const [role,steps] of [['tenant',TOUR_STEPS.TENANT_DASHBOARD],['landlord',TOUR_STEPS.LANDLORD_DASHBOARD]]){steps.push({id:role+'_disputes_current',target:'[data-tour-id="action-disputes"]',title:'Disputes',description:'Open the separate Disputes card to submit and follow a dispute.',placement:'bottom'},{id:role+'_reports_current',target:'[data-tour-id="action-damage"]',title:'Property Reports',description:'Open Property Reports to report a property issue and track its progress.',placement:'bottom'});for(const step of steps){if(step.target==='.tour-legal-help'){step.title='Coverage assistance';step.description='Paid coverage is required for private assistance. Check your coverage and submit a request from your dashboard.';}if(step.target==='.tour-wallet'){step.title='Wallet';step.description='Open Wallet to fund it or withdraw available funds. Payments and Rent Savings remain separate options.';}if(step.target==='.tour-support-widget'){step.title='Assistant and support';step.description='Start with the assistant for guided troubleshooting, review a support ticket if needed, and ask for a person when the issue remains unresolved.';}}}
+
 export const SHARED_HEADER_STEPS = [
   {
     id: 'header_messages',

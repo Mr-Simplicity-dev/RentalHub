@@ -182,7 +182,7 @@ test('sendCampaign explains why a campaign cannot be queued', async (t) => {
   assert.match(response.body.message, /sending/);
 });
 
-test('sendWhatsAppTemplate builds the exact Meta Graph payload', async (t) => {
+test('sendWhatsAppTemplate builds the exact Meta Graph payload', async (t) => { mockDb(t,()=>({rows:[]}));
   process.env.WHATSAPP_PROVIDER = 'meta';
   process.env.WHATSAPP_META_TOKEN = 'test-eb-token';
   process.env.WHATSAPP_PHONE_NUMBER_ID = '1122334455667788';
@@ -322,7 +322,7 @@ test('createCampaign persists media columns for free-form media campaigns', asyn
   assert.equal(insert.params[7], 'https://rentalhub.com.ng/uploads/whatsapp-campaigns/wa_9.jpg');
 });
 
-test('sendWhatsAppMedia builds the exact Meta Graph payload', async (t) => {
+test('sendWhatsAppMedia builds the exact Meta Graph payload', async (t) => { mockDb(t,()=>({rows:[]}));
   process.env.WHATSAPP_PROVIDER = 'meta';
   process.env.WHATSAPP_META_TOKEN = 'test-eb-token';
   process.env.WHATSAPP_PHONE_NUMBER_ID = '1122334455667788';
@@ -371,7 +371,7 @@ test('sendWhatsAppMedia builds the exact Meta Graph payload', async (t) => {
   assert.equal(badType.success, false);
 });
 
-test('sendWhatsAppTemplate prepends a header media component when supplied', async (t) => {  process.env.WHATSAPP_PROVIDER = 'meta';
+test('sendWhatsAppTemplate prepends a header media component when supplied', async (t) => { mockDb(t,()=>({rows:[]}));  process.env.WHATSAPP_PROVIDER = 'meta';
   process.env.WHATSAPP_META_TOKEN = 'test-eb-token';
   process.env.WHATSAPP_PHONE_NUMBER_ID = '1122334455667788';
 
