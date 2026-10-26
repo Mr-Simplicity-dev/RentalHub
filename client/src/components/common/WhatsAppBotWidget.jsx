@@ -174,6 +174,7 @@ const WhatsAppBotWidget = ({embedded=false,onHumanRequest}) => {
         text,
         created_at: new Date().toISOString(),
         link: faq?.link || null,
+        engine:faq?.engine || 'guided',
         ticketDraft: faq?.ticketDraft || null,
         linkText: faq?.linkText || null,
         showQuickReplies: showQR || false,
@@ -429,7 +430,7 @@ const WhatsAppBotWidget = ({embedded=false,onHumanRequest}) => {
                       <span className="flex items-center gap-1.5 mb-1">
                         <img src="/rentalhub-mark.svg" alt="" className="w-4 h-4 shrink-0" />
                         <span className="text-xs font-semibold text-green-700 tracking-wide">
-                          {t('messages.whatsapp.bot_label', 'Amana RentalHub NG')}
+                          {t('messages.whatsapp.bot_label', 'Amana RentalHub NG')}{msg.engine==='ai'?' · AI guidance':msg.engine==='verified'?' · Account record':''}
                         </span>
                       </span>
                     )}
