@@ -344,3 +344,5 @@
 .rentalhub-assistant input, .rentalhub-assistant textarea { font-size: 1rem; min-height: 44px; }
 .rentalhub-assistant p.whitespace-pre-line { font-size: 0.9375rem; line-height: 1.65; }
 .rentalhub-assistant button, .rentalhub-assistant a { white-space: normal; overflow-wrap: anywhere; }
+
+.rentalhub-assistant button, .rentalhub-assistant a, .support-widget-shell button { min-height: 44px; }

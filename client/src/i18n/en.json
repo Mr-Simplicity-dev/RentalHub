@@ -370,7 +370,7 @@
     "hide_request_form": "Hide request form",
     "show_request_form": "Can't find your preferred property? Submit a request",
     "request_title": "Not finding what you need?",
-    "request_intro": "Submit your request and we will notify you by email and WhatsApp once a matching property is available. A support admin reviews each request before it is assigned to the state team.",
+    "request_intro": "Submit your request and we will notify you by email and WhatsApp once a matching property is available. All request are reviewed before it is attended to.",
     "request_fee_text": "A one-time {{amount}} payment or more is required before the request is processed.",
     "request_free_text": "Requests are currently submitted immediately without payment.",
     "request_select_location_fee": "Select both state and local government area to confirm the exact fee.",

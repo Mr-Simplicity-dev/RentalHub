@@ -130,6 +130,7 @@ const WhatsAppBotWidget = ({embedded=false,onHumanRequest}) => {
     }
   }, [open]);
   useEffect(() => {
+    if(embedded)return;
     const handler = (e) => {
       if (e.detail?.id !== widgetInstanceId.current) setOpen(false);
     };
@@ -139,7 +140,7 @@ const WhatsAppBotWidget = ({embedded=false,onHumanRequest}) => {
 
   // Focus trap + Escape + click-outside
   useEffect(() => {
-    if (!open) return;
+    if (!open || embedded) return;
     const el = widgetRef.current;
     if (!el) return;
     const focusable = el.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
