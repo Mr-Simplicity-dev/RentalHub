@@ -1,3 +1,4 @@
+const requirePaymentEmail = require('../config/utils/paymentEmail');
 const FumigationCleaningService = require('../models/FumigationCleaning');
 const { validationResult } = require('express-validator');
 const NotificationService = require('../services/notificationService');
@@ -195,7 +196,7 @@ const PaymentService = {
       const response = await axios.post(
         `${PAYSTACK_BASE_URL}/transaction/initialize`,
         {
-          email: paymentData.email,
+          email: requirePaymentEmail(paymentData.email),
           amount: Math.round(paymentData.amount * 100), // Paystack expects amount in kobo
           reference: paymentData.reference,
           metadata: paymentData.metadata || {},

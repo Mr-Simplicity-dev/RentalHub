@@ -1,3 +1,4 @@
+const requirePaymentEmail = require('../config/utils/paymentEmail');
 const axios = require('axios');
 const db = require('../config/middleware/database');
 const { getFrontendUrl } = require('../config/utils/frontendUrl');
@@ -127,7 +128,7 @@ exports.initializeVerificationPayment = async (req, res) => {
     const paystackResponse = await axios.post(
       `${PAYSTACK_BASE_URL}/transaction/initialize`,
       {
-        email: payerEmail,
+        email: requirePaymentEmail(payerEmail),
         amount: EVIDENCE_VERIFICATION_FEE_NGN * 100,
         reference,
         callback_url: callbackUrl,

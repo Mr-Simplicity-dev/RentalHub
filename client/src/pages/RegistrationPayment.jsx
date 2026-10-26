@@ -1,14 +1,84 @@
-import React,{useCallback,useEffect,useState} from 'react';
-import {useNavigate} from 'react-router-dom';
-import {useAuth} from '../hooks/useAuth';
+import AssistedPasswordForm from '../components/common/AssistedPasswordForm';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
+import { useTranslation } from 'react-i18next';
+import copy from '../i18n/assistedRegistration.json';
 import VirtualAccountCheckout from '../components/VirtualAccountCheckout';
 import BankTransferCheckout from '../components/BankTransferCheckout';
-export default function RegistrationPayment(){
- const {user,updateUser,logout}=useAuth();const navigate=useNavigate();const [record,setRecord]=useState(null);const [checkout,setCheckout]=useState(null);const [busy,setBusy]=useState(false);const [message,setMessage]=useState('');
- const refresh=useCallback(async()=>{const r=await api.get('/assisted-registration/me');setRecord(r.data.data);if(r.data.data.status==='paid'){const me=await api.get('/auth/me');updateUser(me.data.data);navigate(me.data.data.user_type==='tenant'?'/tenant/dashboard':'/dashboard',{replace:true});}},[navigate,updateUser]);
- useEffect(()=>{let active=true;const load=()=>{if(active)refresh().catch(e=>setMessage(e.response?.data?.message||'Unable to check payment. Please retry.'));};load();const timer=setInterval(load,10000);return()=>{active=false;clearInterval(timer);};},[refresh]);
- const pay=async method=>{setBusy(true);setMessage('');try{const r=await api.post('/assisted-registration/payment',{method});if(r.data.data.paid)return await refresh();if(r.data.data.authorization_url)window.location.assign(r.data.data.authorization_url);else setCheckout(r.data.data);}catch(e){setMessage(e.response?.data?.message||'Payment is unavailable. Please retry.');}finally{setBusy(false);}};
- const verify=async()=>{setBusy(true);try{await api.post('/assisted-registration/payment/verify');await refresh();}catch(e){setMessage(e.response?.data?.message||'Payment is not confirmed yet.');}finally{setBusy(false);}};
- return <main className="mx-auto min-h-[70vh] max-w-xl px-4 py-12"><section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><p className="text-sm font-semibold uppercase tracking-wide text-blue-800">Complete your registration</p><h1 className="mt-3 text-2xl font-bold text-slate-900">Welcome, {user?.full_name}</h1><p className="mt-3 text-slate-600">Your account is saved. Pay the registration fee to open your dashboard. Your payment is checked by the server.</p>{record&&<><p className="mt-6 text-3xl font-bold">₦{Number(record.amount).toLocaleString('en-NG')}</p><p className="mt-2 break-all text-sm text-slate-500">Reference: {record.reference}</p><div className="mt-6 grid gap-3"><button disabled={busy} onClick={()=>pay('bank_transfer')} className="rounded-xl bg-blue-900 p-3 font-semibold text-white">Pay by bank transfer</button>{record.email&&<button disabled={busy} onClick={()=>pay('paystack')} className="rounded-xl border border-blue-900 p-3 font-semibold text-blue-900">Pay by card</button>}<button disabled={busy} onClick={verify} className="rounded-xl border p-3">Check card payment</button><button disabled={busy} onClick={()=>refresh().catch(()=>setMessage('Unable to check payment.'))} className="rounded-xl border p-3">Refresh payment status</button></div><p className="mt-5 text-sm text-slate-600">If you pay an authorized support agent in cash, ask for your receipt. A screenshot or an unchecked transfer does not confirm payment.</p></>}{message&&<p className="mt-4 text-sm text-red-700" role="status">{message}</p>}<button className="mt-6 text-sm text-slate-600 underline" onClick={()=>{logout();navigate('/login');}}>Sign out</button></section>{checkout?.account?<VirtualAccountCheckout account={checkout.account} amount={record.amount} reference={record.reference} statusEndpoint={'/virtual-accounts/registration/'+encodeURIComponent(record.reference)} onPaid={refresh} onCancel={()=>setCheckout(null)} onRefresh={()=>pay('bank_transfer')} />:checkout&&<BankTransferCheckout amount={record.amount} reference={record.reference} accounts={checkout.bank_accounts} endpoint="/bank-transfer/registration/proof" buildPayload={data=>({...data,reference:record.reference})} onSubmitted={()=>{setCheckout(null);setMessage('Transfer submitted for review. Your dashboard opens after confirmation.');}} onCancel={()=>setCheckout(null)} />}</main>;
+export default function RegistrationPayment() {
+  const {
+    i18n
+  } = useTranslation();
+  const c = copy[i18n.language?.split('-')[0]] || copy.en;
+  const {
+    user,
+    updateUser,
+    logout
+  } = useAuth();
+  const navigate = useNavigate();
+  const [record, setRecord] = useState(null);
+  const [checkout, setCheckout] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const refresh = useCallback(async () => {
+    const r = await api.get('/assisted-registration/me');
+    setRecord(r.data.data);
+    if (r.data.data.status === 'paid') {
+      const me = await api.get('/auth/me');
+      updateUser(me.data.data);
+      navigate(me.data.data.user_type === 'tenant' ? '/tenant/dashboard' : '/dashboard', {
+        replace: true
+      });
+    }
+  }, [navigate, updateUser]);
+  useEffect(() => {
+    let active = true;
+    const load = () => {
+      if (active) refresh().catch(e => setMessage(e.response?.data?.message || 'Unable to check payment. Please retry.'));
+    };
+    load();
+    const timer = setInterval(load, 10000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [refresh]);
+  const pay = async method => {
+    setBusy(true);
+    setMessage('');
+    try {
+      const r = await api.post('/assisted-registration/payment', {
+        method
+      });
+      if (r.data.data.paid) return await refresh();
+      if (r.data.data.authorization_url) window.location.assign(r.data.data.authorization_url);else setCheckout(r.data.data);
+    } catch (e) {
+      setMessage(e.response?.data?.message || 'Payment is unavailable. Please retry.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const verify = async () => {
+    setBusy(true);
+    try {
+      await api.post('/assisted-registration/payment/verify');
+      await refresh();
+    } catch (e) {
+      setMessage(e.response?.data?.message || 'Payment is not confirmed yet.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return <main className="mx-auto min-h-[70vh] max-w-xl px-4 py-12"><section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><p className="text-sm font-semibold uppercase tracking-wide text-blue-800">{c.paymentTitle}</p><h1 className="mt-3 text-2xl font-bold text-slate-900">{c.welcome}, {user?.full_name}</h1><p className="mt-3 text-slate-600">{c.paymentHelp}</p>{record && <><p className="mt-6 text-3xl font-bold">₦{Number(record.amount).toLocaleString('en-NG')}</p><p className="mt-2 break-all text-sm text-slate-500">{c.ref}: {record.reference}</p><div className="mt-6 grid gap-3"><button disabled={busy} onClick={() => pay('bank_transfer')} className="rounded-xl bg-blue-900 p-3 font-semibold text-white">{c.transfer}</button>{record.email && <button disabled={busy} onClick={() => pay('paystack')} className="rounded-xl border border-blue-900 p-3 font-semibold text-blue-900">{c.card}</button>}<button disabled={busy} onClick={verify} className="rounded-xl border p-3">{c.checkCard}</button><button disabled={busy} onClick={() => refresh().catch(() => setMessage('Unable to check payment.'))} className="rounded-xl border p-3">{c.refresh}</button></div><p className="mt-5 text-sm text-slate-600">{c.cashHelp}</p></>}{message && <p className="mt-4 text-sm text-red-700" role="status">{message}</p>}<button className="mt-6 text-sm text-slate-600 underline" onClick={() => {
+        logout();
+        navigate('/login');
+      }}>{c.signOut}</button></section><AssistedPasswordForm />{checkout?.account ? <VirtualAccountCheckout account={checkout.account} amount={record.amount} reference={record.reference} statusEndpoint={'/virtual-accounts/registration/' + encodeURIComponent(record.reference)} onPaid={refresh} onCancel={() => setCheckout(null)} onRefresh={() => pay('bank_transfer')} /> : checkout && <BankTransferCheckout amount={record.amount} reference={record.reference} accounts={checkout.bank_accounts} endpoint="/bank-transfer/registration/proof" buildPayload={data => ({
+      ...data,
+      reference: record.reference
+    })} onSubmitted={() => {
+      setCheckout(null);
+      setMessage(c.unconfirmed);
+    }} onCancel={() => setCheckout(null)} />}</main>;
 }

@@ -1,3 +1,4 @@
+const requirePaymentEmail = require('../config/utils/paymentEmail');
 const db = require('../config/middleware/database');
 const crypto = require('crypto');
 const net = require('net');
@@ -3307,7 +3308,7 @@ exports.initiatePayment = async (req, res) => {
     const response = await axios.post(
       `${PAYSTACK_BASE_URL}/transaction/initialize`,
       {
-        email: application.email_address,
+        email: requirePaymentEmail(application.email_address),
         amount: amountKobo,
         reference,
         callback_url: `${getFrontendUrl()}/careers?payment_reference=${encodeURIComponent(reference)}`,

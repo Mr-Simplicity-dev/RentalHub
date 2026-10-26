@@ -153,7 +153,7 @@ router.get('/verifications', async (req, res) => {
     if (!scope) return res.status(403).json({ success: false, message: 'Zonal Admin account is missing a valid assigned_zone' });
     const { page, limit, offset } = pagination(req.query);
     const params = [scope.states, `%${String(req.query.search || '').trim()}%`];
-    const where = `u.deleted_at IS NULL AND u.email_verified = TRUE AND u.phone_verified = TRUE
+    const where = `u.deleted_at IS NULL AND (u.email_verified = TRUE OR (u.assisted_registration=TRUE AND u.email IS NULL)) AND u.phone_verified = TRUE
       AND COALESCE(u.identity_verification_status, CASE WHEN u.identity_verified THEN 'verified' ELSE 'pending' END) = 'pending'
       AND (u.full_name ILIKE $2 OR u.email ILIKE $2 OR u.phone ILIKE $2)
       AND EXISTS (SELECT 1 FROM properties p JOIN states s ON s.id = p.state_id WHERE (p.user_id = u.id OR p.landlord_id = u.id) AND s.state_name = ANY($1)

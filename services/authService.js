@@ -1,3 +1,4 @@
+const requirePaymentEmail = require('../config/utils/paymentEmail');
 const bcrypt = require('bcryptjs');
 const axios = require('axios');
 const crypto = require('crypto');
@@ -1355,6 +1356,7 @@ const createUserFromPreparedRegistration = async ({
   utm,
   beforeCommit,
   deferPaidBenefits = false,
+  assistedRegistration = false,
   logger = console
 }) => {
   await ensureTenantRegistrationPaymentSchema();
@@ -1418,9 +1420,10 @@ const createUserFromPreparedRegistration = async ({
          utm_campaign,
          utm_term,
          utm_content,
-         utm_captured_at
+         utm_captured_at,
+         assisted_registration
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
        RETURNING id, email, full_name, user_type, created_at,
                  identity_document_type, nin_verified, nationality,
                  preferred_state_id, preferred_lga_name`,
@@ -1450,6 +1453,7 @@ const createUserFromPreparedRegistration = async ({
         utm?.utm_term || null,
         utm?.utm_content || null,
         utm?.utm_source ? new Date().toISOString() : null,
+        assistedRegistration === true,
       ]
     );
 
@@ -2182,7 +2186,7 @@ exports.initializeRegistrationPayment = async (req, res) => {
     const paystackResponse = await axios.post(
       `${PAYSTACK_BASE_URL}/transaction/initialize`,
       {
-        email: preparedRegistration.email,
+        email: requirePaymentEmail(preparedRegistration.email),
         amount: chargeableAmountNgn * 100,
         reference,
         callback_url: `${FRONTEND_URL}/register`,
@@ -2393,7 +2397,7 @@ exports.getRegistrationPaymentStatus = async (req, res) => {
       const paystackResponse = await axios.post(
         `${PAYSTACK_BASE_URL}/transaction/initialize`,
         {
-          email: row.email,
+          email: requirePaymentEmail(row.email),
           amount: Number(row.amount) * 100,
           reference,
           callback_url: `${FRONTEND_URL}/register`,
@@ -3149,7 +3153,7 @@ exports.payForeignCardAdjustment = async (req, res) => {
     const paystackResponse = await axios.post(
       `${PAYSTACK_BASE_URL}/transaction/initialize`,
       {
-        email: userEmail,
+        email: requirePaymentEmail(userEmail),
         amount: adjustment * 100,
         reference: adjustmentReference,
         callback_url: `${FRONTEND_URL}/register`,
@@ -3340,7 +3344,7 @@ exports.login = async (req, res) => {
     if ((!user.assisted_registration && (user.email_verified === false || user.email_verified === null)) || (user.assisted_registration && user.phone_verified !== true)) {
       return res.status(403).json({
         success: false,
-        message: 'Please verify your email before logging in. Check your inbox for the verification link.',
+        message: user.assisted_registration ? 'Use a phone verification code to verify your phone before signing in.' : 'Please verify your email before logging in. Check your inbox for the verification link.',
       });
     }
 

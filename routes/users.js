@@ -1986,7 +1986,7 @@ router.get('/verification/status', authenticate, async (req, res) => {
     const userId = req.user.id;
 
     const result = await db.query(
-      `SELECT email_verified, phone_verified, nin_verified,
+      `SELECT email, assisted_registration, email_verified, phone_verified, nin_verified,
               identity_verified, passport_photo_url, nin,
               identity_document_type, international_passport_number,
               identity_verification_status
@@ -2008,6 +2008,7 @@ router.get('/verification/status', authenticate, async (req, res) => {
     const status = {
       identity_document_type: user.identity_document_type || 'nin',
       email: user.email_verified,
+      email_required: !(user.assisted_registration && !user.email),
       phone: user.phone_verified,
       nin: user.nin_verified,
       has_identity_number: hasIdentityNumber,
@@ -2020,7 +2021,7 @@ router.get('/verification/status', authenticate, async (req, res) => {
           : user.passport_photo_url && hasIdentityNumber
             ? 'pending'
             : 'not_submitted'),
-      overall_complete: user.email_verified && 
+      overall_complete: (user.email_verified || (user.assisted_registration && !user.email)) && 
                         user.phone_verified && 
                         ninStepComplete && 
                         user.identity_verified &&

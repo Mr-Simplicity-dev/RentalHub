@@ -92,6 +92,9 @@ const sendWithTimeout = async (payload) => {
 };
 
 exports.sendEmail = async ({ to, subject, html, attachments }) => {
+  if(!to || (Array.isArray(to)&&to.length===0))return {success:false,skipped:true,reason:'missing_recipient'};
+  const recipients=Array.isArray(to)?to:[to];
+  if(recipients.some(value=>!require('validator').isEmail(extractEmailAddress(value))))throw new Error('A valid recipient email is required');
   const primaryPayload = {
     from: FROM,
     to,

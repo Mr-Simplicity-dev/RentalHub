@@ -1004,7 +1004,7 @@ io.use(async (socket, next) => {
     const { userId, userType, tokenVersion } = getSessionTokenIdentity(decoded);
 
     const userResult = await db.query(
-      `SELECT id, user_type, is_active, deleted_at, token_version
+      `SELECT id, user_type, is_active, deleted_at, token_version, assisted_registration
        FROM users WHERE id = $1 LIMIT 1`,
       [userId]
     );

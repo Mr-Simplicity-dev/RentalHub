@@ -1,3 +1,4 @@
+import AssistedPasswordForm from '../components/common/AssistedPasswordForm';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -758,6 +759,7 @@ const Profile = () => {
         <BackToDashboard />
       </div>
 
+      <AssistedPasswordForm />
       <div className="card mb-6" data-tour-id="profile-details-workflow">
         <h2 className="font-semibold mb-4">{t('profile.account_title')}</h2>
         <div className="space-y-3 text-sm">
@@ -776,7 +778,7 @@ const Profile = () => {
           </div>
           <div>
             <strong>{t('profile.email')}:</strong>
-            <span className="ml-2">{user?.email}</span>
+            <span className="ml-2">{user?.email || t('profile.not_provided')}</span>
           </div>
           <div>
             <strong>{t('profile.phone')}:</strong>

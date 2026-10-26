@@ -1,3 +1,4 @@
+const requirePaymentEmail = require('../config/utils/paymentEmail');
 const TransportationService = require('../models/Transportation');
 const { validationResult } = require('express-validator');
 const { buildReference } = require('../config/utils/referenceGenerator');
@@ -295,7 +296,7 @@ class TransportationController {
             const paystackResponse = await axios.post(
               `${PAYSTACK_BASE_URL}/transaction/initialize`,
               {
-                email: req.user.email,
+                email: requirePaymentEmail(req.user.email),
                 amount: Math.round(booking.total_price * 100),
                 reference,
                 metadata: {

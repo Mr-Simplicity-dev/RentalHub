@@ -3,6 +3,8 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS assisted_registration BOOLEAN NOT NUL
 ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_login_key TEXT;
 ALTER TABLE users ALTER COLUMN email DROP NOT NULL;
 ALTER TABLE tenant_registration_payments ALTER COLUMN email DROP NOT NULL;
+ALTER TABLE users ADD CONSTRAINT assisted_registration_contact_required CHECK (email IS NOT NULL OR (assisted_registration=TRUE AND user_type IN ('tenant','landlord') AND phone IS NOT NULL));
+ALTER TABLE tenant_registration_payments ADD CONSTRAINT assisted_payment_contact_required CHECK (email IS NOT NULL OR COALESCE(registration_payload->>'assisted_registration','false')='true');
 CREATE OR REPLACE FUNCTION rentalhub_phone_key(value TEXT) RETURNS TEXT LANGUAGE sql IMMUTABLE AS $$
  SELECT CASE WHEN digits ~ '^0[789][0-9]{9}$' THEN '+234' || substring(digits FROM 2)
              WHEN digits ~ '^234[789][0-9]{9}$' THEN '+' || digits
@@ -23,9 +25,10 @@ CREATE TABLE IF NOT EXISTS assisted_registration_requests (
 CREATE TABLE IF NOT EXISTS assisted_registrations (
  reference VARCHAR(255) PRIMARY KEY REFERENCES tenant_registration_payments(transaction_reference), user_id INTEGER UNIQUE NOT NULL REFERENCES users(id),
  staff_id INTEGER NOT NULL REFERENCES users(id), state_id INTEGER NOT NULL REFERENCES states(id), lga_name VARCHAR(120) NOT NULL,
+ consent_version VARCHAR(60) NOT NULL DEFAULT 'assisted-registration-v1', consent_confirmed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
  amount_due NUMERIC(12,2) NOT NULL CHECK(amount_due>=0), quote JSONB NOT NULL,
  status VARCHAR(12) NOT NULL DEFAULT 'unpaid' CHECK(status IN ('unpaid','paid')),
- assigned_agent_id INTEGER REFERENCES users(id), benefits_completed_at TIMESTAMPTZ, payment_id INTEGER REFERENCES payments(id), collected_by INTEGER REFERENCES users(id), collection_method VARCHAR(24),
+ assigned_agent_id INTEGER REFERENCES users(id), benefits_completed_at TIMESTAMPTZ, benefits_last_attempt_at TIMESTAMPTZ, payment_id INTEGER REFERENCES payments(id), collected_by INTEGER REFERENCES users(id), collection_method VARCHAR(24),
  remittance_status VARCHAR(20) NOT NULL DEFAULT 'not_applicable' CHECK(remittance_status IN ('not_applicable','outstanding','received')),
  remitted_by INTEGER REFERENCES users(id), remitted_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), paid_at TIMESTAMPTZ
 );

@@ -1,3 +1,4 @@
+const requirePaymentEmail = require('../config/utils/paymentEmail');
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
@@ -185,7 +186,7 @@ router.post(
       const paystackResponse = await axios.post(
         `${PAYSTACK_BASE_URL}/transaction/initialize`,
         {
-          email: payload.email,
+          email: requirePaymentEmail(payload.email),
           amount: pricing.amount * 100,
           reference,
           callback_url: callbackUrl,

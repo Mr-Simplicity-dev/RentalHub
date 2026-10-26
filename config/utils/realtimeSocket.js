@@ -133,7 +133,7 @@ const fetchSocketUser = async (token) => {
 
   const result = await db.query(
     `SELECT id, full_name, email, user_type, deleted_at, is_active, token_version,
-            assigned_state, assigned_city, assigned_lga, assigned_zone
+            assigned_state, assigned_city, assigned_lga, assigned_zone, assisted_registration
      FROM users
      WHERE id = $1
      LIMIT 1`,
@@ -151,6 +151,7 @@ const fetchSocketUser = async (token) => {
     throw new Error('Session expired. Please log in again.');
   }
 
+  if(user.assisted_registration){const payment=await db.query('SELECT status FROM assisted_registrations WHERE user_id=$1',[user.id]);if(payment.rows[0]?.status!=='paid')throw new Error('Registration payment required');}
   return user;
 };
 

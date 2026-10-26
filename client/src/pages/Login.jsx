@@ -8,6 +8,7 @@ import { toast } from 'react-toastify';
 import { FaEnvelope, FaEye, FaEyeSlash, FaLock } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 
+import assistedCopy from '../i18n/assistedRegistration.json';
 import PhoneAccountAccess from '../components/common/PhoneAccountAccess';
 
 const LOGIN_EMAIL_HISTORY_KEY = 'loginEmailHistory';
@@ -54,7 +55,8 @@ const saveLoginEmailSuggestion = (email) => {
 };
 
 const Login = () => {
-  const { t } = useTranslation();
+  const { t,i18n } = useTranslation();
+  const identityLabel=(assistedCopy[i18n.language?.split('-')[0]]||assistedCopy.en).identity;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -278,7 +280,7 @@ const Login = () => {
               autoComplete="email"
               list="login-email-suggestions"
               className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-slate-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-              placeholder="Email or verified phone number" aria-label="Email or verified phone number"
+              placeholder={identityLabel} aria-label={identityLabel}
             />
             <datalist id="login-email-suggestions">
               {matchingEmailSuggestions.map((item) => (

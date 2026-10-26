@@ -1,3 +1,4 @@
+const requirePaymentEmail = require('../config/utils/paymentEmail');
 // ====================== IMPORTS ======================
 const axios = require("axios");
 const db = require('../config/middleware/database');
@@ -1594,7 +1595,7 @@ exports.initializePropertyUnlock = async (req, res) => {
       const paystackResponse = await axios.post(
         `${PAYSTACK_BASE_URL}/transaction/initialize`,
         {
-          email: user.email,
+          email: requirePaymentEmail(user.email),
           amount: PROPERTY_UNLOCK_PRICE_NGN * 100,
           reference: buildReference('UNLOCK', paymentId, Date.now()),
           callback_url: `${FRONTEND_URL}/properties/${property_id}`,
@@ -2041,7 +2042,7 @@ exports.initializePropertyInspectionPayment = async (req, res) => {
     const paystackResponse = await axios.post(
       `${PAYSTACK_BASE_URL}/transaction/initialize`,
       {
-        email: application.email,
+        email: requirePaymentEmail(application.email),
         amount: PROPERTY_INSPECTION_FEE_NGN * 100,
         reference,
         callback_url: `${FRONTEND_URL}/tenant/dashboard?inspection_reference=${encodeURIComponent(reference)}`,
@@ -2306,7 +2307,7 @@ exports.initializeTenantLocationAccess = async (req, res) => {
     const paystackResponse = await axios.post(
       `${PAYSTACK_BASE_URL}/transaction/initialize`,
       {
-        email: req.user.email,
+        email: requirePaymentEmail(req.user.email),
         amount: Number(quote.amount) * 100,
         reference,
         callback_url: callbackUrl,
@@ -2786,7 +2787,7 @@ exports.initializeListingPayment = async (req, res) => {
       const paystackResponse = await axios.post(
         `${PAYSTACK_BASE_URL}/transaction/initialize`,
         {
-          email: user.email,
+          email: requirePaymentEmail(user.email),
           amount: plan.price * 100,
            reference: buildReference('LIST', paymentId, Date.now()),
           callback_url: `${FRONTEND_URL}/payment/verify-listing`,
@@ -3204,7 +3205,7 @@ exports.initializeRentPayment = async (req, res) => {
       const paystackResponse = await axios.post(
         `${PAYSTACK_BASE_URL}/transaction/initialize`,
         {
-          email: user.email,
+          email: requirePaymentEmail(user.email),
           amount: amount * 100,
           reference: buildReference('RENT', paymentId, Date.now()),
           callback_url: `${FRONTEND_URL}/payment/verify-rent`,
@@ -3507,7 +3508,7 @@ exports.initializeHelpRentPayment = async (req, res) => {
       const paystackResponse = await axios.post(
         `${PAYSTACK_BASE_URL}/transaction/initialize`,
         {
-          email: payer.email,
+          email: requirePaymentEmail(payer.email),
           amount: amount * 100,
           reference: buildReference('RENT', paymentId, Date.now()),
           callback_url: `${FRONTEND_URL}/payment/verify-rent`,
@@ -3888,7 +3889,7 @@ exports.initializeWalletFunding = async (req, res) => {
     const paystackResponse = await axios.post(
       `${PAYSTACK_BASE_URL}/transaction/initialize`,
       {
-        email: user.email,
+        email: requirePaymentEmail(user.email),
         amount: Math.round(Number(amount) * 100), // kobo
         reference,
         callback_url: `${FRONTEND_URL}/payment/verify-wallet-funding`,
@@ -4254,7 +4255,7 @@ exports.retryPayment = async (req, res) => {
     const paystackResponse = await axios.post(
       `${PAYSTACK_BASE_URL}/transaction/initialize`,
       {
-        email: user.email,
+        email: requirePaymentEmail(user.email),
         amount: Number(payment.amount) * 100,
         reference: retryReference,
         callback_url: callbackUrl,
