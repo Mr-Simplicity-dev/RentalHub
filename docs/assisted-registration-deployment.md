@@ -80,7 +80,7 @@ Mobile: `src/navigation/AppNavigator.js`, `src/screens/auth/LoginScreen.js`, `sr
 
 ## Deployment
 
-No new environment variables or dependencies were added. Existing SMS, Turnstile, identity verification, payment-provider, JWT and database configuration must be working. No live account, charge, SMS, migration or deployment was performed for verification.
+No new environment variables or dependencies were added. Existing SMS, Turnstile, identity verification, payment-provider, JWT and database configuration must be working. Migration 2030 is confirmed applied on the hosting server (178/178 migrations). No live account, charge or SMS was run for verification.
 
 Deploy the migration before running the new backend code, using the existing maintenance/release procedure:
 
@@ -98,15 +98,16 @@ Before rollout, exercise one scoped support registration on staging, SMS deliver
 
 ## Verification results
 
-- Backend: 527 tests passed, 0 failed (full suite).
-- Web: 116 tests passed, 0 failed across 12 files (full suite).
+- Backend: 529 tests passed, 0 failed (full suite).
+- Web: 119 tests passed, 0 failed across 12 files (full suite).
 - Web production build: passed. Existing large-bundle warnings remain; they are not hidden.
 - Focused assisted-registration tests cover scoped authorization, fee integrity, cash remittance, OTP rejection, password re-verification, revoked sessions, email guards, zero-fee completion and mobile routing.
 - Three earlier existing frontend tests hit timeouts during concurrent builds. Their isolated rerun passed, and the final full web suite also passed.
 - Android JavaScript/Hermes bundle: passed (final export).
+- Android release APK 1.0.44 (versionCode 55) built, signed, zipaligned and deployed to `/api/downloads/app` on 2026-10-26. Live `/api/downloads/version` reports `apkAvailable: true`.
 - iOS JavaScript/Hermes bundle: passed (final export).
 - Mobile language round-trip checks: passed for all 8 languages and both old native direction states.
 - Mobile tour checks: passed for 87 steps, 21 administrative roles and 32 role-navigation audits.
 - Mobile typography checks: passed for Android, iOS and web; 204 screen/component files parsed.
-- Existing WebRTC package-export fallback warnings remain in mobile bundling. No native APK or signed IPA was built or installed.
+- Existing WebRTC package-export fallback warnings remain in mobile bundling. The Android APK above is the release artifact; no signed IPA was built or installed.
 - Validation logs are retained locally under RentalHubMobile/.codex-tmp/assisted-*.log. Generated bundle directories were removed after successful verification.
