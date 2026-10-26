@@ -11,7 +11,7 @@
 - Tour version 7 makes the corrected guide available. The native catalogue has 87 localized steps in eight languages.
 
 ## Currency
-Repaired 17 corrupted naira strings: seven in native registration, five in web wallet withdrawal displays, three mobile administrator prices using N instead of the symbol, and two refund responses. The native registration changes cover the total due, diaspora estimate, lawyer/agent options and additional foreign-card amount. Shared native source applies to Android and iOS.
+Repaired 17 currency labels: seven in native registration, five in web wallet withdrawal displays, three mobile administrator prices using N instead of the symbol, and two refund responses. The native registration changes cover the total due, diaspora estimate, lawyer/agent options and additional foreign-card amount. Shared native source applies to Android and iOS.
 
 All four bundled Inter weights on both web and native contain U+20A6. Existing web registration local fees render with the proper symbol. Pricing, fees, payment calculations and authorization were not changed.
 
@@ -26,3 +26,5 @@ These are code, component-rendering and bundle checks. They do not guarantee eve
 
 ## Release
 Deploy the rebuilt website/backend and distribute new Android/iOS releases. Existing installed applications keep their old interface until updated. No migration, payment-provider change or new environment variable is required for these repairs.
+
+Android and iOS JavaScript exports both passed. Native typography and account-assistant regression checks also passed.
