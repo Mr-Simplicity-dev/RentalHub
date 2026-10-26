@@ -38,3 +38,9 @@ test('choosing RentalHub lawyers keeps the user-entered lawyer email editable an
  await act(async()=>fireEvent.click(container.querySelector('#use_rentalhub_lawyers')));
  expect(input.disabled).toBe(false);expect(input.value).toBe('lawyer@example.test');expect(readRegistrationDraft().form.lawyer_email).toBe('lawyer@example.test');
 });
+
+test('registration introduction displays the naira symbol on each local fee',async()=>{
+ await mount();
+ for (const amount of ['3,000','5,000','2,000']) expect(container.textContent).toContain('\u20A6'+amount);
+ expect(container.textContent).not.toContain(String.fromCodePoint(0xe2,0x201a,0xa6));
+});

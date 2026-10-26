@@ -340,6 +340,13 @@ export const TOUR_STEPS = {
     },
   ],
 
+
+  ZONAL_FINANCIAL_ADMIN_DASHBOARD: [
+    { id: 'zonal_finance_overview', target: '#zonal-finance-personal', route: '/admin/zonal-financial-dashboard', title: 'Local Finance Overview', description: 'Review personal commission, available balance and payout requests for your assigned zone.', placement: 'bottom' },
+    { id: 'zonal_finance_withdraw', target: '.zonal-finance-withdrawal-action', route: '/admin/zonal-financial-dashboard', title: 'Request a Withdrawal', description: 'Request a personal commission payout using the existing verified withdrawal process.', placement: 'bottom' },
+    { id: 'zonal_finance_history', target: '#zonal-finance-withdrawals', route: '/admin/zonal-financial-dashboard', title: 'Withdrawal History', description: 'Review payout amounts, dates, destinations and decision status.', placement: 'top' },
+  ],
+
   // LGA Financial Admin Dashboard
   LGA_FINANCIAL_ADMIN_DASHBOARD: [
     {
@@ -1178,6 +1185,16 @@ export const TOUR_STEPS = {
   ],
 };
 
+TOUR_STEPS.ZONAL_TRANSPORTATION_ADMIN_DASHBOARD = TOUR_STEPS.STATE_TRANSPORTATION_ADMIN_DASHBOARD.map(step => ({
+  ...step, id: ['zonal', step.id].join('_'),
+  route: step.route?.replace('/transportation/state', '/transportation/zonal'),
+  title: step.title.startsWith('State ') ? 'Assigned Jurisdiction' : step.title,
+  description: step.description.replace(/your state/g, 'your assigned zone').replace(/state scope/g, 'zone scope'),
+}));
+TOUR_STEPS.ZONAL_FUMIGATION_ADMIN_DASHBOARD = TOUR_STEPS.FUMIGATION_ADMIN_DASHBOARD.map(step => ({
+  ...step, id: ['zonal', step.id].join('_'), route: '/admin/fumigation-cleaning/zonal',
+}));
+
 for(const [role,steps] of [['tenant',TOUR_STEPS.TENANT_DASHBOARD],['landlord',TOUR_STEPS.LANDLORD_DASHBOARD]]){const addedSteps=[{id:'dashboard_disputes_current',target:'[data-tour-id="action-disputes"]',title:'Disputes',description:'Open the separate Disputes card to submit and follow a dispute.',placement:'bottom'},{id:'dashboard_reports_current',target:'[data-tour-id="action-damage"]',title:'Property Reports',description:'Open Property Reports to report a property issue and track its progress.',placement:'bottom'}];steps.push(...addedSteps.map(step=>({...step,id:role+'_'+step.id})));for(const step of steps){if(step.target==='.tour-legal-help'){step.title='Coverage assistance';step.description='Paid coverage is required for private assistance. Check your coverage and submit a request from your dashboard.';}if(step.target==='.tour-wallet'){step.title='Wallet';step.description='Open Wallet to fund it or withdraw available funds. Payments and Rent Savings remain separate options.';}if(step.target==='.tour-support-widget'){step.title='Assistant and support';step.description='Start with the assistant for guided troubleshooting, review a support ticket if needed, and ask for a person when the issue remains unresolved.';}}}
 
 export const SHARED_HEADER_STEPS = [
@@ -1244,12 +1261,12 @@ export const DASHBOARD_ICON_STEPS = [
 
 const mergeSharedSteps = (baseSteps, userRole) => {
   let steps = [...baseSteps];
-  const isAdmin = ['admin', 'lga_admin', 'state_admin', 'financial_admin', 'lga_financial_admin', 'super_financial_admin', 'transportation_admin', 'lga_transportation_admin', 'state_transportation_admin', 'super_transportation_admin', 'fumigation_admin', 'lga_fumigation_admin', 'state_fumigation_admin', 'super_fumigation_admin', 'recruitment_admin', 'state_financial_admin', 'lga_support_admin', 'state_support_admin', 'super_support_admin', 'super_admin', 'zonal_admin'].includes(userRole);
-  const isLawyer = ['lawyer', 'state_lawyer', 'super_lawyer'].includes(userRole);
+  const isAdmin = ['zonal_financial_admin','zonal_transportation_admin','zonal_fumigation_admin','admin', 'lga_admin', 'state_admin', 'financial_admin', 'lga_financial_admin', 'super_financial_admin', 'transportation_admin', 'lga_transportation_admin', 'state_transportation_admin', 'super_transportation_admin', 'fumigation_admin', 'lga_fumigation_admin', 'state_fumigation_admin', 'super_fumigation_admin', 'recruitment_admin', 'state_financial_admin', 'lga_support_admin', 'state_support_admin', 'super_support_admin', 'super_admin', 'zonal_admin'].includes(userRole);
+  const isLawyer = ['lawyer', 'state_lawyer', 'zonal_lawyer', 'super_lawyer'].includes(userRole);
   const isDashboard = ['tenant', 'user', 'landlord', 'agent', 'marketing_agent'].includes(userRole);
 
   if (isDashboard) {
-    steps = [...DASHBOARD_ICON_STEPS, ...steps];
+    steps = [...DASHBOARD_ICON_STEPS.filter(step => userRole !== 'agent' || step.id !== 'dash_referral'), ...steps];
   }
   if (isAdmin) {
     steps = [...ADMIN_SIDEBAR_STEPS, ...steps];
@@ -1327,6 +1344,10 @@ export const getTourStepsByUserRole = (userRole, t, context = {}) => {
     marketing_agent: TOUR_STEPS.MARKETING_AGENT_DASHBOARD,
     lawyer: TOUR_STEPS.LAWYER_DASHBOARD,
     state_lawyer: TOUR_STEPS.LAWYER_DASHBOARD,
+    zonal_lawyer: TOUR_STEPS.LAWYER_DASHBOARD,
+    zonal_financial_admin: TOUR_STEPS.ZONAL_FINANCIAL_ADMIN_DASHBOARD,
+    zonal_transportation_admin: TOUR_STEPS.ZONAL_TRANSPORTATION_ADMIN_DASHBOARD,
+    zonal_fumigation_admin: TOUR_STEPS.ZONAL_FUMIGATION_ADMIN_DASHBOARD,
     super_lawyer: TOUR_STEPS.LAWYER_DASHBOARD,
     admin: TOUR_STEPS.ADMIN_DASHBOARD,
     lga_admin: TOUR_STEPS.ADMIN_DASHBOARD,
@@ -1373,6 +1394,10 @@ export const getTourDashboardType = (userRole) => {
     marketing_agent: 'marketing_agent_dashboard',
     lawyer: 'lawyer_dashboard',
     state_lawyer: 'state_lawyer_dashboard',
+    zonal_lawyer: 'zonal_lawyer_dashboard',
+    zonal_financial_admin: 'zonal_financial_admin_dashboard',
+    zonal_transportation_admin: 'zonal_transportation_admin_dashboard',
+    zonal_fumigation_admin: 'zonal_fumigation_admin_dashboard',
     super_lawyer: 'super_lawyer_dashboard',
     admin: 'admin_dashboard',
     lga_admin: 'lga_admin_dashboard',
@@ -1412,6 +1437,10 @@ export const getTourDashboardRoute = (userRole) => {
     marketing_agent: '/marketing-agent/dashboard',
     lawyer: '/lawyer',
     state_lawyer: '/lawyer/state',
+    zonal_lawyer: '/lawyer/zonal',
+    zonal_financial_admin: '/admin/zonal-financial-dashboard',
+    zonal_transportation_admin: '/admin/transportation/zonal',
+    zonal_fumigation_admin: '/admin/fumigation-cleaning/zonal',
     super_lawyer: '/lawyer/super',
     admin: '/admin',
     lga_admin: '/admin',

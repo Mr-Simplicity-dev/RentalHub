@@ -330,10 +330,14 @@ export const getWorkflowToursByUserRole = (userRole, t) => {
     marketing_agent: [WORKFLOW_TOURS.ACCOUNT_SETTINGS],
     lawyer: [WORKFLOW_TOURS.LAWYER_CASEWORK, WORKFLOW_TOURS.ACCOUNT_SETTINGS],
     state_lawyer: [WORKFLOW_TOURS.LAWYER_CASEWORK, WORKFLOW_TOURS.ACCOUNT_SETTINGS],
+    zonal_lawyer: [WORKFLOW_TOURS.LAWYER_CASEWORK, WORKFLOW_TOURS.ACCOUNT_SETTINGS],
     super_lawyer: [WORKFLOW_TOURS.LAWYER_CASEWORK, WORKFLOW_TOURS.ACCOUNT_SETTINGS],
   };
 
   const adminWorkflowMeta = {
+    zonal_financial_admin: ['zonal_finance_operations','Review zonal finance','Review commission balances and payout history within your assigned zone.'],
+    zonal_transportation_admin: ['zonal_transport_operations','Review zonal transportation','Review bookings and operational activity within your assigned zone.'],
+    zonal_fumigation_admin: ['zonal_fumigation_operations','Review zonal services','Review service bookings and providers within your assigned zone.'],
     admin: ['platform_admin_operations', 'Run the platform review queue', 'Move through users, properties, applications, verifications, and administration tools.'],
     lga_admin: ['lga_admin_operations', 'Run local platform operations', 'Review users, properties, applications, and verification work inside your assigned scope.'],
     zonal_admin: ['zonal_admin_operations', 'Run zonal platform operations', 'Review users, properties, applications, and verification work inside your assigned zone.'],
@@ -375,7 +379,7 @@ export const getWorkflowToursByUserRole = (userRole, t) => {
     title: translate(t, `tour.titles.${workflow.id}`, workflow.title),
     description: translate(t, 'tour.ui.generic_workflow_description', workflow.description)
       .replace('__TITLE__', translate(t, `tour.titles.${workflow.id}`, workflow.title)),
-    steps: localizeTourSteps(workflow.steps, t),
+    steps: localizeTourSteps(workflow.steps.map(step => step.route === '/lawyer' && ['state_lawyer','zonal_lawyer','super_lawyer'].includes(userRole) ? { ...step, route: ({state_lawyer:'/lawyer/state',zonal_lawyer:'/lawyer/zonal',super_lawyer:'/lawyer/super'})[userRole] } : step), t),
   }));
 };
 

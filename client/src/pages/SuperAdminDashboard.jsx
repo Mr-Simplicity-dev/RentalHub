@@ -1493,7 +1493,7 @@ export default function SuperAdminDashboard() {
       )}
 
       {tab === "property_requests" && (
-        <div className="space-y-6">
+        <div data-tour-id="super-property-requests" className="space-y-6">
           <PropertyRequestWorkflowPanel
             mode="support"
             title="National Tenant Property Requests"

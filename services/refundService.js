@@ -557,7 +557,7 @@ const ensureRefundSchema = async () => {
 
 
 // =====================================================
-//         TENANT â€” Submit Refund Request
+//         TENANT — Submit Refund Request
 // =====================================================
 exports.submitRefundRequest = async (req, res) => {
   try {
@@ -730,7 +730,7 @@ exports.submitRefundRequest = async (req, res) => {
 
 
 // =====================================================
-//         TENANT â€” Get My Refund Requests
+//         TENANT — Get My Refund Requests
 // =====================================================
 exports.getTenantRefundRequests = async (req, res) => {
   try {
@@ -767,7 +767,7 @@ exports.getTenantRefundRequests = async (req, res) => {
 
 
 // =====================================================
-//     TENANT â€” Get Eligible Rent Payments
+//     TENANT — Get Eligible Rent Payments
 //     (completed rent payments with no pending/approved refund)
 // =====================================================
 exports.getEligibleRentPayments = async (req, res) => {
@@ -815,7 +815,7 @@ exports.getEligibleRentPayments = async (req, res) => {
 
 
 // =====================================================
-//     LANDLORD â€” Get Pending Refund Requests
+//     LANDLORD — Get Pending Refund Requests
 // =====================================================
 exports.getLandlordRefundRequests = async (req, res) => {
   try {
@@ -867,7 +867,7 @@ exports.getLandlordRefundRequests = async (req, res) => {
 
 
 // =====================================================
-//     LANDLORD â€” Approve Refund Request (full / partial)
+//     LANDLORD — Approve Refund Request (full / partial)
 // =====================================================
 // refund_type: 'full' | 'partial_months' | 'partial_custom'
 // refund_months: number of months to refund (for partial_months)
@@ -883,14 +883,14 @@ exports.approveRefundRequest = async (req, res) => {
     const {
       landlord_note,
       refund_type = 'full',      // full | partial_months | partial_custom
-      refund_months,             // e.g. 3, 6, 10 â€” used when refund_type = partial_months
-      approved_amount,           // custom amount  â€” used when refund_type = partial_custom
+      refund_months,             // e.g. 3, 6, 10 — used when refund_type = partial_months
+      approved_amount,           // custom amount  — used when refund_type = partial_custom
     } = req.body;
 
     await client.query('BEGIN');
 
     // Fetch refund + original payment details. FOR UPDATE serializes
-    // concurrent approvals of the same request â€” the second caller blocks
+    // concurrent approvals of the same request — the second caller blocks
     // here and then finds the row no longer 'pending' (404), so the
     // Paystack refund can never be double-fired.
     const refundResult = await client.query(
@@ -1029,7 +1029,7 @@ exports.approveRefundRequest = async (req, res) => {
 
     return res.json({
       success: true,
-      message: `${typeLabel} of â‚¦${finalAmount.toLocaleString()} approved. ${paystackSuccess ? 'Processed via Paystack.' : 'Credited to tenant wallet â€” manual payout pending.'}`,
+      message: `${typeLabel} of ₦${finalAmount.toLocaleString()} approved. ${paystackSuccess ? 'Processed via Paystack.' : 'Credited to tenant wallet — manual payout pending.'}`,
       data: {
         refund_id: refundId,
         status: newStatus,
@@ -1049,7 +1049,7 @@ exports.approveRefundRequest = async (req, res) => {
 
 
 // =====================================================
-//     LANDLORD â€” Reject Refund Request
+//     LANDLORD — Reject Refund Request
 // =====================================================
 exports.rejectRefundRequest = async (req, res) => {
   try {
@@ -1138,7 +1138,7 @@ exports.rejectRefundRequest = async (req, res) => {
 
 
 // =====================================================
-//     ADMIN â€” Get All Refund Requests
+//     ADMIN — Get All Refund Requests
 // =====================================================
 exports.adminGetAllRefundRequests = async (req, res) => {
   try {
@@ -1847,7 +1847,7 @@ exports.adminReviewTenancyAdjustmentRequest = async (req, res) => {
 };
 
 // =====================================================
-//     TENANT â€” Get Wallet Balance
+//     TENANT — Get Wallet Balance
 // =====================================================
 exports.getWalletBalance = async (req, res) => {
   try {
@@ -1871,7 +1871,7 @@ exports.getWalletBalance = async (req, res) => {
 
 
 // =====================================================
-//     TENANT / LANDLORD â€” Request Withdrawal
+//     TENANT / LANDLORD — Request Withdrawal
 // =====================================================
 
 /**
@@ -1943,7 +1943,7 @@ exports.requestWithdrawal = async (req, res) => {
     // â”€â”€ Server-side account name verification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     try {
       const { verifiedName } = await verifyBankAccountWithPaystack(bank_name, account_number);
-      // Compare names â€” allow case-insensitive and partial word matching
+      // Compare names — allow case-insensitive and partial word matching
       const normalizedVerified = verifiedName.trim().toLowerCase().replace(/\s+/g, ' ');
       const normalizedProvided = account_name.trim().toLowerCase().replace(/\s+/g, ' ');
       if (normalizedVerified !== normalizedProvided) {
@@ -2034,11 +2034,11 @@ exports.requestWithdrawal = async (req, res) => {
     if (withdrawAmount > balance) {
       return res.status(400).json({
         success: false,
-        message: `Insufficient wallet balance. Available: â‚¦${balance.toLocaleString()}`,
+        message: `Insufficient wallet balance. Available: ₦${balance.toLocaleString()}`,
       });
     }
 
-    // For landlords â€” enforce 14 working days hold
+    // For landlords — enforce 14 working days hold
     if (userType === 'landlord') {
       const feeStatus = await getLandlordPropertyFeeStatus(userId);
       if (feeStatus.reserve_required && Number(feeStatus.amount_due || 0) > 0) {
@@ -2074,7 +2074,7 @@ exports.requestWithdrawal = async (req, res) => {
            )`,
         [userId]
       );
-      // We allow withdrawal â€” the 14 day window just means they must wait
+      // We allow withdrawal — the 14 day window just means they must wait
       // If there are recent uncleared payments we warn but don't block
       // (admin reviews all withdrawals before processing)
     }
@@ -2173,7 +2173,7 @@ exports.requestWithdrawal = async (req, res) => {
 
 
 // =====================================================
-//     TENANT / LANDLORD â€” Get My Withdrawal Requests
+//     TENANT / LANDLORD — Get My Withdrawal Requests
 // =====================================================
 exports.getMyWithdrawals = async (req, res) => {
   try {
@@ -2429,7 +2429,7 @@ exports.rejectWalletWithdrawal = async (req, res) => {
 
 
 // =====================================================
-//     LANDLORD â€” Get Wallet Balance (cleared funds)
+//     LANDLORD — Get Wallet Balance (cleared funds)
 //     Only rent payments older than 14 working days
 //     with no active refund dispute count as cleared
 // =====================================================

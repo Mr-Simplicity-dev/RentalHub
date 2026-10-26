@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { getTourStepsByUserRole, TOUR_STEPS } from './tourConfig';
+import { getTourStepsByUserRole, getTourDashboardRoute, TOUR_STEPS } from './tourConfig';
 import { getWorkflowToursByUserRole } from './tourWorkflows';
 
-const roles = ['admin','lga_admin','zonal_admin','state_admin','state_financial_admin','financial_admin','lga_financial_admin','super_financial_admin','lga_support_admin','state_support_admin','super_support_admin','transportation_admin','lga_transportation_admin','state_transportation_admin','super_transportation_admin','fumigation_admin','lga_fumigation_admin','state_fumigation_admin','super_fumigation_admin','recruitment_admin','super_admin'];
+const roles = ['admin','lga_admin','zonal_admin','state_admin','state_financial_admin','financial_admin','lga_financial_admin','super_financial_admin','lga_support_admin','state_support_admin','super_support_admin','transportation_admin','lga_transportation_admin','state_transportation_admin','super_transportation_admin','fumigation_admin','lga_fumigation_admin','state_fumigation_admin','super_fumigation_admin','recruitment_admin','super_admin','zonal_financial_admin','zonal_transportation_admin','zonal_fumigation_admin','zonal_lawyer'];
 const stepsFor = role => getTourStepsByUserRole(role, undefined, {user:{user_type:role}});
 
 describe('current administrative tours', () => {
@@ -37,4 +37,13 @@ describe('current administrative tours', () => {
     expect(copy).toContain('Not Applicable');
     expect(copy).toContain('interviews are not automatic');
   });
+});
+
+const zonalRoutes = { zonal_financial_admin: '/admin/zonal-financial-dashboard', zonal_transportation_admin: '/admin/transportation/zonal', zonal_fumigation_admin: '/admin/fumigation-cleaning/zonal', zonal_lawyer: '/lawyer/zonal' };
+it.each(Object.entries(zonalRoutes))('%s uses its own dashboard and workflow instead of tenant guidance', (role,route) => {
+ expect(getTourDashboardRoute(role)).toBe(route);
+ const steps = stepsFor(role);
+ expect(steps.some(step=>step.id.startsWith('tenant_'))).toBe(false);
+ expect(getWorkflowToursByUserRole(role).flatMap(flow=>flow.steps).some(step=>step.target===steps.find(item=>!item.id.startsWith('header_')&&!item.id.includes('sidebar_')).target)).toBe(true);
+ if(role!=='zonal_lawyer')expect(steps.filter(step=>!step.id.startsWith('header_')&&!step.id.includes('sidebar_')).every(step=>step.route?.startsWith(route))).toBe(true);
 });
