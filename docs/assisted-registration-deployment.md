@@ -104,7 +104,7 @@ Before rollout, exercise one scoped support registration on staging, SMS deliver
 - Focused assisted-registration tests cover scoped authorization, fee integrity, cash remittance, OTP rejection, password re-verification, revoked sessions, email guards, zero-fee completion and mobile routing.
 - Three earlier existing frontend tests hit timeouts during concurrent builds. Their isolated rerun passed, and the final full web suite also passed.
 - Android JavaScript/Hermes bundle: passed (final export).
-- Android release APK 1.0.45 (versionCode 56) built, signed, zipaligned and deployed to `/api/downloads/app` on 2026-10-26. Live `/api/downloads/version` reports `apkAvailable: true`.
+- Android release APK 1.0.46 (versionCode 57) built, signed, zipaligned and deployed to `/api/downloads/app` on 2026-10-27. Live `/api/downloads/version` reports `apkAvailable: true`. This release moves the mobile Super Admin notification bell into the hero top-right, keeps the bell count aligned with the combined notifications/messages activity badge, and declares the Android launcher/badge-provider queries needed by ShortcutBadger on Android 11+.
 - iOS JavaScript/Hermes bundle: passed (final export).
 - Mobile language round-trip checks: passed for all 8 languages and both old native direction states.
 - Mobile tour checks: passed for 87 steps, 21 administrative roles and 32 role-navigation audits.
