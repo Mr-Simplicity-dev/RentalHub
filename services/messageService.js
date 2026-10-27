@@ -4,6 +4,7 @@ const { sendMessageNotification } = require('../config/utils/emailService');
 const { detectPhoneNumber } = require('../config/utils/phoneNumberFilter');
 const { emitToUser } = require('../config/utils/realtimeEmitter');
 const { sendPushToUser } = require('../config/utils/pushNotificationService');
+const { getPushBadgeCount } = require('../config/utils/unreadActivityService');
 const logger = require('../config/utils/logger');
 
 let messageSchemaReady = false;
@@ -373,6 +374,14 @@ exports.sendMessage = async (req, res) => {
 
     emitToUser(receiver_id, 'message:new', realtimeMessage);
     emitToUser(senderId, 'message:new', realtimeMessage);
+
+    let badge = 1;
+    try {
+      badge = await getPushBadgeCount(receiver_id);
+    } catch (badgeError) {
+      logger.warn(`Message push badge count failed: ${badgeError.message}`);
+    }
+
     void sendPushToUser(receiver_id, {
       title: sender.full_name || 'New RentalHub message',
       body: message_text,
@@ -383,6 +392,7 @@ exports.sendMessage = async (req, res) => {
         messageId: String(message.id),
       },
       channelId: 'messages',
+      badge: Math.max(1, Number(badge) || 1),
     }).catch((error) => req.logger.error('Message push notification failed:', error.message));
 
     res.status(201).json({
