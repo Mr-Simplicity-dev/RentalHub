@@ -29,7 +29,8 @@ function mockPublic(settings){api.get.mockImplementation(async url=>{
 async function mount(url='/careers'){await act(async()=>{root.render(<MemoryRouter initialEntries={[url]}><Careers/></MemoryRouter>);});}
 test.each([[false,true],[true,false],[true,true]])('independent availability employment=%s volunteer=%s',async(employment,volunteer)=>{
  mockPublic({is_active:employment,volunteer_applications_enabled:volunteer});await mount();
- await waitFor(()=>expect(container.querySelector('form')).toBeTruthy());
+ await waitFor(()=>expect(container.querySelector('article')).toBeTruthy());
+ expect(container.querySelector('form')).toBeNull();
  expect(container.textContent.includes('Community Volunteer')).toBe(volunteer);expect(container.textContent.includes('Paid Employment Role')).toBe(employment);
 });
 test('both toggles OFF shows no application form',async()=>{mockPublic({is_active:false,volunteer_applications_enabled:false});await mount();expect(container.querySelector('form')).toBeNull();expect(api.get.mock.calls.some(([url])=>url==='/recruitment/roles/active')).toBe(false);});
@@ -73,6 +74,7 @@ test('employment fees remain available only for selected employment roles and di
  expect(container.textContent).not.toContain('Application Access Fee');
  await act(async()=>fireEvent.click(within(container).getByRole('button',{name:'Apply for Employment'})));
  expect(container.textContent).toContain('Application Access Fee');expect(container.querySelector('select[name="application_track"]')).toBeTruthy();
+ await act(async()=>fireEvent.click(within(container).getByRole('button',{name:'Back'})));
  await act(async()=>fireEvent.click(within(container).getByRole('button',{name:copy.en.opportunity_volunteer})));
  expect(container.textContent).not.toContain('Application Access Fee');expect(container.textContent).not.toContain('5,000');expect(container.querySelector('select[name="application_track"]')).toBeNull();
  await act(async()=>fireEvent.click(within(container).getAllByRole('button',{name:'Apply as Volunteer'})[0]));
@@ -83,7 +85,7 @@ test('a saved employment draft cannot show a fee or submit an employment applica
  window.localStorage.setItem('rentalhub_careers_application_draft',JSON.stringify({role_id:'1',full_name:'Returning Applicant',email_address:'returning@example.test',phone_number:'08012345678',application_track:'premium'}));
  mockPublic({is_active:true,volunteer_applications_enabled:true});await mount('/careers?type=volunteer');
  expect(container.textContent).not.toContain('Application Access Fee');expect(container.textContent).not.toContain('5,000');expect(container.querySelector('select[name="application_track"]')).toBeNull();
- await act(async()=>fireEvent.submit(container.querySelector('form')));expect(api.post).not.toHaveBeenCalled();
+ expect(container.querySelector('form')).toBeNull();expect(api.post).not.toHaveBeenCalled();
 });
 
 test('volunteer role cards show complete responsibilities and learning-friendly eligibility before applying',async()=>{
@@ -104,6 +106,7 @@ test('education is optional for volunteer roles and remains required for employm
  await act(async()=>fireEvent.click(within(container).getAllByRole('button',{name:'Apply as Volunteer'})[0]));
  expect(container.querySelector('[name="highest_education"]').required).toBe(false);
  expect(container.textContent).toContain(copy.en.volunteer_no_degree);
+ await act(async()=>fireEvent.click(within(container).getByRole('button',{name:'Back'})));
  await act(async()=>fireEvent.click(within(container).getByRole('button',{name:'Apply for Employment'})));
  expect(container.querySelector('[name="highest_education"]').required).toBe(true);
 });
@@ -113,4 +116,27 @@ test('deep link to a category with no available roles shows an empty state inste
  await waitFor(()=>expect(container.textContent).toContain(copy.en.no_opportunities));
  expect(container.querySelector('form')).toBeNull();
  expect(container.textContent).not.toContain('Apply as Volunteer');
+});
+
+
+test('Apply opens a separate form; Back preserves entered details and the dropdown can change roles',async()=>{
+ mockPublic({is_active:true,volunteer_applications_enabled:true});await mount();
+ const ui=within(container);
+ expect(container.querySelector('form')).toBeNull();
+ expect(container.textContent).not.toContain('Career Application Form');
+ expect(ui.getByRole('heading',{name:'Recruitment Portal'}).classList.contains('text-center')).toBe(true);
+ await act(async()=>fireEvent.click(ui.getByRole('button',{name:'Apply as Volunteer'})));
+ expect(container.querySelector('article')).toBeNull();
+ expect(ui.getByRole('heading',{name:'Career Application Form'}).parentElement.classList.contains('text-center')).toBe(true);
+ expect(container.querySelector('select[name="role_id"]').value).toBe('2');
+ await act(async()=>fireEvent.change(container.querySelector('[name="full_name"]'),{target:{value:'Returning Applicant'}}));
+ await act(async()=>fireEvent.change(container.querySelector('select[name="role_id"]'),{target:{value:'1'}}));
+ expect(container.textContent).toContain('Application Access Fee');
+ await act(async()=>fireEvent.click(ui.getByRole('button',{name:'Back'})));
+ expect(container.querySelector('form')).toBeNull();
+ await act(async()=>fireEvent.click(ui.getByRole('button',{name:'Apply as Volunteer'})));
+ expect(container.querySelector('[name="full_name"]').value).toBe('Returning Applicant');
+ expect(container.querySelector('select[name="role_id"]').value).toBe('2');
+ expect(container.textContent).not.toContain('Application Access Fee');
+ expect(api.post).not.toHaveBeenCalled();
 });

@@ -305,6 +305,34 @@ export default function Careers() {
   const [lgas, setLgas] = useState([]);
   const [application, setApplication] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [applicationFormOpen, setApplicationFormOpen] = useState(false);
+  const applicationHeadingRef = useRef(null);
+  const opportunityListRef = useRef(null);
+  const lastOpportunityButtonRef = useRef(null);
+
+  useEffect(() => {
+    if (applicationFormOpen) {
+      applicationHeadingRef.current?.focus();
+      applicationHeadingRef.current?.scrollIntoView?.({ block: 'start' });
+    }
+  }, [applicationFormOpen]);
+
+  const chooseOpportunity = (role) => {
+    lastOpportunityButtonRef.current = document.activeElement;
+    setForm(prev => ({ ...prev, role_id: String(role.id), application_track: 'standard' }));
+    setApplicationFormOpen(true);
+  };
+
+  const returnToOpportunities = () => {
+    setApplicationFormOpen(false);
+    setTurnstileToken(null);
+    requestAnimationFrame(() => {
+      const previous = lastOpportunityButtonRef.current;
+      const buttons = opportunityListRef.current?.querySelectorAll('button');
+      const matching = Array.from(buttons || []).find(button => button.textContent === previous?.textContent);
+      (matching || opportunityListRef.current)?.focus();
+    });
+  };
   const [accessCodeInput, setAccessCodeInput] = useState('');
   const [visibleAccessCode, setVisibleAccessCode] = useState('');
   const [documents, setDocuments] = useState({});
@@ -1507,21 +1535,6 @@ export default function Careers() {
   );
 
   const renderApplicationForm = () => {
-    if (!visibleRoles.length) {
-      return (
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.1 }}
-          className="grid gap-5 lg:grid-cols-2"
-        >
-          <OpportunityPicker roles={roles} filter={opportunityFilter} onFilter={changeOpportunityFilter} selected={form.role_id} onSelect={role=>setForm(prev=>({...prev,role_id:String(role.id),application_track:'standard'}))} />
-          <div role="status" className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm leading-6 text-slate-600 lg:col-span-2">
-            <p className="font-semibold text-slate-800">{t('careers.no_opportunities')}</p>
-          </div>
-        </motion.div>
-      );
-    }
     return (
     <motion.form
       initial={{ opacity: 0, y: 16 }}
@@ -1530,7 +1543,6 @@ export default function Careers() {
       onSubmit={startApplication}
       className="grid gap-5 lg:grid-cols-2"
     >
-      <OpportunityPicker roles={roles} filter={opportunityFilter} onFilter={changeOpportunityFilter} selected={form.role_id} onSelect={role=>setForm(prev=>({...prev,role_id:String(role.id),application_track:'standard'}))} />
       <SelectField label={t('careers.role_applying')} name="role_id" value={form.role_id} onChange={handleFormChange} required>
         <option value="">{t('careers.select_role')}</option>
         {visibleRoles.map((role) => (
@@ -2371,9 +2383,9 @@ export default function Careers() {
           transition={{ duration: 0.5 }}
           className="mb-8 rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 p-6 text-white shadow-elevated-lg sm:p-8"
         >
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-300">Amana RentalHub NG Careers</p>
-          <h1 className="mt-3 text-3xl font-black sm:text-4xl">Recruitment Portal</h1>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300">
+          <p className="text-center text-xs font-semibold uppercase tracking-[0.2em] text-blue-300">Amana RentalHub NG Careers</p>
+          <h1 className="mt-3 text-center text-3xl font-black sm:text-4xl">Recruitment Portal</h1>
+          <p className="mx-auto mt-3 max-w-3xl text-center text-sm leading-7 text-slate-300">
             {t('careers.portal_intro')}
           </p>
           {application && (
@@ -2413,13 +2425,18 @@ export default function Careers() {
             transition={{ duration: 0.4, delay: 0.1 }}
           >
             <section className="rounded-3xl border border-slate-200 bg-white/80 backdrop-blur-sm p-6 shadow-elevated sm:p-8">
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold text-slate-900">Career Application Form</h2>
+              {applicationFormOpen && visibleRoles.length > 0 ? <>
+              <button type="button" onClick={returnToOpportunities} className="btn btn-secondary mb-5">{t('register.back')}</button>
+              <div className="mb-6 text-center">
+                <h2 ref={applicationHeadingRef} tabIndex={-1} className="text-2xl font-bold text-slate-900">Career Application Form</h2>
                 <p className="mt-1.5 text-sm text-slate-500">
                   Fill in your details below. All fields are stored for admin review.
                 </p>
               </div>
               {renderApplicationForm()}
+              </> : <div ref={opportunityListRef} tabIndex={-1}>
+                <OpportunityPicker roles={roles} filter={opportunityFilter} onFilter={changeOpportunityFilter} selected={form.role_id} onSelect={chooseOpportunity} />
+              </div>}
             </section>
           </motion.div>
         )}
