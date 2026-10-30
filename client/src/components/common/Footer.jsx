@@ -142,6 +142,10 @@ const Footer = () => {
                   <span dir="ltr" className="inline-block">+234 9052187099</span>
                 </FooterContact>
               </li>
+              <li className="flex items-start gap-2">
+                <span className="text-primary-400 mt-1 shrink-0">📍</span>
+                <span className="break-words">No 3 Okene street, compensation layout IV old kutunku gwagwalada FCT Abuja</span>
+              </li>
             </ul>
           </div>
         </div>
