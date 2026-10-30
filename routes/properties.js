@@ -223,6 +223,7 @@ router.put(
     body('amenities').optional().isArray(),
     validateRequest,
   ],
+  require('../config/middleware/securityRateLimiters').sensitiveActionLimiter,
   propertyController.updateProperty
 );
 
@@ -350,4 +351,8 @@ router.post('/:propertyId/ownership-document', authenticate, isLandlordOrAgent, 
 // Get property by ID (limited info for non-subscribers) — keep LAST
 router.get('/:propertyId', propertyController.getPropertyById);
 
+const propertyUpdates = require('../services/propertyUpdateService');
+const { sensitiveActionLimiter: updateRequestLimiter } = require('../config/middleware/securityRateLimiters');
+router.get('/:propertyId/updates', authenticate, isLandlordOrAgent, propertyUpdates.handler(req => propertyUpdates.history(req.user, req.params.propertyId)));
+router.post('/:propertyId/updates/:requestId/withdraw', authenticate, isLandlordOrAgent, updateRequestLimiter, propertyUpdates.handler(req => propertyUpdates.cancel(req.user, req.params.propertyId, req.params.requestId)));
 module.exports = router;

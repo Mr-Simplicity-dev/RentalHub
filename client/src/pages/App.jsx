@@ -692,6 +692,8 @@ const AdminWithdrawalsRoute = () => {
 };
 
 function Layout({ children }) {
+  const { user } = useAuth();
+  const isAdminAccount = /(^|_)admin($|_)/.test(String(user?.user_type || '')) || user?.is_recruitment_admin === true;
   const location = useLocation();
   const previousPathRef = useRef('');
   const [activeLanguage, setActiveLanguage] = useState(i18n.language?.split('-')[0] || 'en');
@@ -759,7 +761,7 @@ function Layout({ children }) {
       {showPublicHeaderFooter && <div className="app-public-header"><Header /></div>}
 
       {/* Global Language Switcher */}
-      {!isDashboardShell && (
+      {!isDashboardShell && !isAdminAccount && (
         <div className={`app-language-switcher flex items-center border-b bg-white px-3 py-1 sm:px-4 sm:py-2 ${isMobileAppPage || isLandingPage ? 'justify-between gap-3' : 'justify-end'}`}>
           {(isMobileAppPage || isLandingPage) && (
             <Link

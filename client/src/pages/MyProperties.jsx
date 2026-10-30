@@ -8,6 +8,7 @@ import { useAuth } from '../hooks/useAuth';
 import BackToDashboard from '../components/common/BackToDashboard';
 import { useTranslation } from 'react-i18next';
 import AppealModal from '../components/common/AppealModal';
+import PropertyUpdateEditor from '../components/properties/PropertyUpdateEditor';
 
 const MyProperties = () => {
   const { user } = useAuth();
@@ -15,6 +16,7 @@ const MyProperties = () => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [appealProperty, setAppealProperty] = useState(null);
+  const [editingProperty, setEditingProperty] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -60,7 +62,9 @@ const MyProperties = () => {
                   <p className="mt-1 text-xs text-red-600">{t('appeal.reason_label')} {p.rejection_reason}</p>
                 )}
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <button onClick={() => setEditingProperty(p)} className="rounded-xl border border-blue-200 px-4 py-3 text-blue-900">{t('property_updates.title', {defaultValue:'Update property details'})}</button>
+                {p.update_request_status && <span className="text-sm text-amber-800">{t('property_updates.'+p.update_request_status,{defaultValue:p.update_request_status})}</span>}
                 <span className={`text-sm capitalize ${isRejected ? 'text-red-600 font-medium' : ''}`}>
                   {isRejected
                     ? t('verification_status.rejected_title')
@@ -89,6 +93,7 @@ const MyProperties = () => {
         )}
       </div>
 
+      {editingProperty && <PropertyUpdateEditor property={editingProperty} onClose={() => {setEditingProperty(null);load();}} />}
       {appealProperty && (
         <AppealModal
           appealType="property"

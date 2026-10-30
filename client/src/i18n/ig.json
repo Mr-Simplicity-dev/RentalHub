@@ -4645,5 +4645,28 @@
     "loc_blocked_title": "Egbochiri ịbanye",
     "loc_checking": "Na-enyocha ebe ị nọ...",
     "google_hint": "Ị nwere ike iji Google banye"
+  },
+  "property_updates": {
+    "title": "Melite nkọwa ụlọ",
+    "approval_notice": "Mgbanwe ọ bụla chọrọ nkwado onye nchịkwa. Nkọwa e bipụtara agaghị agbanwe ruo mgbe a kwadoro ya. Kwụsị mgbasa ozi nwa oge ma ọ bụrụ na nkọwa adịghị mma ma ọ bụ ụlọ enweghị nchekwa.",
+    "load_failed": "Enweghị ike ibudata nkọwa ụlọ. Mechie ma gbalịa ọzọ.",
+    "save_failed": "Enweghị ike izipu mgbanwe. Gbalịa ọzọ.",
+    "pending_notice": "Mgbanwe na-eche nkwado",
+    "withdraw": "Weghachite mgbanwe ka ị dezie ọzọ",
+    "listing_title": "Aha ụlọ",
+    "description": "Nkọwa ụlọ",
+    "amenities": "Ihe enyemaka ndị ọzọ (kewaa ha na kọma)",
+    "reason": "Gịnị gbanwere, n’ihi gịnị?",
+    "submitting": "Na-ezipụ…",
+    "submit": "Zipu maka nkwado",
+    "history": "Akụkọ mgbanwe",
+    "pending": "Na-eche",
+    "approved": "A kwadoro",
+    "rejected": "A jụrụ",
+    "cancelled": "E weghachitere",
+    "close": "Mechie",
+    "loading": "Na-ebudata…",
+    "additional": "Nkọwa ndị ọzọ",
+    "withdraw_failed": "Enweghị ike iweghachite mgbanwe."
   }
 }

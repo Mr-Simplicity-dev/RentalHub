@@ -187,7 +187,7 @@ const PropertiesTab = ({
                 {/* TITLE */}
 
                 <td className="p-3 font-medium">
-                  {p.title}
+                  {p.title}<a href={`/admin/properties/${p.id}`} className="mt-1 block text-sm text-blue-700 underline">Review property updates</a>
                 </td>
 
                 {/* LANDLORD */}

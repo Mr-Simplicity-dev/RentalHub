@@ -16,7 +16,7 @@ A captured transfer screenshot is evidence for review, not payment confirmation.
 
 ## Fingerprint status
 
-The U.are.U 4500 and currently installed software provide capture. This release does **not** implement fingerprint enrollment, matching, account lookup or recovery. The staff workspace and protected status endpoint explicitly show matching as unavailable. There is no environment switch that activates it, and no fingerprint images or templates are stored by this feature. A validated matching engine and secure enrollment/recovery integration are still required. A scan must not become a customer-session or privileged-action bypass.
+Office fingerprint enrollment and one-to-one verification now use SourceAFIS, a free non-expiring matching engine. See [Office fingerprint verification](office-fingerprint-verification.md) for the consent workflow, deployment requirements, limitations and migration 2031. The Windows office website supports the USB reader; Android/iOS direct USB scanning is not implemented. This does not enable passwordless customer impersonation or account changes.
 
 ## Database migration
 

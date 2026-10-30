@@ -138,7 +138,7 @@ const AdminProperties = () => {
 
                   <FaHome className="mr-2 text-primary-600" />
 
-                  {p.title}
+                  {p.title}{p.has_pending_update && <span className="ml-2 rounded bg-amber-50 px-2 py-1 text-xs text-amber-800">Update awaiting approval</span>}
 
                 </td>
 

@@ -1285,7 +1285,7 @@ exports.getAllProperties = async (req, res) => {
     const dataQuery = `
       SELECT 
         p.id,
-        p.title,
+        p.title, EXISTS (SELECT 1 FROM property_update_requests pur WHERE pur.property_id=p.id AND pur.status='pending') AS has_pending_update,
         p.rent_amount,
         p.status,
         CASE
@@ -1304,7 +1304,7 @@ exports.getAllProperties = async (req, res) => {
       LEFT JOIN users u ON p.user_id = u.id
       LEFT JOIN states s ON s.id = p.state_id
       ${whereClause}
-      ORDER BY p.created_at DESC
+      ORDER BY EXISTS (SELECT 1 FROM property_update_requests pur WHERE pur.property_id=p.id AND pur.status='pending') DESC, p.created_at DESC
       LIMIT $${i++} OFFSET $${i++}
     `;
 
@@ -1366,7 +1366,7 @@ exports.getPendingProperties = async (req, res) => {
 
     const result = await db.query(
       `SELECT 
-         p.*, 
+         p.*, EXISTS (SELECT 1 FROM property_update_requests pur WHERE pur.property_id=p.id AND pur.status='pending') AS has_pending_update, 
          CASE
            WHEN p.is_verified = TRUE THEN 'approved'
            WHEN COALESCE(LOWER(p.status), '') = 'rejected' THEN 'rejected'
@@ -1378,8 +1378,7 @@ exports.getPendingProperties = async (req, res) => {
        FROM properties p
        LEFT JOIN users u ON p.landlord_id = u.id
        LEFT JOIN states s ON s.id = p.state_id
-       WHERE p.is_verified = FALSE
-         AND COALESCE(LOWER(p.status), '') <> 'rejected'
+       WHERE ((p.is_verified = FALSE AND COALESCE(LOWER(p.status), '') <> 'rejected') OR EXISTS (SELECT 1 FROM property_update_requests pur WHERE pur.property_id=p.id AND pur.status='pending'))
          AND p.deleted_at IS NULL
          ${stateClause}
        ORDER BY p.created_at DESC`,
@@ -2987,3 +2986,7 @@ exports.unfeatureProperty = async (req, res) => {
     });
   }
 };
+
+const propertyUpdates = require('./propertyUpdateService');
+exports.getPropertyUpdateRequests = propertyUpdates.handler(async req => propertyUpdates.adminHistory(req.params.id, await buildPropertyScopeClause(req.user)));
+exports.reviewPropertyUpdate = propertyUpdates.handler(async req => propertyUpdates.review(req.user, req.params.id, req.params.requestId, req.body, await buildPropertyScopeClause(req.user)));

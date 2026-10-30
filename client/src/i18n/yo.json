@@ -4645,5 +4645,28 @@
     "loc_blocked_title": "Wiwọle ti dina mọ",
     "loc_checking": "Nṣayẹwo ipo rẹ...",
     "google_hint": "O le wọle pẹlu Google"
+  },
+  "property_updates": {
+    "title": "Ṣàtúnṣe àlàyé ilé",
+    "approval_notice": "Gbogbo àtúnṣe nílò ìfọwọ́sí alábòójútó. Àlàyé tí a tẹ̀ jáde kò ní yí padà títí a fi fọwọ́ sí i. Dá ìpolówó dúró fún ìgbà díẹ̀ bí àlàyé kò bá pé tàbí ilé kò bá ní ààbò.",
+    "load_failed": "A kò lè ṣí àlàyé ilé. Pa á kí o sì tún gbìyànjú.",
+    "save_failed": "A kò lè fi àwọn àtúnṣe ránṣẹ́. Tún gbìyànjú.",
+    "pending_notice": "Àtúnṣe ń dúró de ìfọwọ́sí",
+    "withdraw": "Fa àtúnṣe padà láti tún un ṣe",
+    "listing_title": "Àkọlé ilé",
+    "description": "Àpèjúwe ilé",
+    "amenities": "Àwọn ohun èlò mìíràn (fi àmì kọ́mà yà wọ́n)",
+    "reason": "Kí ló yí padà, kí sì ni ìdí?",
+    "submitting": "Ń firánṣẹ́…",
+    "submit": "Fi ránṣẹ́ fún ìfọwọ́sí",
+    "history": "Ìtàn àwọn àtúnṣe",
+    "pending": "Ń dúró",
+    "approved": "A ti fọwọ́ sí i",
+    "rejected": "A kọ̀ ọ́",
+    "cancelled": "A ti fà á padà",
+    "close": "Pa á",
+    "loading": "Ń gbé wọlé…",
+    "additional": "Àfikún àlàyé",
+    "withdraw_failed": "A kò lè fa àtúnṣe padà."
   }
 }

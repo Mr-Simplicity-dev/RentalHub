@@ -1771,111 +1771,7 @@ exports.uploadPropertyClips = async (req, res) => {
 // -----------------------------------------------------
 // Update Property
 // -----------------------------------------------------
-exports.updateProperty = async (req, res) => {
-  try {
-    await ensurePropertySchema();
-
-    const { propertyId } = req.params;
-    const userId = req.user.id;
-
-    const propertyCheck = await db.query(
-      'SELECT id FROM properties WHERE id = $1 AND landlord_id = $2',
-      [propertyId, userId]
-    );
-
-    if (propertyCheck.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Property not found or unauthorized'
-      });
-    }
-
-    const updates = [];
-    const params = [];
-    let paramCount = 1;
-
-    const allowedFields = [
-      'state_id', 'lga_name', 'city', 'area', 'full_address', 'latitude', 'longitude', 'property_type',
-      'bedrooms', 'bathrooms', 'rent_amount', 'payment_frequency',
-      'caution_deposit', 'title', 'description', 'amenities', 'structured_features'
-    ];
-
-    for (const field of allowedFields) {
-      if (req.body[field] !== undefined) {
-        if (field === 'latitude') {
-          const parsedLatitude = parseCoordinate(req.body[field], -90, 90);
-          if (parsedLatitude === null) {
-            return res.status(400).json({
-              success: false,
-              message: 'Please provide a valid latitude.',
-            });
-          }
-          updates.push(`${field} = $${paramCount}`);
-          params.push(parsedLatitude);
-          paramCount++;
-          continue;
-        }
-
-        if (field === 'longitude') {
-          const parsedLongitude = parseCoordinate(req.body[field], -180, 180);
-          if (parsedLongitude === null) {
-            return res.status(400).json({
-              success: false,
-              message: 'Please provide a valid longitude.',
-            });
-          }
-          updates.push(`${field} = $${paramCount}`);
-          params.push(parsedLongitude);
-          paramCount++;
-          continue;
-        }
-
-        updates.push(`${field} = $${paramCount}`);
-        params.push(
-          field === 'amenities' || field === 'structured_features'
-            ? JSON.stringify(
-                field === 'structured_features'
-                  ? validateStructuredFeatures(req.body[field]).features
-                  : req.body[field]
-              )
-            : req.body[field]
-        );
-        paramCount++;
-      }
-    }
-
-    if (updates.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'No updates provided'
-      });
-    }
-
-    updates.push(`updated_at = CURRENT_TIMESTAMP`);
-    params.push(propertyId);
-
-    const query = `
-      UPDATE properties
-      SET ${updates.join(', ')}
-      WHERE id = $${paramCount}
-      RETURNING *
-    `;
-
-    const result = await db.query(query, params);
-
-    res.json({
-      success: true,
-      message: 'Property updated successfully',
-      data: result.rows[0]
-    });
-  } catch (error) {
-    req.logger.error('Update property error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update property'
-    });
-  }
-};
+exports.updateProperty = require('./propertyUpdateService').handler(req => require('./propertyUpdateService').submit(req.user, req.params.propertyId, req.body));
 
 
 // -----------------------------------------------------
@@ -1957,6 +1853,7 @@ exports.getMyProperties = async (req, res) => {
     const result = await db.query(
       `SELECT 
         p.*, s.state_name, s.state_code,
+        (SELECT status FROM property_update_requests WHERE property_id=p.id ORDER BY created_at DESC,id DESC LIMIT 1) AS update_request_status,
         (SELECT photo_url FROM property_photos 
          WHERE property_id = p.id AND is_primary = TRUE LIMIT 1) AS primary_photo,
         (SELECT COUNT(*) FROM property_photos WHERE property_id = p.id) AS photo_count,

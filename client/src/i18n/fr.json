@@ -4390,5 +4390,28 @@
     "by_lga": "Par LGA",
     "my_responses": "Mes réponses",
     "no_responses": "Aucune réponse enregistrée pour le moment."
+  },
+  "property_updates": {
+    "title": "Modifier les détails du logement",
+    "approval_notice": "Toute modification nécessite une approbation administrative. Les informations publiées restent inchangées avant approbation. Suspendez l’annonce si elle est inexacte ou présente un risque.",
+    "load_failed": "Impossible de charger les détails. Fermez et réessayez.",
+    "save_failed": "Impossible d’envoyer les modifications. Réessayez.",
+    "pending_notice": "Modification en attente d’approbation",
+    "withdraw": "Retirer la demande pour la modifier",
+    "listing_title": "Titre du logement",
+    "description": "Description du logement",
+    "amenities": "Autres équipements (séparés par des virgules)",
+    "reason": "Qu’est-ce qui a changé et pourquoi ?",
+    "submitting": "Envoi…",
+    "submit": "Envoyer pour approbation",
+    "history": "Historique des modifications",
+    "pending": "En attente",
+    "approved": "Approuvé",
+    "rejected": "Rejeté",
+    "cancelled": "Retiré",
+    "close": "Fermer",
+    "loading": "Chargement…",
+    "additional": "Détails supplémentaires",
+    "withdraw_failed": "Impossible de retirer la demande."
   }
 }

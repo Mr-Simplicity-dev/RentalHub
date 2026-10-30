@@ -431,7 +431,7 @@ app.use(helmet({
         "https://static.cloudflareinsights.com",
       ],
       imgSrc: ["'self'", "res.cloudinary.com", "data:", "blob:", "js-eu1.hs-scripts.com", "www.googletagmanager.com", "https://challenges.cloudflare.com", "https://static.cloudflareinsights.com"],
-      connectSrc: ["'self'", "api.paystack.co", "api.hubspot.com", "forms.hubspot.com", "www.google-analytics.com", "www.googletagmanager.com", "https://challenges.cloudflare.com"],
+      connectSrc: ["'self'", "https://127.0.0.1:*", "wss://127.0.0.1:*", "api.paystack.co", "api.hubspot.com", "forms.hubspot.com", "www.google-analytics.com", "www.googletagmanager.com", "https://challenges.cloudflare.com"],
       fontSrc: ["'self'", "fonts.googleapis.com", "fonts.gstatic.com"],
       styleSrc: ["'self'", "fonts.googleapis.com", "https://challenges.cloudflare.com"],
       mediaSrc: ["'self'", "res.cloudinary.com", "blob:"],

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import Loader from "../../components/common/Loader";
+import PropertyUpdateReview from "../../components/admin/PropertyUpdateReview";
 
 const AdminPropertyDetail = () => {
 
@@ -123,6 +124,7 @@ const AdminPropertyDetail = () => {
       </button>
 
 
+      <PropertyUpdateReview propertyId={id} onReviewed={loadProperty} />
       {/* PROPERTY HEADER */}
 
       <div className="bg-white border border-soft rounded-xl2 shadow-card p-6">

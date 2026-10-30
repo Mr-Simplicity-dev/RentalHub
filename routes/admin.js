@@ -26,6 +26,8 @@ router.use(authenticate);
  * =========================
  */
 router.get('/stats', requireAdminOrSuperAdmin, adminController.getStats);
+router.get('/properties/:id/updates', requireAdminOrSuperAdmin, adminController.getPropertyUpdateRequests);
+router.patch('/properties/:id/updates/:requestId', requireAdminOrSuperAdmin, require('../config/middleware/securityRateLimiters').sensitiveActionLimiter, adminController.reviewPropertyUpdate);
 
 /**
  * =========================

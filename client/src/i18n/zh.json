@@ -4390,5 +4390,28 @@
     "by_lga": "按辖区 (LGA) 分布",
     "my_responses": "我的收集记录",
     "no_responses": "目前暂无收集记录。"
+  },
+  "property_updates": {
+    "title": "更新房源详情",
+    "approval_notice": "所有修改均需管理员批准。批准前，已发布的详情保持不变。如果房源信息不准确或存在安全问题，请在审核期间暂停发布。",
+    "load_failed": "无法加载房源详情。请关闭后重试。",
+    "save_failed": "无法提交修改，请重试。",
+    "pending_notice": "更新待批准",
+    "withdraw": "撤回更新以重新编辑",
+    "listing_title": "房源标题",
+    "description": "房源描述",
+    "amenities": "其他设施（用逗号分隔）",
+    "reason": "修改了什么，为什么？",
+    "submitting": "正在提交…",
+    "submit": "提交审批",
+    "history": "更新历史",
+    "pending": "待处理",
+    "approved": "已批准",
+    "rejected": "已拒绝",
+    "cancelled": "已撤回",
+    "close": "关闭",
+    "loading": "正在加载…",
+    "additional": "其他详情",
+    "withdraw_failed": "无法撤回更新。"
   }
 }

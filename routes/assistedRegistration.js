@@ -21,6 +21,7 @@ const {
 } = require('../config/utils/twoFactor');
 const service = require('../services/assistedRegistrationService');
 const policy = require('../services/assistedRegistrationPolicy');
+const fingerprints = require('../services/officeFingerprintService');
 const router = express.Router();
 router.use((req, res, next) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -108,10 +109,12 @@ router.get('/staff/config', run(async () => ({
 router.get('/staff/request-id', run(() => ({
   request_id: require('crypto').randomUUID()
 })));
-router.get('/staff/biometric-status', run(() => ({
-  available: false,
-  reason: 'Fingerprint matching is unavailable. The installed reader software supports capture only. A licensed matching engine and secure enrollment service are required. No fingerprints are stored.'
-})));
+router.get('/staff/biometric-status', sensitiveActionLimiter, run(() => fingerprints.status()));
+router.get('/staff/:reference/fingerprint', run(req => fingerprints.enrollmentStatus(req.user, req.params.reference)));
+router.post('/staff/:reference/fingerprint/consent', sensitiveActionLimiter, run(req => fingerprints.requestConsent(req.user, req.params.reference, req.body)));
+router.post('/staff/:reference/fingerprint/enroll', sensitiveActionLimiter, run(req => fingerprints.enroll(req.user, req.params.reference, req.body)));
+router.post('/staff/:reference/fingerprint/verify', sensitiveActionLimiter, run(req => fingerprints.verify(req.user, req.params.reference, req.body)));
+router.delete('/staff/:reference/fingerprint', sensitiveActionLimiter, run(req => fingerprints.revoke(req.user, req.params.reference)));
 router.get('/staff', run(req => service.list(req.user, req.query.search)));
 router.post('/staff/quote', assistedRegistrationQuoteLimiter, run(req => service.quote(req.user, req.body)));
 router.post('/staff', assistedRegistrationCreateLimiter, run(req => service.create(req.user, req.body)));

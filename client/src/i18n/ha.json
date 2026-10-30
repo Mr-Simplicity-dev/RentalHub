@@ -4645,5 +4645,28 @@
     "loc_blocked_title": "Ba za a iya shiga ba",
     "loc_checking": "Ana duba wurin ku...",
     "google_hint": "Kuna iya shiga da Google"
+  },
+  "property_updates": {
+    "title": "Sabunta bayanan gida",
+    "approval_notice": "Kowane canji yana bukatar amincewar mai gudanarwa. Bayanan da aka wallafa ba za su canza ba sai an amince. Idan bayanan ba daidai ba ne ko gidan ba shi da aminci, dakatar da tallan yayin dubawa.",
+    "load_failed": "An kasa loda bayanan gida. Rufe sannan ka sake gwadawa.",
+    "save_failed": "An kasa aika canje-canje. Sake gwadawa.",
+    "pending_notice": "Canji yana jiran amincewa",
+    "withdraw": "Janye canjin domin gyarawa",
+    "listing_title": "Taken gida",
+    "description": "Bayanin gida",
+    "amenities": "Sauran abubuwan more rayuwa (raba da waƙafi)",
+    "reason": "Me ya canza kuma me ya sa?",
+    "submitting": "Ana aikawa…",
+    "submit": "Aika don amincewa",
+    "history": "Tarihin canje-canje",
+    "pending": "Ana jira",
+    "approved": "An amince",
+    "rejected": "An ƙi",
+    "cancelled": "An janye",
+    "close": "Rufe",
+    "loading": "Ana lodawa…",
+    "additional": "Ƙarin bayani",
+    "withdraw_failed": "An kasa janye canjin."
   }
 }
