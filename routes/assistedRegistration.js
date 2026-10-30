@@ -109,6 +109,21 @@ router.get('/staff/config', run(async () => ({
 router.get('/staff/request-id', run(() => ({
   request_id: require('crypto').randomUUID()
 })));
+const photos = require('../services/assistedPhotoService');
+const passportUploads = require('../config/middleware/upload');
+router.post('/staff/:reference/photo/session', sensitiveActionLimiter, run(req => photos.start(req.user, req.params.reference, req.body)));
+const authorizePhoto = async (req, res, next) => {
+  try {
+    req.assistedPassportSubject = await photos.consume(req.user, req.params.reference, req.headers['x-capture-token']);
+    next();
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ success: false, message: error.statusCode ? error.message : 'Unable to start customer photo upload.' });
+  }
+};
+router.post('/staff/:reference/photo', sensitiveActionLimiter, authorizePhoto,
+  passportUploads.uploadPassportLocal, passportUploads.validateFileMagicBytesMiddleware,
+  passportUploads.reprocessPassportImage, passportUploads.scanUploadForMalware,
+  (req, res) => require('./users').handlePassportUpload(req, res));
 router.get('/staff/biometric-status', sensitiveActionLimiter, run(() => fingerprints.status()));
 router.get('/staff/:reference/fingerprint', run(req => fingerprints.enrollmentStatus(req.user, req.params.reference)));
 router.post('/staff/:reference/fingerprint/consent', sensitiveActionLimiter, run(req => fingerprints.requestConsent(req.user, req.params.reference, req.body)));

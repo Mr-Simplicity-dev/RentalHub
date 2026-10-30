@@ -40,8 +40,8 @@ const loadExternalScript = (src) => {
   });
 };
 
-const LivePassportCaptureModal = ({ onCapture, onClose, title }) => {
-  const { t } = useTranslation();
+const LivePassportCaptureModal = ({ onCapture, onClose, title, sessionEndpoint = '/users/verification/live-capture/session', uploadEndpoint = '/users/upload-passport', consentConfirmed = false, language }) => {
+  const { t } = useTranslation(undefined, { lng: language });
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraLoading, setCameraLoading] = useState(false);
   const [cameraError, setCameraError] = useState('');
@@ -60,6 +60,8 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title }) => {
   const detectionEnabledRef = useRef(false);
   const metricsRef = useRef({ baselineEar: null, eyesClosed: false, baseArea: null });
   const autoCaptureTriggeredRef = useRef(false);
+  const captureTimerRef = useRef(null);
+  const cameraRunRef = useRef(0);
 
   const canCaptureLive = useMemo(() => (
     livenessChecks.faceDetected && livenessChecks.centered && livenessChecks.blink &&
@@ -68,6 +70,8 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title }) => {
   ), [livenessChecks]);
 
   const stopResources = useCallback(() => {
+    cameraRunRef.current += 1;
+    clearTimeout(captureTimerRef.current);
     detectionEnabledRef.current = false;
     if (detectionLoopRef.current) { cancelAnimationFrame(detectionLoopRef.current); detectionLoopRef.current = null; }
     if (faceMeshRef.current?.close) { faceMeshRef.current.close(); faceMeshRef.current = null; }
@@ -153,11 +157,18 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title }) => {
     setCameraError('');
     setLivenessError('');
     stopResources();
+    const run = cameraRunRef.current;
+    setLiveCaptureToken('');
     try {
+      const session = await api.post(sessionEndpoint, { consent_confirmed: consentConfirmed });
+      if (!session.data?.data?.token) throw new Error('Unable to start photo capture. Please try again.');
+      if (run !== cameraRunRef.current) return;
+      setLiveCaptureToken(session.data.data.token);
       await loadExternalScript('https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js');
       const FaceMesh = window.FaceMesh;
       if (!FaceMesh) throw new Error('FaceMesh not loaded');
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'user' } } });
+      if (run !== cameraRunRef.current) { stream.getTracks().forEach(track => track.stop()); return; }
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -169,12 +180,18 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title }) => {
       faceMeshRef.current = mesh;
       detectionEnabledRef.current = true;
       const loop = async () => {
-        if (!detectionEnabledRef.current || !videoRef.current || videoRef.current.readyState < 2) {
+        if (!detectionEnabledRef.current) return;
+        if (!videoRef.current || videoRef.current.readyState < 2) {
           detectionLoopRef.current = requestAnimationFrame(loop);
           return;
         }
-        await mesh.send({ image: videoRef.current });
-        detectionLoopRef.current = requestAnimationFrame(loop);
+        try {
+          await mesh.send({ image: videoRef.current });
+          if (detectionEnabledRef.current) detectionLoopRef.current = requestAnimationFrame(loop);
+        } catch {
+          stopResources();
+          setCameraError('Face checks could not finish. Please open the camera again.');
+        }
       };
       loop();
       setCameraActive(true);
@@ -184,32 +201,38 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title }) => {
       autoCaptureTriggeredRef.current = false;
       metricsRef.current = { baselineEar: null, eyesClosed: false, baseArea: null };
       setLivenessChecks(DEFAULT_LIVENESS);
-      try {
-        const res = await api.post('/users/verification/live-capture/session');
-        if (res.data?.success && res.data?.data?.token) {
-          setLiveCaptureToken(res.data.data.token);
-        }
-      } catch {}
+
     } catch (err) {
+      stopResources();
       setCameraError(err.message || t('live_passport_capture.could_not_access_camera', 'Could not access camera'));
       setCameraLoading(false);
     }
-  }, [stopResources, handleFaceResults, t]);
+  }, [stopResources, handleFaceResults, t, sessionEndpoint, consentConfirmed]);
+
+  useEffect(() => {
+    if (!cameraActive || !videoRef.current || !streamRef.current) return;
+    videoRef.current.srcObject = streamRef.current;
+    videoRef.current.play().catch(() => setCameraError('Unable to start camera preview.'));
+  }, [cameraActive]);
+
+  useEffect(() => () => { if (capturedImage) URL.revokeObjectURL(capturedImage); }, [capturedImage]);
 
   useEffect(() => {
     if (!canCaptureLive || autoCaptureTriggeredRef.current || !cameraActive) return;
     autoCaptureTriggeredRef.current = true;
-    setTimeout(() => {
+    const run = cameraRunRef.current;
+    captureTimerRef.current = setTimeout(() => {
       const canvas = capturePhoto();
       if (canvas) {
         canvas.toBlob((blob) => {
-          if (!blob) return;
+          if (!blob || run !== cameraRunRef.current) return;
           setCapturedImage(URL.createObjectURL(blob));
           setCaptured(true);
+          stopResources();
         }, 'image/jpeg', 0.92);
       }
     }, 650);
-  }, [canCaptureLive, cameraActive, capturePhoto]);
+  }, [canCaptureLive, cameraActive, capturePhoto, stopResources]);
 
   const handleUpload = useCallback(async () => {
     if (!capturedImage) return;
@@ -220,7 +243,7 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title }) => {
       formData.append('passport', blob, `passport-capture-${Date.now()}.jpg`);
       formData.append('capture_source', 'live_camera');
       if (liveCaptureToken) formData.append('live_capture_token', liveCaptureToken);
-      await api.post('/users/upload-passport', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      await api.post(uploadEndpoint, formData, { headers: { 'Content-Type': 'multipart/form-data', 'X-Capture-Token': liveCaptureToken } });
       toast.success(t('live_passport_capture.passport_uploaded', 'Passport photo uploaded successfully'));
       onCapture?.();
       onClose?.();
@@ -229,16 +252,16 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title }) => {
     } finally {
       setUploadingPhoto(false);
     }
-  }, [capturedImage, liveCaptureToken, onCapture, onClose, t]);
+  }, [capturedImage, liveCaptureToken, onCapture, onClose, t, uploadEndpoint]);
 
   useEffect(() => { return () => stopResources(); }, [stopResources]);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/65 flex items-center justify-center p-4">
-      <div className="w-full max-w-md rounded-2xl bg-zinc-950 p-4 text-white shadow-2xl">
+      <div role="dialog" aria-modal="true" aria-label={title || 'Live Passport Capture'} className="max-h-[90dvh] overflow-y-auto w-full max-w-md rounded-2xl bg-zinc-950 p-4 text-white shadow-2xl">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-bold">{title || t('live_passport_capture.title', 'Live Passport Capture')}</h3>
-          <button onClick={onClose} className="rounded-full p-1 text-zinc-400 hover:text-white hover:bg-zinc-800"><FaTimes /></button>
+          <button aria-label="Close photo capture" disabled={uploadingPhoto} onClick={onClose} className="rounded-full p-1 text-zinc-400 hover:text-white hover:bg-zinc-800"><FaTimes /></button>
         </div>
 
         {!cameraActive && !captured && (
@@ -257,7 +280,7 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title }) => {
             <img src={capturedImage} alt={t('live_passport_capture.captured_alt', 'Captured')} className="mx-auto max-h-60 rounded-lg border-2 border-green-500" />
             <p className="text-sm text-green-400 font-medium">{t('live_passport_capture.liveness_passed', 'Liveness checks passed. Tap upload to proceed.')}</p>
             <div className="flex justify-center gap-3">
-              <button onClick={startCamera} disabled={cameraLoading} className="inline-flex items-center gap-1 rounded-lg bg-zinc-700 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-600 transition">
+              <button onClick={startCamera} disabled={cameraLoading || uploadingPhoto} className="inline-flex items-center gap-1 rounded-lg bg-zinc-700 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-600 transition">
                 <FaRedo /> {t('live_passport_capture.retake', 'Retake')}
               </button>
               <button onClick={handleUpload} disabled={uploadingPhoto} className="inline-flex items-center gap-1 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 transition disabled:opacity-60">

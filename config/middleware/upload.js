@@ -202,7 +202,7 @@ const passportDiskStorage = multer.diskStorage({
     if (!ALLOWED_PASSPORT_EXTENSIONS.has(ext)) {
       return cb(new Error(`Invalid file extension "${ext}". Allowed: ${Array.from(ALLOWED_PASSPORT_EXTENSIONS).join(', ')}`));
     }
-    cb(null, `passport_${req.user ? req.user.id : 'anon'}_${Date.now()}${ext}`);
+    cb(null, `passport_${req.assistedPassportSubject?.id || (req.user ? req.user.id : 'anon')}_${Date.now()}_${require('crypto').randomBytes(6).toString('hex')}${ext}`);
   }
 });
 

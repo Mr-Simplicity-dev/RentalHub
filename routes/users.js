@@ -168,7 +168,7 @@ const cleanupUploadedFile = (file) => {
   try {
     fs.unlinkSync(file.path);
   } catch (err) {
-    req.logger.warn('Failed to clean up uploaded file:', err.message);
+    if (err.code !== 'ENOENT') console.warn('Failed to clean up passport upload');
   }
 };
 
@@ -2328,7 +2328,7 @@ router.post('/verify-password', authenticate, sensitiveActionLimiter, async (req
 });
 
 // Upload passport photo
-router.post('/upload-passport', authenticate, uploadPassportLocal, validateFileMagicBytesMiddleware, reprocessPassportImage, scanUploadForMalware, async (req, res) => {
+const handlePassportUpload = async (req, res) => {
   let uploadPersisted = false;
 
   try {
@@ -2341,7 +2341,8 @@ router.post('/upload-passport', authenticate, uploadPassportLocal, validateFileM
       });
     }
 
-    const userId = req.user.id;
+    const subject = req.assistedPassportSubject || req.user;
+    const userId = subject.id;
     const captureSource = req.body?.capture_source;
     const liveCaptureToken = req.body?.live_capture_token;
 
@@ -2353,7 +2354,7 @@ router.post('/upload-passport', authenticate, uploadPassportLocal, validateFileM
       });
     }
 
-    if (REQUIRE_LIVE_CAPTURE_SESSION) {
+    if (!req.assistedPassportSubject && REQUIRE_LIVE_CAPTURE_SESSION) {
       const isValidSession = consumeLiveCaptureSession(userId, liveCaptureToken);
       if (!isValidSession) {
         cleanupUploadedFile(req.file);
@@ -2371,7 +2372,7 @@ router.post('/upload-passport', authenticate, uploadPassportLocal, validateFileM
     if (isPremblyConfigured()) {
       try {
         const imageBuffer = fs.readFileSync(req.file.path);
-        const liveness = await performLivenessCheckWithPrembly(imageBuffer, req.user.full_name);
+        const liveness = await performLivenessCheckWithPrembly(imageBuffer, subject.full_name);
         if (
           liveness.status !== 'not_configured' &&
           liveness.status !== 'service_error' &&
@@ -2423,7 +2424,7 @@ router.post('/upload-passport', authenticate, uploadPassportLocal, validateFileM
             ? 'revalidation_required'
             : null;
 
-    const autoVerified = hasVerifiedIdentity && hasIdentityNumber && !hasActiveRevalidation;
+    const autoVerified = !req.assistedPassportSubject && hasVerifiedIdentity && hasIdentityNumber && !hasActiveRevalidation;
 
     await db.query(
       `UPDATE users
@@ -2448,6 +2449,10 @@ router.post('/upload-passport', authenticate, uploadPassportLocal, validateFileM
       ]
     );
     uploadPersisted = true;
+    if (req.assistedPassportSubject) {
+      await require('../services/assistedPhotoService').audit(req.user, userId, 'ASSISTED_CUSTOMER_PHOTO_UPLOADED');
+      return res.json({ success: true, message: 'Customer photo saved. Existing identity review requirements still apply.' });
+    }
 
     const userResult = await db.query(
       `SELECT id, user_type, email, phone, full_name, nin,
@@ -2482,8 +2487,9 @@ router.post('/upload-passport', authenticate, uploadPassportLocal, validateFileM
       message: 'Failed to upload passport'
     });
   }
-});
-
+};
+router.post('/upload-passport', authenticate, uploadPassportLocal, validateFileMagicBytesMiddleware, reprocessPassportImage, scanUploadForMalware, handlePassportUpload);
+router.handlePassportUpload = handlePassportUpload;
 
 // Authenticated passport photo serving (NOT via express.static)
 router.get('/passport-photo/:filename', authenticate, async (req, res) => {
