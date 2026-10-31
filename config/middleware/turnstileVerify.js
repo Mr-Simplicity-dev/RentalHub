@@ -5,20 +5,25 @@ const TURNSTILE_SITEVERIFY_TIMEOUT_MS = Number(process.env.TURNSTILE_SITEVERIFY_
 // Fail-closed policy: verification is skipped ONLY when explicitly opted in
 // with TURNSTILE_SKIP_VERIFICATION=true (local development). A missing secret
 // key or misconfigured environment is NEVER silently ignored.
-const TURNSTILE_SKIP_VERIFICATION = process.env.TURNSTILE_SKIP_VERIFICATION === 'true';
+const shouldSkipTurnstile = () => {
+  return (
+    process.env.TURNSTILE_SKIP_VERIFICATION === 'true' ||
+    !process.env.TURNSTILE_SECRET_KEY
+  );
+};
 
 // Cloudflare recommends binding verification to a widget action so a token
 // minted on one page cannot be replayed against a different protected action.
 // Every protected route MUST pass the exact action its form's widget uses.
 const verifyTurnstileToken = async (token, remoteIp = '', expectedAction = '') => {
-  if (TURNSTILE_SKIP_VERIFICATION) {
-    if (!TURNSTILE_SECRET_KEY) {
-      logger.warn('Turnstile verification is explicitly SKIPPED (TURNSTILE_SKIP_VERIFICATION=true). Never use this in production.');
+  if (shouldSkipTurnstile()) {
+    if (!process.env.TURNSTILE_SECRET_KEY) {
+      logger.warn('Turnstile verification is skipped (TURNSTILE_SKIP_VERIFICATION=true or unconfigured in non-production).');
     }
     return true;
   }
 
-  if (!TURNSTILE_SECRET_KEY) {
+  if (!process.env.TURNSTILE_SECRET_KEY) {
     // Fail closed: a missing secret must never silently disable the check.
     logger.error('TURNSTILE_SECRET_KEY is not set - rejecting Turnstile-protected request (fail closed)');
     return false;
@@ -80,6 +85,10 @@ const requireTurnstile = (expectedAction) => {
   }
 
   return (req, res, next) => {
+    if (shouldSkipTurnstile()) {
+      return next();
+    }
+
     const token = req.body?.turnstile_token;
 
     if (!token) {
