@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Two-factor authentication for withdrawals and financial approvals.
  *
  * Design (Option 1 â€” agreed):
@@ -26,7 +26,7 @@ const SMS_OTP_TTL_SECONDS = 300;
 const RECOVERY_CODE_COUNT = 10;
 const RECOVERY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
-authenticator.options = { window: 1 };
+authenticator.options = { window: 2 };
 
 let redisClient = redis; // ioredis wrapper (null when unavailable) â€” falls back to in-memory
 const memoryOtpStore = new Map();
@@ -179,7 +179,14 @@ exports.confirmTotpEnrollment = async ({ userId, code }) => {
   }
 
   const secret = decryptStoredSecret(user.totp_secret);
-  const valid = authenticator.verify({ token: String(code || '').replace(/\s/g, ''), secret });
+  const cleanCode = String(code || '').replace(/[^0-9]/g, '');
+  const cleanSecret = String(secret || '').replace(/\s+/g, '').trim();
+
+  const valid = cleanSecret && cleanCode.length === 6 && (
+    authenticator.check(cleanCode, cleanSecret) ||
+    authenticator.verify({ token: cleanCode, secret: cleanSecret })
+  );
+
   if (!valid) {
     throw new TwoFactorError('TOTP_INVALID', 'The code you entered is not valid.');
   }
@@ -226,7 +233,13 @@ exports.verifyTotpCode = async ({ userId, code }) => {
   }
 
   const secret = decryptStoredSecret(user.totp_secret);
-  const valid = authenticator.verify({ token: String(code || '').replace(/\s/g, ''), secret });
+  const cleanCode = String(code || '').replace(/[^0-9]/g, '');
+  const cleanSecret = String(secret || '').replace(/\s+/g, '').trim();
+
+  const valid = cleanSecret && cleanCode.length === 6 && (
+    authenticator.check(cleanCode, cleanSecret) ||
+    authenticator.verify({ token: cleanCode, secret: cleanSecret })
+  );
 
   if (valid) {
     await resetTotpFailures(userId);
@@ -336,9 +349,15 @@ exports.verifySmsWithdrawalOtp = async ({ userId, code }) => {
  * client knows which method to present.
  */
 exports.verifyWithdrawalFactor = async ({ user, body }) => {
-  const totpCode = String(body.totp_code || '').trim();
+  const rawTotp = String(body.totp_code || body.code || '').trim();
   const smsCode = String(body.otp || '').trim();
-  const recoveryCode = String(body.recovery_code || '').trim();
+  let recoveryCode = String(body.recovery_code || '').trim();
+  let totpCode = rawTotp;
+
+  if (!recoveryCode && rawTotp.replace(/[^a-zA-Z0-9]/g, '').length > 6) {
+    recoveryCode = rawTotp.replace(/[^a-zA-Z0-9]/g, '');
+    totpCode = '';
+  }
 
   const userRow = await loadUserTotp(user.id);
   const totpEnabled = userRow?.totp_enabled === true;

@@ -234,6 +234,44 @@ const mockQuery = async (sql = '', params = []) => {
 
   // Update user
   if (/UPDATE\s+users\b/i.test(normalized)) {
+    const whereIdMatch = normalized.match(/WHERE\s+id\s*=\s*\$(\d+)/i);
+    const idParamIdx = whereIdMatch ? Number(whereIdMatch[1]) - 1 : params.length - 1;
+    const userId = Number(params[idParamIdx]) || 1;
+    const user = mockUsers.find((u) => u.id === userId) || mockUsers[0];
+
+    if (user) {
+      if (/totp_secret\s*=\s*\$1/i.test(normalized)) {
+        user.totp_secret = params[0];
+        user.totp_enabled = false;
+        user.totp_failed_attempts = 0;
+        user.totp_locked_until = null;
+      }
+      if (/totp_enabled\s*=\s*TRUE/i.test(normalized)) {
+        user.totp_enabled = true;
+        user.totp_recovery_codes = params[0];
+        user.totp_failed_attempts = 0;
+        user.totp_locked_until = null;
+        user.totp_enrolled_at = new Date();
+      }
+      if (/totp_enabled\s*=\s*FALSE/i.test(normalized)) {
+        user.totp_enabled = false;
+        user.totp_secret = null;
+        user.totp_recovery_codes = [];
+        user.totp_enrolled_at = null;
+      }
+      if (/totp_failed_attempts\s*=\s*\$1/i.test(normalized)) {
+        user.totp_failed_attempts = Number(params[0]) || 0;
+        user.totp_locked_until = params[1] || null;
+      }
+      if (/totp_failed_attempts\s*=\s*0/i.test(normalized)) {
+        user.totp_failed_attempts = 0;
+        user.totp_locked_until = null;
+      }
+      if (/mfa_last_verified_at\s*=\s*NOW\(\)/i.test(normalized)) {
+        user.mfa_last_verified_at = new Date();
+        user.mfa_grace_until = null;
+      }
+    }
     return { rows: [], rowCount: 1 };
   }
 
