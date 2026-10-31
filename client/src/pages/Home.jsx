@@ -5,7 +5,7 @@ import PropertyCard from '../components/properties/PropertyCard';
 import Loader from '../components/common/Loader';
 import AdSpace from '../components/common/AdSpace';
 import ShareMenu from '../components/common/ShareMenu';
-import { FaSearch, FaHome, FaCheckCircle, FaShieldAlt, FaMobileAlt, FaTimes, FaArrowRight, FaMapMarkerAlt } from 'react-icons/fa';
+import { FaSearch, FaHome, FaCheckCircle, FaShieldAlt, FaMobileAlt, FaTimes, FaArrowRight, FaMapMarkerAlt, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/useAuth';
 import FloatingContactWidget from '../components/common/FloatingContactWidget';
@@ -36,6 +36,7 @@ const Home = () => {
 
   const [featuredProperties, setFeaturedProperties] = useState([]);
   const [popularLocations, setPopularLocations] = useState(DEFAULT_POPULAR_LOCATIONS);
+  const [showAllStates, setShowAllStates] = useState(false);
   const [treatedCases, setTreatedCases] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -60,7 +61,7 @@ const Home = () => {
     try {
       const [featured, locations] = await Promise.all([
         propertyService.getFeaturedProperties(10),
-        propertyService.getPopularLocations(6),
+        propertyService.getPopularLocations(37),
       ]);
 
       if (featured?.success) {
@@ -479,7 +480,7 @@ const Home = () => {
 
           {loading ? (
             <Loader />
-          ) : (
+          ) : featuredProperties.length > 0 ? (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
               {featuredProperties.map((property, index) => (
                 <div
@@ -493,6 +494,22 @@ const Home = () => {
                   />
                 </div>
               ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-card">
+              <FaHome className="mx-auto mb-3 text-4xl text-primary-500" />
+              <h3 className="text-lg font-semibold text-slate-900">{t('home.browse_verified_rentals', 'Browse Verified Rentals')}</h3>
+              <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
+                {t('home.explore_all_listings', 'Explore properties listed directly by verified Nigerian landlords and authorized agents across all states.')}
+              </p>
+              <div className="mt-5">
+                <Link
+                  to="/properties"
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-700"
+                >
+                  {t('home.browse_properties', 'Browse All Properties')}
+                </Link>
+              </div>
             </div>
           )}
         </div>
@@ -508,11 +525,27 @@ const Home = () => {
         }`}
       >
         <div className="container mx-auto px-4">
-          <h2 className="mb-10 text-center text-2xl font-bold text-slate-900 sm:text-3xl animate-fadeIn">
-            {t('home.popular_locations')}
-          </h2>
+          <div className="mb-10 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl animate-fadeIn">
+                {t('home.popular_locations')}
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {t('home.popular_locations_subtitle', 'Browse verified rental homes and apartments across Nigerian states')}
+              </p>
+            </div>
+            <Link
+              to="/nigeria"
+              className="group inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-primary-600 transition-all duration-300 hover:text-primary-700"
+            >
+              {t('home.all_states_directory', 'All States & LGAs')} <FaArrowRight className="transition-transform duration-300 group-hover:translate-x-1" />
+            </Link>
+          </div>
+
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-            {(popularLocations && popularLocations.length > 0 ? popularLocations : DEFAULT_POPULAR_LOCATIONS).map((location, index) => {
+            {((popularLocations && popularLocations.length > 0 ? popularLocations : DEFAULT_POPULAR_LOCATIONS)
+              .slice(0, showAllStates ? popularLocations.length : 6)
+            ).map((location, index) => {
               const stateId = location?.state_id || location?.id;
               const linkUrl = stateId ? `/properties?state_id=${stateId}` : '/properties';
               return (
@@ -520,7 +553,7 @@ const Home = () => {
                   key={stateId ?? location?.state_name ?? `loc-${index}`}
                   to={linkUrl}
                   className="group rounded-2xl border border-slate-100 bg-white p-5 text-center shadow-card transition-all duration-500 hover:-translate-y-2 hover:border-primary-200 hover:shadow-cardHover"
-                  style={{ transitionDelay: `${index * 50}ms` }}
+                  style={{ transitionDelay: `${index * 30}ms` }}
                 >
                   <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary-50 text-primary-600 transition-all duration-300 group-hover:scale-110 group-hover:bg-primary-100">
                     <FaMapMarkerAlt />
@@ -534,6 +567,35 @@ const Home = () => {
                 </Link>
               );
             })}
+          </div>
+
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+            {popularLocations.length > 6 && (
+              <button
+                type="button"
+                onClick={() => setShowAllStates((prev) => !prev)}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:border-primary-300 hover:text-primary-700 hover:shadow"
+              >
+                {showAllStates ? (
+                  <>
+                    <span>{t('home.show_top_locations', 'Show Top 6 Locations')}</span>
+                    <FaChevronUp className="text-xs" />
+                  </>
+                ) : (
+                  <>
+                    <span>{t('home.show_more_states', `Show All States (${popularLocations.length} States & FCT)`)}</span>
+                    <FaChevronDown className="text-xs" />
+                  </>
+                )}
+              </button>
+            )}
+            <Link
+              to="/nigeria"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary-50 px-5 py-2.5 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-100"
+            >
+              <span>{t('home.browse_nigeria_directory', 'Browse Full Nigeria Directory')}</span>
+              <FaArrowRight className="text-xs" />
+            </Link>
           </div>
         </div>
       </section>

@@ -401,14 +401,30 @@ exports.getAllStates = async (req, res) => {
       'SELECT * FROM states ORDER BY state_name ASC'
     );
 
+    let rows = result?.rows || [];
+    if (rows.length === 0) {
+      const nigeriaLocations = require('../data/nigeriaLocations');
+      rows = nigeriaLocations.map((entry, idx) => ({
+        id: idx + 1,
+        state_name: entry.displayName || entry.state,
+        state_code: entry.slug || String(entry.state || '').toLowerCase(),
+      }));
+    }
+
     res.json({
       success: true,
-      data: result.rows
+      data: rows
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch states'
+    const nigeriaLocations = require('../data/nigeriaLocations');
+    const fallbackRows = nigeriaLocations.map((entry, idx) => ({
+      id: idx + 1,
+      state_name: entry.displayName || entry.state,
+      state_code: entry.slug || String(entry.state || '').toLowerCase(),
+    }));
+    res.json({
+      success: true,
+      data: fallbackRows,
     });
   }
 };
@@ -541,9 +557,32 @@ exports.getFeaturedProperties = async (req, res) => {
       [...params, limit]
     );
 
+    let rows = result.rows || [];
+    if (rows.length === 0) {
+      // Fallback: If no properties are specifically flagged featured=TRUE, show latest verified available properties
+      const fallbackConditions = whereConditions.filter((c) => c !== 'p.featured = TRUE');
+      const fallbackResult = await db.query(
+        `SELECT 
+          p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
+          p.rent_amount, p.payment_frequency, p.city, p.area,
+          p.created_at,
+          s.state_name, s.state_code,
+          (SELECT photo_url FROM property_photos 
+           WHERE property_id = p.id AND is_primary = TRUE LIMIT 1) AS primary_photo,
+          (SELECT AVG(rating) FROM reviews WHERE property_id = p.id) AS avg_rating
+        FROM properties p
+        JOIN states s ON p.state_id = s.id
+        WHERE ${fallbackConditions.join(' AND ')}
+        ORDER BY p.created_at DESC
+        LIMIT $${paramCount}`,
+        [...params, limit]
+      );
+      rows = fallbackResult?.rows || [];
+    }
+
     res.json({
       success: true,
-      data: result.rows
+      data: rows
     });
   } catch (error) {
     res.status(500).json({

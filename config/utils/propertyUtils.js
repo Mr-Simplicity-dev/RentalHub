@@ -148,6 +148,29 @@ const getSimilarProperties = async (propertyId, limit = 5) => {
       ]
     );
 
+    if (result.rows.length === 0) {
+      const fallbackResult = await db.query(
+        `SELECT
+           p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
+           p.rent_amount, p.payment_frequency, p.city, p.area,
+           s.state_name,
+           (SELECT photo_url
+            FROM property_photos
+            WHERE property_id = p.id AND is_primary = TRUE
+            LIMIT 1) AS primary_photo
+         FROM properties p
+         JOIN states s ON p.state_id = s.id
+         WHERE p.id != $1
+           AND p.state_id = $2
+           AND p.is_available = TRUE
+           AND p.is_verified = TRUE
+         ORDER BY ABS(p.rent_amount - $3) ASC
+         LIMIT $4`,
+        [propertyId, ref.state_id, Number(ref.rent_amount) || 0, safeLimit]
+      );
+      return fallbackResult.rows || [];
+    }
+
     return result.rows;
   } catch (error) {
     logger.error('Error getting similar properties:', error);
@@ -253,6 +276,31 @@ const getRecommendations = async (userId, limit = 10) => {
        LIMIT $6`,
       [userId, stateIds, propertyTypes, avgPrice - priceRange, avgPrice + priceRange, safeLimit]
     );
+
+    if (!result.rows.length) {
+      const fallback = await db.query(
+        `SELECT
+           p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
+           p.rent_amount, p.payment_frequency, p.city, p.area,
+           s.state_name,
+           (SELECT photo_url
+            FROM property_photos
+            WHERE property_id = p.id AND is_primary = TRUE
+            LIMIT 1) AS primary_photo,
+           (SELECT AVG(rating)
+            FROM reviews
+            WHERE property_id = p.id) AS avg_rating
+         FROM properties p
+         JOIN states s ON p.state_id = s.id
+         WHERE p.is_available = TRUE
+           AND p.is_verified = TRUE
+           AND p.id NOT IN (SELECT property_id FROM saved_properties WHERE tenant_id = $1)
+         ORDER BY p.featured DESC, p.created_at DESC
+         LIMIT $2`,
+        [userId, safeLimit]
+      );
+      return fallback.rows || [];
+    }
 
     return result.rows;
   } catch (error) {

@@ -154,11 +154,25 @@ const buildStateMatch = (stateRows, stateSlug) =>
   }) || null;
 
 const fetchStates = async () => {
-  const { rows } = await db.query(
-    `SELECT id, state_name, state_code
-     FROM states
-     ORDER BY state_name ASC`
-  );
+  let rows = [];
+  try {
+    const res = await db.query(
+      `SELECT id, state_name, state_code
+       FROM states
+       ORDER BY state_name ASC`
+    );
+    rows = res?.rows || [];
+  } catch (err) {
+    rows = [];
+  }
+
+  if (rows.length === 0) {
+    rows = nigeriaLocations.map((entry, idx) => ({
+      id: idx + 1,
+      state_name: entry.displayName || entry.state,
+      state_code: entry.slug || String(entry.state || '').toLowerCase(),
+    }));
+  }
 
   return rows.map((row) => ({
     ...row,
