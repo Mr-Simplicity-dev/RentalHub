@@ -95,8 +95,7 @@ const Register = () => {
   const [initialDraft]=useState(()=>restartToken?null:readRegistrationDraft());
   const [formData,setFormData]=useState(()=>({...buildInitialRegistrationForm(referralCode),...(initialDraft?.form||{}),...(referralCode?{referral_code:referralCode}:{})}));
   const draftCompletedRef=useRef(false);
-  const [draftSaved,setDraftSaved]=useState(Boolean(initialDraft));
-  const completeRegistrationDraft=()=>{draftCompletedRef.current=true;clearRegistrationDraft();setDraftSaved(false);};
+  const completeRegistrationDraft=()=>{draftCompletedRef.current=true;clearRegistrationDraft();};
   const [loading, setLoading] = useState(false);
   const [locationOptions, setLocationOptions] = useState([]);
   const [registrationFlags, setRegistrationFlags] = useState(initialRegistrationFlags);
@@ -138,15 +137,8 @@ const Register = () => {
 
   useEffect(()=>{
     if(draftCompletedRef.current||registrationReference)return;
-    setDraftSaved(saveRegistrationDraft(formData,step));
+    saveRegistrationDraft(formData,step);
   },[formData,step,registrationReference]);
-
-  const discardRegistrationDraft=()=>{
-    clearRegistrationDraft();
-    setFormData(buildInitialRegistrationForm(referralCode));
-    setStep(1);setTermsAccepted(false);setDraftSaved(false);setErrors({});
-    resetTurnstile();
-  };
 
   const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const referralCodePattern = /^[A-Za-z0-9_-]+$/;
@@ -1819,7 +1811,6 @@ return (
           <motion.div key={step} initial={{ opacity:0,x:40 }} animate={{ opacity:1,x:0 }} exit={{ opacity:0,x:-40 }}>
 
             {/* STEP 1 — Account Type */}
-            {draftSaved && <div role="status" className="mb-5 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-900"><p className="font-medium">{t(initialDraft?'registrationDraft.restored':'registrationDraft.saved')}</p><p className="mt-1">{t('registrationDraft.notice')}</p><button type="button" onClick={discardRegistrationDraft} className="mt-2 font-semibold underline underline-offset-4">{t('registrationDraft.clear')}</button></div>}
             {step === 1 && (
               <div className="space-y-6">
                 <h2 className="text-xl font-semibold text-center">{t('register.step_1_title')}</h2>

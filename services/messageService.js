@@ -552,7 +552,7 @@ await db.query(
 
     // 🔐 AUDIT LOG (Safe + Non-blocking)
     try {
-      const { logAction } = require('../utils/auditLogger');
+      const { logAction } = require('../config/utils/auditLogger');
 
       await logAction({
         actorId: userId,

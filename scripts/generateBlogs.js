@@ -3,7 +3,7 @@ require("dotenv").config();
 const mongoose = require("mongoose");
 const Blog = require("../models/Blog");
 const locations = require("../data/nigeriaLocations");
-const slugify = require("../utils/slugify");
+const slugify = require("../config/utils/slugify");
 const { submitUrl } = require("../config/utils/googleIndexing");
 
 const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;

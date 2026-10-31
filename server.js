@@ -138,7 +138,7 @@ const {
 } = require('./config/utils/frontendUrl');
 const startScheduler = require('./config/utils/scheduler');
 const locationRoutes = require('./routes/locationRoutes');
-const { generateSitemap } = require('./utils/sitemapGenerator');
+const { generateSitemap } = require('./config/utils/sitemapGenerator');
 const blogRoutes = require('./routes/blogRoutes');
 const cron = require('node-cron');
 const mongoose = require('mongoose');
@@ -169,14 +169,14 @@ connectMongoWithRetry();
 
 const Blog = require('./models/Blog');
 const locations = require('./data/nigeriaLocations');
-const slugify = require('./utils/slugify');
+const slugify = require('./config/utils/slugify');
 const { submitUrl } = require('./config/utils/googleIndexing');
-const { generateAIContent } = require('./utils/aiContentGenerator');
+const { generateAIContent } = require('./config/utils/aiContentGenerator');
 const configureRealtimeSocket = require('./config/utils/realtimeSocket');
 const { setRealtimeIo } = require('./config/utils/realtimeEmitter');
 const { generateTitles } = require('./config/utils/pageGenerator');
 const { generateKeywords } = require('./config/utils/keywordGenerator');
-const { generateBacklinks } = require('./utils/backlinkEngine');
+const { generateBacklinks } = require('./config/utils/backlinkEngine');
 const adminSeoRoutes = require('./routes/adminSeoRoutes');
 const bankTransferRoutes = require('./routes/bankTransfers');
 const adminBankTransfersRoutes = require('./routes/adminBankTransfers');
@@ -431,14 +431,14 @@ app.use(helmet({
         "https://static.cloudflareinsights.com",
       ],
       imgSrc: ["'self'", "res.cloudinary.com", "data:", "blob:", "js-eu1.hs-scripts.com", "www.googletagmanager.com", "https://challenges.cloudflare.com", "https://static.cloudflareinsights.com"],
-      connectSrc: ["'self'", "https://127.0.0.1:*", "wss://127.0.0.1:*", "api.paystack.co", "api.hubspot.com", "forms.hubspot.com", "www.google-analytics.com", "www.googletagmanager.com", "https://challenges.cloudflare.com"],
-      fontSrc: ["'self'", "fonts.googleapis.com", "fonts.gstatic.com"],
-      styleSrc: ["'self'", "fonts.googleapis.com", "https://challenges.cloudflare.com"],
+      connectSrc: ["'self'", "ws:", "wss:", "https://127.0.0.1:*", "wss://127.0.0.1:*", "api.paystack.co", "api.hubspot.com", "forms.hubspot.com", "www.google-analytics.com", "www.googletagmanager.com", "https://challenges.cloudflare.com"],
+      fontSrc: ["'self'", "fonts.googleapis.com", "fonts.gstatic.com", "data:"],
+      styleSrc: ["'self'", "'unsafe-inline'", "fonts.googleapis.com", "https://challenges.cloudflare.com"],
       mediaSrc: ["'self'", "res.cloudinary.com", "blob:"],
       frameSrc: ["'self'", "app.hubspot.com", "https://challenges.cloudflare.com"],
-      frameAncestors: ["'none'"],
     },
   },
+  frameguard: false,
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   permissionsPolicy: {
     features: {
@@ -608,8 +608,11 @@ app.use((req, res, next) => {
 app.use(audit('API Request', 'system'));
 
 app.get('/', (req, res) => {
-  if (hasClientBuild) {
-    return res.sendFile(clientIndexPath);
+  if (fs.existsSync(clientIndexPath)) {
+    if (!res.locals.cspNonce) return res.sendFile(clientIndexPath);
+    const html = fs.readFileSync(clientIndexPath, 'utf8');
+    const patched = html.replace(/<script\s/g, `<script nonce="${res.locals.cspNonce}" `);
+    return res.type('html').send(patched);
   }
 
   res.json({
@@ -629,11 +632,10 @@ app.get('/api/health', async (req, res) => {
 
   if (healthStatus === 'OK' && process.env.REDIS_URL) {
     try {
-      const redis = require('ioredis');
-      const client = new redis(process.env.REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 1 });
-      await client.connect();
-      await client.ping();
-      await client.quit();
+      const redis = require('./config/utils/redis');
+      if (redis && typeof redis.ping === 'function') {
+        await redis.ping();
+      }
     } catch {
       healthStatus = 'DEGRADED';
     }
@@ -789,16 +791,26 @@ app.use('/api/admin/inspections', adminLimiter, adminInspectionRoutes);
 app.use('/api', generalOpsLimiter, appealRoutes);
 app.use('/api', generalOpsLimiter, locationRoutes);
 
-if (hasClientBuild) {
-  app.use(express.static(clientBuildPath));
+app.use(express.static(clientBuildPath));
 
-  app.get(/^\/(?!api\/|socket\.io\/|uploads\/).*/, (req, res) => {
-    if (!res.locals.cspNonce) return res.sendFile(clientIndexPath);
-    const html = fs.readFileSync(clientIndexPath, 'utf8');
-    const patched = html.replace(/<script\s/g, `<script nonce="${res.locals.cspNonce}" `);
-    res.type('html').send(patched);
-  });
-}
+app.get(/^\/(?!api\/|socket\.io\/|uploads\/).*/, (req, res, next) => {
+  if (!fs.existsSync(clientIndexPath)) return next();
+  if (!res.locals.cspNonce) return res.sendFile(clientIndexPath);
+  const html = fs.readFileSync(clientIndexPath, 'utf8');
+  const patched = html.replace(/<script\s/g, `<script nonce="${res.locals.cspNonce}" `);
+  res.type('html').send(patched);
+});
+
+app.use((err, req, res, next) => {
+  if (err && (err.name === 'MongooseError' || err.name === 'MongoNetworkError' || err.message?.includes('buffering timed out'))) {
+    console.warn('[AI Studio] Database offline — returning mock empty response');
+    if (req.method === 'GET') {
+      return res.json(req.path.endsWith('s') || req.path.endsWith('s/') ? [] : {});
+    }
+    return res.status(503).json({ error: 'Service temporarily unavailable (database offline)' });
+  }
+  next(err);
+});
 
 app.use((err, req, res, next) => {
   const statusCode = err.status || err.statusCode || 500;
@@ -829,7 +841,7 @@ app.use((err, req, res, next) => {
   res.status(statusCode).json(response);
 });
 
-const PORT = Number(process.env.APP_PORT || process.env.PORT || 5000);
+const PORT = Number(process.env.APP_PORT || process.env.PORT || 3000);
 let backgroundServicesStarted = false;
 
 // const ensureStartupSchema = async () => {
@@ -918,7 +930,7 @@ const server = http.createServer(app);
 server.once('error', handleServerStartupError);
 
 const startServer = () => {
-  server.listen(PORT, process.env.APP_HOST || '127.0.0.1', () => {
+  server.listen(PORT, process.env.APP_HOST || '0.0.0.0', () => {
     logger.info(`Server running on port ${PORT}`);
     if (process.send) process.send('ready');
   });

@@ -2,7 +2,7 @@ require("dotenv").config();
 const mongoose = require("mongoose");
 const Location = require("../models/Location");
 const locations = require("../data/nigeriaLocations");
-const slugify = require("../utils/slugify");
+const slugify = require("../config/utils/slugify");
 
 const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;
 

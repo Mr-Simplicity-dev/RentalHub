@@ -28,9 +28,6 @@ test('web registration restores personal details and auto-saves edits for a late
  expect(container.querySelector('input[name="email"]').value).toBe('user@example.test');
  await act(async()=>fireEvent.change(container.querySelector('input[name="full_name"]'),{target:{value:'Updated User'}}));
  expect(readRegistrationDraft().form.full_name).toBe('Updated User');
- expect(container.textContent).toContain('registration details have been restored');
- await act(async()=>fireEvent.click([...container.querySelectorAll('button')].find(button=>button.textContent==='Clear saved details')));
- expect(window.localStorage.getItem(REGISTRATION_DRAFT_KEY)).toBeNull();
 });
 test('choosing RentalHub lawyers keeps the user-entered lawyer email editable and intact',async()=>{
  saveRegistrationDraft({full_name:'User',email:'user@example.test',phone:'08012345678',lawyer_email:'lawyer@example.test'},2);

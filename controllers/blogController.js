@@ -1,5 +1,5 @@
 const Blog = require("../models/Blog");
-const { submitURL } = require("../utils/googleIndexing");
+const { submitURL } = require("../config/utils/googleIndexing");
 const { getFrontendUrl } = require("../config/utils/frontendUrl");
 
 exports.getBlog = async (req, res) => {
