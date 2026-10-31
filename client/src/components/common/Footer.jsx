@@ -143,7 +143,12 @@ const Footer = () => {
                 </FooterContact>
               </li>
             </ul>
-            <h3 className="text-lg font-bold pt-2">{t('footer.office_address', 'Office Address')}</h3>
+            <h3 className="text-lg font-bold pt-2">{t('footer.head_office', 'Head Office')}</h3>
+            <div className="flex items-start gap-2 text-sm text-gray-400 mb-3">
+              <span className="text-primary-400 mt-1 shrink-0">📍</span>
+              <span className="break-words">1, Mega Screen , Abuja, FCT, Nigeria</span>
+            </div>
+            <h3 className="text-lg font-bold">{t('footer.branch_office', 'Branch Office')}</h3>
             <div className="flex items-start gap-2 text-sm text-gray-400">
               <span className="text-primary-400 mt-1 shrink-0">📍</span>
               <span className="break-words">No 3 Okene street, compensation layout IV old kutunku gwagwalada FCT Abuja</span>
