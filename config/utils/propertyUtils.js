@@ -7,31 +7,72 @@ const clampLimit = (limit, fallback = 10) => {
   return Math.min(parsed, 100);
 };
 
-// Get popular locations (states with most active verified properties)
+// Top Nigerian hub priority for ordering when property counts are equal or zero
+const PRIORITY_STATES_ORDER = `
+  CASE
+    WHEN LOWER(s.state_name) LIKE '%lagos%' THEN 1
+    WHEN LOWER(s.state_name) LIKE '%abuja%' OR LOWER(s.state_code) LIKE '%fct%' THEN 2
+    WHEN LOWER(s.state_name) LIKE '%rivers%' THEN 3
+    WHEN LOWER(s.state_name) LIKE '%oyo%' THEN 4
+    WHEN LOWER(s.state_name) LIKE '%kano%' THEN 5
+    WHEN LOWER(s.state_name) LIKE '%enugu%' THEN 6
+    WHEN LOWER(s.state_name) LIKE '%ogun%' THEN 7
+    WHEN LOWER(s.state_name) LIKE '%anambra%' THEN 8
+    WHEN LOWER(s.state_name) LIKE '%delta%' THEN 9
+    ELSE 20
+  END
+`;
+
+// Get popular locations (states with most active verified properties, defaulting to top Nigerian hubs)
 const getPopularLocations = async (limit = 10) => {
+  const safeLimit = clampLimit(limit, 10);
   try {
-    const safeLimit = clampLimit(limit, 10);
     const result = await db.query(
       `SELECT
          s.state_name,
          s.state_code,
          s.id AS state_id,
-         COUNT(p.id) AS property_count
+         s.id,
+         COALESCE(COUNT(p.id), 0)::int AS property_count
        FROM states s
        LEFT JOIN properties p ON s.id = p.state_id
          AND p.is_available = TRUE
          AND p.is_verified = TRUE
        GROUP BY s.id, s.state_name, s.state_code
-       HAVING COUNT(p.id) > 0
-       ORDER BY property_count DESC
+       ORDER BY property_count DESC, ${PRIORITY_STATES_ORDER} ASC, s.state_name ASC
        LIMIT $1`,
       [safeLimit]
     );
 
-    return result.rows;
+    let rows = (result?.rows || []).map((row) => ({
+      ...row,
+      id: row.state_id || row.id,
+      state_id: row.state_id || row.id,
+      property_count: Number(row.property_count || 0),
+    }));
+
+    if (rows.length === 0) {
+      const defaultStateNames = ['Lagos', 'Abuja', 'Rivers', 'Oyo', 'Kano', 'Enugu'];
+      rows = defaultStateNames.slice(0, safeLimit).map((name, i) => ({
+        id: i + 1,
+        state_id: i + 1,
+        state_name: name,
+        state_code: name.toLowerCase(),
+        property_count: 0,
+      }));
+    }
+
+    return rows.slice(0, safeLimit);
   } catch (error) {
     logger.error('Error getting popular locations:', error);
-    return [];
+    const defaultStateNames = ['Lagos', 'Abuja', 'Rivers', 'Oyo', 'Kano', 'Enugu'];
+    return defaultStateNames.slice(0, safeLimit).map((name, i) => ({
+      id: i + 1,
+      state_id: i + 1,
+      state_name: name,
+      state_code: name.toLowerCase(),
+      property_count: 0,
+    }));
   }
 };
 

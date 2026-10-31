@@ -32,8 +32,10 @@ if (DB_SSL) {
 
 const fallbackStatesRows = nigeriaLocations.map((entry, idx) => ({
   id: idx + 1,
+  state_id: idx + 1,
   state_name: entry.displayName || entry.state,
   state_code: entry.slug || String(entry.state || '').toLowerCase(),
+  property_count: 0,
 }));
 
 const defaultHash = bcrypt.hashSync('Admin123456!', 10);
@@ -140,7 +142,26 @@ const mockQuery = async (sql = '', params = []) => {
 
   // States queries
   if (/FROM\s+states\b/i.test(normalized) && /^SELECT\b/i.test(normalized)) {
-    return { rows: fallbackStatesRows, rowCount: fallbackStatesRows.length };
+    let rows = [...fallbackStatesRows];
+    if (/ORDER\s+BY.*(?:property_count|CASE)/i.test(normalized)) {
+      const priority = ['lagos', 'abuja', 'fct', 'rivers', 'oyo', 'kano', 'enugu', 'ogun', 'anambra'];
+      rows.sort((a, b) => {
+        const aIdx = priority.findIndex((p) => a.state_name.toLowerCase().includes(p) || a.state_code.toLowerCase().includes(p));
+        const bIdx = priority.findIndex((p) => b.state_name.toLowerCase().includes(p) || b.state_code.toLowerCase().includes(p));
+        if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+        if (aIdx !== -1) return -1;
+        if (bIdx !== -1) return 1;
+        return a.state_name.localeCompare(b.state_name);
+      });
+    }
+    const limitMatch = normalized.match(/LIMIT\s+(\$1|\d+)/i);
+    if (limitMatch) {
+      const limitVal = limitMatch[1] === '$1' ? Number(params[0]) : Number(limitMatch[1]);
+      if (Number.isFinite(limitVal) && limitVal > 0) {
+        rows = rows.slice(0, limitVal);
+      }
+    }
+    return { rows, rowCount: rows.length };
   }
 
   // Users queries

@@ -21,12 +21,21 @@ const HUBSPOT_LANG_MAP = {
   'zh-CN': 'zh-cn',
 };
 
+const DEFAULT_POPULAR_LOCATIONS = [
+  { id: 25, state_id: 25, state_name: 'Lagos', property_count: 0 },
+  { id: 1, state_id: 1, state_name: 'Abuja', property_count: 0 },
+  { id: 33, state_id: 33, state_name: 'Rivers', property_count: 0 },
+  { id: 31, state_id: 31, state_name: 'Oyo', property_count: 0 },
+  { id: 20, state_id: 20, state_name: 'Kano', property_count: 0 },
+  { id: 15, state_id: 15, state_name: 'Enugu', property_count: 0 },
+];
+
 const Home = () => {
   const { t, i18n } = useTranslation();
   const { isAuthenticated } = useAuth();
 
   const [featuredProperties, setFeaturedProperties] = useState([]);
-  const [popularLocations, setPopularLocations] = useState([]);
+  const [popularLocations, setPopularLocations] = useState(DEFAULT_POPULAR_LOCATIONS);
   const [treatedCases, setTreatedCases] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -57,8 +66,8 @@ const Home = () => {
       if (featured?.success) {
         setFeaturedProperties(featured.data || []);
       }
-      if (locations?.success) {
-        setPopularLocations(locations.data || []);
+      if (locations?.success && Array.isArray(locations.data) && locations.data.length > 0) {
+        setPopularLocations(locations.data);
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -156,6 +165,11 @@ const Home = () => {
     
     // Trigger hero animation on mount
     setTimeout(() => setHeroLoaded(true), 100);
+    setTimeout(() => {
+      setFeaturesLoaded(true);
+      setPropertiesLoaded(true);
+      setLocationsLoaded(true);
+    }, 800);
 
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -498,24 +512,28 @@ const Home = () => {
             {t('home.popular_locations')}
           </h2>
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-            {popularLocations.map((location, index) => (
-              <Link
-                key={location?.state_id ?? location?.state_name ?? `loc-${index}`}
-                to={`/properties?state_id=${location?.state_id ?? ''}`}
-                className="group rounded-2xl border border-slate-100 bg-white p-5 text-center shadow-card transition-all duration-500 hover:-translate-y-2 hover:border-primary-200 hover:shadow-cardHover"
-                style={{ transitionDelay: `${index * 50}ms` }}
-              >
-                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary-50 text-primary-600 transition-all duration-300 group-hover:scale-110 group-hover:bg-primary-100">
-                  <FaMapMarkerAlt />
-                </div>
-                <h3 className="font-semibold text-slate-900 transition-colors duration-300 group-hover:text-primary-700">
-                  {location?.state_name ?? t('home.unknown')}
-                </h3>
-                <p className="mt-1 text-sm text-slate-500 transition-colors duration-300 group-hover:text-slate-700">
-                  {location?.property_count ?? 0} {t('home.properties')}
-                </p>
-              </Link>
-            ))}
+            {(popularLocations && popularLocations.length > 0 ? popularLocations : DEFAULT_POPULAR_LOCATIONS).map((location, index) => {
+              const stateId = location?.state_id || location?.id;
+              const linkUrl = stateId ? `/properties?state_id=${stateId}` : '/properties';
+              return (
+                <Link
+                  key={stateId ?? location?.state_name ?? `loc-${index}`}
+                  to={linkUrl}
+                  className="group rounded-2xl border border-slate-100 bg-white p-5 text-center shadow-card transition-all duration-500 hover:-translate-y-2 hover:border-primary-200 hover:shadow-cardHover"
+                  style={{ transitionDelay: `${index * 50}ms` }}
+                >
+                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary-50 text-primary-600 transition-all duration-300 group-hover:scale-110 group-hover:bg-primary-100">
+                    <FaMapMarkerAlt />
+                  </div>
+                  <h3 className="font-semibold text-slate-900 transition-colors duration-300 group-hover:text-primary-700">
+                    {location?.state_name ?? t('home.unknown')}
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-500 transition-colors duration-300 group-hover:text-slate-700">
+                    {location?.property_count ?? 0} {t('home.properties')}
+                  </p>
+                </Link>
+              );
+            })}
           </div>
         </div>
       </section>
