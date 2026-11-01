@@ -917,9 +917,9 @@ const Profile = () => {
               <input
                 type="text"
                 inputMode="numeric"
-                maxLength={6}
+                maxLength={10}
                 value={totpConfirmCode}
-                onChange={(e) => setTotpConfirmCode(e.target.value.replace(/\D/g, ''))}
+                onChange={(e) => setTotpConfirmCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 placeholder="••••••"
                 className="input w-full sm:w-40"
               />

@@ -245,21 +245,22 @@ const mockQuery = async (sql = '', params = []) => {
         user.totp_enabled = false;
         user.totp_failed_attempts = 0;
         user.totp_locked_until = null;
-      }
-      if (/totp_enabled\s*=\s*TRUE/i.test(normalized)) {
+      } else if (/totp_enabled\s*=\s*TRUE/i.test(normalized)) {
         user.totp_enabled = true;
-        user.totp_recovery_codes = params[0];
+        try {
+          user.totp_recovery_codes = typeof params[0] === 'string' ? JSON.parse(params[0]) : params[0];
+        } catch {
+          user.totp_recovery_codes = params[0] || [];
+        }
         user.totp_failed_attempts = 0;
         user.totp_locked_until = null;
         user.totp_enrolled_at = new Date();
-      }
-      if (/totp_enabled\s*=\s*FALSE/i.test(normalized)) {
+      } else if (/totp_secret\s*=\s*NULL/i.test(normalized)) {
         user.totp_enabled = false;
         user.totp_secret = null;
         user.totp_recovery_codes = [];
         user.totp_enrolled_at = null;
-      }
-      if (/totp_failed_attempts\s*=\s*\$1/i.test(normalized)) {
+      } else if (/totp_failed_attempts\s*=\s*\$1/i.test(normalized)) {
         user.totp_failed_attempts = Number(params[0]) || 0;
         user.totp_locked_until = params[1] || null;
       }

@@ -88,16 +88,20 @@ export default function TwoFactorStep({ method, onVerified, onCancel, title }) {
 
           <input
             type="text"
-            inputMode="numeric"
-            maxLength={6}
+            inputMode={method === 'totp' ? 'text' : 'numeric'}
+            maxLength={method === 'totp' ? 14 : 10}
             value={code}
             onChange={(e) => {
-              setCode(e.target.value.replace(/\D/g, ''));
+              const raw = e.target.value;
+              const cleaned = method === 'totp'
+                ? raw.replace(/[^a-zA-Z0-9]/g, '').slice(0, 12)
+                : raw.replace(/\D/g, '').slice(0, 6);
+              setCode(cleaned);
               setError('');
             }}
             placeholder="••••••"
             autoFocus
-            className="w-full rounded-xl border border-gray-300 px-4 py-3 text-center text-2xl font-bold tracking-[0.5em] text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            className="w-full rounded-xl border border-gray-300 px-4 py-3 text-center text-2xl font-bold tracking-[0.3em] text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
           />
 
           {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
