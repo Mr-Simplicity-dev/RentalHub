@@ -67,6 +67,28 @@ export const authService = {
   return response.data;
 },
 
+  // Google OAuth Sign-in
+  googleAuth: async (credential) => {
+    const response = await api.post(
+      '/auth/google',
+      { credential },
+      {
+        skipAuth: true,
+        skipAuthRefresh: true,
+      }
+    );
+
+    if (response.data.success && response.data.data) {
+      const { token, user } = response.data.data;
+      setAuthSession(token, user);
+      if (token) {
+        api.defaults.headers.common.Authorization = `Bearer ${token}`;
+      }
+    }
+
+    return response.data;
+  },
+
   clearLocalSession: () => {
     clearAuthSession();
     delete api.defaults.headers.common['Authorization'];

@@ -429,13 +429,42 @@ app.use(helmet({
         "www.googletagmanager.com",
         "https://challenges.cloudflare.com",
         "https://static.cloudflareinsights.com",
+        "https://accounts.google.com",
+        "https://maps.googleapis.com",
       ],
-      imgSrc: ["'self'", "res.cloudinary.com", "data:", "blob:", "js-eu1.hs-scripts.com", "www.googletagmanager.com", "https://challenges.cloudflare.com", "https://static.cloudflareinsights.com"],
-      connectSrc: ["'self'", "ws:", "wss:", "https://127.0.0.1:*", "wss://127.0.0.1:*", "api.paystack.co", "api.hubspot.com", "forms.hubspot.com", "www.google-analytics.com", "www.googletagmanager.com", "https://challenges.cloudflare.com"],
+      imgSrc: [
+        "'self'",
+        "res.cloudinary.com",
+        "data:",
+        "blob:",
+        "js-eu1.hs-scripts.com",
+        "www.googletagmanager.com",
+        "https://challenges.cloudflare.com",
+        "https://static.cloudflareinsights.com",
+        "https://lh3.googleusercontent.com",
+        "https://*.googleusercontent.com",
+        "https://maps.gstatic.com",
+        "https://maps.googleapis.com",
+      ],
+      connectSrc: [
+        "'self'",
+        "ws:",
+        "wss:",
+        "https://127.0.0.1:*",
+        "wss://127.0.0.1:*",
+        "api.paystack.co",
+        "api.hubspot.com",
+        "forms.hubspot.com",
+        "www.google-analytics.com",
+        "www.googletagmanager.com",
+        "https://challenges.cloudflare.com",
+        "https://accounts.google.com",
+        "https://maps.googleapis.com",
+      ],
       fontSrc: ["'self'", "fonts.googleapis.com", "fonts.gstatic.com", "data:"],
       styleSrc: ["'self'", "'unsafe-inline'", "fonts.googleapis.com", "https://challenges.cloudflare.com"],
       mediaSrc: ["'self'", "res.cloudinary.com", "blob:"],
-      frameSrc: ["'self'", "app.hubspot.com", "https://challenges.cloudflare.com"],
+      frameSrc: ["'self'", "app.hubspot.com", "https://challenges.cloudflare.com", "https://accounts.google.com"],
     },
   },
   frameguard: false,
@@ -482,6 +511,15 @@ app.use((err, req, res, next) => {
 app.use('/', locationRoutes);
 app.use('/', blogRoutes);
 app.use('/.well-known', appLinksRoutes);
+
+// Google Search Console / Site Verification file handler
+app.get('/google:code.html', (req, res) => {
+  const code = req.params.code;
+  if (/^[a-zA-Z0-9_-]+$/.test(code)) {
+    return res.type('text/html').send(`google-site-verification: google${code}.html`);
+  }
+  return res.status(404).send('Not found');
+});
 
 // Uploaded files are served through authenticated routes only — never via public static
 const authenticatedUploadsStaticOptions = {
