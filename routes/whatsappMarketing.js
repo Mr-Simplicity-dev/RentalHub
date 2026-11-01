@@ -98,18 +98,18 @@ router.post(
 router.post(
   '/contacts/import',
   [
-    body('phones')
-      .custom((value) => {
-        if (Array.isArray(value)) {
-          if (value.length < 1 || value.length > 5000) throw new Error('phones must have between 1 and 5000 items');
-          return true;
-        }
-        if (typeof value === 'string') {
-          if (!value.trim()) throw new Error('phones cannot be empty');
-          return true;
-        }
-        throw new Error('phones must be an array or string');
-      }),
+    body().custom((val) => {
+      const items = val?.contacts || val?.phones;
+      if (Array.isArray(items)) {
+        if (items.length < 1 || items.length > 5000) throw new Error('Contacts must have between 1 and 5000 items');
+        return true;
+      }
+      if (typeof items === 'string') {
+        if (!items.trim()) throw new Error('Contacts cannot be empty');
+        return true;
+      }
+      throw new Error('Please provide contacts or phones to import');
+    }),
   ],
   validateRequest,
   authenticate,
@@ -120,11 +120,25 @@ router.post('/contacts/check', authenticate, requireSuperAdmin, waCtrl.checkCont
 // Registered before /contacts/:id so the literal path is not read as an id.
 router.delete('/contacts/invalid', authenticate, requireSuperAdmin, waCtrl.deleteInvalidContacts);
 router.delete('/contacts/duplicates', authenticate, requireSuperAdmin, waCtrl.cleanDuplicateContacts);
+router.patch(
+  '/contacts/:id',
+  [
+    param('id').isInt(),
+    body('full_name').optional({ values: 'null' }).isString().trim().isLength({ max: 255 }),
+    body('phone').optional().isString().trim().isLength({ min: 5, max: 20 }),
+  ],
+  validateRequest,
+  authenticate,
+  requireSuperAdmin,
+  waCtrl.updateContact
+);
 router.delete('/contacts/:id', [param('id').isInt()], validateRequest, authenticate, requireSuperAdmin, waCtrl.deleteContact);
 
 router.post('/media', authenticate, requireSuperAdmin, uploadCampaignMedia);
 
 router.get('/campaigns', authenticate, requireSuperAdmin, waCtrl.listCampaigns);
+router.get('/campaigns/preview-audience', authenticate, requireSuperAdmin, waCtrl.previewAudience);
+router.get('/campaigns/:id/recipients', [param('id').isInt()], validateRequest, authenticate, requireSuperAdmin, waCtrl.getCampaignRecipients);
 router.post(
   '/campaigns',
   [

@@ -94,6 +94,7 @@ const ensureSchema = async () => {
 
   await db.query(`CREATE INDEX IF NOT EXISTS idx_wa_contacts_status ON whatsapp_contacts (wa_status)`);
   await db.query(`CREATE INDEX IF NOT EXISTS idx_wa_contacts_subscribed ON whatsapp_contacts (subscribed)`);
+  await db.query(`ALTER TABLE whatsapp_contacts ADD COLUMN IF NOT EXISTS import_batch VARCHAR(100)`);
 
   await db.query(`
     ALTER TABLE whatsapp_campaign_recipients
@@ -609,7 +610,10 @@ const listContacts = async (req, res) => {
     await ensureSchema();
     const search = String(req.query?.search || '').trim();
     const status = String(req.query?.status || '').trim().toLowerCase();
-    const limit = Math.min(Math.max(parseInt(req.query?.limit, 10) || 200, 1), 1000);
+    const batch = String(req.query?.batch || '').trim();
+    const page = Math.max(parseInt(req.query?.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query?.limit, 10) || 30, 1), 1000);
+    const offset = (page - 1) * limit;
 
     const where = [];
     const params = [];
@@ -621,13 +625,23 @@ const listContacts = async (req, res) => {
       params.push(status);
       where.push(`wa_status = $${params.length}`);
     }
+    if (batch) {
+      params.push(batch);
+      where.push(`import_batch = $${params.length}`);
+    }
     const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
-    params.push(limit);
+    const countRes = await db.query(
+      `SELECT COUNT(*)::int AS total FROM whatsapp_contacts ${whereClause}`,
+      params
+    );
+    const total = countRes.rows[0]?.total || 0;
+
+    params.push(limit, offset);
     const { rows } = await db.query(
-      `SELECT id, phone, full_name, source, subscribed, wa_status, wa_checked_at, created_at
+      `SELECT id, phone, full_name, source, subscribed, wa_status, wa_checked_at, import_batch, created_at, updated_at
        FROM whatsapp_contacts ${whereClause}
-       ORDER BY created_at DESC LIMIT $${params.length}`,
+       ORDER BY created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
       params
     );
 
@@ -640,7 +654,30 @@ const listContacts = async (req, res) => {
        FROM whatsapp_contacts`
     );
 
-    res.json({ success: true, data: { contacts: rows, stats: stats.rows[0] } });
+    let batches = [];
+    try {
+      const batchRes = await db.query(
+        `SELECT DISTINCT import_batch FROM whatsapp_contacts WHERE import_batch IS NOT NULL AND import_batch != '' ORDER BY import_batch DESC LIMIT 30`
+      );
+      batches = (batchRes.rows || []).map((r) => r.import_batch);
+    } catch {
+      batches = [];
+    }
+
+    res.json({
+      success: true,
+      data: {
+        contacts: rows,
+        stats: stats.rows[0],
+        batches,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit) || 1,
+        },
+      },
+    });
   } catch (error) {
     req.logger.error('List WhatsApp contacts error:', error.message);
     res.status(500).json({ success: false, message: 'Failed to load WhatsApp contacts' });
@@ -662,7 +699,7 @@ const addContact = async (req, res) => {
        ON CONFLICT (phone) DO UPDATE SET
          full_name = COALESCE(EXCLUDED.full_name, whatsapp_contacts.full_name),
          updated_at = CURRENT_TIMESTAMP
-       RETURNING id, phone, full_name, source, subscribed, wa_status, wa_checked_at, created_at`,
+       RETURNING id, phone, full_name, source, subscribed, wa_status, wa_checked_at, import_batch, created_at`,
       [phone, fullName, req.user?.id || null]
     );
 
@@ -673,37 +710,94 @@ const addContact = async (req, res) => {
   }
 };
 
-// CSV/paste import. Accepts an array of raw phone strings (the UI extracts the
-// first column) or already-normalized E.164 numbers and dedupes on insert.
+const updateContact = async (req, res) => {
+  try {
+    await ensureSchema();
+    const { id } = req.params;
+    const fullName = typeof req.body?.full_name === 'string'
+      ? req.body.full_name.trim().slice(0, 255) || null
+      : undefined;
+    const phone = req.body?.phone ? normalizeWhatsphone(req.body.phone) : undefined;
+
+    const updates = [];
+    const params = [];
+    if (fullName !== undefined) {
+      params.push(fullName);
+      updates.push(`full_name = $${params.length}`);
+    }
+    if (phone !== undefined) {
+      if (!phone) return res.status(400).json({ success: false, message: 'Invalid Nigerian phone number format' });
+      params.push(phone);
+      updates.push(`phone = $${params.length}`);
+    }
+    if (updates.length === 0) {
+      return res.status(400).json({ success: false, message: 'No fields to update' });
+    }
+
+    params.push(id);
+    updates.push(`updated_at = CURRENT_TIMESTAMP`);
+    const result = await db.query(
+      `UPDATE whatsapp_contacts SET ${updates.join(', ')} WHERE id = $${params.length}
+       RETURNING id, phone, full_name, source, subscribed, wa_status, wa_checked_at, import_batch, created_at, updated_at`,
+      params
+    );
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, message: 'Contact not found' });
+    }
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    req.logger.error('Update WhatsApp contact error:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to update WhatsApp contact' });
+  }
+};
+
+// CSV/paste import. Accepts an array of contact objects { phone, full_name/name },
+// raw phone strings, or comma/newline text. Names are optional (lack of name never stops import).
 const importContacts = async (req, res) => {
   try {
     await ensureSchema();
-    let incoming = req.body?.phones;
-    if (typeof incoming === 'string') {
-      incoming = incoming
+    const rawIncoming = req.body?.contacts || req.body?.phones;
+    const batchName = String(req.body?.import_batch || req.body?.batch_name || '').trim().slice(0, 100) || null;
+
+    let contactItems = [];
+    if (typeof rawIncoming === 'string') {
+      contactItems = rawIncoming
         .split(/[\n,;\t|\r]+/)
-        .map((p) => String(p || '').replace(/[^0-9+]/g, ''))
-        .filter((p) => p.replace(/^\+/, '').length >= 10);
-    }
-    incoming = Array.isArray(incoming) ? incoming : [];
-    if (incoming.length === 0) {
-      return res.status(400).json({ success: false, message: 'No phone numbers provided' });
+        .map((p) => ({ phone: String(p || '').replace(/[^0-9+]/g, ''), fullName: null }))
+        .filter((c) => c.phone.replace(/^\+/, '').length >= 10);
+    } else if (Array.isArray(rawIncoming)) {
+      contactItems = rawIncoming.map((item) => {
+        if (typeof item === 'string') {
+          return { phone: item, fullName: null };
+        }
+        return {
+          phone: String(item?.phone || item?.number || '').trim(),
+          fullName: String(item?.full_name || item?.fullName || item?.name || '').trim().slice(0, 255) || null,
+        };
+      });
     }
 
-    // Keep malformed entries in the list so classifyNewPhones can count them
-    // as invalid instead of silently dropping them from the report.
-    const normalizedIncoming = incoming.map((p) => {
-      if (typeof p !== 'string') return '';
-      return p.replace(/\D/g, '');
-    });
+    if (contactItems.length === 0) {
+      return res.status(400).json({ success: false, message: 'No contacts provided' });
+    }
+
+    // Map each item by phone digits
+    const rawToNameMap = new Map();
+    const normalizedIncoming = [];
+    for (const item of contactItems) {
+      const digits = String(item.phone || '').replace(/\D/g, '');
+      if (digits) {
+        normalizedIncoming.push(digits);
+        if (item.fullName && !rawToNameMap.has(digits)) {
+          rawToNameMap.set(digits, item.fullName);
+        }
+      }
+    }
 
     if (normalizedIncoming.length === 0) {
       return res.status(400).json({ success: false, message: 'No valid phone numbers found' });
     }
 
-    // classifyNewPhones refuses anything the platform already holds — users,
-    // the SMS list, survey leads or an earlier WhatsApp import — so a number
-    // can never be imported twice or silently revived after it unsubscribed.
     const { accepted, alreadyKnown, invalid, duplicates } = await classifyNewPhones(normalizedIncoming);
 
     if (accepted.length === 0) {
@@ -712,42 +806,57 @@ const importContacts = async (req, res) => {
         message: alreadyKnown > 0
           ? `All ${alreadyKnown} number(s) already exist in the system`
           : 'No valid Nigerian phone numbers found',
-        data: { added: 0, alreadyKnown, invalid, duplicates },
+        data: { added: 0, updated: 0, alreadyKnown, invalid, duplicates },
       });
     }
 
     // Normalize to WhatsApp/E.164 format (+234...) for consistency
-    const normalized = accepted.map((p) => normalizeWhatsphone(p)).filter(Boolean);
+    const normalizedContacts = accepted.map((digits) => {
+      const phone = normalizeWhatsphone(digits);
+      return phone ? { phone, fullName: rawToNameMap.get(digits) || null } : null;
+    }).filter(Boolean);
 
-    if (normalized.length === 0) {
+    if (normalizedContacts.length === 0) {
       return res.status(400).json({
         success: false,
         message: 'No valid Nigerian phone numbers found',
-        data: { added: 0, alreadyKnown, invalid: invalid + accepted.length, duplicates },
+        data: { added: 0, updated: 0, alreadyKnown, invalid: invalid + accepted.length, duplicates },
       });
     }
 
-    // Collapse rows that already exist in both shapes (0803… and 234803…)
-    // before inserting, so an import never leaves the list with duplicates.
     const { deleted: removedDuplicates } = await dedupeContacts();
 
     let added = 0;
-    for (let i = 0; i < normalized.length; i += 250) {
-      const chunk = normalized.slice(i, i + 250);
+    let updated = 0;
+    for (let i = 0; i < normalizedContacts.length; i += 250) {
+      const chunk = normalizedContacts.slice(i, i + 250);
       const params = [];
-      const values = chunk.map((phone) => {
-        params.push(phone);
-        return `($${params.length}, 'import', TRUE, $${params.length + 1})`;
+      const values = chunk.map((c) => {
+        const base = params.length;
+        params.push(c.phone, c.fullName, batchName);
+        return `($${base + 1}, $${base + 2}, 'import', TRUE, $${base + 3}, $${chunk.length * 3 + 1})`;
       });
       // created_by is appended once at the end of the parameter list.
       params.push(req.user?.id || null);
+
       const result = await db.query(
-        `INSERT INTO whatsapp_contacts (phone, source, subscribed, created_by)
+        `INSERT INTO whatsapp_contacts (phone, full_name, source, subscribed, import_batch, created_by)
          VALUES ${values.join(', ')}
-         ON CONFLICT (phone) DO NOTHING`,
+         ON CONFLICT (phone) DO UPDATE SET
+           full_name = COALESCE(EXCLUDED.full_name, whatsapp_contacts.full_name),
+           import_batch = COALESCE(EXCLUDED.import_batch, whatsapp_contacts.import_batch),
+           updated_at = CURRENT_TIMESTAMP
+         RETURNING (xmax = 0) AS inserted`,
         params
       );
-      added += result.rowCount ?? 0;
+      if (result.rows) {
+        for (const row of result.rows) {
+          if (row.inserted) added += 1;
+          else updated += 1;
+        }
+      } else {
+        added += chunk.length;
+      }
     }
 
     const total = await db.query(`SELECT COUNT(*)::int AS total FROM whatsapp_contacts`);
@@ -757,13 +866,14 @@ const importContacts = async (req, res) => {
       entityType: 'whatsapp_contact',
       entityId: null,
       eventType: 'contacts_imported',
-      metadata: { submitted: incoming.length, added, alreadyKnown, invalid, duplicates, removedDuplicates, total: total.rows[0].total },
+      metadata: { submitted: contactItems.length, added, updated, alreadyKnown, invalid, duplicates, removedDuplicates, total: total.rows[0].total },
     });
 
     res.status(201).json({
       success: true,
       data: {
         added,
+        updated,
         alreadyKnown,
         invalid,
         duplicates,
@@ -960,6 +1070,96 @@ const deleteCampaign = async (req, res) => {
   }
 };
 
+const previewAudience = async (req, res) => {
+  try {
+    const { byPhone, skipped } = await resolveAudience(req.query || {});
+    const limit = Math.min(Math.max(parseInt(req.query?.limit, 10) || 100, 1), 500);
+    const search = String(req.query?.search || '').toLowerCase().trim();
+
+    let allRecipients = Array.from(byPhone.entries()).map(([phone, meta]) => ({
+      phone,
+      full_name: meta.fullName || null,
+      source: meta.source || (meta.userId ? 'platform_user' : 'imported_contact'),
+      user_id: meta.userId || null,
+      contact_id: meta.contactId || null,
+    }));
+
+    if (search) {
+      allRecipients = allRecipients.filter(
+        (r) => r.phone.includes(search) || (r.full_name && r.full_name.toLowerCase().includes(search))
+      );
+    }
+
+    const total = allRecipients.length;
+    const page = Math.max(parseInt(req.query?.page, 10) || 1, 1);
+    const offset = (page - 1) * limit;
+    const paginated = allRecipients.slice(offset, offset + limit);
+
+    res.json({
+      success: true,
+      data: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit) || 1,
+        recipients: paginated,
+        skipped,
+      },
+    });
+  } catch (error) {
+    req.logger.error('Preview WhatsApp audience error:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to preview audience' });
+  }
+};
+
+const getCampaignRecipients = async (req, res) => {
+  try {
+    await ensureSchema();
+    const { id } = req.params;
+    const page = Math.max(parseInt(req.query?.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query?.limit, 10) || 50, 1), 200);
+    const offset = (page - 1) * limit;
+    const search = String(req.query?.search || '').trim();
+
+    const where = ['campaign_id = $1'];
+    const params = [id];
+    if (search) {
+      params.push(`%${search}%`);
+      where.push(`(phone ILIKE $${params.length} OR full_name ILIKE $${params.length})`);
+    }
+
+    const countRes = await db.query(
+      `SELECT COUNT(*)::int AS total FROM whatsapp_campaign_recipients WHERE ${where.join(' AND ')}`,
+      params
+    );
+    const total = countRes.rows[0]?.total || 0;
+
+    params.push(limit, offset);
+    const result = await db.query(
+      `SELECT id, campaign_id, phone, full_name, user_id, contact_id, status, error_message, sent_at, created_at
+       FROM whatsapp_campaign_recipients
+       WHERE ${where.join(' AND ')}
+       ORDER BY id ASC
+       LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
+    );
+
+    res.json({
+      success: true,
+      data: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit) || 1,
+        recipients: result.rows,
+      },
+    });
+  } catch (error) {
+    req.logger.error('Get WhatsApp campaign recipients error:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to load campaign recipients' });
+  }
+};
+
 module.exports = {
   ensureSchema,
   requireSuperAdmin,
@@ -969,6 +1169,8 @@ module.exports = {
   getDashboardStats,
   getDailySendLimit,
   getAudienceEstimate,
+  previewAudience,
+  getCampaignRecipients,
   createCampaign,
   listCampaigns,
   getCampaignStats,
@@ -977,6 +1179,7 @@ module.exports = {
   deleteCampaign,
   listContacts,
   addContact,
+  updateContact,
   importContacts,
   deleteContact,
   deleteInvalidContacts,
