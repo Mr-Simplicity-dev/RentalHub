@@ -641,7 +641,7 @@ const listContacts = async (req, res) => {
     const { rows } = await db.query(
       `SELECT id, phone, full_name, source, subscribed, wa_status, wa_checked_at, import_batch, created_at, updated_at
        FROM whatsapp_contacts ${whereClause}
-       ORDER BY created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
+       ORDER BY COALESCE(updated_at, created_at) DESC, id DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
       params
     );
 
@@ -781,55 +781,56 @@ const importContacts = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No contacts provided' });
     }
 
-    // Map each item by phone digits
+    // Normalize each phone number, map names, and deduplicate within the file
     const rawToNameMap = new Map();
-    const normalizedIncoming = [];
+    const seenPhonesInBatch = new Set();
+    const validContacts = [];
+    let duplicates = 0;
+    let invalid = 0;
+
     for (const item of contactItems) {
-      const digits = String(item.phone || '').replace(/\D/g, '');
-      if (digits) {
-        normalizedIncoming.push(digits);
-        if (item.fullName && !rawToNameMap.has(digits)) {
-          rawToNameMap.set(digits, item.fullName);
+      const normalizedPhone = normalizeWhatsphone(item.phone);
+      if (!normalizedPhone) {
+        invalid++;
+        continue;
+      }
+      if (seenPhonesInBatch.has(normalizedPhone)) {
+        duplicates++;
+        // If this duplicate entry has a name and previous didn't, save the name
+        if (item.fullName && !rawToNameMap.get(normalizedPhone)) {
+          rawToNameMap.set(normalizedPhone, item.fullName);
         }
+        continue;
+      }
+      seenPhonesInBatch.add(normalizedPhone);
+      if (item.fullName) {
+        rawToNameMap.set(normalizedPhone, item.fullName);
+      }
+      validContacts.push({
+        phone: normalizedPhone,
+        fullName: item.fullName || null,
+      });
+    }
+
+    if (validContacts.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No valid phone numbers found in the file',
+        data: { added: 0, updated: 0, alreadyKnown: 0, invalid, duplicates },
+      });
+    }
+
+    // Attach any updated names from rawToNameMap
+    for (const c of validContacts) {
+      if (!c.fullName && rawToNameMap.has(c.phone)) {
+        c.fullName = rawToNameMap.get(c.phone);
       }
     }
 
-    if (normalizedIncoming.length === 0) {
-      return res.status(400).json({ success: false, message: 'No valid phone numbers found' });
-    }
-
-    const { accepted, alreadyKnown, invalid, duplicates } = await classifyNewPhones(normalizedIncoming);
-
-    if (accepted.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: alreadyKnown > 0
-          ? `All ${alreadyKnown} number(s) already exist in the system`
-          : 'No valid Nigerian phone numbers found',
-        data: { added: 0, updated: 0, alreadyKnown, invalid, duplicates },
-      });
-    }
-
-    // Normalize to WhatsApp/E.164 format (+234...) for consistency
-    const normalizedContacts = accepted.map((digits) => {
-      const phone = normalizeWhatsphone(digits);
-      return phone ? { phone, fullName: rawToNameMap.get(digits) || null } : null;
-    }).filter(Boolean);
-
-    if (normalizedContacts.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'No valid Nigerian phone numbers found',
-        data: { added: 0, updated: 0, alreadyKnown, invalid: invalid + accepted.length, duplicates },
-      });
-    }
-
-    const { deleted: removedDuplicates } = await dedupeContacts();
-
     let added = 0;
     let updated = 0;
-    for (let i = 0; i < normalizedContacts.length; i += 250) {
-      const chunk = normalizedContacts.slice(i, i + 250);
+    for (let i = 0; i < validContacts.length; i += 250) {
+      const chunk = validContacts.slice(i, i + 250);
       const params = [];
       const values = chunk.map((c) => {
         const base = params.length;
@@ -845,6 +846,7 @@ const importContacts = async (req, res) => {
          ON CONFLICT (phone) DO UPDATE SET
            full_name = COALESCE(EXCLUDED.full_name, whatsapp_contacts.full_name),
            import_batch = COALESCE(EXCLUDED.import_batch, whatsapp_contacts.import_batch),
+           subscribed = TRUE,
            updated_at = CURRENT_TIMESTAMP
          RETURNING (xmax = 0) AS inserted`,
         params
@@ -866,7 +868,15 @@ const importContacts = async (req, res) => {
       entityType: 'whatsapp_contact',
       entityId: null,
       eventType: 'contacts_imported',
-      metadata: { submitted: contactItems.length, added, updated, alreadyKnown, invalid, duplicates, removedDuplicates, total: total.rows[0].total },
+      metadata: {
+        submitted: contactItems.length,
+        added,
+        updated,
+        alreadyKnown: updated,
+        invalid,
+        duplicates,
+        total: total.rows[0].total,
+      },
     });
 
     res.status(201).json({
@@ -874,10 +884,9 @@ const importContacts = async (req, res) => {
       data: {
         added,
         updated,
-        alreadyKnown,
+        alreadyKnown: updated,
         invalid,
         duplicates,
-        removedDuplicates,
         total: total.rows[0].total,
       },
     });

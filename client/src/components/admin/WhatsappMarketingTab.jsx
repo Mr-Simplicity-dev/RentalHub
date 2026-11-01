@@ -184,7 +184,7 @@ const WhatsappMarketingTab = () => {
   const [contactPage, setContactPage] = useState(1);
   const [contactTotal, setContactTotal] = useState(0);
   const [contactTotalPages, setContactTotalPages] = useState(1);
-  const CONTACTS_PER_PAGE = 30;
+  const [contactPageSize, setContactPageSize] = useState(50);
   const CSV_PREVIEW_PER_PAGE = 15;
 
   // Contact editing state
@@ -215,25 +215,25 @@ const WhatsappMarketingTab = () => {
     search: '',
   });
 
-  const loadContacts = useCallback(async (search = '', page = 1, batch = '') => {
+  const loadContacts = useCallback(async (search = '', page = 1, batch = '', limit = contactPageSize) => {
     setContactsLoading(true);
     try {
-      const params = { page, limit: CONTACTS_PER_PAGE };
+      const params = { page, limit };
       if (search) params.search = search;
       if (batch) params.batch = batch;
       const res = await api.get('/whatsapp-marketing/contacts', { params });
       setContacts(res.data.data.contacts || []);
       setContactStats(res.data.data.stats || null);
       setBatches(res.data.data.batches || []);
-      const total = res.data.data.pagination?.total || res.data.data.contacts?.length || 0;
+      const total = res.data.data.pagination?.total ?? res.data.data.contacts?.length ?? 0;
       setContactTotal(total);
-      setContactTotalPages(res.data.data.pagination?.totalPages || Math.ceil(total / CONTACTS_PER_PAGE) || 1);
+      setContactTotalPages(res.data.data.pagination?.totalPages || Math.ceil(total / limit) || 1);
     } catch {
       toast.error('Failed to load imported contacts');
     } finally {
       setContactsLoading(false);
     }
-  }, []);
+  }, [contactPageSize]);
 
   useEffect(() => {
     const boot = async () => {
@@ -242,14 +242,14 @@ const WhatsappMarketingTab = () => {
       setListLoading(false);
     };
     boot();
-    loadContacts(contactSearch, contactPage, selectedBatch);
+    loadContacts(contactSearch, contactPage, selectedBatch, contactPageSize);
   }, []);
 
   useEffect(() => {
     if (activeTab === 'contacts') {
-      loadContacts(contactSearch, contactPage, selectedBatch);
+      loadContacts(contactSearch, contactPage, selectedBatch, contactPageSize);
     }
-  }, [activeTab, contactSearch, contactPage, selectedBatch, loadContacts]);
+  }, [activeTab, contactSearch, contactPage, selectedBatch, contactPageSize, loadContacts]);
 
   const parseCsvContacts = (text = '') => {
     if (!text) return [];
@@ -409,23 +409,26 @@ const WhatsappMarketingTab = () => {
 
     setImporting(true);
     try {
+      const importedBatch = csvBatchName.trim() || csvFile?.name?.replace(/\.[^/.]+$/, '') || 'CSV_Import';
       const payload = {
         contacts: validContacts.map((c) => ({
           phone: c.phone,
           full_name: c.name || null,
         })),
-        import_batch: csvBatchName.trim() || csvFile?.name || 'CSV_Import',
+        import_batch: importedBatch,
       };
 
       const res = await api.post('/whatsapp-marketing/contacts/import', payload);
-      const { added, updated, alreadyKnown, invalid, duplicates, removedDuplicates, total } = res.data.data;
+      const { added, updated, total } = res.data.data;
       toast.success(
-        `Imported ${added} new · Updated: ${updated || 0} · In system: ${alreadyKnown} · Duplicates: ${duplicates} · Total now: ${total}`
+        `Import complete: ${added} new contacts added, ${updated || 0} updated. All ${validContacts.length} contacts are viewable below.`
       );
       setCsvFile(null);
       setCsvContacts([]);
+      setContactSearch('');
+      setSelectedBatch(importedBatch);
       setContactPage(1);
-      loadContacts(contactSearch, 1, selectedBatch);
+      loadContacts('', 1, importedBatch, contactPageSize);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Import failed');
     } finally {
@@ -1371,7 +1374,7 @@ const WhatsappMarketingTab = () => {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
-                      loadContacts(contactSearch, 1, selectedBatch);
+                      loadContacts(contactSearch, 1, selectedBatch, contactPageSize);
                     }
                   }}
                   placeholder="Search phone or name..."
@@ -1387,7 +1390,7 @@ const WhatsappMarketingTab = () => {
                     const val = e.target.value;
                     setSelectedBatch(val);
                     setContactPage(1);
-                    loadContacts(contactSearch, 1, val);
+                    loadContacts(contactSearch, 1, val, contactPageSize);
                   }}
                   aria-label="Filter by batch"
                   className="max-w-[200px]"
@@ -1401,7 +1404,7 @@ const WhatsappMarketingTab = () => {
                 </SelectInput>
               )}
 
-              <SecondaryButton onClick={() => loadContacts(contactSearch, 1, selectedBatch)}>
+              <SecondaryButton onClick={() => loadContacts(contactSearch, 1, selectedBatch, contactPageSize)}>
                 Filter
               </SecondaryButton>
 
@@ -1411,19 +1414,64 @@ const WhatsappMarketingTab = () => {
                     setContactSearch('');
                     setSelectedBatch('');
                     setContactPage(1);
-                    loadContacts('', 1, '');
+                    loadContacts('', 1, '', contactPageSize);
                   }}
                   className="text-xs text-gray-500"
                 >
-                  <FaTimes className="mr-1" /> Reset
+                  <FaTimes className="mr-1" /> Reset filters
                 </GhostButton>
               )}
             </div>
 
-            <div className="text-xs text-gray-500">
-              Total in system: <strong className="text-gray-800">{contactTotal}</strong>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                <span>Per page:</span>
+                <select
+                  value={contactPageSize}
+                  onChange={(e) => {
+                    const nextSize = Number(e.target.value);
+                    setContactPageSize(nextSize);
+                    setContactPage(1);
+                    loadContacts(contactSearch, 1, selectedBatch, nextSize);
+                  }}
+                  className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 shadow-sm outline-none focus:border-primary-500"
+                >
+                  <option value={30}>30</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={250}>250</option>
+                  <option value={1000}>All (up to 1,000)</option>
+                </select>
+              </div>
+
+              <div className="text-xs text-gray-500">
+                Showing <strong className="text-gray-800">{contacts.length}</strong> of <strong className="text-gray-800">{contactTotal}</strong>
+              </div>
             </div>
           </div>
+
+          {selectedBatch && (
+            <div className="flex items-center justify-between rounded-lg bg-primary-50/70 px-3 py-2 text-xs text-primary-900 border border-primary-200">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">Filtered by batch:</span>
+                <span className="font-mono font-bold bg-white px-2 py-0.5 rounded border border-primary-200 text-primary-800">
+                  {selectedBatch}
+                </span>
+                <span>({contactTotal} contacts)</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedBatch('');
+                  setContactPage(1);
+                  loadContacts(contactSearch, 1, '', contactPageSize);
+                }}
+                className="font-semibold text-primary-700 hover:text-primary-900 underline ml-2"
+              >
+                View all imported batches
+              </button>
+            </div>
+          )}
 
           {contactsLoading ? (
             <LoadingState label="Loading WhatsApp contacts" rows={3} />
@@ -1442,7 +1490,7 @@ const WhatsappMarketingTab = () => {
               <DataTable columns={['S/N', 'Number', 'Name', 'Batch', 'Source', 'On WhatsApp', 'Added', 'Actions']}>
                 {contacts.map((c, index) => (
                   <tr key={c.id} className="transition-colors hover:bg-gray-50/70">
-                    <Td className="text-gray-600">{(contactPage - 1) * CONTACTS_PER_PAGE + index + 1}</Td>
+                    <Td className="text-gray-600">{(contactPage - 1) * contactPageSize + index + 1}</Td>
                     <Td className="font-mono font-medium text-gray-900">{c.phone}</Td>
                     <Td>
                       <div className="flex items-center gap-1.5">
@@ -1465,9 +1513,19 @@ const WhatsappMarketingTab = () => {
                       </div>
                     </Td>
                     <Td>
-                      <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const b = c.import_batch || 'CSV_Import';
+                          setSelectedBatch(b);
+                          setContactPage(1);
+                          loadContacts(contactSearch, 1, b, contactPageSize);
+                        }}
+                        className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 transition hover:bg-primary-100 hover:text-primary-800"
+                        title="Click to filter by this batch"
+                      >
                         {c.import_batch || 'CSV_Import'}
-                      </span>
+                      </button>
                     </Td>
                     <Td className="text-xs uppercase text-gray-500">{c.source}</Td>
                     <Td>
