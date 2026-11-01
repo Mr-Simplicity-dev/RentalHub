@@ -13,7 +13,7 @@ export default {
     "no_opportunities": "No open opportunities in this category.",
     "volunteer_motivation": "Why do you want to volunteer with Amana RentalHub NG?",
     "volunteer_availability": "Availability (days, hours and preferred start date)",
-    "volunteer_notice": "Volunteering is unpaid and does not create employment, salary entitlement, or a staff account.",
+    "volunteer_notice": "Volunteering is unpaid and can create employment, salary entitlement, or a staff account.",
     "volunteer_received": "Volunteer Application Received",
     "volunteer_confirmation": "Thank you for your interest in volunteering with Amana RentalHub NG. Your application has been received successfully. Our team will review your application and contact you if you are selected for the next stage.",
     "volunteer_fields_required": "Please provide your motivation and availability.",
