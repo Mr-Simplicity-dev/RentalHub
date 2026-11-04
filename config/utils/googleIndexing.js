@@ -18,17 +18,41 @@ const resolveKeyFile = () => {
 };
 
 const getIndexingClient = async () => {
+  const jsonString =
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON ||
+    process.env.GOOGLE_INDEXING_CREDENTIALS ||
+    process.env.GOOGLE_CREDENTIALS_JSON;
+
+  let credentials = null;
+  if (jsonString) {
+    try {
+      credentials = typeof jsonString === 'object' ? jsonString : JSON.parse(jsonString);
+    } catch {
+      try {
+        const decoded = Buffer.from(jsonString, 'base64').toString('utf8');
+        credentials = JSON.parse(decoded);
+      } catch {
+        /* fallback to file */
+      }
+    }
+  }
+
   const keyFile = resolveKeyFile();
 
-  if (!keyFile) {
+  if (!credentials && !keyFile) {
     return null;
   }
 
-  const auth = new google.auth.GoogleAuth({
-    keyFile,
+  const authOptions = {
     scopes: ['https://www.googleapis.com/auth/indexing'],
-  });
+  };
+  if (credentials) {
+    authOptions.credentials = credentials;
+  } else if (keyFile) {
+    authOptions.keyFile = keyFile;
+  }
 
+  const auth = new google.auth.GoogleAuth(authOptions);
   const client = await auth.getClient();
 
   return google.indexing({

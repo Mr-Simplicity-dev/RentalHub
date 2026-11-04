@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { toast } from 'react-toastify';
-import { FaWhatsapp, FaPaperPlane, FaPlus, FaTrash, FaRedo, FaChartBar, FaUsers, FaFileAlt, FaCheckCircle, FaTimes, FaSyncAlt, FaSearch, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { FaWhatsapp, FaPaperPlane, FaPlus, FaTrash, FaRedo, FaChartBar, FaUsers, FaFileAlt, FaCheckCircle, FaTimes, FaSyncAlt, FaSearch, FaChevronLeft, FaChevronRight, FaEdit, FaEye, FaCheck } from 'react-icons/fa';
 import api from '../../services/api';
 import {
   Banner,
@@ -169,30 +169,71 @@ const WhatsappMarketingTab = () => {
   const [contactStats, setContactStats] = useState(null);
   const [contactsLoading, setContactsLoading] = useState(true);
   const [csvFile, setCsvFile] = useState(null);
-  const [csvPreview, setCsvPreview] = useState([]);
+  const [csvContacts, setCsvContacts] = useState([]);
+  const [csvBatchName, setCsvBatchName] = useState('');
+  const [csvSearch, setCsvSearch] = useState('');
+  const [csvPage, setCsvPage] = useState(1);
+  const [editingCsvId, setEditingCsvId] = useState(null);
+  const [editingCsvName, setEditingCsvName] = useState('');
   const [importing, setImporting] = useState(false);
   const [checking, setChecking] = useState(false);
   const [deletingInvalid, setDeletingInvalid] = useState(false);
   const [contactSearch, setContactSearch] = useState('');
+  const [selectedBatch, setSelectedBatch] = useState('');
+  const [batches, setBatches] = useState([]);
   const [contactPage, setContactPage] = useState(1);
   const [contactTotal, setContactTotal] = useState(0);
-  const CONTACTS_PER_PAGE = 30;
+  const [contactTotalPages, setContactTotalPages] = useState(1);
+  const [contactPageSize, setContactPageSize] = useState(50);
+  const CSV_PREVIEW_PER_PAGE = 15;
 
-  const loadContacts = useCallback(async (search = '', page = 1) => {
+  // Contact editing state
+  const [editingContact, setEditingContact] = useState(null);
+  const [editContactName, setEditContactName] = useState('');
+  const [savingContactEdit, setSavingContactEdit] = useState(false);
+
+  // Audience preview modal state
+  const [audienceModal, setAudienceModal] = useState({
+    open: false,
+    loading: false,
+    recipients: [],
+    total: 0,
+    page: 1,
+    totalPages: 1,
+    search: '',
+  });
+
+  // Campaign recipients modal state
+  const [campaignRecipientsModal, setCampaignRecipientsModal] = useState({
+    open: false,
+    campaign: null,
+    loading: false,
+    recipients: [],
+    total: 0,
+    page: 1,
+    totalPages: 1,
+    search: '',
+  });
+
+  const loadContacts = useCallback(async (search = '', page = 1, batch = '', limit = contactPageSize) => {
     setContactsLoading(true);
     try {
-      const params = { page, limit: CONTACTS_PER_PAGE };
+      const params = { page, limit };
       if (search) params.search = search;
+      if (batch) params.batch = batch;
       const res = await api.get('/whatsapp-marketing/contacts', { params });
       setContacts(res.data.data.contacts || []);
       setContactStats(res.data.data.stats || null);
-      setContactTotal(res.data.data.pagination?.total || res.data.data.contacts?.length || 0);
+      setBatches(res.data.data.batches || []);
+      const total = res.data.data.pagination?.total ?? res.data.data.contacts?.length ?? 0;
+      setContactTotal(total);
+      setContactTotalPages(res.data.data.pagination?.totalPages || Math.ceil(total / limit) || 1);
     } catch {
       toast.error('Failed to load imported contacts');
     } finally {
       setContactsLoading(false);
     }
-  }, []);
+  }, [contactPageSize]);
 
   useEffect(() => {
     const boot = async () => {
@@ -201,87 +242,274 @@ const WhatsappMarketingTab = () => {
       setListLoading(false);
     };
     boot();
-    loadContacts(contactSearch, contactPage);
+    loadContacts(contactSearch, contactPage, selectedBatch, contactPageSize);
   }, []);
 
   useEffect(() => {
     if (activeTab === 'contacts') {
-      loadContacts(contactSearch, contactPage);
+      loadContacts(contactSearch, contactPage, selectedBatch, contactPageSize);
     }
-  }, [activeTab, contactSearch, contactPage, loadContacts]);
+  }, [activeTab, contactSearch, contactPage, selectedBatch, contactPageSize, loadContacts]);
 
-  const extractPhoneNumbers = (text = '') => {
+  const parseCsvContacts = (text = '') => {
     if (!text) return [];
-    const normalized = String(text)
-      .replace(/\r\n/g, '\n')
-      .replace(/\r/g, '\n');
-    const tokens = normalized.split(/[\n,;\t|]+/);
-    const phones = [];
-    const seen = new Set();
-    for (let i = 0; i < tokens.length; i += 1) {
-      const raw = tokens[i];
-      if (!raw) continue;
-      const matches = raw.match(/\+?\d[\d\s\-\(\)]{7,}\d/g);
-      if (matches && matches.length > 0) {
-        for (let m = 0; m < matches.length; m += 1) {
-          const cleaned = matches[m].replace(/[\s\-\(\)\+]/g, '').trim();
-          if (cleaned.length >= 10 && cleaned.length <= 15 && !seen.has(cleaned)) {
-            seen.add(cleaned);
-            phones.push(cleaned);
-          }
-        }
-      } else {
-        const cleaned = raw.replace(/[^0-9+]/g, '').replace(/^\+/, '');
-        if (cleaned.length >= 10 && cleaned.length <= 15 && !seen.has(cleaned)) {
-          seen.add(cleaned);
-          phones.push(cleaned);
+    const normalized = String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const lines = normalized.split('\n').filter((l) => l.trim().length > 0);
+    if (!lines.length) return [];
+
+    const firstLine = lines[0];
+    let delimiter = ',';
+    if (firstLine.includes('\t')) delimiter = '\t';
+    else if (firstLine.includes(';') && (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length) delimiter = ';';
+    else if (firstLine.includes('|') && (firstLine.match(/\|/g) || []).length > (firstLine.match(/,/g) || []).length) delimiter = '|';
+
+    const parseLine = (line) => {
+      const cells = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"' || char === "'") {
+          inQuotes = !inQuotes;
+        } else if (char === delimiter && !inQuotes) {
+          cells.push(current.trim());
+          current = '';
+        } else {
+          current += char;
         }
       }
+      cells.push(current.trim());
+      return cells.map((c) => c.replace(/^["']|["']$/g, '').trim());
+    };
+
+    const headerCells = parseLine(firstLine).map((h) => h.toLowerCase().trim());
+    const hasHeader = headerCells.some((h) =>
+      /phone|mobile|tel|contact|number|name|full_name|fullname|client|customer/i.test(h)
+    );
+
+    let phoneCol = -1;
+    let nameCol = -1;
+
+    if (hasHeader) {
+      phoneCol = headerCells.findIndex((h) => /phone|mobile|tel|number/i.test(h));
+      if (phoneCol === -1) {
+        phoneCol = headerCells.findIndex((h) => /contact/i.test(h));
+      }
+      nameCol = headerCells.findIndex((h) => /name|full_name|fullname|client|customer/i.test(h));
     }
-    return phones;
+
+    const dataLines = hasHeader ? lines.slice(1) : lines;
+    const parsed = [];
+    const seenPhones = new Set();
+
+    dataLines.forEach((line, index) => {
+      const cells = parseLine(line);
+      if (!cells.length || cells.every((c) => !c)) return;
+
+      let rawPhone = '';
+      let rawName = '';
+
+      if (phoneCol !== -1 && cells[phoneCol]) {
+        rawPhone = cells[phoneCol];
+        rawName = nameCol !== -1 && cells[nameCol] ? cells[nameCol] : '';
+      } else {
+        for (let i = 0; i < cells.length; i++) {
+          const cell = cells[i];
+          const digits = cell.replace(/\D/g, '');
+          if (digits.length >= 10 && digits.length <= 15) {
+            rawPhone = cell;
+            const otherIdx = cells.findIndex((c, idx) => idx !== i && c && c.replace(/\D/g, '').length < 7);
+            if (otherIdx !== -1) {
+              rawName = cells[otherIdx];
+            }
+            break;
+          }
+        }
+        if (!rawPhone && cells[0]) {
+          rawPhone = cells[0];
+          if (cells[1]) rawName = cells[1];
+        }
+      }
+
+      const digitsOnly = String(rawPhone || '').replace(/\D/g, '');
+      let isValid = false;
+      let errorReason = '';
+
+      if (!digitsOnly) {
+        isValid = false;
+        errorReason = 'Missing phone number';
+      } else if (digitsOnly.length < 10) {
+        isValid = false;
+        errorReason = 'Too short (< 10 digits)';
+      } else if (digitsOnly.length > 15) {
+        isValid = false;
+        errorReason = 'Too long (> 15 digits)';
+      } else {
+        isValid = true;
+      }
+
+      // Lack of name does NOT stop contact from importing!
+      const cleanName = String(rawName || '').trim();
+
+      parsed.push({
+        id: `csv-${index + 1}`,
+        rawPhone: rawPhone.trim(),
+        phone: rawPhone.trim(),
+        digits: digitsOnly,
+        name: cleanName,
+        isValid,
+        errorReason,
+        isDuplicate: digitsOnly ? seenPhones.has(digitsOnly) : false,
+      });
+
+      if (digitsOnly) seenPhones.add(digitsOnly);
+    });
+
+    return parsed;
   };
 
   const handleCsvFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     setCsvFile(file);
+    setCsvBatchName(file.name.replace(/\.[^/.]+$/, ''));
+    setCsvPage(1);
+    setCsvSearch('');
 
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const phones = extractPhoneNumbers(ev.target.result || '');
-      setCsvPreview(phones.slice(0, 10));
+      const parsedContacts = parseCsvContacts(ev.target.result || '');
+      setCsvContacts(parsedContacts);
     };
     reader.readAsText(file);
   };
 
+  const handleUpdateCsvContactName = (contactId, newName) => {
+    setCsvContacts((prev) =>
+      prev.map((c) => (c.id === contactId ? { ...c, name: newName.trim() } : c))
+    );
+    setEditingCsvId(null);
+    setEditingCsvName('');
+  };
+
+  const handleRemoveCsvContact = (contactId) => {
+    setCsvContacts((prev) => prev.filter((c) => c.id !== contactId));
+  };
+
   const handleCsvImport = async () => {
-    if (!csvFile) {
+    if (!csvContacts.length) {
       toast.error('Select a CSV file first');
       return;
     }
+    const validContacts = csvContacts.filter((c) => c.isValid);
+    if (!validContacts.length) {
+      toast.error('No valid phone numbers found in the file');
+      return;
+    }
+
     setImporting(true);
     try {
-      const text = await csvFile.text();
-      const phones = extractPhoneNumbers(text);
+      const importedBatch = csvBatchName.trim() || csvFile?.name?.replace(/\.[^/.]+$/, '') || 'CSV_Import';
+      const payload = {
+        contacts: validContacts.map((c) => ({
+          phone: c.phone,
+          full_name: c.name || null,
+        })),
+        import_batch: importedBatch,
+      };
 
-      if (phones.length === 0) {
-        toast.error('No valid phone numbers found in the file');
-        return;
-      }
-
-      const res = await api.post('/whatsapp-marketing/contacts/import', { phones });
-      const { added, alreadyKnown, invalid, duplicates, removedDuplicates, total } = res.data.data;
+      const res = await api.post('/whatsapp-marketing/contacts/import', payload);
+      const { added, updated, total } = res.data.data;
       toast.success(
-        `Imported ${added} new · Already in system: ${alreadyKnown} · Duplicates: ${duplicates} · Invalid: ${invalid} · Old duplicates removed: ${removedDuplicates || 0} · Total now: ${total}`
+        `Import complete: ${added} new contacts added, ${updated || 0} updated. All ${validContacts.length} contacts are viewable below.`
       );
       setCsvFile(null);
-      setCsvPreview([]);
+      setCsvContacts([]);
+      setContactSearch('');
+      setSelectedBatch(importedBatch);
       setContactPage(1);
-      loadContacts(contactSearch, 1);
+      loadContacts('', 1, importedBatch, contactPageSize);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Import failed');
     } finally {
       setImporting(false);
+    }
+  };
+
+  const handleSaveContactName = async () => {
+    if (!editingContact) return;
+    setSavingContactEdit(true);
+    try {
+      const res = await api.patch(`/whatsapp-marketing/contacts/${editingContact.id}`, {
+        full_name: editContactName.trim() || null,
+      });
+      toast.success('Contact name updated');
+      setContacts((prev) =>
+        prev.map((c) => (c.id === editingContact.id ? { ...c, full_name: res.data.data.full_name } : c))
+      );
+      setEditingContact(null);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update contact name');
+    } finally {
+      setSavingContactEdit(false);
+    }
+  };
+
+  const loadAudiencePreview = async (search = '', page = 1) => {
+    setAudienceModal((prev) => ({ ...prev, loading: true, search, page }));
+    try {
+      const params = {
+        source: form.source,
+        scope: form.scope,
+        page,
+        limit: 50,
+      };
+      if (form.scope === 'user_type' && form.user_type.trim()) params.user_type = form.user_type.trim();
+      if (search) params.search = search;
+      const res = await api.get('/whatsapp-marketing/campaigns/preview-audience', { params });
+      setAudienceModal((prev) => ({
+        ...prev,
+        open: true,
+        loading: false,
+        recipients: res.data.data.recipients || [],
+        total: res.data.data.total || 0,
+        totalPages: res.data.data.totalPages || 1,
+        page: res.data.data.page || 1,
+      }));
+    } catch (err) {
+      toast.error('Failed to load audience preview');
+      setAudienceModal((prev) => ({ ...prev, loading: false }));
+    }
+  };
+
+  const openCampaignRecipients = async (campaign, search = '', page = 1) => {
+    setCampaignRecipientsModal({
+      open: true,
+      campaign,
+      loading: true,
+      recipients: [],
+      total: 0,
+      page: 1,
+      totalPages: 1,
+      search,
+    });
+    try {
+      const params = { page, limit: 50 };
+      if (search) params.search = search;
+      const res = await api.get(`/whatsapp-marketing/campaigns/${campaign.id}/recipients`, { params });
+      setCampaignRecipientsModal({
+        open: true,
+        campaign,
+        loading: false,
+        recipients: res.data.data.recipients || [],
+        total: res.data.data.total || 0,
+        page: res.data.data.page || 1,
+        totalPages: res.data.data.totalPages || 1,
+        search,
+      });
+    } catch {
+      toast.error('Failed to load campaign recipients');
+      setCampaignRecipientsModal((prev) => ({ ...prev, loading: false }));
     }
   };
 
@@ -466,7 +694,6 @@ const WhatsappMarketingTab = () => {
   };
 
   const gov = GOVERNANCE_COPY[governanceAction.type] || GOVERNANCE_COPY.send;
-  const contactTotalPages = Math.ceil(contactTotal / CONTACTS_PER_PAGE);
 
   const renderOverview = () => (
     <div className="space-y-6">
@@ -654,14 +881,28 @@ const WhatsappMarketingTab = () => {
                     />
                   </Field>
                 ) : null}
-                <SecondaryButton onClick={previewAudience} loading={audienceLoading} className="w-full">
-                  <FaUsers className="mr-2" /> Preview audience
-                </SecondaryButton>
+                <div className="flex gap-2">
+                  <SecondaryButton onClick={previewAudience} loading={audienceLoading} className="flex-1" title="Get quick estimate of audience size">
+                    <FaUsers className="mr-1.5" /> Quick count
+                  </SecondaryButton>
+                  <SecondaryButton
+                    onClick={() => loadAudiencePreview('', 1)}
+                    className="flex-1"
+                    title="Inspect the exact contacts and users who will receive this campaign"
+                  >
+                    <FaEye className="mr-1.5" /> View audience list
+                  </SecondaryButton>
+                </div>
               </div>
               {audienceCount !== null ? (
-                <p className="mt-3 text-sm text-gray-700">
-                  ≈ <strong>{audienceCount}</strong> recipient(s) will receive this campaign.
-                </p>
+                <div className="mt-3 flex items-center justify-between text-sm text-gray-700">
+                  <p>
+                    ≈ <strong>{audienceCount}</strong> recipient(s) will receive this campaign.
+                  </p>
+                  <GhostButton onClick={() => loadAudiencePreview('', 1)} className="text-xs text-primary-600">
+                    <FaEye className="mr-1" /> View recipient details
+                  </GhostButton>
+                </div>
               ) : null}
             </div>
 
@@ -739,6 +980,9 @@ const WhatsappMarketingTab = () => {
                     <GhostButton onClick={() => openStats(c)} aria-label={`View stats for ${c.name}`}>
                       <FaChartBar /> Stats
                     </GhostButton>
+                    <GhostButton onClick={() => openCampaignRecipients(c)} aria-label={`View recipients for ${c.name}`}>
+                      <FaEye /> Recipients
+                    </GhostButton>
                     {['draft', 'paused'].includes(c.status) ? (
                       <GhostButton
                         className="text-green-700 hover:bg-green-50"
@@ -776,183 +1020,578 @@ const WhatsappMarketingTab = () => {
     </div>
   );
 
-  const renderContacts = () => (
-    <Panel
-      title="WhatsApp contacts"
-      description="Numbers that are not platform users — import them, then check which are actually on WhatsApp."
-    >
-      <div className="space-y-5">
-        <Banner tone="info" title="How this works">
-          A number only counts as reachable if Meta confirms it is on WhatsApp. Imported numbers start as
-          <strong> Not checked </strong>
-          until you run the check. Numbers Meta rejects are skipped automatically when you build an audience.
-        </Banner>
+  const renderContacts = () => {
+    const validCsvCount = csvContacts.filter((c) => c.isValid).length;
+    const invalidCsvCount = csvContacts.filter((c) => !c.isValid).length;
+    const withNameCsvCount = csvContacts.filter((c) => c.name && c.name.trim()).length;
+    const withoutNameCsvCount = csvContacts.length - withNameCsvCount;
 
-        {contactStats ? (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-lg border border-gray-100 bg-gray-50/60 p-3">
-              <p className="text-xs uppercase tracking-wide text-gray-400">Total</p>
-              <p className="text-lg font-semibold text-gray-900">{contactStats.total ?? 0}</p>
-            </div>
-            <div className="rounded-lg border border-green-100 bg-green-50/60 p-3">
-              <p className="text-xs uppercase tracking-wide text-green-600">On WhatsApp</p>
-              <p className="text-lg font-semibold text-green-700">{contactStats.valid ?? 0}</p>
-            </div>
-            <div className="rounded-lg border border-red-100 bg-red-50/60 p-3">
-              <p className="text-xs uppercase tracking-wide text-red-500">Not on WhatsApp</p>
-              <p className="text-lg font-semibold text-red-600">{contactStats.invalid ?? 0}</p>
-            </div>
-            <div className="rounded-lg border border-gray-100 bg-white p-3">
-              <p className="text-xs uppercase tracking-wide text-gray-400">Not checked</p>
-              <p className="text-lg font-semibold text-gray-500">{contactStats.unknown ?? 0}</p>
-            </div>
-          </div>
-        ) : null}
+    const filteredCsv = csvContacts.filter((c) => {
+      if (!csvSearch) return true;
+      const q = csvSearch.toLowerCase();
+      return (c.phone && c.phone.toLowerCase().includes(q)) || (c.name && c.name.toLowerCase().includes(q));
+    });
 
-        <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-3">
-          <Field label="Import from CSV" hint="One number per line, or the first column of a CSV">
-            <input
-              type="file"
-              accept=".csv,text/csv,text/plain"
-              onChange={handleCsvFileChange}
-              className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-primary-700 hover:file:bg-primary-100"
-            />
-          </Field>
-          <SecondaryButton onClick={handleCsvImport} loading={importing} disabled={!csvFile} className="w-full">
-            <FaFileAlt className="mr-2" /> Import numbers
-          </SecondaryButton>
-          <button
-            type="button"
-            onClick={handleCheckContacts}
-            disabled={checking}
-            className="btn w-full bg-green-600 text-white shadow-sm hover:bg-green-700 disabled:opacity-60"
-          >
-            <FaCheckCircle className="mr-2" />
-            {checking ? 'Checking…' : 'Check on WhatsApp'}
-          </button>
-        </div>
+    const csvTotalPages = Math.ceil(filteredCsv.length / CSV_PREVIEW_PER_PAGE) || 1;
+    const paginatedCsv = filteredCsv.slice((csvPage - 1) * CSV_PREVIEW_PER_PAGE, csvPage * CSV_PREVIEW_PER_PAGE);
 
-        <div className="flex flex-wrap items-center gap-2">
-          <GhostButton
-            className="text-red-600 hover:bg-red-50"
-            onClick={handleDeleteInvalidContacts}
-            disabled={deletingInvalid || (contactStats?.invalid ?? 0) === 0}
-          >
-            <FaTrash className="mr-2" />
-            {deletingInvalid
-              ? 'Deleting…'
-              : `Delete all invalid contacts (${contactStats?.invalid ?? 0})`}
-          </GhostButton>
-          <GhostButton onClick={handleCleanDuplicates}>
-            <FaSyncAlt className="mr-2" />
-            Remove duplicates
-          </GhostButton>
-          <p className="text-xs text-gray-500">
-            Removes every number Meta confirmed is not on WhatsApp. Unchecked numbers are kept.
-          </p>
-        </div>
+    return (
+      <Panel
+        title="WhatsApp contacts"
+        description="Numbers that are not platform users — import them, verify them, and target them in campaigns."
+      >
+        <div className="space-y-5">
+          <Banner tone="info" title="How this works">
+            A number only counts as reachable if Meta confirms it is on WhatsApp. Imported numbers start as
+            <strong> Not checked </strong>
+            until you run the check. Numbers Meta rejects are skipped automatically when you build an audience.
+          </Banner>
 
-        {csvPreview.length > 0 ? (
-          <div className="rounded-lg border border-gray-100 bg-gray-50/60 p-3">
-            <p className="text-xs font-medium text-gray-500">
-              Preview — first {csvPreview.length} number(s) in {csvFile?.name}:
-            </p>
-            <div className="mt-1 flex flex-wrap gap-1">
-              {csvPreview.map((p, i) => (
-                <span key={`${p}-${i}`} className="rounded bg-white px-2 py-0.5 text-xs text-gray-600 shadow-sm">
-                  {p}
-                </span>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        <div className="flex flex-1 items-center gap-2">
-          <div className="relative max-w-xs flex-1">
-            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <TextInput
-              value={contactSearch}
-              onChange={(e) => {
-                setContactSearch(e.target.value);
-                setContactPage(1);
-              }}
-              placeholder="Search phone or name..."
-              aria-label="Search WhatsApp contacts"
-              className="pl-9"
-            />
-          </div>
-          <SecondaryButton onClick={() => loadContacts(contactSearch, contactPage)}>Search</SecondaryButton>
-        </div>
-
-        {contactsLoading ? (
-          <LoadingState label="Loading WhatsApp contacts" rows={3} />
-        ) : contacts.length === 0 ? (
-          <EmptyState
-            icon={<FaUsers />}
-            title="No imported contacts yet"
-            message="Upload a CSV of phone numbers above. You can then target 'Imported contacts' when building a campaign."
-          />
-        ) : (
-          <div className="space-y-4">
-            <DataTable columns={['S/N', 'Number', 'Name', 'Source', 'On WhatsApp', 'Added', '']}>
-              {contacts.map((c, index) => (
-                <tr key={c.id} className="transition-colors hover:bg-gray-50/70">
-                  <Td className="text-gray-600">{(contactPage - 1) * CONTACTS_PER_PAGE + index + 1}</Td>
-                  <Td className="font-medium text-gray-900">{c.phone}</Td>
-                  <Td className="text-gray-600">{c.full_name || '—'}</Td>
-                  <Td className="text-xs uppercase text-gray-500">{c.source}</Td>
-                  <Td>
-                    {c.wa_status === 'valid' ? (
-                      <span className="badge bg-green-100 text-green-700">🟢 On WhatsApp</span>
-                    ) : c.wa_status === 'invalid' ? (
-                      <span className="badge bg-red-100 text-red-700">🔴 Not on WhatsApp</span>
-                    ) : (
-                      <span className="badge bg-gray-100 text-gray-500">⚪ Not checked</span>
-                    )}
-                  </Td>
-                  <Td className="text-xs text-gray-500">
-                    <span className="block text-gray-600">{formatDate(c.created_at)}</span>
-                    {c.wa_checked_at ? (
-                      <span className="text-gray-400">checked {formatDate(c.wa_checked_at)}</span>
-                    ) : null}
-                  </Td>
-                  <Td>
-                    <GhostButton
-                      className="text-red-600 hover:bg-red-50"
-                      onClick={() => handleDeleteContact(c)}
-                      aria-label={`Remove ${c.phone}`}
-                    >
-                      <FaTimes /> Remove
-                    </GhostButton>
-                  </Td>
-                </tr>
-              ))}
-            </DataTable>
-
-            {contactTotalPages > 1 && (
-              <div className="flex items-center justify-center gap-2">
-                <SecondaryButton
-                  disabled={contactPage <= 1}
-                  onClick={() => setContactPage((p) => Math.max(1, p - 1))}
-                  aria-label="Previous page"
-                >
-                  <FaChevronLeft />
-                </SecondaryButton>
-                <span className="text-sm text-gray-600">Page {contactPage} of {contactTotalPages}</span>
-                <SecondaryButton
-                  disabled={contactPage >= contactTotalPages}
-                  onClick={() => setContactPage((p) => p + 1)}
-                  aria-label="Next page"
-                >
-                  <FaChevronRight />
-                </SecondaryButton>
+          {contactStats ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="rounded-lg border border-gray-100 bg-gray-50/60 p-3">
+                <p className="text-xs uppercase tracking-wide text-gray-400">Total in System</p>
+                <p className="text-lg font-semibold text-gray-900">{contactStats.total ?? 0}</p>
               </div>
+              <div className="rounded-lg border border-green-100 bg-green-50/60 p-3">
+                <p className="text-xs uppercase tracking-wide text-green-600">On WhatsApp</p>
+                <p className="text-lg font-semibold text-green-700">{contactStats.valid ?? 0}</p>
+              </div>
+              <div className="rounded-lg border border-red-100 bg-red-50/60 p-3">
+                <p className="text-xs uppercase tracking-wide text-red-500">Not on WhatsApp</p>
+                <p className="text-lg font-semibold text-red-600">{contactStats.invalid ?? 0}</p>
+              </div>
+              <div className="rounded-lg border border-gray-100 bg-white p-3">
+                <p className="text-xs uppercase tracking-wide text-gray-400">Not checked</p>
+                <p className="text-lg font-semibold text-gray-500">{contactStats.unknown ?? 0}</p>
+              </div>
+            </div>
+          ) : null}
+
+          {/* CSV File Selection & Verification Action */}
+          <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-3">
+            <Field label="Choose CSV / Text File" hint="Supports phone, name, customer, and comma/tab/semicolon formats">
+              <input
+                type="file"
+                accept=".csv,text/csv,text/plain"
+                onChange={handleCsvFileChange}
+                className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-primary-700 hover:file:bg-primary-100"
+              />
+            </Field>
+            {csvContacts.length > 0 ? (
+              <PrimaryButton onClick={handleCsvImport} loading={importing} disabled={validCsvCount === 0} className="w-full">
+                <FaCheckCircle className="mr-2" /> Import {validCsvCount} Valid
+              </PrimaryButton>
+            ) : (
+              <SecondaryButton onClick={() => toast.info('Please select a CSV file first')} className="w-full">
+                <FaFileAlt className="mr-2" /> Select CSV file above
+              </SecondaryButton>
             )}
+            <button
+              type="button"
+              onClick={handleCheckContacts}
+              disabled={checking}
+              className="btn w-full bg-green-600 text-white shadow-sm hover:bg-green-700 disabled:opacity-60"
+            >
+              <FaCheckCircle className="mr-2" />
+              {checking ? 'Checking…' : 'Check on WhatsApp'}
+            </button>
           </div>
-        )}
-      </div>
-    </Panel>
-  );
+
+          <div className="flex flex-wrap items-center gap-2">
+            <GhostButton
+              className="text-red-600 hover:bg-red-50"
+              onClick={handleDeleteInvalidContacts}
+              disabled={deletingInvalid || (contactStats?.invalid ?? 0) === 0}
+            >
+              <FaTrash className="mr-2" />
+              {deletingInvalid
+                ? 'Deleting…'
+                : `Delete all invalid contacts (${contactStats?.invalid ?? 0})`}
+            </GhostButton>
+            <GhostButton onClick={handleCleanDuplicates}>
+              <FaSyncAlt className="mr-2" />
+              Remove duplicates
+            </GhostButton>
+            <p className="text-xs text-gray-500">
+              Removes every number Meta confirmed is not on WhatsApp. Unchecked numbers are kept.
+            </p>
+          </div>
+
+          {/* Pre-Import Inspection Table Panel */}
+          {csvContacts.length > 0 ? (
+            <div className="rounded-xl border-2 border-primary-200 bg-primary-50/20 p-4 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-primary-100 pb-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary-600 text-xs font-bold text-white">
+                      ✓
+                    </span>
+                    <h4 className="text-base font-semibold text-gray-900">
+                      Pre-Import Verification &amp; Inspection
+                    </h4>
+                  </div>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    File: <strong className="text-gray-700">{csvFile?.name}</strong> &middot; Review all {csvContacts.length} parsed contacts before saving to the system.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <GhostButton
+                    onClick={() => {
+                      setCsvFile(null);
+                      setCsvContacts([]);
+                      setCsvSearch('');
+                    }}
+                    className="text-gray-500 hover:text-red-600"
+                  >
+                    <FaTimes className="mr-1.5" /> Discard file
+                  </GhostButton>
+                  <PrimaryButton
+                    onClick={handleCsvImport}
+                    loading={importing}
+                    disabled={validCsvCount === 0}
+                    className="gap-2"
+                  >
+                    <FaCheckCircle /> Import {validCsvCount} Valid Contacts
+                  </PrimaryButton>
+                </div>
+              </div>
+
+              {/* CSV Metrics Grid */}
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+                <div className="rounded-lg border border-gray-200 bg-white p-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Total Parsed</p>
+                  <p className="text-base font-bold text-gray-800">{csvContacts.length}</p>
+                </div>
+                <div className="rounded-lg border border-green-200 bg-green-50/60 p-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-green-700">Valid Phone Numbers</p>
+                  <p className="text-base font-bold text-green-800">{validCsvCount}</p>
+                </div>
+                <div className="rounded-lg border border-red-200 bg-red-50/60 p-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-red-700">Invalid / Malformed</p>
+                  <p className="text-base font-bold text-red-800">{invalidCsvCount}</p>
+                </div>
+                <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-700">With Name</p>
+                  <p className="text-base font-bold text-blue-800">{withNameCsvCount}</p>
+                </div>
+                <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-700">Without Name</p>
+                  <p className="text-base font-bold text-amber-800">{withoutNameCsvCount}</p>
+                </div>
+              </div>
+
+              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-800">
+                <strong>Friendly reminder:</strong> Lack of names will <u>never</u> stop contacts from importing. Contacts without names are stored safely with their phone numbers and can receive campaigns. You can also edit names inline below before importing, or later in the contacts table.
+              </div>
+
+              {/* Batch tag & Preview Search */}
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <Field label="Import Batch Tag" hint="Group and filter these contacts later">
+                  <TextInput
+                    value={csvBatchName}
+                    onChange={(e) => setCsvBatchName(e.target.value)}
+                    placeholder="e.g. Lekki Landlords Nov 2026"
+                  />
+                </Field>
+                <div className="sm:col-span-2">
+                  <Field label="Filter Preview Table" hint={`Showing ${filteredCsv.length} of ${csvContacts.length} contacts`}>
+                    <div className="relative">
+                      <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <TextInput
+                        value={csvSearch}
+                        onChange={(e) => {
+                          setCsvSearch(e.target.value);
+                          setCsvPage(1);
+                        }}
+                        placeholder="Search phone or name in preview..."
+                        className="pl-9"
+                      />
+                    </div>
+                  </Field>
+                </div>
+              </div>
+
+              {/* Table of Parsed Contacts */}
+              <div className="mt-3 overflow-hidden rounded-lg border border-gray-200 bg-white">
+                <DataTable columns={['#', 'Phone Number', 'Status', 'Contact Name', 'Actions']}>
+                  {paginatedCsv.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-6 text-center text-sm text-gray-500">
+                        No contacts match your preview search.
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedCsv.map((c, idx) => {
+                      const globalIdx = (csvPage - 1) * CSV_PREVIEW_PER_PAGE + idx + 1;
+                      const isEditingThis = editingCsvId === c.id;
+
+                      return (
+                        <tr key={c.id} className="transition-colors hover:bg-gray-50/70">
+                          <Td className="text-xs text-gray-500">{globalIdx}</Td>
+                          <Td>
+                            <span className="font-mono font-medium text-gray-900">{c.phone}</span>
+                            {c.isDuplicate && (
+                              <span className="ml-2 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                                Duplicate in file
+                              </span>
+                            )}
+                          </Td>
+                          <Td>
+                            {c.isValid ? (
+                              <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                                ✓ Ready
+                              </span>
+                            ) : (
+                              <span
+                                className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800"
+                                title={c.errorReason}
+                              >
+                                ✕ {c.errorReason || 'Invalid'}
+                              </span>
+                            )}
+                          </Td>
+                          <Td>
+                            {isEditingThis ? (
+                              <div className="flex items-center gap-1.5">
+                                <TextInput
+                                  value={editingCsvName}
+                                  onChange={(e) => setEditingCsvName(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleUpdateCsvContactName(c.id, editingCsvName);
+                                    } else if (e.key === 'Escape') {
+                                      setEditingCsvId(null);
+                                      setEditingCsvName('');
+                                    }
+                                  }}
+                                  autoFocus
+                                  placeholder="Enter contact name..."
+                                  className="h-8 text-xs"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateCsvContactName(c.id, editingCsvName)}
+                                  className="rounded bg-green-600 p-1.5 text-white hover:bg-green-700"
+                                  title="Save name"
+                                >
+                                  <FaCheck className="text-xs" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingCsvId(null);
+                                    setEditingCsvName('');
+                                  }}
+                                  className="rounded bg-gray-200 p-1.5 text-gray-700 hover:bg-gray-300"
+                                  title="Cancel"
+                                >
+                                  <FaTimes className="text-xs" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                {c.name ? (
+                                  <span className="font-medium text-gray-800">{c.name}</span>
+                                ) : (
+                                  <span className="text-xs italic text-gray-400">
+                                    No name (optional)
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingCsvId(c.id);
+                                    setEditingCsvName(c.name || '');
+                                  }}
+                                  className="text-gray-400 hover:text-primary-600"
+                                  title="Edit contact name"
+                                >
+                                  <FaEdit className="text-xs" />
+                                </button>
+                              </div>
+                            )}
+                          </Td>
+                          <Td>
+                            <GhostButton
+                              onClick={() => handleRemoveCsvContact(c.id)}
+                              className="text-red-500 hover:bg-red-50 hover:text-red-700"
+                              title="Remove from import"
+                            >
+                              <FaTrash className="text-xs" />
+                            </GhostButton>
+                          </Td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </DataTable>
+              </div>
+
+              {/* Pagination for CSV Preview */}
+              {csvTotalPages > 1 && (
+                <div className="mt-3 flex items-center justify-between border-t border-primary-100 pt-2 text-xs text-gray-600">
+                  <span>
+                    Showing {Math.min(filteredCsv.length, (csvPage - 1) * CSV_PREVIEW_PER_PAGE + 1)} to{' '}
+                    {Math.min(filteredCsv.length, csvPage * CSV_PREVIEW_PER_PAGE)} of {filteredCsv.length} contacts
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <SecondaryButton
+                      disabled={csvPage <= 1}
+                      onClick={() => setCsvPage((p) => Math.max(1, p - 1))}
+                      className="px-2 py-1 text-xs"
+                    >
+                      <FaChevronLeft />
+                    </SecondaryButton>
+                    <span className="font-medium">
+                      Page {csvPage} of {csvTotalPages}
+                    </span>
+                    <SecondaryButton
+                      disabled={csvPage >= csvTotalPages}
+                      onClick={() => setCsvPage((p) => p + 1)}
+                      className="px-2 py-1 text-xs"
+                    >
+                      <FaChevronRight />
+                    </SecondaryButton>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          {/* Search, Batch filter & Actions bar for Saved Contacts */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-3">
+            <div className="flex flex-wrap items-center gap-2 flex-1">
+              <div className="relative min-w-[200px] max-w-xs flex-1">
+                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <TextInput
+                  value={contactSearch}
+                  onChange={(e) => {
+                    setContactSearch(e.target.value);
+                    setContactPage(1);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      loadContacts(contactSearch, 1, selectedBatch, contactPageSize);
+                    }
+                  }}
+                  placeholder="Search phone or name..."
+                  aria-label="Search WhatsApp contacts"
+                  className="pl-9"
+                />
+              </div>
+
+              {batches.length > 0 && (
+                <SelectInput
+                  value={selectedBatch}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedBatch(val);
+                    setContactPage(1);
+                    loadContacts(contactSearch, 1, val, contactPageSize);
+                  }}
+                  aria-label="Filter by batch"
+                  className="max-w-[200px]"
+                >
+                  <option value="">All batches ({batches.length})</option>
+                  {batches.map((b) => (
+                    <option key={b} value={b}>
+                      Batch: {b}
+                    </option>
+                  ))}
+                </SelectInput>
+              )}
+
+              <SecondaryButton onClick={() => loadContacts(contactSearch, 1, selectedBatch, contactPageSize)}>
+                Filter
+              </SecondaryButton>
+
+              {(contactSearch || selectedBatch) && (
+                <GhostButton
+                  onClick={() => {
+                    setContactSearch('');
+                    setSelectedBatch('');
+                    setContactPage(1);
+                    loadContacts('', 1, '', contactPageSize);
+                  }}
+                  className="text-xs text-gray-500"
+                >
+                  <FaTimes className="mr-1" /> Reset filters
+                </GhostButton>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                <span>Per page:</span>
+                <select
+                  value={contactPageSize}
+                  onChange={(e) => {
+                    const nextSize = Number(e.target.value);
+                    setContactPageSize(nextSize);
+                    setContactPage(1);
+                    loadContacts(contactSearch, 1, selectedBatch, nextSize);
+                  }}
+                  className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 shadow-sm outline-none focus:border-primary-500"
+                >
+                  <option value={30}>30</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={250}>250</option>
+                  <option value={1000}>All (up to 1,000)</option>
+                </select>
+              </div>
+
+              <div className="text-xs text-gray-500">
+                Showing <strong className="text-gray-800">{contacts.length}</strong> of <strong className="text-gray-800">{contactTotal}</strong>
+              </div>
+            </div>
+          </div>
+
+          {selectedBatch && (
+            <div className="flex items-center justify-between rounded-lg bg-primary-50/70 px-3 py-2 text-xs text-primary-900 border border-primary-200">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">Filtered by batch:</span>
+                <span className="font-mono font-bold bg-white px-2 py-0.5 rounded border border-primary-200 text-primary-800">
+                  {selectedBatch}
+                </span>
+                <span>({contactTotal} contacts)</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedBatch('');
+                  setContactPage(1);
+                  loadContacts(contactSearch, 1, '', contactPageSize);
+                }}
+                className="font-semibold text-primary-700 hover:text-primary-900 underline ml-2"
+              >
+                View all imported batches
+              </button>
+            </div>
+          )}
+
+          {contactsLoading ? (
+            <LoadingState label="Loading WhatsApp contacts" rows={3} />
+          ) : contacts.length === 0 ? (
+            <EmptyState
+              icon={<FaUsers />}
+              title="No imported contacts found"
+              message={
+                contactSearch || selectedBatch
+                  ? 'No contacts match your search or batch filter. Try clearing filters.'
+                  : 'Upload a CSV of contacts above. You can inspect all numbers, edit names, and target them when building a campaign.'
+              }
+            />
+          ) : (
+            <div className="space-y-4">
+              <DataTable columns={['S/N', 'Number', 'Name', 'Batch', 'Source', 'On WhatsApp', 'Added', 'Actions']}>
+                {contacts.map((c, index) => (
+                  <tr key={c.id} className="transition-colors hover:bg-gray-50/70">
+                    <Td className="text-gray-600">{(contactPage - 1) * contactPageSize + index + 1}</Td>
+                    <Td className="font-mono font-medium text-gray-900">{c.phone}</Td>
+                    <Td>
+                      <div className="flex items-center gap-1.5">
+                        {c.full_name ? (
+                          <span className="font-medium text-gray-900">{c.full_name}</span>
+                        ) : (
+                          <span className="text-xs italic text-gray-400">No name</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingContact(c);
+                            setEditContactName(c.full_name || '');
+                          }}
+                          className="text-gray-400 hover:text-primary-600"
+                          title="Edit name"
+                        >
+                          <FaEdit className="text-xs" />
+                        </button>
+                      </div>
+                    </Td>
+                    <Td>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const b = c.import_batch || 'CSV_Import';
+                          setSelectedBatch(b);
+                          setContactPage(1);
+                          loadContacts(contactSearch, 1, b, contactPageSize);
+                        }}
+                        className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 transition hover:bg-primary-100 hover:text-primary-800"
+                        title="Click to filter by this batch"
+                      >
+                        {c.import_batch || 'CSV_Import'}
+                      </button>
+                    </Td>
+                    <Td className="text-xs uppercase text-gray-500">{c.source}</Td>
+                    <Td>
+                      {c.wa_status === 'valid' ? (
+                        <span className="badge bg-green-100 text-green-700">🟢 On WhatsApp</span>
+                      ) : c.wa_status === 'invalid' ? (
+                        <span className="badge bg-red-100 text-red-700">🔴 Not on WhatsApp</span>
+                      ) : (
+                        <span className="badge bg-gray-100 text-gray-500">⚪ Not checked</span>
+                      )}
+                    </Td>
+                    <Td className="text-xs text-gray-500">
+                      <span className="block text-gray-600">{formatDate(c.created_at)}</span>
+                      {c.wa_checked_at ? (
+                        <span className="text-gray-400">checked {formatDate(c.wa_checked_at)}</span>
+                      ) : null}
+                    </Td>
+                    <Td>
+                      <div className="flex items-center gap-1">
+                        <GhostButton
+                          onClick={() => {
+                            setEditingContact(c);
+                            setEditContactName(c.full_name || '');
+                          }}
+                          aria-label={`Edit name for ${c.phone}`}
+                        >
+                          <FaEdit /> Edit
+                        </GhostButton>
+                        <GhostButton
+                          className="text-red-600 hover:bg-red-50"
+                          onClick={() => handleDeleteContact(c)}
+                          aria-label={`Remove ${c.phone}`}
+                        >
+                          <FaTimes /> Remove
+                        </GhostButton>
+                      </div>
+                    </Td>
+                  </tr>
+                ))}
+              </DataTable>
+
+              {contactTotalPages > 1 && (
+                <div className="flex items-center justify-center gap-2">
+                  <SecondaryButton
+                    disabled={contactPage <= 1}
+                    onClick={() => setContactPage((p) => Math.max(1, p - 1))}
+                    aria-label="Previous page"
+                  >
+                    <FaChevronLeft />
+                  </SecondaryButton>
+                  <span className="text-sm text-gray-600">Page {contactPage} of {contactTotalPages}</span>
+                  <SecondaryButton
+                    disabled={contactPage >= contactTotalPages}
+                    onClick={() => setContactPage((p) => p + 1)}
+                    aria-label="Next page"
+                  >
+                    <FaChevronRight />
+                  </SecondaryButton>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </Panel>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -1065,6 +1704,243 @@ const WhatsappMarketingTab = () => {
             </p>
           </div>
         ) : null}
+      </Dialog>
+
+      {/* Edit Contact Name Dialog */}
+      <Dialog
+        open={Boolean(editingContact)}
+        onClose={() => setEditingContact(null)}
+        title="Edit Contact Name"
+        subtitle={editingContact ? `Phone: ${editingContact.phone}` : ''}
+        size="small"
+        footer={
+          <>
+            <SecondaryButton onClick={() => setEditingContact(null)}>Cancel</SecondaryButton>
+            <PrimaryButton onClick={handleSaveContactName} loading={savingContactEdit}>
+              Save Name
+            </PrimaryButton>
+          </>
+        }
+      >
+        <Field label="Full Name" hint="Leave blank to remove/clear the contact name">
+          <TextInput
+            value={editContactName}
+            onChange={(e) => setEditContactName(e.target.value)}
+            placeholder="e.g. John Doe"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSaveContactName();
+              }
+            }}
+          />
+        </Field>
+      </Dialog>
+
+      {/* Audience Preview Dialog */}
+      <Dialog
+        open={audienceModal.open}
+        onClose={() => setAudienceModal((prev) => ({ ...prev, open: false }))}
+        title={`Audience Preview (${audienceModal.total} contacts)`}
+        subtitle={`Targeting: ${form.source === 'users' ? 'Platform Users' : form.source === 'contacts' ? 'Imported Contacts' : 'Both (Users & Contacts)'}`}
+        footer={
+          <SecondaryButton onClick={() => setAudienceModal((prev) => ({ ...prev, open: false }))}>
+            Close
+          </SecondaryButton>
+        }
+      >
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <TextInput
+                value={audienceModal.search}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setAudienceModal((prev) => ({ ...prev, search: val }));
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    loadAudiencePreview(audienceModal.search, 1);
+                  }
+                }}
+                placeholder="Search recipient by phone or name..."
+                className="pl-9"
+              />
+            </div>
+            <SecondaryButton onClick={() => loadAudiencePreview(audienceModal.search, 1)}>
+              Search
+            </SecondaryButton>
+          </div>
+
+          {audienceModal.loading ? (
+            <LoadingState label="Loading recipient preview..." rows={4} />
+          ) : audienceModal.recipients.length === 0 ? (
+            <p className="py-6 text-center text-sm text-gray-500">
+              No matching recipients found for this audience filter.
+            </p>
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-gray-200">
+              <DataTable columns={['#', 'Phone', 'Name', 'Source', 'Details']}>
+                {audienceModal.recipients.map((r, i) => (
+                  <tr key={`${r.phone}-${i}`} className="hover:bg-gray-50/70">
+                    <Td className="text-xs text-gray-500">
+                      {(audienceModal.page - 1) * 50 + i + 1}
+                    </Td>
+                    <Td className="font-mono font-medium text-gray-900">{r.phone}</Td>
+                    <Td className="text-gray-700">{r.full_name || '—'}</Td>
+                    <Td className="text-xs uppercase text-gray-500">{r.source}</Td>
+                    <Td className="text-xs text-gray-500">{r.user_type || r.role || '—'}</Td>
+                  </tr>
+                ))}
+              </DataTable>
+            </div>
+          )}
+
+          {audienceModal.totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-gray-100 pt-3 text-xs text-gray-600">
+              <span>
+                Page {audienceModal.page} of {audienceModal.totalPages} ({audienceModal.total} total)
+              </span>
+              <div className="flex items-center gap-1.5">
+                <SecondaryButton
+                  disabled={audienceModal.page <= 1}
+                  onClick={() => loadAudiencePreview(audienceModal.search, audienceModal.page - 1)}
+                  className="px-2 py-1 text-xs"
+                >
+                  <FaChevronLeft />
+                </SecondaryButton>
+                <SecondaryButton
+                  disabled={audienceModal.page >= audienceModal.totalPages}
+                  onClick={() => loadAudiencePreview(audienceModal.search, audienceModal.page + 1)}
+                  className="px-2 py-1 text-xs"
+                >
+                  <FaChevronRight />
+                </SecondaryButton>
+              </div>
+            </div>
+          )}
+        </div>
+      </Dialog>
+
+      {/* Campaign Recipients Modal */}
+      <Dialog
+        open={campaignRecipientsModal.open}
+        onClose={() => setCampaignRecipientsModal((prev) => ({ ...prev, open: false }))}
+        title={`${campaignRecipientsModal.campaign?.name || 'Campaign'} — Recipients (${campaignRecipientsModal.total})`}
+        subtitle="Individual delivery status for each recipient in this campaign"
+        footer={
+          <SecondaryButton onClick={() => setCampaignRecipientsModal((prev) => ({ ...prev, open: false }))}>
+            Close
+          </SecondaryButton>
+        }
+      >
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <TextInput
+                value={campaignRecipientsModal.search}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setCampaignRecipientsModal((prev) => ({ ...prev, search: val }));
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (campaignRecipientsModal.campaign) {
+                      openCampaignRecipients(campaignRecipientsModal.campaign, campaignRecipientsModal.search, 1);
+                    }
+                  }
+                }}
+                placeholder="Search by phone, name, or status..."
+                className="pl-9"
+              />
+            </div>
+            <SecondaryButton
+              onClick={() => {
+                if (campaignRecipientsModal.campaign) {
+                  openCampaignRecipients(campaignRecipientsModal.campaign, campaignRecipientsModal.search, 1);
+                }
+              }}
+            >
+              Search
+            </SecondaryButton>
+          </div>
+
+          {campaignRecipientsModal.loading ? (
+            <LoadingState label="Loading campaign recipients..." rows={4} />
+          ) : campaignRecipientsModal.recipients.length === 0 ? (
+            <p className="py-6 text-center text-sm text-gray-500">
+              No recipients found for this campaign.
+            </p>
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-gray-200">
+              <DataTable columns={['#', 'Phone', 'Name', 'Status', 'Sent At', 'Error']}>
+                {campaignRecipientsModal.recipients.map((r, i) => (
+                  <tr key={r.id || `${r.phone}-${i}`} className="hover:bg-gray-50/70">
+                    <Td className="text-xs text-gray-500">
+                      {(campaignRecipientsModal.page - 1) * 50 + i + 1}
+                    </Td>
+                    <Td className="font-mono font-medium text-gray-900">{r.phone}</Td>
+                    <Td className="text-gray-700">{r.full_name || '—'}</Td>
+                    <Td>
+                      <StatusBadge status={r.status} />
+                    </Td>
+                    <Td className="text-xs text-gray-500">
+                      {r.sent_at ? formatDate(r.sent_at) : '—'}
+                    </Td>
+                    <Td className="text-xs text-red-600 max-w-[200px] truncate" title={r.error_message || ''}>
+                      {r.error_message || '—'}
+                    </Td>
+                  </tr>
+                ))}
+              </DataTable>
+            </div>
+          )}
+
+          {campaignRecipientsModal.totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-gray-100 pt-3 text-xs text-gray-600">
+              <span>
+                Page {campaignRecipientsModal.page} of {campaignRecipientsModal.totalPages} ({campaignRecipientsModal.total} total)
+              </span>
+              <div className="flex items-center gap-1.5">
+                <SecondaryButton
+                  disabled={campaignRecipientsModal.page <= 1}
+                  onClick={() => {
+                    if (campaignRecipientsModal.campaign) {
+                      openCampaignRecipients(
+                        campaignRecipientsModal.campaign,
+                        campaignRecipientsModal.search,
+                        campaignRecipientsModal.page - 1
+                      );
+                    }
+                  }}
+                  className="px-2 py-1 text-xs"
+                >
+                  <FaChevronLeft />
+                </SecondaryButton>
+                <SecondaryButton
+                  disabled={campaignRecipientsModal.page >= campaignRecipientsModal.totalPages}
+                  onClick={() => {
+                    if (campaignRecipientsModal.campaign) {
+                      openCampaignRecipients(
+                        campaignRecipientsModal.campaign,
+                        campaignRecipientsModal.search,
+                        campaignRecipientsModal.page + 1
+                      );
+                    }
+                  }}
+                  className="px-2 py-1 text-xs"
+                >
+                  <FaChevronRight />
+                </SecondaryButton>
+              </div>
+            </div>
+          )}
+        </div>
       </Dialog>
     </div>
   );

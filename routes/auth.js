@@ -168,6 +168,11 @@ router.post(
 );
 
 router.post(
+  '/google',
+  authController.googleAuth
+);
+
+router.post(
   '/lawyer/accept-invite',
   [
     requireTurnstile('rentalhub_lawyer_invite'),

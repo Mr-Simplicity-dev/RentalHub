@@ -5,11 +5,12 @@ import FloatingContactWidget from '../components/common/FloatingContactWidget';
 import WhatsAppBotWidget from '../components/common/WhatsAppBotWidget';
 import TurnstileWidget from '../components/common/TurnstileWidget';
 import { toast } from 'react-toastify';
-import { FaEye, FaEyeSlash, FaLock, FaUser } from 'react-icons/fa';
+import { FaEye, FaEyeSlash, FaGoogle, FaLock, FaUser } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 
 import assistedCopy from '../i18n/assistedRegistration.json';
 
+const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
 const LOGIN_EMAIL_HISTORY_KEY = 'loginEmailHistory';
 const MAX_LOGIN_EMAIL_SUGGESTIONS = 8;
 const REMEMBERED_EMAIL_KEY = 'rememberedEmail';
@@ -54,8 +55,8 @@ const saveLoginEmailSuggestion = (email) => {
 };
 
 const Login = () => {
-  const { t,i18n } = useTranslation();
-  const identityLabel=(assistedCopy[i18n.language?.split('-')[0]]||assistedCopy.en).identity;
+  const { t, i18n } = useTranslation();
+  const identityLabel = (assistedCopy[i18n.language?.split('-')[0]] || assistedCopy.en).identity;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -64,9 +65,128 @@ const Login = () => {
   const [loginEmailSuggestions, setLoginEmailSuggestions] = useState([]);
   const [turnstileToken, setTurnstileToken] = useState(null);
   const turnstileRef = useRef(null);
-  const { login } = useAuth();
+  const googleButtonRef = useRef(null);
+  const googleReady = useRef(false);
+  const { login, googleLogin } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  const redirectUserAfterLogin = (user) => {
+    const role = user?.user_type;
+    const isRecruitmentAdmin = role === 'recruitment_admin' || user?.is_recruitment_admin === true;
+    const redirectParam = searchParams.get('redirect');
+    const allowedPaths = ['/dashboard', '/tenant/dashboard', '/super-admin', '/profile', '/applications', '/messages', '/saved-properties', '/payment-history', '/my-properties', '/verification-status', '/subscribe', '/my-disputes', '/my-damage-reports', '/subscribed-properties'];
+    const safeRedirect = redirectParam && redirectParam.startsWith('/') && !redirectParam.includes('//') && allowedPaths.some(p => redirectParam === p || redirectParam.startsWith(p + '/')) ? redirectParam : '';
+
+    if (safeRedirect) {
+      navigate(safeRedirect);
+      return;
+    }
+
+    if (role === 'super_admin') {
+      navigate('/super-admin');
+    } else if (role === 'super_support_admin') {
+      navigate('/admin/super-support-dashboard');
+    } else if (isRecruitmentAdmin) {
+      navigate('/admin/recruitment');
+    } else if (role === 'state_support_admin') {
+      navigate('/admin/state-support-dashboard');
+    } else if (role === 'lga_support_admin') {
+      navigate('/admin/lga-support-dashboard');
+    } else if (role === 'super_financial_admin') {
+      navigate('/admin/super-financial-dashboard');
+    } else if (role === 'financial_admin' || role === 'lga_financial_admin') {
+      navigate('/admin/financial-dashboard');
+    } else if (role === 'zonal_financial_admin') {
+      navigate('/admin/zonal-financial-dashboard');
+    } else if (role === 'state_admin' || role === 'state_financial_admin') {
+      navigate('/admin');
+    } else if (role === 'admin' || role === 'lga_admin') {
+      navigate('/admin');
+    } else if (role === 'super_fumigation_admin') {
+      navigate('/admin/fumigation-cleaning/super');
+    } else if (role === 'state_fumigation_admin') {
+      navigate('/admin/fumigation-cleaning/state');
+    } else if (role === 'fumigation_admin' || role === 'lga_fumigation_admin') {
+      navigate('/admin/fumigation-cleaning');
+    } else if (role === 'super_transportation_admin') {
+      navigate('/super-admin/transportation');
+    } else if (role === 'state_transportation_admin') {
+      navigate('/admin/transportation/state');
+    } else if (role === 'transportation_admin' || role === 'lga_transportation_admin') {
+      navigate('/admin/transportation');
+    } else if (role === 'super_lawyer') {
+      navigate('/lawyer/super');
+    } else if (role === 'state_lawyer') {
+      navigate('/lawyer/state');
+    } else if (role === 'zonal_lawyer') {
+      navigate('/lawyer/zonal');
+    } else if (role === 'lawyer') {
+      navigate('/lawyer');
+    } else if (role === 'agent') {
+      navigate('/agent/dashboard');
+    } else if (role === 'landlord') {
+      navigate('/dashboard');
+    } else {
+      navigate('/tenant/dashboard');
+    }
+  };
+
+  const handleGoogleSuccess = async (googleResponse) => {
+    if (!googleResponse?.credential) return;
+    setLoading(true);
+    try {
+      const response = await googleLogin(googleResponse.credential);
+      if (response && response.success) {
+        toast.success(t('login.success'));
+        redirectUserAfterLogin(response.data?.user || {});
+      } else {
+        toast.error(response?.message || t('login.failed'));
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message || t('login.failed'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Google Identity Services setup
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID || googleReady.current) return;
+
+    const renderBtn = () => {
+      if (!window.google?.accounts?.id || !googleButtonRef.current) return;
+      googleReady.current = true;
+      try {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: handleGoogleSuccess,
+          auto_select: false,
+        });
+        window.google.accounts.id.renderButton(googleButtonRef.current, {
+          theme: 'outline',
+          size: 'large',
+          width: 320,
+          text: 'continue_with',
+          shape: 'rectangular',
+        });
+      } catch (err) {
+        console.warn('Google Identity Services button init error:', err);
+      }
+    };
+
+    if (typeof window.google?.accounts !== 'undefined') {
+      renderBtn();
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = renderBtn;
+    document.body.appendChild(script);
+  }, [GOOGLE_CLIENT_ID]);
 
   // Load saved email if user previously checked Remember Me
   useEffect(() => {
@@ -109,64 +229,7 @@ const Login = () => {
         }
 
         const user = response.data?.user || {};
-        const role = user.user_type;
-        const isRecruitmentAdmin = role === 'recruitment_admin' || user.is_recruitment_admin === true;
-        const redirectParam = searchParams.get('redirect');
-        const allowedPaths = ['/dashboard', '/tenant/dashboard', '/super-admin', '/profile', '/applications', '/messages', '/saved-properties', '/payment-history', '/my-properties', '/verification-status', '/subscribe', '/my-disputes', '/my-damage-reports', '/subscribed-properties'];
-        const safeRedirect = redirectParam && redirectParam.startsWith('/') && !redirectParam.includes('//') && allowedPaths.some(p => redirectParam === p || redirectParam.startsWith(p + '/')) ? redirectParam : '';
-
-        if (safeRedirect) {
-          navigate(safeRedirect);
-          return;
-        }
-
-        if (role === 'super_admin') {
-          navigate('/super-admin');
-        } else if (role === 'super_support_admin') {
-          navigate('/admin/super-support-dashboard');
-        } else if (isRecruitmentAdmin) {
-          navigate('/admin/recruitment');
-        } else if (role === 'state_support_admin') {
-          navigate('/admin/state-support-dashboard');
-        } else if (role === 'lga_support_admin') {
-          navigate('/admin/lga-support-dashboard');
-        } else if (role === 'super_financial_admin') {
-          navigate('/admin/super-financial-dashboard');
-        } else if (role === 'financial_admin' || role === 'lga_financial_admin') {
-          navigate('/admin/financial-dashboard');
-        } else if (role === 'zonal_financial_admin') {
-          navigate('/admin/zonal-financial-dashboard');
-        } else if (role === 'state_admin' || role === 'state_financial_admin') {
-          navigate('/admin');
-        } else if (role === 'admin' || role === 'lga_admin') {
-          navigate('/admin');
-        } else if (role === 'super_fumigation_admin') {
-                    navigate('/admin/fumigation-cleaning/super');
-        } else if (role === 'state_fumigation_admin') {
-          navigate('/admin/fumigation-cleaning/state');
-        } else if (role === 'fumigation_admin' || role === 'lga_fumigation_admin') {
-          navigate('/admin/fumigation-cleaning');
-        } else if (role === 'super_transportation_admin') {
-                    navigate('/super-admin/transportation');
-        } else if (role === 'state_transportation_admin') {
-          navigate('/admin/transportation/state');
-        } else if (role === 'transportation_admin' || role === 'lga_transportation_admin') {
-          navigate('/admin/transportation');
-        } else if (role === 'super_lawyer') {
-          navigate('/lawyer/super');
-        } else if (role === 'state_lawyer') {
-          navigate('/lawyer/state');
-        } else if (role === 'zonal_lawyer') {
-          navigate('/lawyer/zonal');
-        } else if (role === 'lawyer') {
-          navigate('/lawyer');
-        } else if (role === 'agent') {
-          navigate('/agent/dashboard');
-        } else if (role === 'landlord') {
-          navigate('/dashboard');
-        } else {
-          navigate('/tenant/dashboard');
-        }
+        redirectUserAfterLogin(user);
       } else {
         toast.error(response.message || t('login.failed'));
         turnstileRef.current?.reset();
@@ -345,6 +408,22 @@ const Login = () => {
             {loading ? t('login.signing') : t('login.submit')}
           </button>
         </form>
+
+        {/* GOOGLE SIGN IN */}
+        <div className="relative my-4">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-slate-200 dark:border-slate-700"></div>
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-white px-3 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+              {t('login.or_continue_with', 'Or continue with')}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center justify-center">
+          <div ref={googleButtonRef} className="flex min-h-[44px] w-full justify-center" />
+        </div>
       </div>
     </div>
       <FloatingContactWidget />

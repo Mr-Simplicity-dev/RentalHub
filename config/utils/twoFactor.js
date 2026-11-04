@@ -26,7 +26,8 @@ const SMS_OTP_TTL_SECONDS = 300;
 const RECOVERY_CODE_COUNT = 10;
 const RECOVERY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
-authenticator.options = { window: 2 };
+// Forgiving window [4, 4] (+/- 120s) accounts for clock skew on user mobile devices (Google Authenticator)
+authenticator.options = { window: [4, 4] };
 
 let redisClient = redis; // ioredis wrapper (null when unavailable) â€” falls back to in-memory
 const memoryOtpStore = new Map();
@@ -142,6 +143,20 @@ class TwoFactorError extends Error {
 }
 
 /**
+ * Clean and verify a raw TOTP token against a secret with clock-drift tolerance.
+ */
+exports.verifyTotpToken = ({ secret, token }) => {
+  const cleanCode = String(token || '').replace(/\D/g, '');
+  const cleanSecret = String(secret || '').replace(/\s+/g, '').trim().toUpperCase();
+  if (!cleanSecret || cleanCode.length !== 6) return false;
+  return Boolean(
+    authenticator.check(cleanCode, cleanSecret) ||
+    authenticator.verify({ token: cleanCode, secret: cleanSecret }) ||
+    typeof authenticator.checkDelta(cleanCode, cleanSecret) === 'number'
+  );
+};
+
+/**
  * Create a TOTP secret for a user and return the enrollment material.
  * The secret is encrypted at rest (same AES-256-GCM key as identity data).
  */
@@ -179,12 +194,13 @@ exports.confirmTotpEnrollment = async ({ userId, code }) => {
   }
 
   const secret = decryptStoredSecret(user.totp_secret);
-  const cleanCode = String(code || '').replace(/[^0-9]/g, '');
-  const cleanSecret = String(secret || '').replace(/\s+/g, '').trim();
+  const cleanCode = String(code || '').replace(/\D/g, '');
+  const cleanSecret = String(secret || '').replace(/\s+/g, '').trim().toUpperCase();
 
   const valid = cleanSecret && cleanCode.length === 6 && (
     authenticator.check(cleanCode, cleanSecret) ||
-    authenticator.verify({ token: cleanCode, secret: cleanSecret })
+    authenticator.verify({ token: cleanCode, secret: cleanSecret }) ||
+    typeof authenticator.checkDelta(cleanCode, cleanSecret) === 'number'
   );
 
   if (!valid) {
@@ -233,12 +249,13 @@ exports.verifyTotpCode = async ({ userId, code }) => {
   }
 
   const secret = decryptStoredSecret(user.totp_secret);
-  const cleanCode = String(code || '').replace(/[^0-9]/g, '');
-  const cleanSecret = String(secret || '').replace(/\s+/g, '').trim();
+  const cleanCode = String(code || '').replace(/\D/g, '');
+  const cleanSecret = String(secret || '').replace(/\s+/g, '').trim().toUpperCase();
 
   const valid = cleanSecret && cleanCode.length === 6 && (
     authenticator.check(cleanCode, cleanSecret) ||
-    authenticator.verify({ token: cleanCode, secret: cleanSecret })
+    authenticator.verify({ token: cleanCode, secret: cleanSecret }) ||
+    typeof authenticator.checkDelta(cleanCode, cleanSecret) === 'number'
   );
 
   if (valid) {
