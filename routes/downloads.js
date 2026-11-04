@@ -129,9 +129,12 @@ const serveVersion = (req, res) => {
 };
 
 router.get('/version', serveVersion);
+router.post('/version', serveVersion);
 router.get('/version.json', serveVersion);
 router.get('/latest-version', serveVersion);
+router.post('/latest-version', serveVersion);
 router.get('/app-version', serveVersion);
+router.post('/app-version', serveVersion);
 
 module.exports = router;
 module.exports.getBuildInfo = getBuildInfo;

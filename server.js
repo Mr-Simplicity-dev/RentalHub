@@ -704,6 +704,28 @@ const publicDownloadLimiter = rateLimit({
 // Mobile release downloads must stay public and available even when database-backed
 // feature flag checks are unavailable.
 app.use('/api/downloads', publicDownloadLimiter, downloadsRoutes);
+app.get('/api/downloads/app-version', publicDownloadLimiter, (req, res, next) => {
+  req.url = '/app-version';
+  return downloadsRoutes(req, res, next);
+});
+app.post('/api/downloads/app-version', publicDownloadLimiter, (req, res, next) => {
+  req.url = '/app-version';
+  req.method = 'GET';
+  return downloadsRoutes(req, res, next);
+});
+app.get('/api/downloads/latest-version', publicDownloadLimiter, (req, res, next) => {
+  req.url = '/latest-version';
+  return downloadsRoutes(req, res, next);
+});
+app.post('/api/downloads/latest-version', publicDownloadLimiter, (req, res, next) => {
+  req.url = '/latest-version';
+  req.method = 'GET';
+  return downloadsRoutes(req, res, next);
+});
+app.get('/downloads/app-version', publicDownloadLimiter, (req, res, next) => {
+  req.url = '/app-version';
+  return downloadsRoutes(req, res, next);
+});
 app.use('/api/sms', smsDeliveryRoutes);
 app.use('/api/prembly', premblyRecoveryRoutes);
 app.use('/api', enforceFlags);
