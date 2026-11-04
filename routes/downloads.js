@@ -91,7 +91,7 @@ router.get('/app', (req, res) => {
   });
 });
 
-router.get('/version', (req, res) => {
+const serveVersion = (req, res) => {
   res.set({
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0, private',
     'Pragma': 'no-cache',
@@ -126,7 +126,12 @@ router.get('/version', (req, res) => {
       },
     },
   });
-});
+};
+
+router.get('/version', serveVersion);
+router.get('/version.json', serveVersion);
+router.get('/latest-version', serveVersion);
+router.get('/app-version', serveVersion);
 
 module.exports = router;
 module.exports.getBuildInfo = getBuildInfo;
