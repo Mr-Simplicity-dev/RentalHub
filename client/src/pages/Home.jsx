@@ -110,7 +110,7 @@ const Home = () => {
     let active = true;
 
     api
-      .get('/downloads/version')
+      .get(`/downloads/version?cb=${Date.now()}`, { headers: { 'Cache-Control': 'no-cache' } })
       .then((response) => {
         if (!active) return;
         const android = response?.data?.data?.android;

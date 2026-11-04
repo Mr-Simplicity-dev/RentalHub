@@ -8,7 +8,7 @@ const MobileAppPage = () => {
 
   useEffect(() => {
     let active = true;
-    fetch('/api/downloads/version')
+    fetch(`/api/downloads/version?cb=${Date.now()}`, { cache: 'no-store' })
       .then((response) => response.json())
       .then((payload) => {
         if (active) setBuild(payload?.data?.android || null);
