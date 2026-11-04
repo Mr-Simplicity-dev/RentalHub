@@ -65,9 +65,12 @@ router.get('/app', (req, res) => {
   // being handed out. The versioned filename also stops devices reusing a stale
   // "Amana RentalHub NG.apk" they already downloaded.
   res.set({
-    'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
-    Pragma: 'no-cache',
-    Expires: '0',
+    'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0, private',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+    'CDN-Cache-Control': 'no-store',
+    'Cloudflare-CDN-Cache-Control': 'no-store',
+    'Surrogate-Control': 'no-store',
   });
 
   const apkPath = findApk();
@@ -90,20 +93,25 @@ router.get('/app', (req, res) => {
 
 router.get('/version', (req, res) => {
   res.set({
-    'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
-    Pragma: 'no-cache',
-    Expires: '0',
+    'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0, private',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+    'CDN-Cache-Control': 'no-store',
+    'Cloudflare-CDN-Cache-Control': 'no-store',
+    'Surrogate-Control': 'no-store',
+    'Vary': '*',
   });
 
   const info = getBuildInfo();
   const apkAvailable = Boolean(findApk());
+  const cacheBust = Date.now();
   res.json({
     success: true,
     data: {
       android: {
         version: info.version,
         buildNumber: info.buildNumber,
-        downloadUrl: `/api/downloads/app?v=${encodeURIComponent(info.version)}`,
+        downloadUrl: `/api/downloads/app?v=${encodeURIComponent(info.version)}&cb=${cacheBust}`,
         fileName: `${DOWNLOAD_BASENAME}-${info.version}.apk`,
         apkAvailable,
         lastUpdated: info.lastUpdated,
