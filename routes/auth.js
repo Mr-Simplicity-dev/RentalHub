@@ -167,10 +167,11 @@ router.post(
   authController.login
 );
 
-router.post(
-  '/google',
-  authController.googleAuth
-);
+const googleCustomer = require('../services/googleCustomerSignin');
+router.post('/google/start', authSensitiveLimiter, googleCustomer.start);
+router.get('/google/mobile/:id', authSensitiveLimiter, googleCustomer.browserConfig);
+router.post('/google/mobile/exchange', authSensitiveLimiter, googleCustomer.exchange);
+router.post('/google', authSensitiveLimiter, authController.googleAuth);
 
 router.post(
   '/lawyer/accept-invite',

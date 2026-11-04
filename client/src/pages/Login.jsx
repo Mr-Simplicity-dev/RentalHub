@@ -5,12 +5,12 @@ import FloatingContactWidget from '../components/common/FloatingContactWidget';
 import WhatsAppBotWidget from '../components/common/WhatsAppBotWidget';
 import TurnstileWidget from '../components/common/TurnstileWidget';
 import { toast } from 'react-toastify';
-import { FaEye, FaEyeSlash, FaGoogle, FaLock, FaUser } from 'react-icons/fa';
+import { FaEye, FaEyeSlash, FaLock, FaUser } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 
 import assistedCopy from '../i18n/assistedRegistration.json';
 
-const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
+import CustomerGoogleSignIn from './CustomerGoogleSignIn';
 const LOGIN_EMAIL_HISTORY_KEY = 'loginEmailHistory';
 const MAX_LOGIN_EMAIL_SUGGESTIONS = 8;
 const REMEMBERED_EMAIL_KEY = 'rememberedEmail';
@@ -65,9 +65,7 @@ const Login = () => {
   const [loginEmailSuggestions, setLoginEmailSuggestions] = useState([]);
   const [turnstileToken, setTurnstileToken] = useState(null);
   const turnstileRef = useRef(null);
-  const googleButtonRef = useRef(null);
-  const googleReady = useRef(false);
-  const { login, googleLogin } = useAuth();
+  const { login, establishSession } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -131,62 +129,6 @@ const Login = () => {
       navigate('/tenant/dashboard');
     }
   };
-
-  const handleGoogleSuccess = async (googleResponse) => {
-    if (!googleResponse?.credential) return;
-    setLoading(true);
-    try {
-      const response = await googleLogin(googleResponse.credential);
-      if (response && response.success) {
-        toast.success(t('login.success'));
-        redirectUserAfterLogin(response.data?.user || {});
-      } else {
-        toast.error(response?.message || t('login.failed'));
-      }
-    } catch (error) {
-      toast.error(error.response?.data?.message || error.message || t('login.failed'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Google Identity Services setup
-  useEffect(() => {
-    if (!GOOGLE_CLIENT_ID || googleReady.current) return;
-
-    const renderBtn = () => {
-      if (!window.google?.accounts?.id || !googleButtonRef.current) return;
-      googleReady.current = true;
-      try {
-        window.google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: handleGoogleSuccess,
-          auto_select: false,
-        });
-        window.google.accounts.id.renderButton(googleButtonRef.current, {
-          theme: 'outline',
-          size: 'large',
-          width: 320,
-          text: 'continue_with',
-          shape: 'rectangular',
-        });
-      } catch (err) {
-        console.warn('Google Identity Services button init error:', err);
-      }
-    };
-
-    if (typeof window.google?.accounts !== 'undefined') {
-      renderBtn();
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.defer = true;
-    script.onload = renderBtn;
-    document.body.appendChild(script);
-  }, [GOOGLE_CLIENT_ID]);
 
   // Load saved email if user previously checked Remember Me
   useEffect(() => {
@@ -422,7 +364,7 @@ const Login = () => {
         </div>
 
         <div className="flex flex-col items-center justify-center">
-          <div ref={googleButtonRef} className="flex min-h-[44px] w-full justify-center" />
+          <CustomerGoogleSignIn onSignedIn={async data => { await establishSession(data); redirectUserAfterLogin(data.user); }} />
         </div>
       </div>
     </div>

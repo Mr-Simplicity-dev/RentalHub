@@ -296,15 +296,17 @@ const mockQuery = async (sql = '', params = []) => {
 
 let realPool = null;
 let useMock = false;
+const allowDemoDatabase = process.env.ALLOW_IN_MEMORY_DEMO_DB === 'true' && process.env.NODE_ENV !== 'production';
 
 try {
   realPool = new Pool(poolConfig);
   realPool.on('error', (err) => {
-    logger.warn('Database pool error (falling back to mock):', err.message);
-    useMock = true;
+    logger.warn('Database pool connection error:', err.message);
+    if (allowDemoDatabase) useMock = true;
   });
 } catch (err) {
   logger.warn('DB pool initialization failed:', err.message);
+  if (!allowDemoDatabase) throw err;
   useMock = true;
 }
 
@@ -320,6 +322,7 @@ const db = {
         const res = await realPool.query(text, params);
         return res;
       } catch (err) {
+        if (!allowDemoDatabase) throw err;
         if (
           err.code === 'ECONNREFUSED' ||
           err.code === 'ENOTFOUND' ||
@@ -343,6 +346,7 @@ const db = {
       try {
         return await realPool.connect();
       } catch (err) {
+        if (!allowDemoDatabase) throw err;
         logger.warn('Database connect failed, using mock client:', err.message);
         useMock = true;
       }

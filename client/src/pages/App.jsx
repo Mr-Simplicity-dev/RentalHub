@@ -24,6 +24,7 @@ import PlatformRatingPrompt from '../components/ratings/PlatformRatingPrompt';
 
 import Home from './Home';
 import Login from './Login';
+import CustomerGoogleSignIn from './CustomerGoogleSignIn';
 import Register from './Register';
 import NotFound from './NotFound';
 
@@ -827,6 +828,7 @@ function App() {
               {/* Public Routes */}
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
+              <Route path="/mobile-google-sign-in" element={<CustomerGoogleSignIn mobile />} />
               <Route path="/register" element={<Register />} />
               <Route path="/lawyer/accept-invite" element={<AcceptLawyerInvite />} />
               <Route path="/agent/accept-invite" element={<AcceptAgentInvite />} />
