@@ -8,42 +8,12 @@ const MobileAppPage = () => {
 
   useEffect(() => {
     let active = true;
-    const fallback = {
-      version: '1.0.50',
-      buildNumber: '61',
-      downloadUrl: `/api/downloads/app?v=1.0.50&cb=${Date.now()}`,
-      fileName: 'Amana RentalHub NG-1.0.50.apk',
-      apkAvailable: true,
-    };
-    fetch(`/api/downloads/app-version?cb=${Date.now()}`, { cache: 'no-store' })
-      .then((response) => {
-        if (!response.ok) throw new Error('bad');
-        return response.json();
-      })
+    fetch('/api/downloads/version')
+      .then((response) => response.json())
       .then((payload) => {
-        if (active && payload?.data?.android) {
-          setBuild(payload.data.android);
-        } else if (active) {
-          setBuild(fallback);
-        }
+        if (active) setBuild(payload?.data?.android || null);
       })
-      .catch(() => {
-        fetch(`/api/downloads/version?cb=${Date.now()}`, { cache: 'no-store' })
-          .then((response) => {
-            if (!response.ok) throw new Error('bad');
-            return response.json();
-          })
-          .then((payload) => {
-            if (active && payload?.data?.android) {
-              setBuild(payload.data.android);
-            } else if (active) {
-              setBuild(fallback);
-            }
-          })
-          .catch(() => {
-            if (active) setBuild(fallback);
-          });
-      });
+      .catch(() => {});
     return () => {
       active = false;
     };
