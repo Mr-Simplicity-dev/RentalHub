@@ -1,3 +1,4 @@
+import { createMfaVerification } from './mfaVerification.cjs';
 import axios from 'axios';
 import { clearAuthSession, getAuthToken, setAuthToken } from './authStorage';
 import { requestMfaCode, resetMfaAttempts } from './mfaPromptService';
@@ -29,8 +30,14 @@ let isRefreshing = false;
 let pendingRequests = [];
 
 // Request interceptor to add auth token
+const mfaVerification = createMfaVerification({
+  requestCode: requestMfaCode,
+  verify: code => api.post('/auth/2fa/verify', { code }),
+});
+
 api.interceptors.request.use(
   (config) => {
+    config.mfaGeneration = mfaVerification.generation();
     const token = getAuthToken();
     if (config.skipAuth && typeof config.headers?.delete === 'function') {
       config.headers.delete('Authorization');
@@ -84,15 +91,11 @@ api.interceptors.response.use(
       }
 
       try {
-        const mfaCode = await requestMfaCode(error.response?.data?.message || '');
+        await mfaVerification.ensure(originalRequest.mfaGeneration || 0, error.response?.data?.message || '');
         originalRequest.mfaAttempts = attempts;
-        originalRequest.headers = {
-          ...(originalRequest.headers || {}),
-          'X-RentalHub-Mfa-Code': mfaCode,
-        };
         return api(originalRequest);
       } catch (promptError) {
-        return Promise.reject(error);
+        return Promise.reject(promptError);
       }
     }
 

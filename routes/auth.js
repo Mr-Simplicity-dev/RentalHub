@@ -168,6 +168,7 @@ router.post(
 );
 
 const googleCustomer = require('../services/googleCustomerSignin');
+router.post('/2fa/verify', authenticate, sensitiveActionLimiter, authController.verifyDashboardMfa);
 router.post('/google/start', authSensitiveLimiter, googleCustomer.start);
 router.get('/google/mobile/:id', authSensitiveLimiter, googleCustomer.browserConfig);
 router.post('/google/mobile/exchange', authSensitiveLimiter, googleCustomer.exchange);

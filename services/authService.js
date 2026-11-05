@@ -2999,6 +2999,16 @@ const respondTwoFactorError = (res, error) => {
   return res.status(500).json({ success: false, message: 'Two-factor check failed' });
 };
 
+exports.verifyDashboardMfa = async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  try {
+    await twoFactor.verifyTotpCode({ userId: req.user.id, code: req.body.code });
+    return res.json({ success: true });
+  } catch (error) {
+    return respondTwoFactorError(res, error);
+  }
+};
+
 exports.getTwoFactorStatus = async (req, res) => {
   try {
     const status = await twoFactor.getTotpStatus(req.user.id);
