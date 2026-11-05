@@ -49,6 +49,7 @@ import VoiceSupportOverview from "../components/admin/VoiceSupportOverview";
 import BankAccountsTab from "../components/admin/BankAccountsTab";
 import BankTransfersTab from "../components/admin/BankTransfersTab";
 import VirtualAccountsTab from "../components/admin/VirtualAccountsTab";
+import TransportationFleetTracker from "../components/admin/TransportationFleetTracker";
 
 const tabs = [
   "overview",
@@ -87,6 +88,7 @@ const tabs = [
   "bank_accounts",
   "bank_transfers",
   "virtual_accounts",
+  "transportation_tracking",
 ];
 
 const tabLabels = {
@@ -126,6 +128,7 @@ const tabLabels = {
   bank_accounts: "Bank Accounts",
   bank_transfers: "Manual Payments",
   virtual_accounts: "Automatic Transfers",
+  transportation_tracking: "National Transportation Fleet",
 };
 
 const shortcutCategories = [
@@ -144,6 +147,7 @@ const shortcutCategories = [
       { name: "rent_savings_fees", label: "Rent Savings Fees", detail: "Set location-based rent-savings activation fees" },
       { name: "rent_savings_withdrawals", label: "Rent Savings Withdrawals", detail: "Approve or reject early rent-savings withdrawal requests" },
       { name: "registration_access", label: "Registration Access", detail: "Control registration by state and LGA" },
+      { name: "transportation_tracking", label: "National Fleet Radar", detail: "Real-time national vehicle tracking radar across all 6 geopolitical zones" },
     ],
   },
   {
@@ -1670,6 +1674,44 @@ export default function SuperAdminDashboard() {
 
         {tab === "bank_accounts" && (
           <BankAccountsTab />
+        )}
+
+        {tab === "transportation_tracking" && (
+          <div className="space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 p-6 rounded-2xl text-white shadow-xl">
+              <div>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold uppercase tracking-wider mb-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                  Live National Radar
+                </span>
+                <h2 className="text-2xl font-bold">Nigeria National Transportation Fleet</h2>
+                <p className="text-sm text-slate-300 mt-1 max-w-2xl">
+                  Super Admin live GPS oversight across all 6 Geopolitical Zones and 36 States + FCT. Monitor in-transit moves, driver coordinates, and route exceptions in real-time.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => navigate('/admin/transportation/zonal')}
+                  className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm shadow-md transition flex items-center gap-2"
+                >
+                  6 Geopolitical Zones Portal &rarr;
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/admin/transportation')}
+                  className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium text-sm border border-white/10 transition"
+                >
+                  Admin Operations Console
+                </button>
+              </div>
+            </div>
+
+            <TransportationFleetTracker
+              userRole="super_admin"
+              title="National Fleet Live Operations Radar (All 6 Geopolitical Zones)"
+            />
+          </div>
         )}
 
       <InputDialog

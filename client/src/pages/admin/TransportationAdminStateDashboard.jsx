@@ -16,9 +16,11 @@ import {
 } from '../../components/admin/TransportationAdminUi';
 import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdrawalBanner';
 import DepartmentSupportEscalations from '../../components/admin/DepartmentSupportEscalations';
+import TransportationFleetTracker from '../../components/admin/TransportationFleetTracker';
 
 const tabs = [
   { label: 'Overview', value: 'overview' },
+  { label: 'Live Fleet Tracking', value: 'tracking' },
   { label: 'Bookings', value: 'bookings' },
   { label: 'Services', value: 'services' },
   { label: 'Alerts', value: 'alerts' },
@@ -244,6 +246,10 @@ export default function TransportationAdminStateDashboard() {
             </SectionCard>
           </div>
         </div>
+      ) : null}
+
+      {activeTab === 'tracking' ? (
+        <TransportationFleetTracker />
       ) : null}
 
       {activeTab === 'bookings' ? (

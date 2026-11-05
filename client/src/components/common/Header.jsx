@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { FaBell, FaUser, FaSignOutAlt, FaEnvelope, FaBars, FaTimes, FaChevronDown, FaIdCard, FaTachometerAlt, FaFileAlt, FaCheckCircle, FaHeadset, FaExclamationTriangle, FaHome } from 'react-icons/fa';
+import { FaBell, FaUser, FaSignOutAlt, FaEnvelope, FaBars, FaTimes, FaChevronDown, FaIdCard, FaTachometerAlt, FaFileAlt, FaCheckCircle, FaHeadset, FaExclamationTriangle, FaHome, FaTruck, FaLocationArrow, FaSprayCan, FaCompass } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
@@ -643,6 +643,51 @@ return (
                       <span>{t('header.verification')}</span>
                     </Link>
 
+                    <Link
+                      to="/service-tracking"
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-indigo-700 font-semibold transition-colors duration-150 hover:bg-indigo-50"
+                      onClick={() => handleHeaderNavigation('/service-tracking')}
+                    >
+                      <FaCompass className="text-xs text-indigo-600" />
+                      <span>Service Tracking Centre</span>
+                    </Link>
+
+                    <Link
+                      to="/transportation/bookings"
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 transition-colors duration-150 hover:bg-primary-50 hover:text-primary-700"
+                      onClick={() => handleHeaderNavigation('/transportation/bookings')}
+                    >
+                      <FaTruck className="text-xs text-primary-500" />
+                      <span>Transportation Bookings</span>
+                    </Link>
+
+                    <Link
+                      to="/transportation/driver"
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-cyan-700 font-semibold transition-colors duration-150 hover:bg-cyan-50"
+                      onClick={() => handleHeaderNavigation('/transportation/driver')}
+                    >
+                      <FaLocationArrow className="text-xs text-cyan-600" />
+                      <span>Driver Operations Console</span>
+                    </Link>
+
+                    <Link
+                      to="/fumigation-cleaning/bookings"
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 transition-colors duration-150 hover:bg-primary-50 hover:text-primary-700"
+                      onClick={() => handleHeaderNavigation('/fumigation-cleaning/bookings')}
+                    >
+                      <FaSprayCan className="text-xs text-primary-500" />
+                      <span>Fumigation Bookings</span>
+                    </Link>
+
+                    <Link
+                      to="/fumigation/team"
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-emerald-700 font-semibold transition-colors duration-150 hover:bg-emerald-50"
+                      onClick={() => handleHeaderNavigation('/fumigation/team')}
+                    >
+                      <FaSprayCan className="text-xs text-emerald-600" />
+                      <span>Fumigation Specialist Console</span>
+                    </Link>
+
                     <div className="mt-1 border-t border-gray-100 pt-1">
                       <button
                         onClick={handleLogout}
@@ -835,6 +880,14 @@ return (
             <MobileNavLink
               to={roleDashboardPath}
               label={t('header.dashboard')}
+              onClick={closeMobileMenu}
+            />
+          )}
+
+          {isAuthenticated && (
+            <MobileNavLink
+              to="/service-tracking"
+              label="🛰️ Service Tracking Centre"
               onClick={closeMobileMenu}
             />
           )}

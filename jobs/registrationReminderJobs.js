@@ -160,28 +160,37 @@ const runRegistrationReminders = async () => {
         message = 'This is your final reminder to complete your registration. Your reserved registration link will expire soon.';
       }
 
-      const result = await sendCompleteRegistrationEmail({
-        email: row.email,
-        fullName: row.full_name,
-        reference: row.transaction_reference,
-        subject,
-        message,
-      });
+      try {
+        const result = await sendCompleteRegistrationEmail({
+          email: row.email,
+          fullName: row.full_name,
+          reference: row.transaction_reference,
+          subject,
+          message,
+        });
 
-      if (result.success) {
-        const nextCount = count + 1;
-        await db.query(
-          `UPDATE tenant_registration_payments
-           SET reminder_sent_at = CURRENT_TIMESTAMP,
-               reminder_count = $1,
-               abandoned_at = CASE WHEN $1 >= $2 THEN CURRENT_TIMESTAMP ELSE abandoned_at END,
-               payment_status = CASE WHEN $1 >= $2 THEN 'abandoned' ELSE payment_status END
-           WHERE id = $3`,
-          [nextCount, MAX_REMINDERS, row.id]
-        );
-        sent++;
+        if (result && result.success) {
+          const nextCount = count + 1;
+          await db.query(
+            `UPDATE tenant_registration_payments
+             SET reminder_sent_at = CURRENT_TIMESTAMP,
+                 reminder_count = $1,
+                 abandoned_at = CASE WHEN $1 >= $2 THEN CURRENT_TIMESTAMP ELSE abandoned_at END,
+                 payment_status = CASE WHEN $1 >= $2 THEN 'abandoned' ELSE payment_status END
+             WHERE id = $3`,
+            [nextCount, MAX_REMINDERS, row.id]
+          );
+          sent++;
+        }
+      } catch (rowErr) {
+        logger.warn('Failed to dispatch registration reminder for row', {
+          id: row.id,
+          email: row.email,
+          error: rowErr.message,
+        });
       }
     }
+
 
     if (due.rows.length > 0) {
       logger.info('Registration reminders emailed', { sent, due: due.rows.length });

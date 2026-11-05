@@ -37,11 +37,14 @@ const TransportationBooking = React.lazy(() => import('./TransportationBooking')
 const TransportationPayment = React.lazy(() => import('./TransportationPayment'));
 const TransportationBookings = React.lazy(() => import('./TransportationBookings'));
 const TransportationBookingDetails = React.lazy(() => import('./TransportationBookingDetails'));
+const DriverTripConsole = React.lazy(() => import('./driver/DriverTripConsole'));
 const FumigationCleaningBooking = React.lazy(() => import('./FumigationCleaningBooking'));
 const FumigationCleaningPayment = React.lazy(() => import('./FumigationCleaningPayment'));
 const FumigationCleaningCatalog = React.lazy(() => import('../components/fumigation/FumigationCleaningCatalog'));
 const FumigationCleaningBookings = React.lazy(() => import('./FumigationCleaningBookings'));
 const FumigationCleaningBookingDetails = React.lazy(() => import('./FumigationCleaningBookingDetails'));
+const FumigationTeamConsole = React.lazy(() => import('./fumigation/FumigationTeamConsole'));
+const ServiceTrackingCentre = React.lazy(() => import('./ServiceTrackingCentre'));
 const AdminDashboard = React.lazy(() => import('./admin/AdminDashboard'));
 const AdminLayout = React.lazy(() => import('./admin/AdminLayout'));
 const AdminUsers = React.lazy(() => import('./admin/AdminUsers'));
@@ -116,6 +119,7 @@ const AgentWithdrawalPage = React.lazy(() => import('./agent/AgentWithdrawalPage
 const VerificationStatus = React.lazy(() => import('./VerificationStatus'));
 const TransportationAdminDashboard = React.lazy(() => import('./admin/TransportationAdminDashboard'));
 const TransportationAdminStateDashboard = React.lazy(() => import('./admin/TransportationAdminStateDashboard'));
+const TransportationAdminZonalDashboard = React.lazy(() => import('./admin/TransportationAdminZonalDashboard'));
 const TransportationSuperAdminDashboard = React.lazy(() => import('./admin/TransportationSuperAdminDashboard'));
 const FumigationOversightPanel = React.lazy(() => import('../components/admin/FumigationOversightPanel'));
 const LgaFumigationAdminDashboard = React.lazy(() => import('./admin/LgaFumigationAdminDashboard'));
@@ -149,7 +153,12 @@ const FINANCIAL_ADMIN_ROLES = ['financial_admin', 'lga_financial_admin'];
 const ZONAL_FINANCIAL_ADMIN_ROLES = ['zonal_financial_admin'];
 const ZONAL_LAWYER_ROLES = ['zonal_lawyer'];
 const ZONAL_FUMIGATION_ADMIN_ROLES = ['zonal_fumigation_admin'];
-const ZONAL_TRANSPORTATION_ADMIN_ROLES = ['zonal_transportation_admin'];
+const ZONAL_TRANSPORTATION_ADMIN_ROLES = [
+  'zonal_transportation_admin',
+  'zonal_admin',
+  'super_transportation_admin',
+  'super_admin',
+];
 const SUPER_FINANCIAL_ADMIN_ROLES = ['super_financial_admin'];
 const STATE_ADMIN_ROLES = ['state_admin', 'state_financial_admin'];
 const ZONAL_ADMIN_ROLES = ['zonal_admin'];
@@ -847,7 +856,14 @@ function App() {
               <Route path="/transportation/payment/:bookingId" element={<TransportationPayment />} />
               <Route path="/transportation/bookings" element={<TransportationBookings />} />
               <Route path="/transportation/bookings/:bookingId" element={<TransportationBookingDetails />} />
+              <Route path="/transportation/driver" element={<DriverTripConsole />} />
+              <Route path="/transportation/driver/trips/:bookingId" element={<DriverTripConsole />} />
+              <Route path="/transportation/zonal" element={<Navigate to="/admin/transportation/zonal" replace />} />
               <Route path="/fumigation-cleaning/catalog" element={<FumigationCleaningCatalog />} />
+              <Route path="/service-tracking" element={<ProtectedRoute><ServiceTrackingCentre /></ProtectedRoute>} />
+              <Route path="/service-tracking/:serviceType/:bookingId" element={<ProtectedRoute><ServiceTrackingCentre /></ProtectedRoute>} />
+              <Route path="/fumigation/team" element={<ProtectedRoute><FumigationTeamConsole /></ProtectedRoute>} />
+              <Route path="/fumigation/team/jobs/:bookingId" element={<ProtectedRoute><FumigationTeamConsole /></ProtectedRoute>} />
               <Route path="/verify-email" element={<VerifyEmail />} />
               <Route path="/verify-email/:token" element={<VerifyEmailToken />} />
               <Route path="/auth/verify-email/:token" element={<VerifyEmailToken />} />
@@ -1017,7 +1033,7 @@ function App() {
                 <Route path="transportation/zonal"
                   element={
                     <ZonalTransportationAdminRoute>
-                      <TransportationAdminStateDashboard />
+                      <TransportationAdminZonalDashboard />
                     </ZonalTransportationAdminRoute>
                   }
                 />

@@ -10,11 +10,14 @@ const FUMIGATION_ADMIN_ROLES = new Set([
   'super_admin',
   'state_admin',
   'state_financial_admin',
+  'zonal_admin',
+  'zonal_fumigation_admin',
   'fumigation_admin',
   'lga_fumigation_admin',
   'state_fumigation_admin',
   'super_fumigation_admin',
 ]);
+
 
 const requireFumigationAdminAccess = (req, res, next) => {
   if (!req.user) {
@@ -120,6 +123,68 @@ router.get('/bookings/:bookingId',
   authenticate,
   isTenant,
   fumigationCleaningController.getBookingDetails
+);
+
+// Get real-time live vehicle/team tracking for a fumigation booking
+router.get('/bookings/:bookingId/tracking',
+  authenticate,
+  async (req, res) => {
+    try {
+      const FumigationTrackingService = require('../services/fumigationTrackingService');
+      const bookingId = Number(req.params.bookingId);
+      if (!Number.isInteger(bookingId) || bookingId <= 0) {
+        return res.status(400).json({ success: false, message: 'Valid booking ID required' });
+      }
+
+      const summary = await FumigationTrackingService.getTrackingSummary(bookingId, req.user);
+      if (!summary) {
+        return res.status(404).json({ success: false, message: 'Fumigation booking not found' });
+      }
+
+      // Check tenant authorization: tenants can only view their own booking
+      if (req.user.user_type === 'tenant' && Number(summary.booking.tenant_id) !== Number(req.user.id)) {
+        return res.status(403).json({ success: false, message: 'Unauthorized: Access denied' });
+      }
+
+      return res.json({
+        success: true,
+        data: summary,
+        message: 'Fumigation live tracking telemetry retrieved successfully'
+      });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// Customer confirms completion signoff or reports a problem
+router.post('/bookings/:bookingId/signoff',
+  authenticate,
+  isTenant,
+  async (req, res) => {
+    try {
+      const FumigationTrackingService = require('../services/fumigationTrackingService');
+      const bookingId = Number(req.params.bookingId);
+      const { rating, feedback, problem_reported, problem_description } = req.body;
+
+      const result = await FumigationTrackingService.confirmTenantSignoff({
+        bookingId,
+        tenantUser: req.user,
+        rating,
+        feedback,
+        problemReported: problem_reported,
+        problemDescription: problem_description
+      });
+
+      return res.json({
+        success: true,
+        data: result,
+        message: problem_reported ? 'Issue recorded and escalated to support' : 'Service completion confirmed'
+      });
+    } catch (error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+  }
 );
 
 // Cancel fumigation/cleaning booking

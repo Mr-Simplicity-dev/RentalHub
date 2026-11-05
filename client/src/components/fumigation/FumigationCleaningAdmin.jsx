@@ -23,6 +23,7 @@ import {
 } from 'react-icons/fa';
 import Loader from '../common/Loader';
 import DepartmentSupportEscalations from '../admin/DepartmentSupportEscalations';
+import FumigationFleetTracker from './FumigationFleetTracker';
 import { useTranslation } from 'react-i18next';
 
 const FUMIGATION_ADMIN_ROLES = [
@@ -31,6 +32,8 @@ const FUMIGATION_ADMIN_ROLES = [
   'super_admin',
   'state_admin',
   'state_financial_admin',
+  'zonal_admin',
+  'zonal_fumigation_admin',
   'fumigation_admin',
   'lga_fumigation_admin',
   'state_fumigation_admin',
@@ -51,6 +54,7 @@ const FumigationCleaningAdmin = ({
   const highlightedBookingId = new URLSearchParams(location.search).get('bookingId');
   
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('tracking'); // 'tracking' | 'bookings'
   const [bookings, setBookings] = useState([]);
   const [filteredBookings, setFilteredBookings] = useState([]);
   const [stats, setStats] = useState(null);
@@ -479,7 +483,37 @@ const FumigationCleaningAdmin = ({
             </div>
           )}
         </div>
-        
+
+        {/* Tab Navigation */}
+        <div className="flex border-b border-gray-200 mb-8 space-x-2">
+          <button
+            onClick={() => setActiveTab('tracking')}
+            className={`py-3 px-5 text-sm font-semibold border-b-2 flex items-center space-x-2 transition-colors ${
+              activeTab === 'tracking'
+                ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50 rounded-t-lg'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <span className="text-base">🛰️</span>
+            <span>Live Field Radar & Fleet Operations</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('bookings')}
+            className={`py-3 px-5 text-sm font-semibold border-b-2 flex items-center space-x-2 transition-colors ${
+              activeTab === 'bookings'
+                ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50 rounded-t-lg'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <span className="text-base">📋</span>
+            <span>Bookings & Provider Management</span>
+          </button>
+        </div>
+
+        {activeTab === 'tracking' ? (
+          <FumigationFleetTracker adminScope={scopeLabel || 'Fumigation Operations'} />
+        ) : (
+          <>
         {/* Stats Cards */}
         <div id="fumigation-overview" className="fum-admin-payments-section grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <div className="fum-admin-providers-section bg-white rounded-lg shadow p-6">
@@ -805,6 +839,8 @@ const FumigationCleaningAdmin = ({
             </table>
           </div>
         </div>
+        </>
+        )}
         
         {/* Booking Details Modal */}
         {statusDialog.open && statusDialog.booking && (

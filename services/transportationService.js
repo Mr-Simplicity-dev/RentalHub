@@ -1,5 +1,6 @@
 const requirePaymentEmail = require('../config/utils/paymentEmail');
 const TransportationService = require('../models/Transportation');
+const TransportationTrackingService = require('./transportationTrackingService');
 const { validationResult } = require('express-validator');
 const { buildReference } = require('../config/utils/referenceGenerator');
 
@@ -242,7 +243,55 @@ class TransportationController {
     }
   }
 
-    // Initialize payment for transportation booking
+  // Get live tracking details for a booking
+  async getBookingTracking(req, res) {
+    try {
+      const { bookingId } = req.params;
+      const user = req.user;
+
+      const booking = await TransportationService.getBookingById(bookingId);
+      if (!booking) {
+        return res.status(404).json({
+          success: false,
+          message: 'Booking not found'
+        });
+      }
+
+      // Check access: customer tenant, assigned driver, or admin
+      const isOwner = Number(booking.tenant_id) === Number(user.id);
+      const isDriver = TransportationTrackingService.isAuthorizedDriver(booking, user);
+
+      if (!isOwner && !isDriver) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied: not authorized to track this booking'
+        });
+      }
+
+      const summary = await TransportationTrackingService.getTrackingSummary(bookingId);
+      if (!summary) {
+        return res.status(404).json({
+          success: false,
+          message: 'Tracking details not found'
+        });
+      }
+
+      return res.json({
+        success: true,
+        data: summary,
+        message: 'Live tracking details retrieved successfully'
+      });
+    } catch (error) {
+      if (req.logger) req.logger.error('Error getting booking tracking:', error);
+      else console.error('Error getting booking tracking:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve tracking details'
+      });
+    }
+  }
+
+  // Initialize payment for transportation booking
   async initializeBookingPayment(req, res) {
     try {
       const { bookingId } = req.params;

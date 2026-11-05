@@ -73,6 +73,12 @@ router.get('/bookings/:bookingId',
   transportationController.getBookingDetails
 );
 
+// Get real-time live vehicle tracking for a booking
+router.get('/bookings/:bookingId/tracking',
+  authenticate,
+  transportationController.getBookingTracking
+);
+
 // Cancel transportation booking
 router.delete('/bookings/:bookingId/cancel',
   authenticate,

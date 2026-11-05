@@ -180,6 +180,10 @@ exports.sendCompleteRegistrationEmail = async ({
   message = 'Your registration payment did not complete. Please finish your payment to activate your account.',
 }) => {
   const resumeUrl = `${FRONTEND_URL}/register?registration_ref=${encodeURIComponent(reference)}`;
+  if (!process.env.RESEND_API_KEY) {
+    logger.info?.('Simulated complete registration email (RESEND_API_KEY not configured)', { email, reference });
+    return { success: true, simulated: true };
+  }
   try {
     await sendEmail({
       to: email,

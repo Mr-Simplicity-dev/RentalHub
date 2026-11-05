@@ -20,6 +20,7 @@ import {
 import Loader from '../components/common/Loader';
 import BackToDashboard from '../components/common/BackToDashboard';
 import BookingCancelModal from '../components/common/BookingCancelModal';
+import TransportationLiveTracker from '../components/transportation/TransportationLiveTracker';
 
 const TransportationBookingDetails = () => {
   const { t } = useTranslation();
@@ -230,6 +231,13 @@ const TransportationBookingDetails = () => {
             </div>
           </div>
         </div>
+
+        {/* Real-Time Live Transportation Tracking */}
+        {booking.booking_status !== 'cancelled' && (
+          <div className="mb-8">
+            <TransportationLiveTracker bookingId={booking.id} />
+          </div>
+        )}
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left column - Main details */}

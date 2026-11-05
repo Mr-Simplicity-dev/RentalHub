@@ -15,9 +15,11 @@ import {
   StatusPill,
 } from '../../components/admin/TransportationAdminUi';
 import DepartmentSupportEscalations from '../../components/admin/DepartmentSupportEscalations';
+import TransportationFleetTracker from '../../components/admin/TransportationFleetTracker';
 
 const tabs = [
   { label: 'Overview', value: 'overview' },
+  { label: 'National Fleet Tracking', value: 'tracking' },
   { label: 'State admins', value: 'state-admins' },
   { label: 'Alerts', value: 'alerts' },
   { label: 'Escalations', value: 'support-escalations' },
@@ -207,6 +209,13 @@ export default function TransportationSuperAdminDashboard() {
         description="Oversee tenant move logistics across Nigeria, assign state transportation jurisdictions, and track system health, unresolved alerts, and performance metrics from one command layer."
         actions={
           <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => navigate('/admin/transportation/zonal')}
+              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 transition"
+            >
+              6 Geopolitical Zones &rarr;
+            </button>
             <span className="rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/20">
               Oversight: {dashboard?.oversight_config?.oversight_level || 'national'}
             </span>
@@ -283,6 +292,10 @@ export default function TransportationSuperAdminDashboard() {
             </SectionCard>
           </div>
         </div>
+      ) : null}
+
+      {activeTab === 'tracking' ? (
+        <TransportationFleetTracker />
       ) : null}
 
       {activeTab === 'state-admins' ? (

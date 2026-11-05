@@ -886,6 +886,130 @@ const configureRealtimeSocket = (io) => {
       }
     });
 
+    socket.on('transportation:join_booking', async (payload = {}, callback) => {
+      try {
+        const bookingId = Number(payload.bookingId || payload.booking_id);
+        if (!Number.isInteger(bookingId) || bookingId <= 0) {
+          if (typeof callback === 'function') callback({ success: false, message: 'Invalid booking ID' });
+          return;
+        }
+        socket.join(`transportation:booking:${bookingId}`);
+        if (typeof callback === 'function') callback({ success: true, bookingId });
+      } catch (err) {
+        if (typeof callback === 'function') callback({ success: false, message: err.message });
+      }
+    });
+
+    socket.on('transportation:leave_booking', (payload = {}) => {
+      try {
+        const bookingId = Number(payload.bookingId || payload.booking_id);
+        if (bookingId > 0) {
+          socket.leave(`transportation:booking:${bookingId}`);
+        }
+      } catch (e) {}
+    });
+
+    socket.on('transportation:driver_location', async (payload = {}, callback) => {
+      try {
+        const TransportationTrackingService = require('../../services/transportationTrackingService');
+        const bookingId = Number(payload.bookingId || payload.booking_id);
+        if (!bookingId) {
+          if (typeof callback === 'function') callback({ success: false, message: 'Booking ID required' });
+          return;
+        }
+
+        const booking = await TransportationTrackingService.getBookingForTracking(bookingId);
+        if (!booking) {
+          if (typeof callback === 'function') callback({ success: false, message: 'Booking not found' });
+          return;
+        }
+
+        if (!TransportationTrackingService.isAuthorizedDriver(booking, user)) {
+          if (typeof callback === 'function') callback({ success: false, message: 'Unauthorized driver' });
+          return;
+        }
+
+        const result = await TransportationTrackingService.recordLocationPing({
+          bookingId,
+          driverId: user.id,
+          latitude: payload.latitude,
+          longitude: payload.longitude,
+          accuracy: payload.accuracy,
+          heading: payload.heading,
+          speed: payload.speed,
+          altitude: payload.altitude,
+          batteryLevel: payload.battery_level,
+          isMocked: payload.is_mocked
+        });
+
+        if (typeof callback === 'function') callback({ success: true, data: result });
+      } catch (err) {
+        if (typeof callback === 'function') callback({ success: false, message: err.message });
+      }
+    });
+
+    socket.on('fumigation:join_booking', async (payload = {}, callback) => {
+      try {
+        const bookingId = Number(payload.bookingId || payload.booking_id);
+        if (!Number.isInteger(bookingId) || bookingId <= 0) {
+          if (typeof callback === 'function') callback({ success: false, message: 'Invalid booking ID' });
+          return;
+        }
+        socket.join(`fumigation:booking:${bookingId}`);
+        if (typeof callback === 'function') callback({ success: true, bookingId });
+      } catch (err) {
+        if (typeof callback === 'function') callback({ success: false, message: err.message });
+      }
+    });
+
+    socket.on('fumigation:leave_booking', (payload = {}) => {
+      try {
+        const bookingId = Number(payload.bookingId || payload.booking_id);
+        if (bookingId > 0) {
+          socket.leave(`fumigation:booking:${bookingId}`);
+        }
+      } catch (e) {}
+    });
+
+    socket.on('fumigation:team_location', async (payload = {}, callback) => {
+      try {
+        const FumigationTrackingService = require('../../services/fumigationTrackingService');
+        const bookingId = Number(payload.bookingId || payload.booking_id);
+        if (!bookingId) {
+          if (typeof callback === 'function') callback({ success: false, message: 'Booking ID required' });
+          return;
+        }
+
+        const booking = await FumigationTrackingService.getBookingForTracking(bookingId);
+        if (!booking) {
+          if (typeof callback === 'function') callback({ success: false, message: 'Booking not found' });
+          return;
+        }
+
+        if (!FumigationTrackingService.isAuthorizedTeam(booking, user)) {
+          if (typeof callback === 'function') callback({ success: false, message: 'Unauthorized specialist team' });
+          return;
+        }
+
+        const result = await FumigationTrackingService.recordLocationPing({
+          bookingId,
+          teamId: user.id,
+          latitude: payload.latitude,
+          longitude: payload.longitude,
+          accuracy: payload.accuracy,
+          heading: payload.heading,
+          speed: payload.speed,
+          altitude: payload.altitude,
+          batteryLevel: payload.battery_level,
+          isMocked: payload.is_mocked
+        });
+
+        if (typeof callback === 'function') callback({ success: true, data: result });
+      } catch (err) {
+        if (typeof callback === 'function') callback({ success: false, message: err.message });
+      }
+    });
+
     socket.on('call:invite', async (payload = {}, callback) => {
       try {
         const receiverId = Number(payload.receiverId || payload.receiver_id);

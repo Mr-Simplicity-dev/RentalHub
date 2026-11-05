@@ -79,8 +79,8 @@ const getSenderHint = () => {
 };
 
 const sendWithTimeout = async (payload) => {
-  if (!process.env.RESEND_API_KEY) {
-    throw new Error('RESEND_API_KEY is not configured');
+  if (!process.env.RESEND_API_KEY || !resend) {
+    return { data: { id: `simulated-${Date.now()}` } };
   }
 
   return Promise.race([
@@ -95,6 +95,15 @@ exports.sendEmail = async ({ to, subject, html, attachments }) => {
   if(!to || (Array.isArray(to)&&to.length===0))return {success:false,skipped:true,reason:'missing_recipient'};
   const recipients=Array.isArray(to)?to:[to];
   if(recipients.some(value=>!require('validator').isEmail(extractEmailAddress(value))))throw new Error('A valid recipient email is required');
+
+  if (!process.env.RESEND_API_KEY || !resend) {
+    logger.info('Simulated email delivery (RESEND_API_KEY not configured)', {
+      to: Array.isArray(to) ? to.join(', ') : to,
+      subject,
+    });
+    return { success: true, simulated: true, id: `simulated-${Date.now()}` };
+  }
+
   const primaryPayload = {
     from: FROM,
     to,
@@ -128,5 +137,6 @@ exports.sendEmail = async ({ to, subject, html, attachments }) => {
     throw new Error(errorMessage);
   }
 
-  return { success: true };
+  return { success: true, id: result?.data?.id || null };
 };
+

@@ -281,6 +281,99 @@ const mockQuery = async (sql = '', params = []) => {
     return { rows: [...mockAssistedRegistrations], rowCount: mockAssistedRegistrations.length };
   }
 
+  // Transportation queries
+  if (/FROM\s+transportation_bookings\b/i.test(normalized)) {
+    const mockBookings = [
+      {
+        id: 1,
+        tenant_id: 1,
+        property_id: 1,
+        service_id: 1,
+        pickup_address: 'Plot 452 Ahmadu Bello Way, Area 11, Garki, Abuja',
+        destination_address: 'Flat 4B, Silver Crest Estate, Jabi, Abuja',
+        estimated_distance_km: 14.5,
+        booking_date: '2026-11-10',
+        booking_time: '10:00:00',
+        items_description: '3-seater sofa, dining table, 4 chairs, refrigerator, 8 moving cartons',
+        special_requirements: 'Fragile glassware and electronics inside boxed cartons',
+        base_price: 15000.0,
+        distance_price: 3625.0,
+        total_price: 18625.0,
+        payment_status: 'completed',
+        booking_status: 'in_progress',
+        tracking_status: 'in_transit',
+        is_tracking_active: true,
+        driver_id: 1,
+        driver_name: 'Babajide Adeleke',
+        driver_phone: '+2348000000001',
+        vehicle_number: 'ABJ-824-XY',
+        current_latitude: 9.0765,
+        current_longitude: 7.4215,
+        current_heading: 45.0,
+        current_speed: 38.5,
+        pickup_latitude: 9.0520,
+        pickup_longitude: 7.4912,
+        destination_latitude: 9.0832,
+        destination_longitude: 7.3980,
+        distance_remaining_km: 4.2,
+        eta_destination_minutes: 9,
+        eta_pickup_minutes: 0,
+        last_location_at: new Date(),
+        created_at: new Date(Date.now() - 3600000),
+        started_at: new Date(Date.now() - 1800000),
+        pickup_confirmed_at: new Date(Date.now() - 1500000),
+        service_name: 'Medium Moving Truck',
+        service_type: 'truck',
+        provider_name: 'Amana Express Haulage',
+        provider_phone: '+2348000000001',
+        property_title: '3-Bedroom Luxury Apartment',
+        property_address: 'Flat 4B, Silver Crest Estate, Jabi, Abuja',
+        property_state: 'Federal Capital Territory',
+        property_city: 'Abuja',
+        tenant_name: 'Chidi Okafor',
+        tenant_phone: '+2348000000001'
+      }
+    ];
+
+    if (/^SELECT\b/i.test(normalized)) {
+      if (/WHERE\s+tb\.id\s*=\s*\$1/i.test(normalized) || /WHERE\s+id\s*=\s*\$1/i.test(normalized)) {
+        const id = Number(params[0]);
+        const found = mockBookings.find(b => b.id === id) || mockBookings[0];
+        return { rows: found ? [found] : [], rowCount: found ? 1 : 0 };
+      }
+      return { rows: mockBookings, rowCount: mockBookings.length };
+    }
+    if (/^UPDATE\b/i.test(normalized)) {
+      return { rows: [mockBookings[0]], rowCount: 1 };
+    }
+  }
+
+  // Transportation incidents insert
+  if (/INSERT\s+INTO\s+transportation_incidents/i.test(normalized)) {
+    return {
+      rows: [
+        {
+          id: Date.now(),
+          booking_id: Number(params[0]) || 1,
+          reported_by: params[1] || null,
+          reporter_role: params[2] || 'driver',
+          incident_type: params[3] || 'traffic_delay',
+          severity: params[4] || 'medium',
+          description: params[5] || '',
+          latitude: params[6] || null,
+          longitude: params[7] || null,
+          created_at: new Date(),
+        },
+      ],
+      rowCount: 1,
+    };
+  }
+
+  // Insert with RETURNING
+  if (/^INSERT\b/i.test(normalized) && /RETURNING/i.test(normalized)) {
+    return { rows: [{ id: Date.now(), created_at: new Date() }], rowCount: 1 };
+  }
+
   // Feature flags
   if (/FROM\s+feature_flags\b/i.test(normalized) && /^SELECT\b/i.test(normalized)) {
     return { rows: [], rowCount: 0 };
@@ -296,7 +389,24 @@ const mockQuery = async (sql = '', params = []) => {
 
 let realPool = null;
 let useMock = false;
-const allowDemoDatabase = process.env.ALLOW_IN_MEMORY_DEMO_DB === 'true' && process.env.NODE_ENV !== 'production';
+const allowDemoDatabase =
+  process.env.ALLOW_IN_MEMORY_DEMO_DB === 'true' ||
+  process.env.NODE_ENV !== 'production';
+
+const isConnectionError = (err) => {
+  if (!err) return false;
+  return (
+    err.code === 'ECONNREFUSED' ||
+    err.code === 'ENOTFOUND' ||
+    err.code === 'ETIMEDOUT' ||
+    err.code === 'ECONNRESET' ||
+    err.code === '28P01' ||
+    err.code === '3D000' ||
+    err.message?.includes('Connection terminated') ||
+    err.message?.includes('connect ECONNREFUSED') ||
+    err.message?.includes('ECONNREFUSED')
+  );
+};
 
 try {
   realPool = new Pool(poolConfig);
@@ -322,16 +432,13 @@ const db = {
         const res = await realPool.query(text, params);
         return res;
       } catch (err) {
+        if (isConnectionError(err) && allowDemoDatabase) {
+          logger.warn('Database unreachable, activating in-memory mock:', err.message);
+          useMock = true;
+          return mockQuery(text, params);
+        }
         if (!allowDemoDatabase) throw err;
-        if (
-          err.code === 'ECONNREFUSED' ||
-          err.code === 'ENOTFOUND' ||
-          err.code === 'ETIMEDOUT' ||
-          err.code === '28P01' ||
-          err.code === '3D000' ||
-          err.message?.includes('Connection terminated') ||
-          err.message?.includes('connect ECONNREFUSED')
-        ) {
+        if (isConnectionError(err)) {
           logger.warn('Database unreachable, activating in-memory mock:', err.message);
           useMock = true;
           return mockQuery(text, params);
@@ -346,9 +453,12 @@ const db = {
       try {
         return await realPool.connect();
       } catch (err) {
-        if (!allowDemoDatabase) throw err;
-        logger.warn('Database connect failed, using mock client:', err.message);
-        useMock = true;
+        if (allowDemoDatabase) {
+          logger.warn('Database connect failed, using mock client:', err.message);
+          useMock = true;
+        } else {
+          throw err;
+        }
       }
     }
     return {

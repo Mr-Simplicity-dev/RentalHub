@@ -1,10 +1,11 @@
-﻿const express = require('express');
+const express = require('express');
 const { body, param } = require('express-validator');
 const router = express.Router();
 const { authenticate } = require('../config/middleware/auth');
 const db = require('../config/middleware/database');
 const validateRequest = require('../config/middleware/validateRequest');
 const { ZONE_STATES, canonicalZone } = require('../config/utils/territorialZones');
+const TransportationTrackingService = require('../services/transportationTrackingService');
 
 const TRANSPORTATION_ADMIN_ROLES = new Set([
   'admin',
@@ -12,6 +13,7 @@ const TRANSPORTATION_ADMIN_ROLES = new Set([
   'state_admin',
   'state_financial_admin',
   'state_support_admin',
+  'zonal_admin',
   'super_admin',
   'super_financial_admin',
   'super_support_admin',
@@ -24,6 +26,7 @@ const TRANSPORTATION_ADMIN_ROLES = new Set([
 
 const ZONAL_TRANSPORTATION_ADMIN_ROLES = new Set([
   'zonal_transportation_admin',
+  'zonal_admin',
 ]);
 
 const LGA_TRANSPORTATION_ADMIN_ROLES = new Set([
@@ -87,12 +90,18 @@ const requireTransportationSuperAdmin = (req, res, next) => {
 
 const normalizeLocation = (value) => String(value || '').trim().toLowerCase();
 
-const getTransportationAdminScope = (user) => {
+const getTransportationAdminScope = (user, queryZone = null) => {
   const role = normalizeLocation(user?.user_type);
   const state = String(user?.assigned_state || '').trim();
   const city = String(user?.assigned_city || '').trim();
 
   if (GLOBAL_TRANSPORTATION_ADMIN_ROLES.has(role)) {
+    if (queryZone) {
+      const z = canonicalZone(queryZone);
+      if (z) {
+        return { valid: true, level: 'zone', zone: z, states: ZONE_STATES[z] };
+      }
+    }
     return { valid: true, level: 'national', state: null, city: null };
   }
 
@@ -119,7 +128,7 @@ const getTransportationAdminScope = (user) => {
   }
 
   if (ZONAL_TRANSPORTATION_ADMIN_ROLES.has(role)) {
-    const zone = canonicalZone(user?.assigned_zone);
+    const zone = canonicalZone(user?.assigned_zone || queryZone);
     if (!zone) {
       return {
         valid: false,
@@ -127,7 +136,7 @@ const getTransportationAdminScope = (user) => {
           'This zonal transportation admin account has no assigned zone. Ask a super admin to update its jurisdiction.',
       };
     }
-    return { valid: true, level: 'zone', states: ZONE_STATES[zone] };
+    return { valid: true, level: 'zone', zone, states: ZONE_STATES[zone] };
   }
 
   return { valid: false, message: 'Transportation admin access only' };
@@ -150,9 +159,19 @@ const buildTransportationScopeSql = (
   }
 
   if (scope.level === 'zone') {
+    const stateNames = (scope.states || []).flatMap((st) => {
+      const lower = st.toLowerCase();
+      if (lower === 'fct') {
+        return ['fct', 'federal capital territory', 'abuja'];
+      }
+      return [lower];
+    });
     return {
-      sql: ` AND LOWER(TRIM(${stateAlias}.state_name)) = ANY($${startIndex})`,
-      params: [scope.states.map((s) => s.toLowerCase())],
+      sql: ` AND (
+        LOWER(TRIM(${stateAlias}.state_name)) = ANY($${startIndex})
+        OR LOWER(TRIM(${stateAlias}.state_code)) = ANY($${startIndex})
+      )`,
+      params: [stateNames],
     };
   }
 
@@ -174,8 +193,8 @@ const buildTransportationScopeSql = (
   return { sql, params };
 };
 
-const getScopedTransportationBooking = async (bookingId, user) => {
-  const scope = getTransportationAdminScope(user);
+const getScopedTransportationBooking = async (bookingId, user, queryZone = null) => {
+  const scope = getTransportationAdminScope(user, queryZone);
   if (!scope.valid) return { scope, booking: null };
 
   const scopeFilter = buildTransportationScopeSql(scope, 2);
@@ -276,7 +295,7 @@ router.use(requireTransportationAdminAccess);
  */
 router.get('/dashboard', async (req, res) => {
   try {
-    const scope = getTransportationAdminScope(req.user);
+    const scope = getTransportationAdminScope(req.user, req.query?.zone);
     if (!scope.valid) {
       return sendInvalidTransportationScope(res, scope);
     }
@@ -439,7 +458,7 @@ router.get('/dashboard', async (req, res) => {
 router.get('/bookings', async (req, res) => {
   try {
     await ensureTransportationOperationsSchema();
-    const scope = getTransportationAdminScope(req.user);
+    const scope = getTransportationAdminScope(req.user, req.query?.zone);
     if (!scope.valid) {
       return sendInvalidTransportationScope(res, scope);
     }
@@ -620,7 +639,7 @@ router.get('/bookings/:bookingId', async (req, res) => {
   try {
     await ensureTransportationOperationsSchema();
     const { bookingId } = req.params;
-    const scope = getTransportationAdminScope(req.user);
+    const scope = getTransportationAdminScope(req.user, req.query?.zone);
     if (!scope.valid) {
       return sendInvalidTransportationScope(res, scope);
     }
@@ -5893,4 +5912,343 @@ router.post('/super-admin/generate-report', requireTransportationSuperAdmin, asy
     }
   });
 
+// ====================== ADVANCED REAL-TIME TRACKING DESK ======================
+
+/**
+ * GET /api/transportation-admin/live-tracking
+ * Retrieve active fleet and vehicles in motion within admin jurisdiction
+ */
+router.get('/live-tracking', async (req, res) => {
+  try {
+    const scope = getTransportationAdminScope(req.user, req.query?.zone);
+    if (!scope.valid) {
+      return sendInvalidTransportationScope(res, scope);
+    }
+    const scopeFilter = buildTransportationScopeSql(scope, 1, 'p', 's');
+
+    const query = `
+      SELECT
+        tb.id as booking_id,
+        tb.booking_status,
+        tb.tracking_status,
+        tb.is_tracking_active,
+        tb.current_latitude,
+        tb.current_longitude,
+        tb.current_heading,
+        tb.current_speed,
+        tb.last_location_at,
+        tb.distance_remaining_km,
+        tb.eta_destination_minutes,
+        tb.driver_name,
+        tb.driver_phone,
+        tb.vehicle_number,
+        tb.pickup_address,
+        tb.destination_address,
+        tb.pickup_latitude,
+        tb.pickup_longitude,
+        tb.destination_latitude,
+        tb.destination_longitude,
+        ts.service_name,
+        ts.service_type,
+        p.title as property_title,
+        p.city as property_city,
+        s.state_name as property_state,
+        u.full_name as tenant_name,
+        u.phone as tenant_phone
+      FROM transportation_bookings tb
+      JOIN transportation_services ts ON tb.service_id = ts.id
+      JOIN properties p ON p.id = tb.property_id
+      LEFT JOIN states s ON s.id = p.state_id
+      LEFT JOIN users u ON tb.tenant_id = u.id
+      WHERE tb.booking_status IN ('confirmed', 'in_progress')
+      ${scopeFilter.sql}
+      ORDER BY tb.last_location_at DESC NULLS LAST
+    `;
+
+    let vehicles = [];
+    try {
+      const result = await db.query(query, scopeFilter.params);
+      vehicles = result.rows || [];
+    } catch (err) {
+      if (req.logger) req.logger.warn('Live tracking query fallback:', err.message);
+      vehicles = await TransportationTrackingService.getLiveFleet({
+        scope: scope.level === 'national' ? 'GLOBAL' : scope.level === 'state' ? 'STATE' : 'LGA',
+        state: scope.state,
+        lga: scope.city
+      });
+    }
+
+    const now = Date.now();
+    const enriched = vehicles.map(v => {
+      let isFresh = false;
+      let isStale = false;
+      let isOffline = true;
+      let secondsAgo = null;
+
+      if (v.last_location_at) {
+        const diffMs = now - new Date(v.last_location_at).getTime();
+        secondsAgo = Math.max(0, Math.round(diffMs / 1000));
+        isFresh = diffMs < 60000;
+        isStale = diffMs >= 60000 && diffMs < 180000;
+        isOffline = diffMs >= 180000;
+      }
+
+      return {
+        ...v,
+        is_fresh: isFresh,
+        is_stale: isStale,
+        is_offline: isOffline,
+        seconds_ago: secondsAgo
+      };
+    });
+
+    return res.json({
+      success: true,
+      data: enriched,
+      scope: {
+        level: scope.level,
+        state: scope.state,
+        city: scope.city
+      },
+      message: 'Active fleet tracking retrieved successfully'
+    });
+  } catch (error) {
+    if (req.logger) req.logger.error('Get live tracking error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve live fleet tracking'
+    });
+  }
+});
+
+/**
+ * GET /api/transportation-admin/bookings/:bookingId/pings
+ * Retrieve historical breadcrumb trail for an assigned booking
+ */
+router.get('/bookings/:bookingId/pings', [param('bookingId').isInt()], validateRequest, async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    const { scope, booking } = await getScopedTransportationBooking(bookingId, req.user);
+    if (!scope.valid) {
+      return sendInvalidTransportationScope(res, scope);
+    }
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Transportation booking not found' });
+    }
+
+    const summary = await TransportationTrackingService.getTrackingSummary(bookingId);
+    return res.json({
+      success: true,
+      data: summary?.breadcrumb_trail || [],
+      message: 'Breadcrumb trail retrieved successfully'
+    });
+  } catch (error) {
+    if (req.logger) req.logger.error('Get breadcrumb trail error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve breadcrumb trail'
+    });
+  }
+});
+
+/**
+ * GET /api/transportation-admin/incidents
+ * Retrieve transit incidents within jurisdiction
+ */
+router.get('/incidents', async (req, res) => {
+  try {
+    const scope = getTransportationAdminScope(req.user, req.query?.zone);
+    if (!scope.valid) {
+      return sendInvalidTransportationScope(res, scope);
+    }
+    const scopeFilter = buildTransportationScopeSql(scope, 1, 'p', 's');
+
+    const query = `
+      SELECT
+        ti.*,
+        tb.driver_name,
+        tb.driver_phone,
+        tb.vehicle_number,
+        ts.service_name,
+        p.title as property_title,
+        p.city as property_city,
+        s.state_name as property_state
+      FROM transportation_incidents ti
+      JOIN transportation_bookings tb ON ti.booking_id = tb.id
+      JOIN transportation_services ts ON tb.service_id = ts.id
+      JOIN properties p ON p.id = tb.property_id
+      LEFT JOIN states s ON s.id = p.state_id
+      WHERE 1=1
+      ${scopeFilter.sql}
+      ORDER BY ti.created_at DESC
+      LIMIT 100
+    `;
+
+    let incidents = [];
+    try {
+      const result = await db.query(query, scopeFilter.params);
+      incidents = result.rows || [];
+    } catch (err) {
+      if (req.logger) req.logger.warn('Incidents query fallback:', err.message);
+    }
+
+    return res.json({
+      success: true,
+      data: incidents,
+      message: 'Incidents retrieved successfully'
+    });
+  } catch (error) {
+    if (req.logger) req.logger.error('Get incidents error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve transportation incidents'
+    });
+  }
+});
+
+/**
+ * PATCH /api/transportation-admin/incidents/:incidentId/resolve
+ * Resolve or update transit incident
+ */
+router.patch(
+  '/incidents/:incidentId/resolve',
+  [
+    param('incidentId').isInt(),
+    body('status').isIn(['acknowledged', 'dispatched_help', 'resolved']),
+    body('resolution_note').optional().isString().trim()
+  ],
+  validateRequest,
+  async (req, res) => {
+    try {
+      const { incidentId } = req.params;
+      const { status, resolution_note } = req.body;
+      const adminId = req.user.id;
+
+      const updateQuery = `
+        UPDATE transportation_incidents
+        SET
+          status = $1,
+          resolution_note = COALESCE($2, resolution_note),
+          resolved_by = CASE WHEN $1 = 'resolved' THEN $3 ELSE resolved_by END,
+          resolved_at = CASE WHEN $1 = 'resolved' THEN NOW() ELSE resolved_at END,
+          updated_at = NOW()
+        WHERE id = $4
+        RETURNING *
+      `;
+
+      let updated = null;
+      try {
+        const result = await db.query(updateQuery, [status, resolution_note || null, adminId, incidentId]);
+        updated = result.rows?.[0];
+      } catch (err) {
+        if (req.logger) req.logger.warn('Resolve incident query fallback:', err.message);
+      }
+
+      return res.json({
+        success: true,
+        data: updated,
+        message: `Incident marked as ${status}`
+      });
+    } catch (error) {
+      if (req.logger) req.logger.error('Resolve incident error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to update incident'
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/transportation-admin/zonal-overview
+ * Retrieve aggregated logistics stats and state breakdowns across the 6 geopolitical zones
+ */
+router.get('/zonal-overview', async (req, res) => {
+  try {
+    const requestedZone = req.query?.zone;
+    const scope = getTransportationAdminScope(req.user, requestedZone);
+    if (!scope.valid) {
+      return sendInvalidTransportationScope(res, scope);
+    }
+
+    const { ZONES, ZONE_STATES, canonicalZone } = require('../config/utils/territorialZones');
+    const activeZone = scope.level === 'zone' && scope.zone ? scope.zone : canonicalZone(requestedZone) || 'North Central';
+    const memberStates = ZONE_STATES[activeZone] || [];
+
+    const scopeFilter = buildTransportationScopeSql({ level: 'zone', states: memberStates }, 1, 'p', 's');
+
+    const query = `
+      SELECT
+        COALESCE(s.state_name, p.state, 'Unknown') as state_name,
+        COUNT(tb.id) as total_bookings,
+        COUNT(CASE WHEN tb.booking_status IN ('confirmed', 'in_progress') THEN 1 END) as active_trips,
+        COUNT(CASE WHEN tb.booking_status = 'completed' THEN 1 END) as completed_trips,
+        COUNT(CASE WHEN tb.tracking_status = 'incident_delayed' THEN 1 END) as delayed_trips,
+        COALESCE(SUM(tb.total_price), 0) as total_revenue
+      FROM transportation_bookings tb
+      JOIN properties p ON p.id = tb.property_id
+      LEFT JOIN states s ON s.id = p.state_id
+      WHERE 1=1
+      ${scopeFilter.sql}
+      GROUP BY COALESCE(s.state_name, p.state, 'Unknown')
+    `;
+
+    let breakdownRows = [];
+    try {
+      const result = await db.query(query, scopeFilter.params);
+      breakdownRows = result.rows || [];
+    } catch (e) {
+      if (req.logger) req.logger.warn('Zonal breakdown fallback:', e.message);
+    }
+
+    const stateBreakdown = memberStates.map((st) => {
+      const match = breakdownRows.find(
+        (r) =>
+          String(r.state_name || '').toLowerCase().includes(st.toLowerCase()) ||
+          (st.toLowerCase() === 'fct' && String(r.state_name || '').toLowerCase().includes('federal capital'))
+      );
+      return {
+        state: st,
+        total_bookings: match ? Number(match.total_bookings) : 0,
+        active_trips: match ? Number(match.active_trips) : 0,
+        completed_trips: match ? Number(match.completed_trips) : 0,
+        delayed_trips: match ? Number(match.delayed_trips) : 0,
+        total_revenue: match ? Number(match.total_revenue) : 0
+      };
+    });
+
+    const totalBookings = stateBreakdown.reduce((sum, s) => sum + s.total_bookings, 0);
+    const activeTrips = stateBreakdown.reduce((sum, s) => sum + s.active_trips, 0);
+    const completedTrips = stateBreakdown.reduce((sum, s) => sum + s.completed_trips, 0);
+    const delayedTrips = stateBreakdown.reduce((sum, s) => sum + s.delayed_trips, 0);
+    const totalRevenue = stateBreakdown.reduce((sum, s) => sum + s.total_revenue, 0);
+
+    return res.json({
+      success: true,
+      data: {
+        active_zone: activeZone,
+        all_zones: ZONES,
+        member_states: memberStates,
+        state_breakdown: stateBreakdown,
+        stats: {
+          total_bookings: totalBookings,
+          active_trips: activeTrips,
+          completed_trips: completedTrips,
+          delayed_trips: delayedTrips,
+          total_revenue: totalRevenue,
+          member_states_count: memberStates.length
+        }
+      },
+      message: `Zonal overview for ${activeZone} retrieved successfully`
+    });
+  } catch (error) {
+    if (req.logger) req.logger.error('Zonal overview error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve zonal overview'
+    });
+  }
+});
+
 module.exports = router;
+

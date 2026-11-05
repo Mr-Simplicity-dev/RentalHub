@@ -27,6 +27,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import Loader from '../components/common/Loader';
 import BackToDashboard from '../components/common/BackToDashboard';
+import FumigationLiveTracker from '../components/fumigation/FumigationLiveTracker';
 
 const FumigationCleaningBookingDetails = () => {
   const { t } = useTranslation();
@@ -42,6 +43,7 @@ const FumigationCleaningBookingDetails = () => {
   const [provider, setProvider] = useState(null);
   const [compliance, setCompliance] = useState(null);
   const [reviews, setReviews] = useState([]);
+  const [activeView, setActiveView] = useState('tracking');
   
   // Load booking details
   useEffect(() => {
@@ -327,12 +329,43 @@ const FumigationCleaningBookingDetails = () => {
             </div>
           </div>
         </div>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left column - Main Details */}
-          <div className="lg:col-span-2">
-            {/* Service Summary Card */}
-            <div className="bg-white rounded-lg shadow p-6 mb-6">
+
+        {/* Navigation View Switcher */}
+        <div className="mb-6 flex items-center gap-2 border-b border-slate-200">
+          <button
+            type="button"
+            onClick={() => setActiveView('tracking')}
+            className={`pb-3 px-3 text-sm font-semibold transition-colors flex items-center gap-2 border-b-2 ${
+              activeView === 'tracking'
+                ? 'border-emerald-600 text-emerald-700'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <FaSprayCan size={13} />
+            Live Service Tracking &amp; Re-entry Protocol
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveView('details')}
+            className={`pb-3 px-3 text-sm font-semibold transition-colors flex items-center gap-2 border-b-2 ${
+              activeView === 'details'
+                ? 'border-emerald-600 text-emerald-700'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <FaFileInvoice size={13} />
+            Booking Manifest &amp; Invoice
+          </button>
+        </div>
+
+        {activeView === 'tracking' ? (
+          <FumigationLiveTracker bookingId={bookingId} />
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Left column - Main Details */}
+            <div className="lg:col-span-2">
+              {/* Service Summary Card */}
+              <div className="bg-white rounded-lg shadow p-6 mb-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
                 {getServiceIcon(booking.category_type)}
                 <span className="ml-2">{t('fumigation_cleaning_booking_details.service_summary')}</span>
@@ -782,6 +815,7 @@ const FumigationCleaningBookingDetails = () => {
             </div>
           </div>
         </div>
+        )}
       </div>
       
       {/* Cancel Booking Modal */}
