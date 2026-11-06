@@ -95,6 +95,7 @@ const getLawyerDisputeAccess = async (lawyerId, disputeId) => {
      LEFT JOIN states s ON s.id = p.state_id
      WHERE la.lawyer_user_id = $1
        AND la.status = 'active'
+       AND u.identity_verified = TRUE
        AND (
          la.property_id = d.property_id
          OR (
@@ -508,7 +509,7 @@ exports.grantLawyerAccess = async (req, res) => {
     const lawyerCheck = await db.query(
       `SELECT id, assigned_state, assigned_zone, lawyer_client_scope
        FROM users
-       WHERE id = $1 AND user_type IN ('lawyer', 'state_lawyer', 'zonal_lawyer', 'super_lawyer')
+       WHERE id = $1 AND identity_verified=TRUE AND user_type IN ('lawyer', 'state_lawyer', 'zonal_lawyer', 'super_lawyer')
        LIMIT 1`,
       [lawyer_id]
     );
@@ -907,6 +908,8 @@ exports.verifyEvidence = async (req, res) => {
       });
     }
 
+    const uploader=await db.query('SELECT uploaded_by FROM dispute_evidence WHERE id=$1 AND dispute_id=$2',[evidenceId,disputeId]);
+    if(uploader.rows[0]?.uploaded_by && await identityPhotos.legalConflict(lawyerId,[uploader.rows[0].uploaded_by]))return res.status(409).json({success:false,message:'You cannot independently verify this evidence. Identity conflict review is required.'});
     const result = await db.query(
       `UPDATE dispute_evidence
        SET verification_status = $1,

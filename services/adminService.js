@@ -1671,6 +1671,7 @@ exports.deleteUser = async (req, res) => {
     // their assigned territory.
     const { clause: userScopeClause, params: userScopeParams } = await buildUserScopeClause(req.user);
 
+    await require('./identityPhotoService').eraseGallery(id);
     const updateResult = await db.query(
       `UPDATE users
        SET deleted_at = NOW(),

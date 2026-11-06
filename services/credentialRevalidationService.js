@@ -619,7 +619,7 @@ exports.reviewRequest = async (req, res) => {
   if (!['approved', 'rejected'].includes(decision)) {
     return res.status(400).json({ success: false, message: 'Decision must be approved or rejected' });
   }
-  if (decision === 'rejected' && reviewNote.length < 5) {
+  if (reviewNote.length < 5) {
     return res.status(400).json({ success: false, message: 'A clear rejection reason is required' });
   }
   if (reviewNote.length > 3000) {

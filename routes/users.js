@@ -2452,7 +2452,8 @@ const handlePassportUpload = async (req, res) => {
     if (!uploadPersisted) {
       cleanupUploadedFile(req.file);
     }
-    req.logger.error('Upload passport error:', error);
+    req.logger.error('Upload passport error:', {code:error.code || 'PHOTO_CHECK_ERROR'});
+    if(error.statusCode===429)return res.status(429).json({success:false,message:error.message});
     res.status(500).json({
       success: false,
       message: 'Failed to upload passport'

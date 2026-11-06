@@ -19,7 +19,7 @@ const logger = require('../config/utils/logger');
  * All admin routes require authentication
  */
 router.use(authenticate);
-router.patch('/users/:id/identity-flags/:flagId/review',superAdminOnly,async(req,res)=>{
+router.patch('/users/:id/identity-flags/:flagId/review',superAdminOnly,require('../config/utils/twoFactor').requirePrivilegedMfa,async(req,res)=>{
   const note=String(req.body?.note || '').trim();
   if(note.length<10 || note.length>2000)return res.status(400).json({success:false,message:'Write a review note of 10–2000 characters.'});
   if(Number(req.params.id)===Number(req.user.id))return res.status(403).json({success:false,message:'You cannot review your own identity.'});

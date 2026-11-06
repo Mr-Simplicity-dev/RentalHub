@@ -577,6 +577,7 @@ const deleteUser = async (req, res) => {
 
 
     const existingUser = existingResult.rows[0];
+    await require('../identityPhotoService').eraseGallery(id);
 
     try {
       const hardDeleteResult = await db.query(
