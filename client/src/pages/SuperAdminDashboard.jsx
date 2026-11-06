@@ -1604,7 +1604,7 @@ export default function SuperAdminDashboard() {
       {tab === "lawyer_invites" && (
         <LawyerInvitesManager
           title="Lawyer Invites"
-          description="Resend pending lawyer invitations or change the invited lawyer email."
+          description="Resend pending lawyer invitations or change the invited legal representative's email."
         />
       )}
 

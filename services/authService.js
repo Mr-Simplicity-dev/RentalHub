@@ -801,7 +801,7 @@ const validateAndPrepareRegistration = async (payload, options = {}) => {
       : null;
 
   if (cleanLawyerEmail && cleanLawyerEmail === cleanEmail) {
-    const error = new Error('Lawyer email must be different from your account email');
+    const error = new Error('Your legal representative's email must be different from your account email');
     error.statusCode = 400;
     throw error;
   }

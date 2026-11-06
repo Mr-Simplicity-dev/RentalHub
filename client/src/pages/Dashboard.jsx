@@ -1247,7 +1247,7 @@ const Dashboard = () => {
   const [showLawyerAcceptedPopup, setShowLawyerAcceptedPopup] = useState(false);
 
     // Track dismissal so the popup never shows again once dismissed (even on refresh)
-  // Keyed by lawyer email so a different invitation acceptance can show again
+  // Keyed by Your legal representative's email so a different invitation acceptance can show again
   const [lawyerAcceptedDismissed, setLawyerAcceptedDismissed] = useState(() => {
     const dismissedData = localStorage.getItem('lawyer_accepted_dismissed');
     if (!dismissedData) return false;

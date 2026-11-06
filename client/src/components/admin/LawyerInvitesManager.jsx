@@ -7,7 +7,7 @@ const INVITES_PAGE_SIZE = 12;
 
 const LawyerInvitesManager = ({
   title = "Lawyer Invites",
-  description = "Resend expired lawyer invites or correct the lawyer email.",
+  description = "Resend expired lawyer invites or correct your legal representative's email.",
 }) => {
   const [invites, setInvites] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -101,7 +101,7 @@ const LawyerInvitesManager = ({
 
     const nextEmail = emailDialog.email.trim().toLowerCase();
     if (!nextEmail) {
-      setEmailDialog((prev) => ({ ...prev, error: "Lawyer email is required" }));
+      setEmailDialog((prev) => ({ ...prev, error: "Your legal representative's email is required" }));
       return;
     }
 
@@ -120,8 +120,8 @@ const LawyerInvitesManager = ({
       const emailSent = res.data?.data?.email_sent !== false;
       const errorMessage = res.data?.data?.email_error;
       const message = errorMessage
-        ? `${res.data?.message || "Lawyer email update failed"}: ${errorMessage}`
-        : res.data?.message || "Lawyer email updated";
+        ? `${res.data?.message || "Your legal representative's email update failed"}: ${errorMessage}`
+        : res.data?.message || "Your legal representative's email updated";
 
       if (emailSent) {
         toast.success(message);
@@ -138,11 +138,11 @@ const LawyerInvitesManager = ({
       });
       loadInvites(search.trim());
     } catch (error) {
-      console.error("Failed to update lawyer email:", error);
+      console.error("Failed to update Your legal representative's email:", error);
       toast.error(
         error.response?.data?.errors?.[0]?.msg ||
           error.response?.data?.message ||
-          "Failed to update lawyer email"
+          "Failed to update Your legal representative's email"
       );
       setEmailDialog((prev) => ({ ...prev, saving: false }));
     }
@@ -211,7 +211,7 @@ const LawyerInvitesManager = ({
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by client or lawyer email"
+            placeholder="Search by client or Your legal representative's email"
             className="input w-full md:w-96"
           />
           <button type="submit" className="btn btn-primary">
@@ -226,7 +226,7 @@ const LawyerInvitesManager = ({
                 <th className="p-3 text-left">Client</th>
                 <th className="p-3 text-left">Assigned By</th>
                 <th className="p-3 text-left">Role</th>
-                <th className="p-3 text-left">Lawyer Email</th>
+                <th className="p-3 text-left">Your legal representative's email</th>
                 <th className="p-3 text-left">Status</th>
                 <th className="p-3 text-left">Expires</th>
                 <th className="p-3 text-left">Last Sent</th>
@@ -326,14 +326,14 @@ const LawyerInvitesManager = ({
           <form onSubmit={changeEmail} className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
             <h3 className="text-lg font-semibold text-gray-900">Change Lawyer Invite Email</h3>
             <p className="mt-2 text-sm text-gray-600">
-              Update the invited lawyer email. A fresh invite will be sent to the new address.
+              Update the invited Your legal representative's email. A fresh invite will be sent to the new address.
             </p>
             <div className="mt-4 rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
               <p><span className="font-medium">Client:</span> {emailDialog.invite?.client_name || "-"}</p>
               <p><span className="font-medium">Current email:</span> {emailDialog.invite?.lawyer_email || "-"}</p>
             </div>
             <label className="mt-5 block text-sm font-medium text-gray-700">
-              New Lawyer Email
+              New Your legal representative's email
             </label>
             <input
               type="email"

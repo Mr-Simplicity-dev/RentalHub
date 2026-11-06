@@ -2021,7 +2021,7 @@ return (
                   )}
                 </div>
 
-                {/* Lawyer Email */}
+                {/* Your legal representative's email */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.lawyer_email')} *</label>
                   <div className="relative">

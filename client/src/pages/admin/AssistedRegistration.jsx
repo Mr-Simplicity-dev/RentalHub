@@ -456,7 +456,7 @@ export default function AssistedRegistration() {
 
                 {!form.use_rentalhub_lawyers && (
                   <label className="block text-sm font-medium text-slate-700 max-w-md">
-                    Customer’s own lawyer email
+                    Customer’s own legal representative's email
                     <div className="relative mt-1">
                       <input
                         type="email"

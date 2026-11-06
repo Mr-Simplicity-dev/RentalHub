@@ -31,7 +31,7 @@ const registerValidators = [
     .withMessage('Full name is required'),
   body('lawyer_email')
     .isEmail()
-    .withMessage('One lawyer email is required at registration')
+    .withMessage("One legal representative's email is required at registration")
     .normalizeEmail(),
   body('is_foreigner')
     .optional()

@@ -29,7 +29,7 @@ test('web registration restores personal details and auto-saves edits for a late
  await act(async()=>fireEvent.change(container.querySelector('input[name="full_name"]'),{target:{value:'Updated User'}}));
  expect(readRegistrationDraft().form.full_name).toBe('Updated User');
 });
-test('choosing RentalHub lawyers keeps the user-entered lawyer email editable and intact',async()=>{
+test("choosing RentalHub lawyers keeps the user-entered a legal representative's email editable and intact",async()=>{
  saveRegistrationDraft({full_name:'User',email:'user@example.test',phone:'08012345678',lawyer_email:'lawyer@example.test'},2);
  await mount();const input=container.querySelector('input[name="lawyer_email"]');
  await act(async()=>fireEvent.click(container.querySelector('#use_rentalhub_lawyers')));
