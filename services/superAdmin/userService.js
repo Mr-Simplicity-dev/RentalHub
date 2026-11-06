@@ -7,6 +7,7 @@ const {
   shouldReturnTokenInBody,
 } = require('../../config/utils/authCookies');
 const {
+  getAdminOperationActorName,
   ensureVerificationAuditSchema,
   ensureUserSuspensionSchema,
   ensureAdminAccountOperationSchema,

@@ -1038,8 +1038,10 @@ export default function SuperAdminDashboard() {
         loadVerifications(verificationPage);
         loadAdminPerformance();
       }
+      return true;
     } catch (err) {
       toast.error(err.response?.data?.message || "Bulk action failed");
+      return false;
     }
   };
 

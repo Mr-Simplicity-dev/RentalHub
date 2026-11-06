@@ -1,0 +1,10 @@
+import React from 'react';
+import {act} from 'react-dom/test-utils';
+import {createRoot} from 'react-dom/client';
+import {fireEvent,getByRole} from '@testing-library/dom';
+import {it,expect,vi} from 'vitest';
+import UsersTab from './UsersTab';
+vi.mock('../calls/OnlineStatusBadge',()=>({default:()=>null}));
+vi.mock('react-toastify',()=>({toast:{error:vi.fn(),success:vi.fn()}}));
+vi.mock('../../services/api',()=>({default:{get:vi.fn(),post:vi.fn()}}));
+it('bulk Verify opens a review-note dialog and submits the note with the selected action',async()=>{globalThis.IS_REACT_ACT_ENVIRONMENT=true;const container=document.createElement('div');document.body.appendChild(container);const root=createRoot(container),bulkUsers=vi.fn().mockResolvedValue(true);try{await act(async()=>root.render(<UsersTab users={[]} selectedUsers={[5]} setSelectedUsers={vi.fn()} bulkUsers={bulkUsers} />));await act(async()=>fireEvent.click(getByRole(container,'button',{name:'Verify',exact:true})));expect(container.textContent).toContain('Verify selected users');const confirm=getByRole(container,'button',{name:/Confirm/i});await act(async()=>fireEvent.click(confirm));expect(bulkUsers).not.toHaveBeenCalled();const note=container.querySelector('textarea');await act(async()=>fireEvent.change(note,{target:{value:'Reviewed identity evidence'}}));await act(async()=>fireEvent.click(confirm));expect(bulkUsers).toHaveBeenCalledWith('verify','Reviewed identity evidence');}finally{await act(async()=>root.unmount());container.remove();}});

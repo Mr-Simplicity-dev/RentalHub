@@ -2,6 +2,7 @@ const db = require('../../config/middleware/database');
 const logger = require('../../config/utils/logger');
 const { decryptNIN } = require('../../config/utils/ninEncryption');
 const {
+  getAdminOperationActorName,
   ensureVerificationAuditSchema,
   ensureUserSuspensionSchema,
   ensureAdminAccountOperationSchema,
