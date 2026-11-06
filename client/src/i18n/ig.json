@@ -3569,7 +3569,9 @@
     "adjustment_body": "E nyere kaadị ịkwụ ụgwọ gị na mpụga Naịjirịa. Iji mezuo ndebanye aha ọnụego obodo gị, mgbakwunye",
     "adjustment_body_2": "(mgbanwe ahịa + $5 ego nhazi) dị mkpa tupu emee ka akaụntụ gị rụọ ọrụ.",
     "adjustment_pay": "Kwuọ ihe dị iche ugbu a",
-    "adjustment_failed": "Enweghị ike ịmalite ịkwụ ụgwọ ihe dị iche. Biko nwaa ọzọ."
+    "adjustment_failed": "Enweghị ike ịmalite ịkwụ ụgwọ ihe dị iche. Biko nwaa ọzọ.",
+    "otp_pre_payment_body": "Anyị ezipụla koodu nkwenye na ekwentị gị. Ọ ga-arụ ọrụ nkeji 10. Kwenye nọmba ekwentị gị tupu ịga n’ihu ịkwụ ụgwọ.",
+    "otp_verify_payment": "Kwenye ma gaa n’ihu ịkwụ ụgwọ"
   },
   "widget": {
     "support_title": "Nkwado RentalHub",

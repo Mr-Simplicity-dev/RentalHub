@@ -94,9 +94,14 @@ const registerValidators = [
 // ================= ROUTES =================
 
 router.get('/registration-flags', authController.getRegistrationFlags);
+router.post('/register/payment/verify-phone', optionalAuthenticate, otpLimiter, registerValidators, authController.verifyRegistrationPaymentPhone);
+router.post('/register/verify-phone', otpLimiter, registerValidators, authController.verifyRegistrationFreePhone);
+router.post('/register/phone/resend', otpSendLimiter, registerValidators, authController.resendRegistrationPhone);
+
 
 router.post(
   '/register/payment',
+  otpSendLimiter,
   optionalAuthenticate,
   requireTurnstile('rentalhub_register'),
   registrationLimiter,
@@ -112,6 +117,7 @@ router.post(
 
 router.post(
   '/register/tenant-payment',
+  otpSendLimiter,
   requireTurnstile('rentalhub_register'),
   registrationLimiter,
   registerValidators,
@@ -153,6 +159,7 @@ router.post('/2fa/send-withdrawal-otp', authenticate, otpSendLimiter, authContro
 // Register new user (Landlord or Tenant)
 router.post(
   '/register',
+  otpSendLimiter,
   requireTurnstile('rentalhub_register'),
   registrationLimiter,
   registerValidators,

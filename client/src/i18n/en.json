@@ -3421,7 +3421,9 @@
     "email_required": "Email address is required.",
     "email_invalid": "Enter a valid email address.",
     "phone_required": "Phone number is required.",
-    "referral_code_invalid": "Referral code can only contain letters, numbers, dashes and underscores."
+    "referral_code_invalid": "Referral code can only contain letters, numbers, dashes and underscores.",
+    "otp_pre_payment_body": "We sent a verification code to your phone. It is valid for 10 minutes. Verify your phone before continuing to payment.",
+    "otp_verify_payment": "Verify and continue to payment"
   },
   "careers": {
     "recruitment_closed_title": "Recruitment Closed",

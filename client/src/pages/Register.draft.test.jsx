@@ -41,3 +41,10 @@ test('registration introduction displays the naira symbol on each local fee',asy
  for (const amount of ['3,000','5,000','2,000']) expect(container.textContent).toContain('\u20A6'+amount);
  expect(container.textContent).not.toContain(String.fromCodePoint(0xe2,0x201a,0xa6));
 });
+
+test('resuming an existing paid registration automatically sends its phone code',async()=>{
+ api.post.mockRejectedValueOnce({response:{status:428,data:{code:'OTP_REQUIRED'}}}).mockResolvedValueOnce({data:{success:true}});
+ await act(async()=>root.render(<MemoryRouter initialEntries={['/register?reference=existing-payment']}><Register/></MemoryRouter>));
+ await waitFor(()=>expect(api.post.mock.calls.filter(([url])=>url==='/auth/register/payment/otp/existing-payment')).toHaveLength(1));
+ await waitFor(()=>expect(container.textContent).toContain('We sent a verification code'));
+});

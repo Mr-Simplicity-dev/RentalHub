@@ -3180,7 +3180,9 @@
     "adjustment_body": "Votre carte bancaire a été émise hors du Nigeria. Pour finaliser votre inscription au tarif local, un complément",
     "adjustment_body_2": "(conversion au taux du marché + 5 $ de frais de traitement) est requis avant l'activation de votre compte.",
     "adjustment_pay": "Payer la différence maintenant",
-    "adjustment_failed": "Impossible d'initier le paiement de la différence. Veuillez réessayer."
+    "adjustment_failed": "Impossible d'initier le paiement de la différence. Veuillez réessayer.",
+    "otp_pre_payment_body": "Nous avons envoyé un code à votre téléphone. Il est valable 10 minutes. Vérifiez votre numéro avant de passer au paiement.",
+    "otp_verify_payment": "Vérifier et passer au paiement"
   },
   "careers": {
     "recruitment_closed_title": "Recrutement clos",

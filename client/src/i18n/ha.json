@@ -3569,7 +3569,9 @@
     "adjustment_body": "Katin biyan kuɗin ku an ba da shi a wajen Najeriya. Don kammala rajistar farashin cikin gida, ana buƙatar ƙarin",
     "adjustment_body_2": "(canjin kasuwa + $5 kuɗin aiki) kafin a kunna asusunku.",
     "adjustment_pay": "Biya bambancin yanzu",
-    "adjustment_failed": "Ba a iya fara biyan bambancin ba. Da fatan za a sake gwadawa."
+    "adjustment_failed": "Ba a iya fara biyan bambancin ba. Da fatan za a sake gwadawa.",
+    "otp_pre_payment_body": "Mun aika lambar tabbatarwa zuwa wayarka. Tana aiki na minti 10. Tabbatar da lambar wayarka kafin ka ci gaba zuwa biyan kuɗi.",
+    "otp_verify_payment": "Tabbatar sannan a ci gaba zuwa biyan kuɗi"
   },
   "widget": {
     "support_title": "Tallafin RentalHub",

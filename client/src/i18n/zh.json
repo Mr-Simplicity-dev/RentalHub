@@ -3180,7 +3180,9 @@
     "adjustment_body": "您的支付卡由尼日利亚境外机构签发。要完成本地费率注册，需要在账户激活前补缴",
     "adjustment_body_2": "（黑市汇率差额 + 5美元手续费）。",
     "adjustment_pay": "立即支付差额",
-    "adjustment_failed": "无法发起差额支付，请重试。"
+    "adjustment_failed": "无法发起差额支付，请重试。",
+    "otp_pre_payment_body": "验证码已发送到您的手机，10分钟内有效。请先验证手机号，再继续付款。",
+    "otp_verify_payment": "验证并继续付款"
   },
   "careers": {
     "recruitment_closed_title": "招聘已关闭",

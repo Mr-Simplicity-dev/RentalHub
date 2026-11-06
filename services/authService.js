@@ -85,6 +85,44 @@ const {
 } = require('../config/utils/sessionToken');
 const redis = require('../config/utils/redis');
 
+const registrationPhoneGate = require('./registrationPhoneGate')({ db, sendVerificationCode, secret: () => process.env.JWT_SECRET });
+const { hashGrant } = require('./registrationPhoneGate');
+const phoneGateResponse = async (req, res, flow) => {
+  if (req.registrationPhoneGrant) return false;
+  await assertRegistrationAllowed({ userType: req.body.user_type, flags: await getFeatureFlagsMap(), stateId: req.body.state_id, lgaName: req.body.lga_name });
+  const data = await registrationPhoneGate.send({ ...req.body, registration_flow: flow });
+  await logOtpEvent({ contact: req.body.phone, channel: 'sms', purpose: 'registration_phone', status: 'sent', expiresAt: Date.now() + 600000, req });
+  res.json({ success: false, code: 'PHONE_VERIFICATION_REQUIRED', message: 'A verification code has been sent to your phone.', data });
+  return true;
+};
+const verifyRegistrationPhone = flow => async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
+    req.registrationPhoneGrant = await registrationPhoneGate.verify({ ...req.body, registration_flow: flow });
+    await logOtpEvent({ contact: req.body.phone, channel: 'sms', purpose: 'registration_phone', status: 'verified', req });
+    const json = res.json.bind(res);
+    res.json = payload => json(payload.success && payload.data ? { ...payload, data: { ...payload.data, completion_token: req.registrationPhoneGrant } } : payload);
+    return flow === 'paid' ? exports.initializeRegistrationPayment(req, res) : exports.register(req, res);
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ success: false, code: error.code, message: error.statusCode ? error.message : 'Phone verification failed. Please try again.' });
+  }
+};
+exports.verifyRegistrationPaymentPhone = verifyRegistrationPhone('paid');
+exports.verifyRegistrationFreePhone = verifyRegistrationPhone('free');
+exports.resendRegistrationPhone = async (req, res) => {
+  try {
+    const flow = req.body.registration_flow === 'free' ? 'free' : 'paid';
+    const details = { ...req.body, registration_flow: flow };
+    const challenge = await db.query('SELECT payload_digest FROM registration_phone_challenges WHERE id::text = $1 AND consumed_at IS NULL AND expires_at > NOW()', [String(req.body.phone_challenge || '')]);
+    if (!challenge.rows.length || challenge.rows[0].payload_digest !== require('./registrationPhoneGate').digestPayload(details)) return res.status(400).json({ success: false, message: 'This verification has expired. Please submit your details again.' });
+    const data = await registrationPhoneGate.send(details);
+    await logOtpEvent({ contact: req.body.phone, channel: 'sms', purpose: 'registration_phone', status: 'sent', expiresAt: Date.now() + 600000, req });
+    return res.json({ success: true, data });
+  } catch (error) { return res.status(error.statusCode || 500).json({ success: false, code: error.code, message: error.statusCode ? error.message : 'Could not send the verification code.' }); }
+};
+
+
 // OTP storage with Redis fallback to in-memory Map
 const otpStore = new Map();
 const lawyerOtpStore = new Map();
@@ -801,7 +839,7 @@ const validateAndPrepareRegistration = async (payload, options = {}) => {
       : null;
 
   if (cleanLawyerEmail && cleanLawyerEmail === cleanEmail) {
-    const error = new Error('Your legal representative's email must be different from your account email');
+    const error = new Error("Your legal representative's email must be different from your account email");
     error.statusCode = 400;
     throw error;
   }
@@ -1357,6 +1395,7 @@ const createUserFromPreparedRegistration = async ({
   beforeCommit,
   deferPaidBenefits = false,
   assistedRegistration = false,
+  phoneVerified = false,
   logger = console
 }) => {
   await ensureTenantRegistrationPaymentSchema();
@@ -1511,6 +1550,10 @@ const createUserFromPreparedRegistration = async ({
     }
 
     if (beforeCommit) await beforeCommit(client, newUser);
+    if (phoneVerified || tenantRegistrationPayment?.registration_payload?.registration_phone_grant_hash || tenantRegistrationPayment?.registration_payload?.registration_phone_verified === true) {
+      await client.query('UPDATE users SET phone_verified = TRUE WHERE id = $1', [newUser.id]);
+      newUser.phone_verified = true;
+    }
     await client.query('COMMIT');
 
     let referralReward = null;
@@ -1762,6 +1805,7 @@ const createUserFromPreparedRegistration = async ({
         created_at: newUser.created_at,
         identity_document_type: newUser.identity_document_type,
         nin_verified: newUser.nin_verified,
+        phone_verified: newUser.phone_verified === true,
         nationality: newUser.nationality,
         preferred_state_id: newUser.preferred_state_id,
         preferred_state_name: preparedRegistration.preferredStateName || null,
@@ -1795,6 +1839,8 @@ exports.register = async (req, res) => {
         errors: errors.array()
       });
     }
+
+    if (await phoneGateResponse(req, res, 'free')) return;
 
     const {
       preparedRegistration,
@@ -1849,6 +1895,7 @@ exports.register = async (req, res) => {
 
     const data = await createUserFromPreparedRegistration({
       preparedRegistration: preparedRegistrationWithLocation,
+      phoneVerified: Boolean(req.registrationPhoneGrant),
       passwordHash,
       verificationMeta,
       kycResult,
@@ -1909,6 +1956,8 @@ exports.initializeRegistrationPayment = async (req, res) => {
         message: 'Payment service is not configured'
       });
     }
+
+    if (await phoneGateResponse(req, res, 'paid')) return;
 
     const {
       preparedRegistration,
@@ -2053,6 +2102,7 @@ exports.initializeRegistrationPayment = async (req, res) => {
     };
 
     const registrationPayload = {
+      registration_phone_grant_hash: hashGrant(req.registrationPhoneGrant),
       ...preparedRegistrationWithLocation,
       cleanNIN: storeIdentityAtRest(preparedRegistrationWithLocation.cleanNIN),
       cleanPassportNumber: storeIdentityAtRest(preparedRegistrationWithLocation.cleanPassportNumber),
@@ -2300,25 +2350,16 @@ exports.sendRegistrationPaymentOTP = async (req, res) => {
       });
     }
 
-    const otpResult = await sendVerificationCode(phone);
-    if (!otpResult.success) {
-      return res.status(400).json({
-        success: false,
-        message: otpResult.message || 'Could not send the verification code. Please try again shortly.'
-      });
-    }
-
-    await otpSet(`reg_otp:${reference}`, { code: otpResult.code }, 300);
-
-    return res.json({
-      success: true,
-      message: 'A verification code has been sent to your phone.'
-    });
+    const data = await registrationPhoneGate.send({ registration_flow: 'resume', reference, phone });
+    await db.query(`UPDATE tenant_registration_payments SET registration_payload = COALESCE(registration_payload, '{}'::jsonb) || jsonb_build_object('resume_phone_challenge', $1::text) WHERE transaction_reference = $2 AND registered_user_id IS NULL`, [data.phone_challenge, reference]);
+    await logOtpEvent({ contact: phone, channel: 'sms', purpose: 'registration_phone', status: 'sent', expiresAt: Date.now() + 600000, req });
+    return res.json({ success: true, message: 'A verification code has been sent to your phone.', data });
   } catch (error) {
     req.logger.error('Registration payment OTP error:', error);
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
-      message: 'Failed to send the verification code'
+      code: error.code,
+      message: error.statusCode ? error.message : 'Failed to send the verification code'
     });
   }
 };
@@ -2839,43 +2880,18 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
       });
     }
 
-    // Phone-OTP gate: the reference is a bearer secret (it travels in the URL
-    // and email). Requiring the code sent to the registration phone means a
-    // leaked or intercepted link alone can never complete the registration —
-    // the account session is only handed to the person who controls that phone.
-    const otpCode = String(req.body.otp || '').trim();
-    const otpKey = `reg_otp:${reference}`;
-    const storedOTP = await otpGet(otpKey);
-
-    if (!otpCode) {
-      return res.status(428).json({
-        success: false,
-        code: 'OTP_REQUIRED',
-        message: 'Enter the verification code sent to your phone to complete your registration.'
-      });
+    const grantHash = tenantRegistrationPayment.registration_payload?.registration_phone_grant_hash;
+    const suppliedGrant = String(req.body.completion_token || '');
+    if (grantHash && suppliedGrant && hashGrant(suppliedGrant) === grantHash) {
+      // The verified browser/app retains this secret; the payment URL carries no session authority.
+    } else {
+      const otp = String(req.body.otp || '').trim();
+      const phoneChallenge = tenantRegistrationPayment.registration_payload?.resume_phone_challenge;
+      if (!otp) return res.status(428).json({ success: false, code: 'OTP_REQUIRED', message: 'Verify your phone to complete this registration.' });
+      if (!phoneChallenge) return res.status(400).json({ success: false, code: 'OTP_EXPIRED', message: 'Request a new verification code.' });
+      await registrationPhoneGate.verify({ registration_flow: 'resume', reference, phone: String(tenantRegistrationPayment.phone || '').trim(), phone_challenge: phoneChallenge, otp });
+      tenantRegistrationPayment.registration_payload.registration_phone_verified = true;
     }
-
-    if (!storedOTP || !storedOTP.code) {
-      return res.status(400).json({
-        success: false,
-        code: 'OTP_EXPIRED',
-        message: 'The verification code has expired. Request a new code and try again.'
-      });
-    }
-
-    const storedOTPString = String(storedOTP.code);
-    if (
-      storedOTPString.length !== otpCode.length ||
-      !crypto.timingSafeEqual(Buffer.from(otpCode), Buffer.from(storedOTPString))
-    ) {
-      return res.status(400).json({
-        success: false,
-        code: 'OTP_INVALID',
-        message: 'Invalid verification code.'
-      });
-    }
-
-    await otpDelete(otpKey);
 
     if (tenantRegistrationPayment.payment_status !== 'completed') {
       if (!PAYSTACK_SECRET_KEY) {

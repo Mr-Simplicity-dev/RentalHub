@@ -10,6 +10,7 @@ import FloatingContactWidget from '../components/common/FloatingContactWidget';
 import WhatsAppBotWidget from '../components/common/WhatsAppBotWidget';
 import TurnstileWidget from '../components/common/TurnstileWidget';
 import BankTransferCheckout from '../components/BankTransferCheckout';
+import RegistrationPhoneVerification from '../components/RegistrationPhoneVerification';
 import VirtualAccountCheckout from '../components/VirtualAccountCheckout';
 import { setAuthSession } from '../services/authStorage';
 import { getStoredUtm } from '../hooks/useUtmParams';
@@ -80,6 +81,7 @@ const formatNaira = (amount) => `₦${Number(amount || 0).toLocaleString()}`;
 const formatUsd = (amount) => `$${Number(amount || 0).toFixed(2)}`;
 
 const Register = () => {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const registrationReference =
     searchParams.get('registration_ref') ||
@@ -113,6 +115,29 @@ const Register = () => {
   const [foreignCardAdjustment, setForeignCardAdjustment] = useState(null);
   const [showOtpStep, setShowOtpStep] = useState(false);
   const [otpCode, setOtpCode] = useState('');
+  const [phoneVerification, setPhoneVerification] = useState(null);
+  const [legacyCodeSent, setLegacyCodeSent] = useState(false);
+  const legacyInitialSend = useRef(null);
+  const applyVerifiedRegistration = async data => {
+    if (data.token && data.user) {
+      completeRegistrationDraft(); setAuthSession(data.token, data.user);
+      window.location.assign(data.user.user_type === 'tenant' ? '/tenant/dashboard' : '/dashboard');
+      return;
+    }
+    if (data.reference && data.completion_token) sessionStorage.setItem('rentalhub.registration-proof:' + data.reference, data.completion_token);
+    if (data.payment_method === 'bank_transfer') { setBankTransfer(data); setPaymentMethod(null); setPhoneVerification(null); return; }
+    if (!data.authorization_url) throw new Error(t('register.registration_failed'));
+    window.location.assign(data.authorization_url);
+  };
+  useEffect(() => {
+    if (!showOtpStep || !registrationReference || legacyInitialSend.current === registrationReference) return;
+    legacyInitialSend.current = registrationReference;
+    setOtpSending(true); setLegacyCodeSent(false);
+    api.post('/auth/register/payment/otp/' + registrationReference, {}, { skipAuth: true, skipAuthRefresh: true })
+      .then(() => setLegacyCodeSent(true))
+      .catch(error => toast.error(error.response?.data?.message || t('register.otp_send_failed')))
+      .finally(() => setOtpSending(false));
+  }, [showOtpStep, registrationReference, t]);
   const [otpSending, setOtpSending] = useState(false);
   const [otpCompleting, setOtpCompleting] = useState(false);
   const [premblyPending, setPremblyPending] = useState(null);
@@ -128,7 +153,6 @@ const Register = () => {
   setTurnstileToken(null);
   turnstileRef.current?.reset();
 };
-  const { t } = useTranslation();
   const { register } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(initialDraft?.step||1);
@@ -436,7 +460,9 @@ const Register = () => {
 
       try {
         const response = await api.post(
-          `/auth/register/payment/complete/${registrationReference}`
+          `/auth/register/payment/complete/${registrationReference}`,
+          { completion_token: sessionStorage.getItem('rentalhub.registration-proof:' + registrationReference) },
+          { skipAuth: true, skipAuthRefresh: true }
         );
 
         if (!active) return;
@@ -444,6 +470,7 @@ const Register = () => {
         if (response.data?.success) {
           const { token, user } = response.data.data;
 
+          sessionStorage.removeItem('rentalhub.registration-proof:' + registrationReference);
           completeRegistrationDraft();
           setAuthSession(token, user);
           api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
@@ -802,6 +829,12 @@ const Register = () => {
   return;
 }
 
+      if (paymentResponse.data?.code === 'PHONE_VERIFICATION_REQUIRED') {
+        resetTurnstile();
+        setPhoneVerification({ payload: { ...registrationData, payment_method: paymentMethod }, challenge: paymentResponse.data.data.phone_challenge, flow: 'paid' });
+        return;
+      }
+
       if (
         paymentResponse.data?.success &&
         paymentResponse.data?.data?.payment_method === 'bank_transfer'
@@ -837,6 +870,11 @@ return;
 
     // Roles without registration payment create the account immediately
     const response = await register(registrationData);
+    if (response.code === 'PHONE_VERIFICATION_REQUIRED') {
+      resetTurnstile();
+      setPhoneVerification({ payload: registrationData, challenge: response.data.phone_challenge, flow: 'free' });
+      return;
+    }
 
     if (response.success) {
   completeRegistrationDraft();
@@ -1315,6 +1353,7 @@ return (
       </div>
     )}
 
+    {phoneVerification ? <RegistrationPhoneVerification key={phoneVerification.challenge} pending={phoneVerification} onVerified={applyVerifiedRegistration} onClose={() => setPhoneVerification(null)} /> : null}
     {showOtpStep && (      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-4">
         <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
           <div className="flex shrink-0 items-start justify-between gap-4">
@@ -1338,7 +1377,7 @@ return (
           </div>
 
           <p className="mt-3 text-sm text-gray-600">
-            {t('register.otp_body')}
+            {otpSending ? t('register.otp_sending') : legacyCodeSent ? t('register.otp_body') : t('register.otp_send_failed')}
           </p>
 
           <input
@@ -1361,6 +1400,7 @@ return (
                 await api.post(
                   `/auth/register/payment/otp/${registrationReference}`
                 );
+                setLegacyCodeSent(true);
                 toast.success(t('register.otp_sent'));
               } catch (sendError) {
                 toast.error(sendError?.response?.data?.message || t('register.otp_send_failed'));

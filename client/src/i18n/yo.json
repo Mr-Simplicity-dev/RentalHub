@@ -3569,7 +3569,9 @@
     "adjustment_body": "Kaadi isanwo rẹ ni a fun ni ita Naijiria. Lati pari iforukọsilẹ owo agbegbe rẹ, afikun",
     "adjustment_body_2": "(iyipada ọja + $5 owo iṣẹ) ni a nilo ki a to le mu akọọlẹ rẹ ṣiṣẹ.",
     "adjustment_pay": "San iyatọ ni bayi",
-    "adjustment_failed": "Ko le bẹrẹ isanwo iyatọ. Jọwọ gbiyanju lẹẹkansi."
+    "adjustment_failed": "Ko le bẹrẹ isanwo iyatọ. Jọwọ gbiyanju lẹẹkansi.",
+    "otp_pre_payment_body": "A ti fi kóòdù ìmúdájú ránṣẹ́ sí fóònù rẹ. Ó wúlò fún ìṣẹ́jú mẹ́wàá. Jẹ́rìí nọ́mbà fóònù rẹ kí o tó tẹ̀síwájú sí ìsanwó.",
+    "otp_verify_payment": "Jẹ́rìí kí o sì tẹ̀síwájú sí ìsanwó"
   },
   "widget": {
     "support_title": "Ìrànwọ́ RentalHub",
