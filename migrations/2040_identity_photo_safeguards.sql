@@ -1,5 +1,5 @@
 BEGIN;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS passport_photo_hash VARCHAR(64), ADD COLUMN IF NOT EXISTS face_gallery_enrolled BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS passport_photo_hash VARCHAR(64), ADD COLUMN IF NOT EXISTS face_gallery_enrolled BOOLEAN NOT NULL DEFAULT FALSE, ADD COLUMN IF NOT EXISTS face_gallery_enrollment_pending BOOLEAN NOT NULL DEFAULT FALSE;
 CREATE INDEX IF NOT EXISTS users_passport_photo_hash_idx ON users(passport_photo_hash) WHERE passport_photo_hash IS NOT NULL;
 ALTER TABLE prembly_verification_attempts ADD COLUMN IF NOT EXISTS reference_photo_encrypted TEXT;
 CREATE TABLE IF NOT EXISTS identity_photo_checks (
@@ -25,11 +25,11 @@ CREATE TABLE IF NOT EXISTS identity_capture_sessions (
 CREATE OR REPLACE FUNCTION rentalhub_guard_identity_uniqueness() RETURNS trigger LANGUAGE plpgsql AS $
 BEGIN
  IF NEW.deleted_at IS NOT NULL THEN RETURN NEW; END IF;
- IF NEW.nin_hash IS NOT NULL AND (TG_OP='INSERT' OR NEW.nin_hash IS DISTINCT FROM OLD.nin_hash) THEN
+ IF NULLIF(TRIM(NEW.nin_hash),'') IS NOT NULL AND (TG_OP='INSERT' OR NEW.nin_hash IS DISTINCT FROM OLD.nin_hash) THEN
   PERFORM pg_advisory_xact_lock(hashtext('nin:'||NEW.nin_hash));
   IF EXISTS(SELECT 1 FROM users WHERE nin_hash=NEW.nin_hash AND id<>NEW.id AND deleted_at IS NULL) THEN RAISE EXCEPTION 'Identity is already registered' USING ERRCODE='23505'; END IF;
  END IF;
- IF NEW.international_passport_number IS NOT NULL AND (TG_OP='INSERT' OR NEW.international_passport_number IS DISTINCT FROM OLD.international_passport_number) THEN
+ IF NULLIF(TRIM(NEW.international_passport_number),'') IS NOT NULL AND (TG_OP='INSERT' OR NEW.international_passport_number IS DISTINCT FROM OLD.international_passport_number) THEN
   PERFORM pg_advisory_xact_lock(hashtext('passport:'||UPPER(TRIM(NEW.international_passport_number))));
   IF EXISTS(SELECT 1 FROM users WHERE UPPER(TRIM(international_passport_number))=UPPER(TRIM(NEW.international_passport_number)) AND id<>NEW.id AND deleted_at IS NULL) THEN RAISE EXCEPTION 'Identity is already registered' USING ERRCODE='23505'; END IF;
  END IF;
