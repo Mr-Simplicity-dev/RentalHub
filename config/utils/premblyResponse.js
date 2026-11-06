@@ -162,7 +162,7 @@ const normalizePremblyResponse = (body = {}, fallbackReference = null) => {
 
   return {
     reference_photo: status === 'verified' ? (() => {
-      const photo = firstValue(containers, ['photo','face_image','portrait','faceImage','facialImage']);
+      const photo = firstValue(containers, ['photo','base64Image','face_image','portrait','faceImage','facialImage']);
       if (typeof photo !== 'string' || photo.length > 2000000) return null;
       const raw = photo.replace(/^data:image\/(?:jpeg|png);base64,/, '');
       if (!/^[A-Za-z0-9+/]+={0,2}$/.test(raw)) return null;
