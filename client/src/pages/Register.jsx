@@ -1,5 +1,6 @@
+import { preparePassportDocument } from '../utils/passportDocument';
 import {readRegistrationDraft,saveRegistrationDraft,clearRegistrationDraft} from '../utils/registrationDraft';
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { toast } from 'react-toastify';
@@ -39,6 +40,7 @@ const buildInitialRegistrationForm = (referralCode = '') => ({
   is_foreigner: false,
   nin: '',
   international_passport_number: '',
+  passport_document_image: '',
   nationality: '',
   state_id: '',
   lga_name: '',
@@ -81,7 +83,8 @@ const formatNaira = (amount) => `₦${Number(amount || 0).toLocaleString()}`;
 const formatUsd = (amount) => `$${Number(amount || 0).toFixed(2)}`;
 
 const Register = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const countryLabels = useMemo(() => { try { return new Intl.DisplayNames([i18n.resolvedLanguage || 'en'], { type: 'region' }); } catch { return null; } }, [i18n.resolvedLanguage]);
   const [searchParams] = useSearchParams();
   const registrationReference =
     searchParams.get('registration_ref') ||
@@ -99,6 +102,7 @@ const Register = () => {
   const draftCompletedRef=useRef(false);
   const completeRegistrationDraft=()=>{draftCompletedRef.current=true;clearRegistrationDraft();};
   const [loading, setLoading] = useState(false);
+  const [passportPreparing, setPassportPreparing] = useState(false);
   const [locationOptions, setLocationOptions] = useState([]);
   const [registrationFlags, setRegistrationFlags] = useState(initialRegistrationFlags);
   const [registrationPricing, setRegistrationPricing] = useState(() =>
@@ -197,6 +201,7 @@ const Register = () => {
       registrationData.nin = '';
       if (!registrationFlags.passport_number) {
         registrationData.international_passport_number = '';
+        registrationData.passport_document_image = '';
       }
     } else {
       registrationData.international_passport_number = '';
@@ -237,6 +242,7 @@ const Register = () => {
       registrationData.utm_content = utm.utm_content || '';
     }
 
+    registrationData.passport_document_image = registrationData.is_foreigner && registrationFlags.passport_number ? registrationData.passport_document_image : '';
     return registrationData;
   };
 
@@ -292,6 +298,7 @@ const Register = () => {
           registration_access_message: data.registration_access_message || null,
           nin_number: data.nin_number !== false,
           passport_number: data.passport_number !== false,
+          passport_country_choices: Array.isArray(data.passport_country_choices) ? data.passport_country_choices : [],
           diaspora_registration: data.diaspora_registration === true,
           diaspora_registration_payment: data.diaspora_registration_payment === true,
           diaspora_base_fee_usd:
@@ -749,6 +756,8 @@ const Register = () => {
       }
     }
 
+  if (formData.is_foreigner && registrationFlags.passport_number && !formData.passport_document_image) { toast.error(t('register.passport_image_required')); return; }
+  if (passportPreparing) return;
   if (!termsAccepted) {
     toast.error(t('register.terms_required'));
     return;
@@ -2318,15 +2327,23 @@ return (
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.nationality_label')}</label>
-                      <input
-                        name="nationality"
-                        value={formData.nationality}
-                        onChange={(e) => { handleChange(e); setErrors(p => ({ ...p, nationality: null })); }}
-                        className={inputClass('nationality')}
-                        placeholder={t('register.nationality_placeholder')}
-                      />
+                      <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.passport_country_label')}</label>
+                      {registrationFlags.passport_country_choices?.length ? <select name="nationality" value={formData.nationality} onChange={handleChange} className={inputClass('nationality')}>
+                        <option value="">{t('register.nationality_placeholder')}</option>
+                        {registrationFlags.passport_country_choices.map(item => <option key={item.code} value={item.name}>{countryLabels?.of(item.code) || item.name}</option>)}
+                      </select> : <input name="nationality" value={formData.nationality} onChange={handleChange} className={inputClass('nationality')} placeholder={t('register.nationality_placeholder')} />}
                       {errors.nationality && <p className="text-red-500 text-sm mt-1">{errors.nationality}</p>}
+                    </div>
+                    <div>
+                      <label htmlFor="passport-document" className="mb-1 block text-sm font-medium text-gray-700">{t('register.passport_image_label')}</label>
+                      <input id="passport-document" type="file" accept="image/jpeg,image/png" disabled={loading || passportPreparing} className="block w-full rounded-lg border p-3 text-sm" onChange={async event => {
+                        const file = event.target.files?.[0]; if (!file) return; setPassportPreparing(true);
+                        try { const image = await preparePassportDocument(file); setFormData(current => ({ ...current, passport_document_image: image })); }
+                        catch (error) { setFormData(current => ({ ...current, passport_document_image: '' })); toast.error(error.message || t('register.passport_image_required')); }
+                        finally { setPassportPreparing(false); }
+                      }} />
+                      <p className="mt-2 text-xs text-gray-600">{t('register.passport_image_help')}</p>
+                      {formData.passport_document_image ? <img src={formData.passport_document_image} alt={t('register.passport_image_label')} className="mx-auto mt-3 max-h-40 max-w-full rounded-lg object-contain" /> : null}
                     </div>
                   </>
                 )}

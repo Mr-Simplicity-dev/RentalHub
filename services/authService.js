@@ -89,7 +89,13 @@ const registrationPhoneGate = require('./registrationPhoneGate')({ db, sendVerif
 const { hashGrant } = require('./registrationPhoneGate');
 const phoneGateResponse = async (req, res, flow) => {
   if (req.registrationPhoneGrant) return false;
-  await assertRegistrationAllowed({ userType: req.body.user_type, flags: await getFeatureFlagsMap(), stateId: req.body.state_id, lgaName: req.body.lga_name });
+  const flags = await getFeatureFlagsMap();
+  await assertRegistrationAllowed({ userType: req.body.user_type, flags, stateId: req.body.state_id, lgaName: req.body.lga_name });
+  if ((req.body.is_foreigner === true || req.body.is_foreigner === 'true') && flags.passport_number !== false) {
+    const passport = require('../config/utils/passportVerification');
+    const route = passport.channel(req.body.nationality, Boolean(req.body.passport_document_image));
+    if (route.method === 'document') await passport.documentImage(req.body.passport_document_image);
+  }
   const data = await registrationPhoneGate.send({ ...req.body, registration_flow: flow });
   await logOtpEvent({ contact: req.body.phone, channel: 'sms', purpose: 'registration_phone', status: 'sent', expiresAt: Date.now() + 600000, req });
   res.json({ success: false, code: 'PHONE_VERIFICATION_REQUIRED', message: 'A verification code has been sent to your phone.', data });
@@ -866,7 +872,7 @@ const validateAndPrepareRegistration = async (payload, options = {}) => {
 
   // Diaspora registrations must pay when the diaspora payment flag is on —
   // this free-register path is not an alternative to the payment flow.
-  if (registrationTier === 'diaspora' && flags.diaspora_registration_payment === true) {
+  if (registrationTier === 'diaspora' && flags.diaspora_registration_payment === true && options.registrationPayment !== true) {
     const error = new Error('Diaspora registration requires a registration payment');
     error.statusCode = 402;
     throw error;
@@ -886,6 +892,7 @@ const validateAndPrepareRegistration = async (payload, options = {}) => {
   let identityType = null;
   let cleanNIN = null;
   let cleanPassportNumber = null;
+  let passportResult = null;
   const submittedNationality = nationality ? String(nationality).trim() : '';
   const isNigerianNationality = /^nigeria(n)?$/i.test(submittedNationality);
 
@@ -895,7 +902,7 @@ const validateAndPrepareRegistration = async (payload, options = {}) => {
     throw error;
   }
 
-  if (isForeigner && !isCountryNameValid(submittedNationality)) {
+  if (isForeigner && !isCountryNameValid(submittedNationality) && !require('../config/utils/passportVerification').countryCode(submittedNationality)) {
     const error = new Error('Nationality must be a recognised country name');
     error.statusCode = 400;
     throw error;
@@ -1043,8 +1050,12 @@ const validateAndPrepareRegistration = async (payload, options = {}) => {
       identityType = 'passport';
       cleanPassportNumber = passportValidation.value;
 
-      const passportResult = await executeRegistrationVerificationWithRecovery({
+      const passport = require('../config/utils/passportVerification');
+      const passportRoute = passport.channel(cleanNationality, Boolean(payload.passport_document_image));
+      passportResult = await executeRegistrationVerificationWithRecovery({
         identityType: 'passport',
+        documentCountry: passportRoute.code + ':' + passportRoute.method,
+        verificationInputHash: payload.passport_document_image ? require('crypto').createHash('sha256').update(payload.passport_document_image).digest('hex') : null,
         identityValue: cleanPassportNumber,
         email: cleanEmail,
         phone: cleanPhone,
@@ -1053,9 +1064,19 @@ const validateAndPrepareRegistration = async (payload, options = {}) => {
           cleanFullName,
           cleanNationality,
           date_of_birth,
-          { callbackUrl }
+          { callbackUrl, documentImage: payload.passport_document_image }
         ),
       });
+
+      passportResult = passport.checkIdentity(passportResult, { number: cleanPassportNumber, country: cleanNationality, method: passportRoute.method });
+      verificationMeta = {
+        status: passportResult.status,
+        message: passportResult.message,
+        reference: passportResult.reference_id || null,
+        response_code: passportResult.response_code || null,
+        billing_status: passportResult.billing_status,
+        verified_name: passportResult.verified_name || null,
+      };
 
       if (passportResult.status === 'not_configured') {
         const error = new Error('Passport verification API is required but not configured on the server');
@@ -1095,6 +1116,7 @@ const validateAndPrepareRegistration = async (payload, options = {}) => {
         error.statusCode = 400;
         throw error;
       }
+      if (passportResult.verified !== true) { const error = new Error('Passport verification has not been confirmed.'); error.statusCode = 503; throw error; }
     }
   }
 
@@ -1104,7 +1126,7 @@ const validateAndPrepareRegistration = async (payload, options = {}) => {
     // A passport issued by Nigeria must use the local NIN path — a Nigerian
     // cannot claim diaspora status with a Nigerian document.
     passportIssuingCountry = passportResult?.document_country || null;
-    if (passportIssuingCountry && /^nigeria(n)?$/i.test(String(passportIssuingCountry))) {
+    if (passportIssuingCountry && /^(nigeria(n)?|ng|nga)$/i.test(String(passportIssuingCountry).trim())) {
       const error = new Error(
         'Nigerian-issued passports must register with NIN using the local path'
       );
@@ -1985,7 +2007,7 @@ exports.initializeRegistrationPayment = async (req, res) => {
       plainPassword,
       verificationMeta,
       kycResult
-    } = await validateAndPrepareRegistration(req.body);
+    } = await validateAndPrepareRegistration(req.body, { registrationPayment: true, logger: req.logger });
 
     await assertRegistrationAllowed({
       userType: preparedRegistration.user_type,
@@ -3516,6 +3538,7 @@ exports.getRegistrationFlags = async (req, res) => {
         registration_access_message: registrationAccess?.message || null,
         nin_number: flags.nin_number !== false,
         passport_number: flags.passport_number !== false,
+        passport_country_choices: require('../config/utils/passportVerification').countryChoices(),
         diaspora_registration: flags.diaspora_registration === true,
         diaspora_registration_payment: flags.diaspora_registration_payment === true,
         diaspora_require_foreign_card: flags.diaspora_require_foreign_card === true,

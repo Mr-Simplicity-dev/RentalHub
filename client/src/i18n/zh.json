@@ -3188,7 +3188,12 @@
     "otp_resend_wait": "{{count}}秒后可重新发送",
     "email_send": "发送验证邮件",
     "email_sent": "请查看收件箱和垃圾邮件文件夹，打开验证链接以确认邮箱。",
-    "email_send_failed": "无法发送验证邮件，请重试。"
+    "email_send_failed": "无法发送验证邮件，请重试。",
+    "passport_image_label": "护照个人资料页",
+    "passport_image_choose": "选择护照资料页",
+    "passport_image_required": "请上传清晰的护照个人资料页图片后继续。",
+    "passport_image_help": "请包含整页照片和护照信息，使用清晰的JPEG或PNG图片。图片不会保存在注册草稿中。",
+    "passport_country_label": "护照签发国家"
   },
   "careers": {
     "recruitment_closed_title": "招聘已关闭",

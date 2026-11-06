@@ -26,3 +26,15 @@ test('an old email link cannot verify a replacement email or act as a session to
  const f=loadEmail({...customer,email:'changed@example.test'}),res=response();await f.run({params:{token:'test'},logger:{error(){}}},res);assert.equal(res.statusCode,404);
  const g=loadEmail(customer,{userId:1,email:customer.email,purpose:'session'}),bad=response();await g.run({params:{token:'test'},logger:{error(){}}},bad);assert.equal(bad.statusCode,400);
 });
+
+test('OTP confirmation returns before identity verification; continuation starts it separately',async()=>{
+ const source=fs.readFileSync(require.resolve('../../services/authService'),'utf8'),a=source.indexOf('const verifyRegistrationPhone ='),b=source.indexOf('exports.verifyRegistrationPaymentPhone',a);let starts=0;
+ const ctx={validationResult:()=>({isEmpty:()=>true}),registrationPhoneGate:{verify:async()=> 'proof',resume:async()=> 'proof'},logOtpEvent:async()=>{},exports:{initializeRegistrationPayment:async(req,res)=>{starts++;return res.json({success:true,data:{reference:'payment'}})}}};
+ const run=vm.runInNewContext(source.slice(a,b)+';verifyRegistrationPhone("paid")',ctx),first=response();
+ await run({body:{phone:'08000000000',phone_verification_protocol:2}},first);assert.equal(first.body.code,'PHONE_VERIFIED');assert.equal(starts,0);assert.equal(first.body.phone_verification_token,'proof');
+ const second=response();await run({body:{phone_verification_token:'proof'}},second);assert.equal(starts,1);assert.equal(second.body.data.completion_token,'proof');
+});
+test('verification email does not claim success when the provider rejects it',async()=>{
+ const source=fs.readFileSync(require.resolve('../../config/utils/emailService'),'utf8'),a=source.indexOf('exports.sendVerificationEmail ='),b=source.indexOf('// Send payment receipt email',a),ctx={exports:{},FRONTEND_URL:'https://example.invalid',sendEmail:async()=>({success:false}),logger:{error(){}},process:{env:{NODE_ENV:'production'}}};
+ vm.runInNewContext(source.slice(a,b),ctx);assert.equal((await ctx.exports.sendVerificationEmail('user@example.invalid','token')).success,false);
+});

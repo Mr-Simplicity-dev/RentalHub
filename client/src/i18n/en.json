@@ -3429,7 +3429,12 @@
     "otp_resend_wait": "Resend available in {{count}}s",
     "email_send": "Send verification email",
     "email_sent": "Check your inbox and spam folder. Open the verification link to confirm your email.",
-    "email_send_failed": "Could not send the verification email. Please try again."
+    "email_send_failed": "Could not send the verification email. Please try again.",
+    "passport_image_label": "Passport bio-data page",
+    "passport_image_choose": "Choose passport page",
+    "passport_image_required": "Attach a clear image of your passport bio-data page before continuing.",
+    "passport_image_help": "Include the whole page showing your photograph and passport details. Use a clear JPEG or PNG; the image is not saved in your registration draft.",
+    "passport_country_label": "Passport issuing country"
   },
   "careers": {
     "recruitment_closed_title": "Recruitment Closed",

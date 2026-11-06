@@ -190,18 +190,15 @@ exports.verifyInternationalPassportWithPrembly = async (
     };
   }
 
+  const passport = require('./passportVerification');
+  const route = passport.channel(nationality, Boolean(options.documentImage));
+  const payload = route.method === 'document'
+    ? { doc_type: 'PP', doc_country: route.code, doc_image: await passport.documentImage(options.documentImage) }
+    : route.code === 'CN' ? { number: passportNumber, name: fullName } : { number: passportNumber };
   try {
-    // Prembly exposes the international passport lookup as
-    // /verification/national_passport taking `number`; the previous path
-    // (/identityverification/verify/international_passport) does not exist.
     const response = await axios.post(
-      `${PREMBLY_BASE_URL}/verification/national_passport`,
-      addCallbackUrl({
-        number: passportNumber,
-        full_name: fullName,
-        country: nationality,
-        date_of_birth: dateOfBirth,
-      }, options),
+      `${PREMBLY_BASE_URL}${route.path}`,
+      addCallbackUrl(payload, options),
       {
         timeout: Math.max(PREMBLY_TIMEOUT_MS, 45000),
         headers: {
@@ -213,7 +210,7 @@ exports.verifyInternationalPassportWithPrembly = async (
     );
 
     const body = response.data || {};
-    return normalizeVerificationResponse(body, 'Passport verification response received');
+    return passport.checkIdentity(normalizeVerificationResponse(body, 'Passport verification response received'), { number: passportNumber, country: nationality, method: route.method });
   } catch (error) {
     if (error.response?.data) {
       const result = normalizeVerificationResponse(

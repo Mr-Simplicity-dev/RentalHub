@@ -3577,7 +3577,12 @@
     "otp_resend_wait": "O lè tún ránṣẹ́ ní ìṣẹ́jú-àáyá {{count}}",
     "email_send": "Fi ímeèlì ìmúdájú ránṣẹ́",
     "email_sent": "Ṣàyẹ̀wò àpótí ímeèlì rẹ àti àpótí àwúrúju. Ṣí ọ̀nà ìmúdájú láti jẹ́rìí ímeèlì rẹ.",
-    "email_send_failed": "A kò lè fi ímeèlì ìmúdájú ránṣẹ́. Jọ̀wọ́ tún gbìyànjú."
+    "email_send_failed": "A kò lè fi ímeèlì ìmúdájú ránṣẹ́. Jọ̀wọ́ tún gbìyànjú.",
+    "passport_image_label": "Ojú ìwé àlàyé ìwé ìrìnnà",
+    "passport_image_choose": "Yan ojú ìwé ìrìnnà",
+    "passport_image_required": "So àwòrán kedere ti ojú ìwé àlàyé ìwé ìrìnnà rẹ pọ̀ kí o tó tẹ̀síwájú.",
+    "passport_image_help": "Fi gbogbo ojú ìwé tí ó ní fọ́tò àti àlàyé ìwé ìrìnnà rẹ hàn. Lo JPEG tàbí PNG tó ṣe kedere. A kò ní fi àwòrán náà pamọ́ sínú àkọ́pamọ́ ìforúkọsílẹ̀.",
+    "passport_country_label": "Orílẹ̀-èdè tó fún ọ ní ìwé ìrìnnà"
   },
   "widget": {
     "support_title": "Ìrànwọ́ RentalHub",

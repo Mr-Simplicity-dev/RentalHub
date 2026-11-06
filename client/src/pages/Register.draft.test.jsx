@@ -48,3 +48,10 @@ test('resuming an existing paid registration automatically sends its phone code'
  await waitFor(()=>expect(api.post.mock.calls.filter(([url])=>url==='/auth/register/payment/otp/existing-payment')).toHaveLength(1));
  await waitFor(()=>expect(container.textContent).toContain('We sent a verification code'));
 });
+
+test('foreign registration offers passport-page input and never saves the document image in its draft',async()=>{
+ api.get.mockImplementation(async url=>({data:{success:true,data:url.includes('registration-flags')?{registration_allowed:true,nin_number:true,passport_number:true,diaspora_registration:true,passport_country_choices:[{name:'United States',code:'US'},{name:'United Kingdom',code:'GB'}],pricing:{amount:0}}:[]}}));
+ saveRegistrationDraft({is_foreigner:true,nationality:'United States',full_name:'Foreign User',email:'foreign@example.test',passport_document_image:'private-image'},3);
+ await mount();await waitFor(()=>expect(container.querySelector('input[type="file"]')).not.toBeNull());
+ expect(container.querySelector('input[type="file"]').accept).toBe('image/jpeg,image/png');expect(container.querySelector('select[name="nationality"]')).not.toBeNull();expect(readRegistrationDraft().form.passport_document_image).toBeUndefined();
+});

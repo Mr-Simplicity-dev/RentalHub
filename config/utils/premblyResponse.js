@@ -12,6 +12,7 @@ const normalizeVerificationStatus = (value) => {
   return text.toUpperCase().replace(/[\s_]+/g, '-');
 };
 
+const decodeResponseData = value => { if (typeof value !== 'string' || value.length > 2000000) return value; try { return JSON.parse(value); } catch { return null; } };
 const responseContainers = (body = {}) => [
   body,
   body.verification,
@@ -28,7 +29,9 @@ const responseContainers = (body = {}) => [
   body.verification?.data,
   body.data?.data,
   body.result?.data,
-].filter((value) => value && typeof value === 'object');
+  decodeResponseData(body.response_data),
+  decodeResponseData(body.data?.response_data),
+].flatMap(value => Array.isArray(value) ? value : [value]).filter((value) => value && typeof value === 'object');
 
 const firstValue = (containers, keys) => {
   for (const container of containers) {
@@ -83,16 +86,23 @@ const extractVerifiedIdentityName = (body = {}) => {
   if (combined.length >= 3) return combined.slice(0, 200);
 
   const direct = namePart(
-    firstValue(containers, ['full_name', 'fullName', 'customer_name', 'customerName', 'name'])
+    firstValue(containers, ['full_name', 'fullName', 'customer_name', 'customerName', 'identity_name', 'name'])
   );
   return direct ? direct.slice(0, 200) : null;
 };
 
+const normalizeDocumentExpiry = value => {
+  const text = cleanText(value);
+  if (!text) return null;
+  if (/^\d{4}-\d{2}-\d{2}(?:T.*)?$/.test(text)) return text.slice(0,10);
+  if (/^\d{8}$/.test(text)) return text.slice(0,4)+'-'+text.slice(4,6)+'-'+text.slice(6,8);
+  return text;
+};
 const normalizePremblyResponse = (body = {}, fallbackReference = null) => {
   const containers = responseContainers(body);
   const responseCode = cleanText(firstValue(containers, ['response_code', 'responseCode']));
   const verificationStatus = normalizeVerificationStatus(
-    firstValue(containers, ['verification_status', 'verificationStatus'])
+    body.verification_status || body.verificationStatus || (typeof body.verification?.status === 'string' ? body.verification.status : null) || (typeof body.data?.verification?.status === 'string' ? body.data.verification.status : null) || firstValue(containers, ['verification_status', 'verificationStatus'])
   );
   const referenceId = cleanText(
     firstValue(containers, [
@@ -116,7 +126,7 @@ const normalizePremblyResponse = (body = {}, fallbackReference = null) => {
     cleanText(firstValue(containers, ['message', 'detail', 'error'])) ||
     'Prembly verification response received';
   const documentCountry = cleanText(
-    firstValue(containers, [
+    firstValue(containers, ['documentCountry', 'document_country', 'issuing_country']) || firstValue(containers, [
       'document_country',
       'issuing_country',
       'country_code',
@@ -159,6 +169,9 @@ const normalizePremblyResponse = (body = {}, fallbackReference = null) => {
     billing_status: billingStatus,
     document_country: documentCountry,
     verified_name: extractVerifiedIdentityName(body),
+    document_number: cleanText(firstValue(containers, ['documentNumber','document_number','passport_number','currentPassportNumber','identity_number'])),
+    document_type: cleanText(firstValue(containers, ['documentType','document_type','identity_type'])),
+    document_expiry: normalizeDocumentExpiry(firstValue(containers, ['expirationDate','expiry_date','expiryDate','date_of_expiry'])),
   };
 };
 

@@ -3577,7 +3577,12 @@
     "otp_resend_wait": "Ị nwere ike izighachi mgbe sekọnd {{count}} gachara",
     "email_send": "Ziga ozi ịntanetị nkwenye",
     "email_sent": "Lelee igbe ozi gị na ozi achọghị. Mepee njikọ nkwenye iji kwenye adreesị ozi ịntanetị gị.",
-    "email_send_failed": "Enweghị ike iziga ozi nkwenye. Biko nwaa ọzọ."
+    "email_send_failed": "Enweghị ike iziga ozi nkwenye. Biko nwaa ọzọ.",
+    "passport_image_label": "Ibe nkọwa paspọtụ",
+    "passport_image_choose": "Họrọ ibe paspọtụ",
+    "passport_image_required": "Tinye foto doro anya nke ibe nkọwa paspọtụ gị tupu ịga n’ihu.",
+    "passport_image_help": "Gosi ibe niile nwere foto gị na nkọwa paspọtụ. Jiri JPEG ma ọ bụ PNG doro anya. A gaghị echekwa foto a na ndebanye aha echekwara.",
+    "passport_country_label": "Obodo nyere paspọtụ"
   },
   "widget": {
     "support_title": "Nkwado RentalHub",

@@ -2,7 +2,7 @@ const logger = require('../utils/logger');
 const db = require('./database');
 const crypto = require('crypto');
 
-const SENSITIVE_FIELDS = new Set(['password', 'current_password', 'new_password', 'nin', 'token', 'reset_token', 'otp', 'secret', 'card_number', 'cvv']);
+const SENSITIVE_FIELDS = new Set(['password', 'current_password', 'new_password', 'nin', 'token', 'reset_token', 'otp', 'secret', 'international_passport_number', 'passport_document_image', 'phone_verification_token', 'completion_token', 'card_number', 'cvv']);
 
 const safeInt = (value) => {
   if (value === null || value === undefined) return null;
@@ -58,7 +58,8 @@ const audit = (action, targetType) => {
           null
         );
 
-        const actionText = action || `${req.method} ${req.originalUrl}`;
+        const safeRoute = String(req.originalUrl || '').replace(/(\/auth\/verify-email\/)[^/?]+/gi, '$1[REDACTED]').replace(/([?&](?:token|phone_verification_token|completion_token)=)[^&]*/gi, '$1[REDACTED]');
+        const actionText = action || `${req.method} ${safeRoute}`;
 
         // Create deterministic data string
         const dataString =
@@ -90,12 +91,12 @@ const audit = (action, targetType) => {
             targetId,
             req.ip || null,
             req.method,
-            req.originalUrl,
+            safeRoute,
             res.statusCode,
             req.headers['user-agent'] || null,
             JSON.stringify({
               responseTimeMs: Date.now() - start,
-              query: req.query || {},
+              query: sanitizeBody(req.query || {}),
               body: req.method !== 'GET' ? sanitizeBody(req.body) : undefined
             }),
             previousHash,

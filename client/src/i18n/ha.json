@@ -3577,7 +3577,12 @@
     "otp_resend_wait": "Za a iya sake aikawa bayan daƙiƙa {{count}}",
     "email_send": "Aika imel na tabbatarwa",
     "email_sent": "Duba akwatin saƙonka da saƙonnin banza. Buɗe hanyar tabbatarwa don tabbatar da imel ɗinka.",
-    "email_send_failed": "Ba a iya aika imel na tabbatarwa ba. Sake gwadawa."
+    "email_send_failed": "Ba a iya aika imel na tabbatarwa ba. Sake gwadawa.",
+    "passport_image_label": "Shafin bayanan fasfo",
+    "passport_image_choose": "Zaɓi shafin fasfo",
+    "passport_image_required": "Haɗa hoto mai kyau na shafin bayanan fasfonka kafin ci gaba.",
+    "passport_image_help": "A nuna duk shafin da hotonka da bayanan fasfo. Yi amfani da JPEG ko PNG mai kyau. Ba a ajiye hoton a daftarin rajista.",
+    "passport_country_label": "Ƙasar da ta bayar da fasfo"
   },
   "widget": {
     "support_title": "Tallafin RentalHub",

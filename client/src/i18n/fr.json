@@ -3188,7 +3188,12 @@
     "otp_resend_wait": "Nouvel envoi possible dans {{count}} s",
     "email_send": "Envoyer le courriel de vérification",
     "email_sent": "Consultez votre boîte de réception et vos indésirables. Ouvrez le lien pour confirmer votre adresse.",
-    "email_send_failed": "Impossible d’envoyer le courriel. Réessayez."
+    "email_send_failed": "Impossible d’envoyer le courriel. Réessayez.",
+    "passport_image_label": "Page d’identité du passeport",
+    "passport_image_choose": "Choisir la page du passeport",
+    "passport_image_required": "Joignez une image nette de la page d’identité de votre passeport.",
+    "passport_image_help": "Incluez toute la page avec votre photo et les informations du passeport. Utilisez une image JPEG ou PNG nette. Elle ne sera pas conservée dans le brouillon.",
+    "passport_country_label": "Pays de délivrance du passeport"
   },
   "careers": {
     "recruitment_closed_title": "Recrutement clos",
