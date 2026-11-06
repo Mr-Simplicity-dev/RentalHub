@@ -104,7 +104,7 @@ const verifyRegistrationPhone = flow => async (req, res) => {
       ? await registrationPhoneGate.resume(details, req.body.phone_verification_token)
       : await registrationPhoneGate.verify(details);
     await logOtpEvent({ contact: req.body.phone, channel: 'sms', purpose: 'registration_phone', status: 'verified', req });
-    if (!req.body.phone_verification_token) return res.json({ success: true, code: 'PHONE_VERIFIED', phone_verification_token: req.registrationPhoneGrant, data: { phone_verified: true } });
+    if (!req.body.phone_verification_token && req.body.phone_verification_protocol === 2) return res.json({ success: true, code: 'PHONE_VERIFIED', phone_verification_token: req.registrationPhoneGrant, data: { phone_verified: true } });
     const json = res.json.bind(res);
     res.json = payload => json({ ...payload, phone_verification_token: req.registrationPhoneGrant, ...(payload.success && payload.data ? { data: { ...payload.data, completion_token: req.registrationPhoneGrant } } : {}) });
     return flow === 'paid' ? exports.initializeRegistrationPayment(req, res) : exports.register(req, res);

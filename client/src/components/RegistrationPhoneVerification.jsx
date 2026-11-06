@@ -37,7 +37,7 @@ export default function RegistrationPhoneVerification({ pending, onVerified, onC
     if (inFlight.current || (!phoneGrant.current && !/^\d{6}$/.test(code))) return;
     inFlight.current = true; clearTimeout(retryTimer.current); setBusy(true); setError('');
     try {
-      const response = await api.post(pending.flow === 'free' ? '/auth/register/verify-phone' : '/auth/register/payment/verify-phone', { ...pending.payload, phone_challenge: challenge, otp: phoneGrant.current ? undefined : code, ...(phoneGrant.current ? { phone_verification_token: phoneGrant.current } : {}) }, { ...options, timeout: 120000 });
+      let response = await api.post(pending.flow === 'free' ? '/auth/register/verify-phone' : '/auth/register/payment/verify-phone', { ...pending.payload, phone_challenge: challenge, phone_verification_protocol: 2, otp: phoneGrant.current ? undefined : code, ...(phoneGrant.current ? { phone_verification_token: phoneGrant.current } : {}) }, { ...options, timeout: 120000 });
       if (response.data.code === 'PHONE_VERIFIED') {
         phoneGrant.current = response.data.phone_verification_token;
         setIdentityPending(true); setStatusMessage(t('register.phone_checking_identity'));

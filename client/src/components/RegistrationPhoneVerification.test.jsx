@@ -19,7 +19,7 @@ test('the sent screen opens after initial send; verification precedes checkout',
   api.post.mockResolvedValue({ data: { success: true, data: { reference: 'ref', completion_token: 'proof', authorization_url: 'https://checkout.paystack.com/test' } } });
   await act(async () => fireEvent.change(container.querySelector('input'), { target: { value: '123456' } }));
   await act(async () => fireEvent.submit(container.querySelector('form')));
-  expect(api.post).toHaveBeenCalledWith('/auth/register/payment/verify-phone', { ...pending.payload, phone_challenge: pending.challenge, otp: '123456' }, { skipAuth: true, skipAuthRefresh: true });
+  expect(api.post).toHaveBeenCalledWith('/auth/register/payment/verify-phone', { ...pending.payload, phone_challenge: pending.challenge, phone_verification_protocol: 2, otp: '123456' }, { skipAuth: true, skipAuthRefresh: true, timeout: 120000 });
   expect(verified).toHaveBeenCalledTimes(1);
 });
 test('invalid code does not open payment; failed resend does not claim a code was sent', async () => {
@@ -41,4 +41,18 @@ test('free account verification uses the free endpoint and does not request a pa
   await act(async () => fireEvent.change(container.querySelector('input'), { target: { value: '123456' } }));
   await act(async () => fireEvent.submit(container.querySelector('form')));
   expect(api.post.mock.calls[0][0]).toBe('/auth/register/verify-phone'); expect(verified).toHaveBeenCalledTimes(1);
+});
+
+test('a provider delay preserves phone verification and retries without reusing the consumed code', async () => {
+ const verified=vi.fn();
+ api.post.mockResolvedValueOnce({data:{success:true,code:'PHONE_VERIFIED',phone_verification_token:'signed-proof'}})
+ .mockResolvedValueOnce({data:{success:false,code:'PREMBLY_VERIFICATION_PENDING',message:'Identity check pending',phone_verification_token:'signed-proof',data:{can_auto_check:false}}});
+ await act(async()=>root.render(<Verification pending={pending} onVerified={verified} onClose={vi.fn()}/>));
+ await act(async()=>fireEvent.change(container.querySelector('input'),{target:{value:'123456'}}));
+ await act(async()=>fireEvent.submit(container.querySelector('form')));
+ expect(api.post).toHaveBeenCalledTimes(2);expect(verified).not.toHaveBeenCalled();
+ expect(container.querySelector('input').disabled).toBe(true);expect(container.textContent).toContain('Identity check pending');
+ api.post.mockResolvedValueOnce({data:{success:true,data:{reference:'ref',authorization_url:'https://checkout.paystack.com/test'}}});
+ await act(async()=>fireEvent.submit(container.querySelector('form')));
+ const body=api.post.mock.calls[2][1];expect(body.phone_verification_token).toBe('signed-proof');expect(body.otp).toBeUndefined();expect(verified).toHaveBeenCalledTimes(1);
 });

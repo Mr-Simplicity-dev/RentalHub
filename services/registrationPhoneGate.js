@@ -7,7 +7,7 @@ const canonical = value => {
   return value;
 };
 const digestPayload = (payload, secret) => {
-  const { turnstile_token, phone_challenge, phone_verification_token, otp, ...details } = payload;
+  const { turnstile_token, phone_challenge, phone_verification_token, phone_verification_protocol, otp, ...details } = payload;
   return crypto.createHmac('sha256', secret).update(JSON.stringify(canonical(details))).digest('hex');
 };
 const hashGrant = grant => crypto.createHash('sha256').update(String(grant || '')).digest('hex');
