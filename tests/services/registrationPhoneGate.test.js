@@ -8,6 +8,7 @@ function setup({ smsFails = false } = {}) {
   const rows = new Map(); let sent = 0;
   const db = { query: async (sql, args = []) => {
     if (/BEGIN|COMMIT|ROLLBACK|pg_advisory/.test(sql)) return { rows: [] };
+    if (sql.includes('SELECT id') && sql.includes('consumed_at IS NOT NULL')) { const row = rows.get(args[0]); return { rows: row?.consumed && row.payload_digest === args[1] && row.created > Date.now()-86400000 ? [row] : [] }; }
     if (sql.includes('SELECT id')) return { rows: [...rows.values()].filter(row => row.phoneKey === args[0] && row.created > Date.now() - 60000) };
     if (sql.startsWith('INSERT')) { rows.set(args[0], { id: args[0], phoneKey: args[1], payload_digest: args[2], code_hash: '', attempts: 0, expires: Date.now() + 600000, created: Date.now() }); return { rows: [] }; }
     if (sql.includes('SET code_hash')) { rows.get(args[1]).code_hash = args[0]; return { rows: [] }; }
@@ -32,7 +33,7 @@ test('tenant, landlord and free registrations verify only their bound details', 
   for (const payload of [details, { ...details, user_type: 'landlord' }, { ...details, registration_flow: 'free' }]) {
     const f = setup(), c = await f.gate.send(payload);
     const grant = await f.gate.verify({ ...payload, phone_challenge: c.phone_challenge, otp: '123456' });
-    assert.match(grant, /^[a-f0-9]{64}$/);
+    assert.equal(require('jsonwebtoken').decode(grant).purpose, 'registration-phone');
     await assert.rejects(f.gate.verify({ ...payload, phone_challenge: c.phone_challenge, otp: '123456' }), { code: 'OTP_EXPIRED' });
   }
 });
@@ -91,4 +92,14 @@ test('a reference or forged paid payload cannot bypass phone proof; phone proof 
   const res = { status(value) { this.statusCode = value; return this; }, json(value) { this.body = value; } };
   await context.exports.completeRegistrationAfterPayment({ params: { reference: 'test-reference' }, body: { completion_token: proof, payment_status: 'completed' }, logger: { error() {} } }, res);
   assert.equal(gatewayCalls, 1); assert.equal(res.statusCode, 402); assert.equal(res.body.success, false);
+});
+
+test('verified phone continues after OTP expiry, while forged or changed-detail continuation is rejected', async () => {
+ const f=setup(), c=await f.gate.send(details), payload={...details,phone_challenge:c.phone_challenge,otp:'123456'};
+ const grant=await f.gate.verify(payload);f.rows.get(c.phone_challenge).expires=0;
+ assert.equal(await f.gate.resume({...payload,otp:undefined,phone_verification_token:grant},grant),grant);
+ await assert.rejects(f.gate.resume({...payload,phone:'08099999999'},grant),{code:'OTP_DETAILS_CHANGED'});
+ await assert.rejects(f.gate.resume(payload,'forged'),{code:'OTP_EXPIRED'});
+ assert.throws(()=>require('../../config/utils/sessionToken').getSessionTokenIdentity(require('jsonwebtoken').decode(grant)));
+ f.rows.get(c.phone_challenge).created=0;await assert.rejects(f.gate.resume(payload,grant),{code:'OTP_EXPIRED'});
 });

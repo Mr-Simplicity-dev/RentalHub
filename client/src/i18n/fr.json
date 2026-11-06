@@ -3182,7 +3182,13 @@
     "adjustment_pay": "Payer la différence maintenant",
     "adjustment_failed": "Impossible d'initier le paiement de la différence. Veuillez réessayer.",
     "otp_pre_payment_body": "Nous avons envoyé un code à votre téléphone. Il est valable 10 minutes. Vérifiez votre numéro avant de passer au paiement.",
-    "otp_verify_payment": "Vérifier et passer au paiement"
+    "otp_verify_payment": "Vérifier et passer au paiement",
+    "phone_verified_continue": "Téléphone vérifié. Continuez sans saisir à nouveau le code.",
+    "phone_checking_identity": "Téléphone vérifié. Vérification de votre identité en cours.",
+    "otp_resend_wait": "Nouvel envoi possible dans {{count}} s",
+    "email_send": "Envoyer le courriel de vérification",
+    "email_sent": "Consultez votre boîte de réception et vos indésirables. Ouvrez le lien pour confirmer votre adresse.",
+    "email_send_failed": "Impossible d’envoyer le courriel. Réessayez."
   },
   "careers": {
     "recruitment_closed_title": "Recrutement clos",

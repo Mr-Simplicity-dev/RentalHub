@@ -599,14 +599,14 @@ exports.submitRequest = async (req, res) => {
       req.user.id,
       'credential_provider_pending',
       'Credential check is still processing',
-      'Prembly is temporarily unavailable or still processing. RentalHub saved this check and will recover the result automatically without submitting another paid verification.',
+      'NIN Service temporarily unavailable or still processing. The check is saved and will recover the result automatically without submitting another verification.',
       '/verification-status'
     );
   }
   return res.status(202).json({
     success: true,
     code: 'PREMBLY_VERIFICATION_PENDING',
-    message: 'Prembly is temporarily unavailable or still processing. RentalHub will check the same transaction automatically; do not resubmit the credential.',
+    message: 'NIN Service is temporarily unavailable or still processing. The transaction will be checked automatically; do not resubmit the credential.',
     data: serialized,
   });
 };

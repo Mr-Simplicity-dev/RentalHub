@@ -3423,7 +3423,13 @@
     "phone_required": "Phone number is required.",
     "referral_code_invalid": "Referral code can only contain letters, numbers, dashes and underscores.",
     "otp_pre_payment_body": "We sent a verification code to your phone. It is valid for 10 minutes. Verify your phone before continuing to payment.",
-    "otp_verify_payment": "Verify and continue to payment"
+    "otp_verify_payment": "Verify and continue to payment",
+    "phone_verified_continue": "Phone verified. Continue registration without entering the code again.",
+    "phone_checking_identity": "Phone verified. Checking your identity before continuing.",
+    "otp_resend_wait": "Resend available in {{count}}s",
+    "email_send": "Send verification email",
+    "email_sent": "Check your inbox and spam folder. Open the verification link to confirm your email.",
+    "email_send_failed": "Could not send the verification email. Please try again."
   },
   "careers": {
     "recruitment_closed_title": "Recruitment Closed",

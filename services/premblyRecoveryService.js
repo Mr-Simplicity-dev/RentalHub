@@ -72,7 +72,9 @@ const attemptToResult = (attempt) => {
     };
   }
 
-  const status =
+  const untrackable = !attempt.provider_reference && !['verified', 'not_verified'].includes(attempt.status);
+  const authFailure = /token_not_valid|invalid.?api.?key|unauthori[sz]ed/i.test(attempt.provider_message || '');
+  const status = untrackable ? 'reconciliation_required' : authFailure ? 'service_error' :
     attempt.status === 'verified'
       ? 'verified'
       : attempt.status === 'not_verified'
@@ -96,6 +98,8 @@ const attemptToResult = (attempt) => {
     billing_status: attempt.billing_status,
     attempt_id: attempt.id,
     document_country: attempt.document_country || null,
+    verified_name: attempt.verified_identity_name || null,
+    can_auto_check: Boolean(attempt.provider_reference) && status === 'provider_pending',
   };
 };
 
@@ -220,7 +224,7 @@ const applyResultWithClient = async (client, attempt, result, source) => {
         ? 'not_verified'
         : result.status === 'wallet_error'
           ? 'attention_required'
-          : 'pending';
+          : result.status === 'service_error' && !referenceId ? 'attention_required' : 'pending';
   const isFinal = ['verified', 'not_verified'].includes(nextStatus);
   const nextCheckMinutes = referenceId
     ? getPremblyBackoffMinutes(Number(attempt.poll_attempts || 0) + 1)
@@ -236,6 +240,7 @@ const applyResultWithClient = async (client, attempt, result, source) => {
          billing_status = COALESCE($6, billing_status),
          provider_message = $7,
          document_country = COALESCE($10, document_country),
+         verified_identity_name = COALESCE($11, verified_identity_name),
          next_check_at = CASE
            WHEN $8::boolean OR $9::integer IS NULL THEN NULL
            ELSE NOW() + ($9::text || ' minutes')::interval
@@ -255,6 +260,7 @@ const applyResultWithClient = async (client, attempt, result, source) => {
       isFinal,
       nextCheckMinutes,
       typeof result.document_country === 'string' ? result.document_country.slice(0, 80) : null,
+      typeof result.verified_name === 'string' ? result.verified_name.slice(0, 200) : null,
     ]
   );
   const updated = updatedAttempt.rows[0];
@@ -508,7 +514,13 @@ const executeRegistrationVerificationWithRecovery = async ({
   });
 
   if (!started.isNew) {
-    return attemptToResult(started.attempt);
+    const attempt = started.attempt;
+    if (attempt.provider_reference && attempt.status !== 'verified' && Date.now() - new Date(attempt.updated_at).getTime() >= 30000) {
+      const checked = await getVerificationStatusWithPrembly(attempt.provider_reference);
+      const updated = await processPremblyAttemptResult({ attemptId: attempt.id, result: checked, source: 'registration_resume' });
+      return attemptToResult(updated);
+    }
+    return attemptToResult(attempt);
   }
 
   const result = await verify(started.callbackUrl);

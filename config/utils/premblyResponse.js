@@ -126,7 +126,9 @@ const normalizePremblyResponse = (body = {}, fallbackReference = null) => {
   );
 
   let status = 'service_error';
-  if (verificationStatus === 'VERIFIED') {
+  if (/token_not_valid|invalid.?api.?key|unauthori[sz]ed/i.test(message)) {
+    status = 'service_error';
+  } else if (verificationStatus === 'VERIFIED') {
     status = 'verified';
   } else if (verificationStatus === 'PENDING' || responseCode === '02') {
     status = 'provider_pending';

@@ -126,7 +126,7 @@ exports.verifyNINWithPrembly = async (
       `${PREMBLY_BASE_URL}/verification/vnin`,
       addCallbackUrl({ number_nin: nin }, options),
       {
-        timeout: PREMBLY_TIMEOUT_MS,
+        timeout: Math.max(PREMBLY_TIMEOUT_MS, 45000),
         headers: {
           'x-api-key': PREMBLY_SECRET_KEY,
           'app-id': PREMBLY_PUBLIC_KEY,
@@ -203,7 +203,7 @@ exports.verifyInternationalPassportWithPrembly = async (
         date_of_birth: dateOfBirth,
       }, options),
       {
-        timeout: PREMBLY_TIMEOUT_MS,
+        timeout: Math.max(PREMBLY_TIMEOUT_MS, 45000),
         headers: {
           'x-api-key': PREMBLY_SECRET_KEY,
           'app-id': PREMBLY_PUBLIC_KEY,
@@ -287,7 +287,7 @@ exports.performKYCCheckWithPrembly = async (
         };
 
     const response = await axios.post(endpoint, payload, {
-      timeout: PREMBLY_TIMEOUT_MS,
+      timeout: Math.max(PREMBLY_TIMEOUT_MS, 45000),
       headers: {
         'Authorization': `Bearer ${PREMBLY_SECRET_KEY}`,
         'x-app-id': PREMBLY_PUBLIC_KEY,
@@ -352,7 +352,7 @@ exports.performLivenessCheckWithPrembly = async (imageBuffer, fullName) => {
       `${PREMBLY_BASE_URL}/biometric/liveness`,
       formData,
       {
-        timeout: PREMBLY_TIMEOUT_MS,
+        timeout: Math.max(PREMBLY_TIMEOUT_MS, 45000),
         headers: {
           'Authorization': `Bearer ${PREMBLY_SECRET_KEY}`,
           'x-app-id': PREMBLY_PUBLIC_KEY,
@@ -409,7 +409,7 @@ exports.getVerificationStatusWithPrembly = async (referenceId) => {
       `${PREMBLY_BASE_URL}/verification/${encodeURIComponent(referenceId)}/status`,
       {
         timeout: PREMBLY_TIMEOUT_MS,
-        headers: getPremblyHeaders(false)
+        headers: { 'x-api-key': PREMBLY_SECRET_KEY }
       }
     );
 

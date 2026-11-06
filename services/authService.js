@@ -99,10 +99,14 @@ const verifyRegistrationPhone = flow => async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
-    req.registrationPhoneGrant = await registrationPhoneGate.verify({ ...req.body, registration_flow: flow });
+    const details = { ...req.body, registration_flow: flow };
+    req.registrationPhoneGrant = req.body.phone_verification_token
+      ? await registrationPhoneGate.resume(details, req.body.phone_verification_token)
+      : await registrationPhoneGate.verify(details);
     await logOtpEvent({ contact: req.body.phone, channel: 'sms', purpose: 'registration_phone', status: 'verified', req });
+    if (!req.body.phone_verification_token) return res.json({ success: true, code: 'PHONE_VERIFIED', phone_verification_token: req.registrationPhoneGrant, data: { phone_verified: true } });
     const json = res.json.bind(res);
-    res.json = payload => json(payload.success && payload.data ? { ...payload, data: { ...payload.data, completion_token: req.registrationPhoneGrant } } : payload);
+    res.json = payload => json({ ...payload, phone_verification_token: req.registrationPhoneGrant, ...(payload.success && payload.data ? { data: { ...payload.data, completion_token: req.registrationPhoneGrant } } : {}) });
     return flow === 'paid' ? exports.initializeRegistrationPayment(req, res) : exports.register(req, res);
   } catch (error) {
     return res.status(error.statusCode || 500).json({ success: false, code: error.code, message: error.statusCode ? error.message : 'Phone verification failed. Please try again.' });
@@ -114,8 +118,8 @@ exports.resendRegistrationPhone = async (req, res) => {
   try {
     const flow = req.body.registration_flow === 'free' ? 'free' : 'paid';
     const details = { ...req.body, registration_flow: flow };
-    const challenge = await db.query('SELECT payload_digest FROM registration_phone_challenges WHERE id::text = $1 AND consumed_at IS NULL AND expires_at > NOW()', [String(req.body.phone_challenge || '')]);
-    if (!challenge.rows.length || challenge.rows[0].payload_digest !== require('./registrationPhoneGate').digestPayload(details)) return res.status(400).json({ success: false, message: 'This verification has expired. Please submit your details again.' });
+    const challenge = await db.query(`SELECT payload_digest FROM registration_phone_challenges WHERE id::text = $1 AND consumed_at IS NULL AND created_at > NOW() - INTERVAL '24 hours'`, [String(req.body.phone_challenge || '')]);
+    if (!challenge.rows.length || challenge.rows[0].payload_digest !== registrationPhoneGate.fingerprint(details)) return res.status(400).json({ success: false, message: 'This verification has expired. Please submit your details again.' });
     const data = await registrationPhoneGate.send(details);
     await logOtpEvent({ contact: req.body.phone, channel: 'sms', purpose: 'registration_phone', status: 'sent', expiresAt: Date.now() + 600000, req });
     return res.json({ success: true, data });
@@ -971,15 +975,23 @@ const validateAndPrepareRegistration = async (payload, options = {}) => {
         throw error;
       }
 
+      if (nimcResult.status === 'reconciliation_required') {
+        const error = new Error('Your phone verification is saved, but the identity provider did not return a trackable result. No additional identity check has been submitted. Support must reconcile the existing request before registration can continue.');
+        error.statusCode = 503;
+        error.code = 'PREMBLY_RECONCILIATION_REQUIRED';
+        error.data = { attempt_id: nimcResult.attempt_id, can_auto_check: false };
+        throw error;
+      }
       if (nimcResult.status === 'provider_pending') {
         const error = new Error(
-          'Prembly is temporarily unavailable or still processing this NIN. RentalHub saved the transaction and will check it automatically without submitting another paid verification.'
+          'Your NIN check is pending. Your phone verification is saved. We are checking the existing identity request before continuing to payment.'
         );
         error.statusCode = 202;
         error.code = 'PREMBLY_VERIFICATION_PENDING';
         error.data = {
           attempt_id: nimcResult.attempt_id,
           identity_type: 'nin',
+          can_auto_check: nimcResult.can_auto_check === true,
         };
         throw error;
       }
@@ -1057,15 +1069,23 @@ const validateAndPrepareRegistration = async (payload, options = {}) => {
         throw error;
       }
 
+      if (passportResult.status === 'reconciliation_required') {
+        const error = new Error('Your phone verification is saved, but the identity provider did not return a trackable result. No additional identity check has been submitted. Support must reconcile the existing request before registration can continue.');
+        error.statusCode = 503;
+        error.code = 'PREMBLY_RECONCILIATION_REQUIRED';
+        error.data = { attempt_id: passportResult.attempt_id, can_auto_check: false };
+        throw error;
+      }
       if (passportResult.status === 'provider_pending') {
         const error = new Error(
-          'Prembly is temporarily unavailable or still processing this passport. RentalHub saved the transaction and will check it automatically without submitting another paid verification.'
+          'Your passport check is pending. Your phone verification is saved. We are checking the existing identity request before continuing to payment.'
         );
         error.statusCode = 202;
         error.code = 'PREMBLY_VERIFICATION_PENDING';
         error.data = {
           attempt_id: passportResult.attempt_id,
           identity_type: 'passport',
+          can_auto_check: passportResult.can_auto_check === true,
         };
         throw error;
       }
@@ -1787,7 +1807,7 @@ const createUserFromPreparedRegistration = async ({
       { expiresIn: '24h' }
     );
 
-    if (newUser.email) await sendVerificationEmail(newUser.email, verificationToken);
+    const verificationEmailResult = newUser.email ? await sendVerificationEmail(newUser.email, verificationToken) : null;
     if (newUser.email) await sendWelcomeEmail(
       newUser.email,
       newUser.full_name,
@@ -1812,6 +1832,7 @@ const createUserFromPreparedRegistration = async ({
         preferred_lga_name: newUser.preferred_lga_name
       },
       token,
+      email_verification: { required: Boolean(newUser.email), sent: verificationEmailResult?.success === true, expires_in: 86400 },
       verification: verificationMeta,
       referral_reward: referralReward,
       lawyer_invite: lawyerInvite,
@@ -4797,9 +4818,9 @@ exports.verifyEmail = async (req, res) => {
     const result = await db.query(
       `UPDATE users
        SET email_verified = TRUE, updated_at = NOW()
-       WHERE id = $1
-       RETURNING id, email, user_type, email_verified, token_version`,
-      [decoded.userId]
+       WHERE id = $1 AND LOWER(email) = LOWER($2)
+       RETURNING id, email, full_name, user_type, email_verified, phone_verified, token_version, is_active, approval_status, deleted_at, totp_enabled, is_recruitment_admin`,
+      [decoded.userId, decoded.email]
     );
 
     if (result.rowCount === 0) {
@@ -4820,29 +4841,10 @@ exports.verifyEmail = async (req, res) => {
       req,
     });
 
-    // 🔐 Auto-login token with current token_version
-    const authToken = jwt.sign(
-      {
-        id: user.id,
-        user_type: user.user_type,
-        tv: user.token_version || 1,
-        purpose: 'session',
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
-    const csrfToken = setAuthCookies(res, authToken);
-    const responseData = {
-      success: true,
-      message: 'Email verified successfully!',
-      user,
-      csrf_token: csrfToken,
-    };
-    if (shouldReturnTokenInBody()) {
-      responseData.token = authToken;
-    }
-    res.json(responseData);
+    const eligibleForSession = ['tenant', 'landlord'].includes(user.user_type) && !user.is_recruitment_admin && user.is_active === true && !user.deleted_at && (!user.approval_status || user.approval_status === 'approved') && !user.totp_enabled;
+    if (!eligibleForSession) return res.json({ success: true, message: 'Email verified successfully. Please sign in to continue.', requires_sign_in: true, user: { id: user.id, user_type: user.user_type, email_verified: true, phone_verified: user.phone_verified } });
+    const session = attachAuthSession(res, { user, token: generateToken(user.id, user.user_type, { tokenVersion: user.token_version || 1 }) }, { exposeSessionToken: isNativeAuthClient(req) });
+    return res.json({ success: true, message: 'Email verified successfully!', ...session, data: session });
 
   } catch (error) {
     req.logger.error('Verify email error:', error.message);
@@ -4860,7 +4862,7 @@ exports.resendVerification = async (req, res) => {
     const { email } = req.body;
 
     const result = await db.query(
-      'SELECT id, email, email_verified FROM users WHERE email = $1',
+      'SELECT id, email, email_verified FROM users WHERE LOWER(email) = LOWER($1)',
       [email]
     );
 
@@ -4891,7 +4893,8 @@ exports.resendVerification = async (req, res) => {
       { expiresIn: '24h' }
     );
 
-    await sendVerificationEmail(email, verificationToken);
+    const delivery = await sendVerificationEmail(user.email, verificationToken);
+    if (!delivery.success) return res.status(503).json({ success: false, message: 'Could not send the verification email. Please try again shortly.' });
 
     res.json({
       success: true,

@@ -3571,7 +3571,13 @@
     "adjustment_pay": "Biya bambancin yanzu",
     "adjustment_failed": "Ba a iya fara biyan bambancin ba. Da fatan za a sake gwadawa.",
     "otp_pre_payment_body": "Mun aika lambar tabbatarwa zuwa wayarka. Tana aiki na minti 10. Tabbatar da lambar wayarka kafin ka ci gaba zuwa biyan kuɗi.",
-    "otp_verify_payment": "Tabbatar sannan a ci gaba zuwa biyan kuɗi"
+    "otp_verify_payment": "Tabbatar sannan a ci gaba zuwa biyan kuɗi",
+    "phone_verified_continue": "An tabbatar da wayarka. Ci gaba da rajista ba tare da sake shigar da lambar ba.",
+    "phone_checking_identity": "An tabbatar da wayarka. Ana duba shaidar ka kafin a ci gaba.",
+    "otp_resend_wait": "Za a iya sake aikawa bayan daƙiƙa {{count}}",
+    "email_send": "Aika imel na tabbatarwa",
+    "email_sent": "Duba akwatin saƙonka da saƙonnin banza. Buɗe hanyar tabbatarwa don tabbatar da imel ɗinka.",
+    "email_send_failed": "Ba a iya aika imel na tabbatarwa ba. Sake gwadawa."
   },
   "widget": {
     "support_title": "Tallafin RentalHub",

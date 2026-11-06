@@ -3182,7 +3182,13 @@
     "adjustment_pay": "立即支付差额",
     "adjustment_failed": "无法发起差额支付，请重试。",
     "otp_pre_payment_body": "验证码已发送到您的手机，10分钟内有效。请先验证手机号，再继续付款。",
-    "otp_verify_payment": "验证并继续付款"
+    "otp_verify_payment": "验证并继续付款",
+    "phone_verified_continue": "手机号已验证。无需再次输入验证码即可继续注册。",
+    "phone_checking_identity": "手机号已验证。正在核验您的身份，请稍候。",
+    "otp_resend_wait": "{{count}}秒后可重新发送",
+    "email_send": "发送验证邮件",
+    "email_sent": "请查看收件箱和垃圾邮件文件夹，打开验证链接以确认邮箱。",
+    "email_send_failed": "无法发送验证邮件，请重试。"
   },
   "careers": {
     "recruitment_closed_title": "招聘已关闭",

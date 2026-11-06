@@ -3571,7 +3571,13 @@
     "adjustment_pay": "San iyatọ ni bayi",
     "adjustment_failed": "Ko le bẹrẹ isanwo iyatọ. Jọwọ gbiyanju lẹẹkansi.",
     "otp_pre_payment_body": "A ti fi kóòdù ìmúdájú ránṣẹ́ sí fóònù rẹ. Ó wúlò fún ìṣẹ́jú mẹ́wàá. Jẹ́rìí nọ́mbà fóònù rẹ kí o tó tẹ̀síwájú sí ìsanwó.",
-    "otp_verify_payment": "Jẹ́rìí kí o sì tẹ̀síwájú sí ìsanwó"
+    "otp_verify_payment": "Jẹ́rìí kí o sì tẹ̀síwájú sí ìsanwó",
+    "phone_verified_continue": "A ti jẹ́rìí fóònù rẹ. Tẹ̀síwájú láì tún kóòdù náà tẹ̀.",
+    "phone_checking_identity": "A ti jẹ́rìí fóònù rẹ. À ń ṣàyẹ̀wò ìdánimọ̀ rẹ kí o tó tẹ̀síwájú.",
+    "otp_resend_wait": "O lè tún ránṣẹ́ ní ìṣẹ́jú-àáyá {{count}}",
+    "email_send": "Fi ímeèlì ìmúdájú ránṣẹ́",
+    "email_sent": "Ṣàyẹ̀wò àpótí ímeèlì rẹ àti àpótí àwúrúju. Ṣí ọ̀nà ìmúdájú láti jẹ́rìí ímeèlì rẹ.",
+    "email_send_failed": "A kò lè fi ímeèlì ìmúdájú ránṣẹ́. Jọ̀wọ́ tún gbìyànjú."
   },
   "widget": {
     "support_title": "Ìrànwọ́ RentalHub",
