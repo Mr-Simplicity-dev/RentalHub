@@ -13,6 +13,16 @@ const {
 
 const ACTIVE_ATTEMPT_STATUSES = ['initiating', 'pending', 'attention_required'];
 
+const canRetryRegistrationAuthFailure = (attempt, now = Date.now()) =>
+  attempt?.context_type === 'registration' &&
+  attempt.status === 'not_verified' &&
+  /token_not_valid/i.test(attempt.provider_message || '') &&
+  !attempt.provider_reference &&
+  attempt.billing_status !== true &&
+  Number.isFinite(new Date(attempt.updated_at).getTime()) &&
+  now - new Date(attempt.updated_at).getTime() >= 5 * 60 * 1000;
+
+
 const rollbackQuietly = async (client) => {
   if (!client) return;
   try {
@@ -129,6 +139,11 @@ const beginAttemptWithClient = async (client, {
       ? [requestKeyHash]
       : [contextId, ACTIVE_ATTEMPT_STATUSES]
   );
+
+  if (canRetryRegistrationAuthFailure(existing.rows[0])) {
+    await client.query("UPDATE prembly_verification_attempts SET status = 'expired', updated_at = NOW() WHERE id = $1", [existing.rows[0].id]);
+    existing.rows = [];
+  }
 
   if (existing.rows.length) {
     return {
