@@ -907,7 +907,7 @@ exports.getPendingVerifications = async (req, res) => {
       SELECT id, full_name, email, nin, identity_document_type,
              international_passport_number, nationality,
              passport_photo_url, user_type, created_at,
-             (SELECT COALESCE(jsonb_agg(jsonb_build_object('id',f.id,'reason',f.reason,'status',f.status)),'[]'::jsonb) FROM identity_review_flags f WHERE f.user_id=users.id AND f.status='pending') AS identity_review_flags
+             (SELECT COALESCE(jsonb_agg(jsonb_build_object('id',f.id,'reason',f.reason,'status',f.status,'related_user_id',f.related_user_id)),'[]'::jsonb) FROM identity_review_flags f WHERE f.user_id=users.id AND f.status='pending') AS identity_review_flags
       FROM users
       ${whereClause}
       ORDER BY created_at ASC

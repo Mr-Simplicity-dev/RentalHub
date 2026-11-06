@@ -24,6 +24,7 @@ async function fixture(options = {}) {
     full_name: 'Test Applicant',
     nin: 'encrypted-nin',
     nin_hash: 'nin-hash',
+    passport_photo_url:options.legalImages?'/uploads/passports/passport_5_test.jpg':null,
     nin_verified: true
   };
   const db = {
@@ -40,20 +41,11 @@ async function fixture(options = {}) {
         sql,
         params
       });
-      if (sql.includes('SELECT *,rentalhub_phone_key')) return {
-        rows: [{
-          ...user,
-          phone_key: '2348012345678'
-        }, {
-          id: 6,
-          phone_key: options.legalDuplicate ? '2348012345678' : '2348099999999'
-        }]
-      };
-      if (sql.includes('SELECT face_gallery_enrolled')) return {
-        rows: [{
-          face_gallery_enrolled: options.enrolled === true
-        }]
-      };
+      if (sql.includes('SELECT *,rentalhub_phone_key')) return { rows: [{...user,phone_key:'2348012345678'},{id:6,phone_key:options.legalDuplicate?'2348012345678':'2348099999999',passport_photo_url:options.legalImages?'/uploads/passports/passport_6_test.jpg':null}] };
+      if(sql.includes('SELECT id FROM identity_review_flags WHERE user_id=$1 AND related_user_id=$2 AND photo_pair_key=$3'))return {rows:options.manualLegalReview?[{id:100}]:[]};
+      if(sql.includes('SELECT user_id,image_hash FROM identity_photo_checks'))return {rows:options.legalConsents?[{user_id:5,image_hash:params[1][0]},{user_id:6,image_hash:params[1][1]}]:[]};
+      if(sql.includes('INSERT INTO identity_face_comparisons'))return {rows:[{pair_key:'claimed'}]};
+      if(sql.includes('SELECT face_gallery_enrolled'))return {rows:[{face_gallery_enrolled:options.enrolled===true}]};
       if (sql.includes('SELECT * FROM users')) return {
         rows: [user]
       };
@@ -157,8 +149,8 @@ async function fixture(options = {}) {
       return {
         data: {
           status: true,
-          message: 'Face Match',
-          confidence: 99
+          message: options.differentFaces?'No Match':'Face Match',
+          confidence: options.differentFaces?20:99
         }
       };
     }
@@ -177,7 +169,7 @@ async function fixture(options = {}) {
       }
     },
     __dirname: path.dirname(require.resolve('../../services/identityPhotoService')),
-    require: name => name === 'axios' ? axios : name === '../config/middleware/database' ? db : name === '../config/utils/ninEncryption' ? {
+    require: name => name === 'fs' && options.legalImages ? {...fs,promises:{...fs.promises,readFile:async filename=>String(filename).includes('passport_5_')?image:await sharp({create:{width:500,height:500,channels:3,background:'#abcdef'}}).jpeg().toBuffer()}} : name === 'axios' ? axios : name === '../config/middleware/database' ? db : name === '../config/utils/ninEncryption' ? {
       encryptNIN: v => v,
       decryptNIN: v => v === 'encrypted-nin' ? '12345678901' : 'data:image/jpeg;base64,' + image.toString('base64')
     } : name === '../config/utils/notificationService' ? {
@@ -349,3 +341,5 @@ test('gallery erasure is required before clearing enrolment and is skipped for u
   await empty.api.eraseGallery(5);
   assert.equal(empty.calls.length, 0);
 });
+
+test('legal face processing requires both consents; manual review is bound to the current photo pair',async()=>{const none=await fixture({legalImages:true});assert.equal(await none.api.legalConflict(5,[6]),true);assert.equal(none.calls.length,0);const flag=none.queries.find(q=>q.sql.includes('INSERT INTO identity_review_flags'));assert.equal(flag.params[3].length,64);const manual=await fixture({legalImages:true,manualLegalReview:true});assert.equal(await manual.api.legalConflict(5,[6]),false);assert.equal(manual.calls.length,0);const consented=await fixture({legalImages:true,legalConsents:true,differentFaces:true});assert.equal(await consented.api.legalConflict(5,[6]),false);assert.ok(consented.calls.some(call=>call.url?.endsWith('/face/comparison')));});

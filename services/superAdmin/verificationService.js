@@ -158,7 +158,7 @@ const getIdentityVerifications = async (req, res) => {
         u.nationality,
 
         u.passport_photo_url,
-        (SELECT COALESCE(jsonb_agg(jsonb_build_object('id',f.id,'reason',f.reason,'status',f.status)),'[]'::jsonb) FROM identity_review_flags f WHERE f.user_id=u.id AND f.status='pending') AS identity_review_flags,
+        (SELECT COALESCE(jsonb_agg(jsonb_build_object('id',f.id,'reason',f.reason,'status',f.status,'related_user_id',f.related_user_id)),'[]'::jsonb) FROM identity_review_flags f WHERE f.user_id=u.id AND f.status='pending') AS identity_review_flags,
 
         u.identity_verified,
 

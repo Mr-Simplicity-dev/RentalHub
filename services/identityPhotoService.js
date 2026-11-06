@@ -51,6 +51,7 @@ const dataUri = image => 'data:image/jpeg;base64,' + image.toString('base64');
 const faceVerdict = body => {
   const raw = body?.confidence ?? body?.data?.confidence;
   const score = typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 && raw <= 100 ? raw : null;
+  if(raw !== undefined && raw !== null && score === null)return {status:'review_required',confidence:null};
   // This endpoint documents a 0-100 score. Ambiguous low fractional scores need review.
   const negative = body?.is_match === false || body?.data?.is_match === false || /^(?:no match|face mismatch|not a match)[.!]?$/i.test(String(body?.message || '').trim());
   if (negative) return {
@@ -126,14 +127,14 @@ const referencePhoto = async user => {
     return null;
   }
 };
-const recordFlag = async (userId, reason, relatedId = null) => {
-  const flag = await db.query(`INSERT INTO identity_review_flags(user_id,reason,related_user_id) SELECT $1,$2,$3 WHERE NOT EXISTS(SELECT 1 FROM identity_review_flags WHERE user_id=$1 AND reason=$2 AND related_user_id IS NOT DISTINCT FROM $3 AND status='pending') RETURNING id`, [userId, reason, relatedId]);
+const recordFlag = async (userId, reason, relatedId = null, pairKey = null) => {
+  const flag = await db.query("INSERT INTO identity_review_flags(user_id,reason,related_user_id,photo_pair_key) SELECT $1,$2,$3,$4 WHERE NOT EXISTS(SELECT 1 FROM identity_review_flags WHERE user_id=$1 AND reason=$2 AND related_user_id IS NOT DISTINCT FROM $3 AND photo_pair_key IS NOT DISTINCT FROM $4 AND status='pending') RETURNING id", [userId, reason, relatedId, pairKey]);
   if (flag.rows.length) {
-    await db.query(`INSERT INTO audit_logs(actor_id,action,target_type,target_id,metadata) VALUES(NULL,'IDENTITY_REVIEW_REQUIRED','user',$1,$2)`, [userId, JSON.stringify({
+    await db.query("INSERT INTO audit_logs(actor_id,action,target_type,target_id,metadata) VALUES(NULL,'IDENTITY_REVIEW_REQUIRED','user',$1,$2)", [userId, JSON.stringify({
       reason,
       flag_id: flag.rows[0].id
     })]);
-    const admins = await db.query(`SELECT id FROM users WHERE user_type='super_admin' AND deleted_at IS NULL AND is_active IS NOT FALSE`);
+    const admins = await db.query("SELECT id FROM users WHERE user_type='super_admin' AND deleted_at IS NULL AND is_active IS NOT FALSE");
     const {
       createNotification
     } = require('../config/utils/notificationService');
@@ -293,20 +294,34 @@ const identityConflict = (one, two) => {
 const legalConflict = async (lawyerId, partyIds) => {
   const ids = [...new Set([lawyerId, ...partyIds].filter(Boolean).map(Number))];
   const rows = (await db.query('SELECT *,rentalhub_phone_key(phone) AS phone_key FROM users WHERE id=ANY($1::int[])', [ids])).rows;
-  const lawyer = rows.find(r => Number(r.id) === Number(lawyerId));
+  const lawyer = rows.find(row => Number(row.id) === Number(lawyerId));
   if (!lawyer) return true;
-  for (const id of partyIds.filter(Boolean)) {
-    const party = rows.find(r => Number(r.id) === Number(id));
+  for (const id of [...new Set(partyIds.filter(Boolean).map(Number))]) {
+    const party = rows.find(row => Number(row.id) === id);
     if (!party) return true;
     if (identityConflict(lawyer, party)) {
       await recordFlag(lawyerId, 'legal_identity_conflict', party.id);
       return true;
     }
     const images = await Promise.all([privatePhoto(lawyer.passport_photo_url), privatePhoto(party.passport_photo_url)]);
-    if (images.some(i => !i)) return true;
+    if (images.some(image => !image)) {
+      await recordFlag(lawyerId, 'legal_missing_photo', party.id);
+      return true;
+    }
+    const canonical = await Promise.all(images.map(canonicalPhoto)),
+      hashes = canonical.map(digest),
+      pairKey = digest([...hashes].sort().join(':'));
+    const manual = await db.query("SELECT id FROM identity_review_flags WHERE user_id=$1 AND related_user_id=$2 AND photo_pair_key=$3 AND reason='legal_conflict_review' AND status='reviewed' AND reviewed_by IS NOT NULL AND reviewed_at IS NOT NULL LIMIT 1", [lawyerId, party.id, pairKey]);
+    if (manual.rows.length) continue;
+    const consents = await db.query('SELECT user_id,image_hash FROM identity_photo_checks WHERE user_id=ANY($1::int[]) AND image_hash=ANY($2::text[]) AND consent_version IS NOT NULL AND consent_at IS NOT NULL', [[Number(lawyerId), id], hashes]);
+    const consented = [lawyer, party].every((subject, index) => consents.rows.some(row => Number(row.user_id) === Number(subject.id) && row.image_hash === hashes[index]));
+    if (!consented) {
+      await recordFlag(lawyerId, 'legal_conflict_review', party.id, pairKey);
+      return true;
+    }
     const compared = await comparePhotos(...images);
     if (compared.status !== 'different') {
-      await recordFlag(lawyerId, compared.status === 'match' ? 'legal_face_conflict' : 'legal_conflict_review', party.id);
+      await recordFlag(lawyerId, compared.status === 'match' ? 'legal_face_conflict' : 'legal_conflict_review', party.id, pairKey);
       return true;
     }
   }

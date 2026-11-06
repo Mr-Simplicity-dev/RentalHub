@@ -1,6 +1,6 @@
 # Identity face photos and conflict safeguards
 
-Migration: `2040_identity_photo_safeguards.sql`. Apply with the normal migration runner before restarting the backend. No new environment variables or packages.
+Migrations: `2040_identity_photo_safeguards.sql` and `2041_legal_identity_review.sql`. Apply with the normal migration runner before restarting the backend. No new environment variables or packages.
 
 The live face photo is the account avatar, served only through the authenticated `/users/passport-photo/:filename` route. The passport document page is never an avatar. Both existing photo-upload URLs use the protected upload handler. Capture tokens are one-use records shared between server workers and expire in ten minutes.
 
@@ -12,7 +12,7 @@ Reference portraits from successful identity responses are encrypted using the e
 
 Registration and identity changes preserve phone/email/NIN/passport checks. A transaction-locked database trigger prevents concurrent reuse of NIN/passport identities while leaving historical duplicates intact for investigation. Matching names flag review and are not proof of fraud. Existing verified accounts are not automatically revoked by this migration.
 
-Legal assignments and case actions check the lawyer against the client, dispute parties and property owner. Case-specific private face comparisons cover legacy photos without enrolling them. Positive matches, missing photos and uncertain provider results block the action for review. Evidence uploaders cannot independently verify their own evidence. Definitive comparisons are cached by immutable photo hashes; failures are not interpreted as no match or automatically retried as paid checks.
+Legal assignments and case actions check the lawyer against the client, dispute parties and property owner. Case-specific private face comparisons require recorded consent for both current photos. Without consent, Super Admin must record a manual conflict review bound to the current photo pair. A new photo invalidates that review. No historical face is sent to the provider silently. Positive matches, missing photos and uncertain provider results block the action for review. Evidence uploaders cannot independently verify their own evidence. Definitive comparisons are cached by immutable photo hashes; failures are not interpreted as no match or automatically retried as paid checks.
 
 Super Admin can record a reasoned investigation in the existing verification queue. This resolves a review flag but does not approve an account. Approval is separate, requires a note, cannot be self-approval and cannot override an actual duplicate identifier. Existing administrator authorization and territorial restrictions remain. The flag-review endpoint additionally requires privileged MFA.
 
