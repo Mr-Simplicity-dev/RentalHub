@@ -639,7 +639,7 @@
       "section_label": "Our Mission",
       "heading": "Transforming Nigeria's Rental Landscape",
       "paragraph_1": "At Amana RentalHub NG, we believe everyone deserves a safe, transparent, and hassle-free experience when finding a home. Our mission is to eliminate the friction, fraud, and frustration from the Nigerian rental market.",
-      "paragraph_2": "By combining technology with rigorous verification processes, legal support, and nationwide coverage, we empower tenants to find verified properties and landlords to connect with qualified tenants — all in one trusted ecosystem.",
+      "paragraph_2": "By combining technology with rigorous verification processes, Dispute support, and nationwide coverage, we empower tenants to find verified properties and landlords to connect with qualified tenants — all in one trusted ecosystem.",
       "badge_verified": "Verified properties",
       "badge_secure": "Secure payments",
       "badge_legal": "Legal protection",
@@ -666,7 +666,7 @@
         "desc": "Every landlord, tenant, and property goes through identity verification. Our superb verification system ensures only genuine participants on the platform."
       },
       "legal": {
-        "title": "Legal Support & Dispute Resolution",
+        "title": "Dispute support & Dispute Resolution",
         "desc": "Access to qualified lawyers, evidence verification, and structured dispute resolution processes to protect all parties."
       },
       "marketplace": {
@@ -703,7 +703,7 @@
       "year_2020": "Amana RentalHub NG was founded with a vision to transform the Nigerian rental market.",
       "year_2021": "Launched property listing framework to onboard landlords across Lagos and Abuja.",
       "year_2022": "Expanded to all 36 states + FCT; introduced identity verification.",
-      "year_2023": "Launched legal support services, dispute resolution, and fumigation/cleaning marketplace.",
+      "year_2023": "Launched Dispute support services, dispute resolution, and fumigation/cleaning marketplace.",
       "year_2024": "Introduced transportation services, evidence verification, and virtual property tours.",
       "year_2025": "Reached 50,000+ active users; launched mobile app with real-time chat and notifications."
     },
@@ -736,7 +736,7 @@
       },
       "6": {
         "title": "Innovation",
-        "desc": "Leveraging cutting-edge technology including property verification, digital evidence, and legal support tools."
+        "desc": "Leveraging cutting-edge technology including property verification, digital evidence, and Dispute support tools."
       }
     },
     "cta": {
@@ -788,14 +788,14 @@
   },
   "mobile_app": {
     "title": "Mobile App",
-    "subtitle": "Manage your rentals, chat with landlords and tenants, and access legal support — all from your phone.",
+    "subtitle": "Manage your rentals, chat with landlords and tenants, and access Dispute support — all from your phone.",
     "feature_instant_alerts": "Instant Alerts",
     "feature_instant_alerts_desc": "Get notified when new properties match your search criteria.",
     "feature_in_app_chat": "In-App Chat",
     "feature_in_app_chat_desc": "Message landlords and tenants directly from your phone.",
     "feature_browse_properties": "Browse Properties",
     "feature_browse_properties_desc": "Search, filter, and save your favourite listings on the go.",
-    "feature_legal_support": "Legal Support",
+    "feature_legal_support": "Dispute support",
     "feature_legal_support_desc": "Submit legal assistance requests and track case progress.",
     "features_heading": "Everything in the app",
     "apk_heading": "APK direct download",
@@ -879,7 +879,7 @@
     },
     "benefit_6": {
       "title": "Dispute Protection",
-      "desc": "Access legal support and structured dispute resolution if any issues arise with tenants."
+      "desc": "Access Dispute support and structured dispute resolution if any issues arise with tenants."
     },
     "plan": {
       "free": {
@@ -912,7 +912,7 @@
         "feature_4": "Featured badge & top placement",
         "feature_5": "Advanced analytics dashboard",
         "feature_6": "Dedicated agent support",
-        "feature_7": "Legal support access",
+        "feature_7": "Dispute support access",
         "cta": "Choose Premium"
       },
       "popular_badge": "Most Popular"
@@ -927,7 +927,7 @@
     },
     "testimonial_3": {
       "role": "Landlord, Kano",
-      "text": "The legal support feature is a game-changer. I had a dispute resolved quickly without the usual stress."
+      "text": "The Dispute support feature is a game-changer. I had a dispute resolved quickly without the usual stress."
     },
     "faq_1": {
       "q": "Who can list properties on Amana RentalHub NG?",
@@ -1113,7 +1113,7 @@
     "features_verification_desc": "Every user — tenant, landlord, and agent — goes through NIN-linked identity verification for a trusted ecosystem.",
     "features_secure_title": "Secure Transactions",
     "features_secure_desc": "Applications and communications are handled securely within the platform. Clear terms protect all parties.",
-    "features_legal_title": "Legal Support",
+    "features_legal_title": "Dispute support",
     "features_legal_desc": "Access qualified lawyers, evidence verification, and structured dispute resolution when you need it.",
     "features_ratings_title": "Ratings & Reviews",
     "features_ratings_desc": "Transparent ratings and verified reviews help tenants and landlords make informed decisions.",
@@ -1175,7 +1175,7 @@
     "plan_premium_feat_4": "Featured badge & top placement",
     "plan_premium_feat_5": "Advanced analytics dashboard",
     "plan_premium_feat_6": "Dedicated agent support",
-    "plan_premium_feat_7": "Legal support access",
+    "plan_premium_feat_7": "Dispute support access",
     "plan_premium_feat_8": "Priority listing reviews",
     "plan_premium_cta": "Choose Premium",
     "save_annual": "Save 15% with annual billing",
@@ -1195,7 +1195,7 @@
     "compare_row_badge": "Featured badge",
     "compare_row_analytics": "Analytics",
     "compare_row_support": "Support",
-    "compare_row_legal": "Legal support",
+    "compare_row_legal": "Dispute support",
     "compare_row_reviews": "Listing reviews",
     "addons_badge": "Add-On Services",
     "addons_heading": "Enhance Your Listing",
@@ -2791,8 +2791,8 @@
     "evidence_queue_desc": "Review integrity checks and dispute uploads.",
     "messages": "Messages",
     "messages_desc": "Continue escalations and legal coordination.",
-    "legal_support": "Legal Support",
-    "legal_support_desc": "View legal support requests and assistance.",
+    "legal_support": "Dispute support",
+    "legal_support_desc": "View Dispute support requests and assistance.",
     "cross_state": "Cross-State Review",
     "cross_state_desc": "Open the shared evidence queue for escalated matters.",
     "state_evidence": "State Evidence",
@@ -2930,7 +2930,7 @@
     "super_dashboard": "Super Lawyer Dashboard",
     "verify_evidence": "Verify Evidence",
     "messages": "Messages",
-    "legal_support": "Legal Support",
+    "legal_support": "Dispute support",
     "verification_status": "Verification Status",
     "profile": "Profile",
     "legal_console": "Legal Console",

@@ -1236,7 +1236,7 @@ export const LAWYER_SIDEBAR_STEPS = [
     id: 'lawyer_sidebar_intro',
     target: '[data-tour-id="sidebar-dashboard"]',
     title: 'Lawyer Navigation',
-    description: 'Your legal console sidebar — access cases, evidence verification, client messages, and legal support.',
+    description: 'Your legal console sidebar — access cases, evidence verification, client messages, and Dispute support.',
     placement: 'right',
   },
 ];

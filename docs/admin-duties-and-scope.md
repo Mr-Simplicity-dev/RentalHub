@@ -227,7 +227,7 @@ These roles are separate from the four departmental super-admin departments.
 **Canonical role:** `super_lawyer`  
 **Scope:** National legal operations
 
-- Oversee legal casework and legal support quality.
+- Oversee legal casework and Dispute support quality.
 - Review national legal queues and escalations.
 - Manage legal assignments and legal-team operations.
 - Review legal evidence, case integrity, and legal reporting.

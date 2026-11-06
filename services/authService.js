@@ -1949,14 +1949,13 @@ exports.initializeRegistrationPayment = async (req, res) => {
     let ipCountry = null;
     let ipFlagged = false;
     if (!isDiasporaQuote && flags.local_rate_ip_check === true) {
-      const { getClientIp, getIpGeolocation } = require('../config/utils/ipGeo');
-      const ip = getClientIp(req);
-      const geo = await getIpGeolocation(ip);
-      ipCountry = geo?.country_code || null;
-      const isForeignOrVpn = geo && (
-        geo.proxy || geo.hosting || geo.vpn ||
-        (geo.country_code && geo.country_code !== 'NG')
-      );
+      const { getClientIp, getIpVerdicts } = require('../config/utils/ipGeo');
+      const verdicts = await getIpVerdicts(getClientIp(req));
+      const countries = [...new Set(verdicts.map(v => v.country_code).filter(Boolean))];
+      ipCountry = countries.length === 1 ? countries[0] : null;
+      const allForeign = verdicts.length > 0 && verdicts.every(v => v.country_code && v.country_code !== 'NG');
+      const allVpn = verdicts.length > 0 && verdicts.every(v => v.proxy || v.hosting || v.vpn);
+      const isForeignOrVpn = allForeign || allVpn;
       if (isForeignOrVpn) {
         const error = new Error(
           'This registration rate is only available to payers in Nigeria. If you are outside Nigeria, please register as a diaspora account (USD pricing), or contact support@rentalhub.com.ng.'
