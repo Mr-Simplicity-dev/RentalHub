@@ -1,3 +1,4 @@
+import UserAvatar from './UserAvatar';
 import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -560,8 +561,9 @@ return (
                 >
                   <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-primary-500 to-primary-700 text-white flex items-center justify-center text-sm font-semibold shadow-sm shrink-0">
                     {user?.passport_photo_url ? (
-                      <img
-                        src={user.passport_photo_url}
+                      <UserAvatar
+                        photo={user.passport_photo_url}
+                        name={user.full_name}
                         alt=""
                         className="w-full h-full object-cover cursor-pointer select-none"
                         draggable="false"
@@ -780,8 +782,9 @@ return (
                     >
                       &times;
                     </button>
-                    <img
-                      src={user.passport_photo_url}
+                    <UserAvatar
+                      photo={user.passport_photo_url}
+                      name={user.full_name}
                       alt="Profile"
                       className="h-auto w-full rounded-2xl border-4 border-white shadow-2xl"
                     />

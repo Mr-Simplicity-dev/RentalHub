@@ -40,6 +40,8 @@ const bulkUserAction = async (req, res) => {
         logActionName = 'BULK_BAN_USERS';
         break;
       case 'verify':
+        if(!reason)return res.status(400).json({message:'A bulk verification review note is required.'});
+        for(const id of ids){try{await require('../identityPhotoService').guardManualVerification(id,req.user.id);}catch(error){return res.status(error.statusCode || 503).json({message:error.message});}}
         query = `
           UPDATE users
           SET identity_verified = TRUE,

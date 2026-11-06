@@ -331,7 +331,9 @@
     "open_live_camera": "打开实时摄像头",
     "captured_preview": "已拍摄护照预览",
     "preview_hint": "上传前请确保您的脸部清晰且完全可见。",
-    "camera_guide": "请将脸部保持在引导框内并完成所有检测。"
+    "camera_guide": "请将脸部保持在引导框内并完成所有检测。",
+    "face_gallery_consent": "我同意进行人脸比对，并将人脸保存在Prembly的私有图库中，以验证身份并防止重复账户。如不同意，工作人员将人工审核我的照片。",
+    "photo_review_pending": "照片已保存，身份验证等待审核。"
   },
   "property_types": {
     "apartment": "公寓",

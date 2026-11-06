@@ -28,6 +28,8 @@ const responseContainers = (body = {}) => [
   body.data?.verification?.data,
   body.verification?.data,
   body.data?.data,
+  body.nin_data,
+  body.data?.nin_data,
   body.result?.data,
   decodeResponseData(body.response_data),
   decodeResponseData(body.data?.response_data),
@@ -159,6 +161,15 @@ const normalizePremblyResponse = (body = {}, fallbackReference = null) => {
   }
 
   return {
+    reference_photo: status === 'verified' ? (() => {
+      const photo = firstValue(containers, ['photo','face_image','portrait','faceImage','facialImage']);
+      if (typeof photo !== 'string' || photo.length > 2000000) return null;
+      const raw = photo.replace(/^data:image\/(?:jpeg|png);base64,/, '');
+      if (!/^[A-Za-z0-9+/]+={0,2}$/.test(raw)) return null;
+      const bytes = Buffer.from(raw,'base64');
+      const mime = bytes[0]===255 && bytes[1]===216 ? 'jpeg' : bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])) ? 'png' : null;
+      return mime ? 'data:image/'+mime+';base64,'+raw : null;
+    })() : null,
     verified: status === 'verified',
     pending: status === 'provider_pending',
     status,

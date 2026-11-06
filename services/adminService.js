@@ -906,7 +906,8 @@ exports.getPendingVerifications = async (req, res) => {
     const dataQuery = `
       SELECT id, full_name, email, nin, identity_document_type,
              international_passport_number, nationality,
-             passport_photo_url, user_type, created_at
+             passport_photo_url, user_type, created_at,
+             (SELECT COALESCE(jsonb_agg(jsonb_build_object('id',f.id,'reason',f.reason,'status',f.status)),'[]'::jsonb) FROM identity_review_flags f WHERE f.user_id=users.id AND f.status='pending') AS identity_review_flags
       FROM users
       ${whereClause}
       ORDER BY created_at ASC
@@ -938,6 +939,9 @@ exports.approveVerification = async (req, res) => {
     await ensureVerificationAuditSchema();
 
     const userId = req.params.id;
+    try { await require('./identityPhotoService').guardManualVerification(userId,req.user.id); } catch(error){return res.status(error.statusCode || 503).json({success:false,message:error.message});}
+    const reviewNote=String(req.body?.note || '').trim();
+    if(!reviewNote)return res.status(400).json({success:false,message:'An approval note is required.'});
     const adminId = req.user.id;
     const { assignedState, assignedCity } = await getRequesterScope(req.user);
 
@@ -1026,6 +1030,8 @@ exports.approveVerification = async (req, res) => {
       });
     }
 
+    await db.query("UPDATE identity_review_flags SET status='reviewed',reviewed_by=$2,review_note=$3,reviewed_at=NOW() WHERE user_id=$1 AND status='pending'",[userId,adminId,reviewNote]);
+    await db.query("INSERT INTO audit_logs(actor_id,action,target_type,target_id,metadata) VALUES($1,'IDENTITY_MANUALLY_APPROVED','user',$2,$3)",[adminId,userId,JSON.stringify({note:reviewNote})]);
     res.json({ success: true, message: 'User verified successfully' });
   } catch (err) {
     req.logger.error('Approve verification error:', err);
@@ -1716,6 +1722,7 @@ exports.verifyUser = async (req, res) => {
     await ensureUserAccountOperationSchema();
 
     const { id } = req.params;
+    try { await require('./identityPhotoService').guardManualVerification(id,req.user.id); } catch(error) { return res.status(error.statusCode || 503).json({success:false,message:error.message}); }
     const adminId = req.user.id;
     const note = requireOperationNote(req.body, 'A verification note is required');
 

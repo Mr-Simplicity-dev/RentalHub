@@ -336,7 +336,9 @@
     "open_live_camera": "Ṣí Kámẹ́rà Láàyè",
     "captured_preview": "Àwòrán ìwé ìrìnnà tí a yà",
     "preview_hint": "Rí i dájú pé ojú rẹ ṣe pọ́n tó kí o tó gbé sílẹ̀.",
-    "camera_guide": "Mú ojú rẹ sí inú ìtọ́sọ́nà kí o sì parí gbogbo àyẹ̀wò."
+    "camera_guide": "Mú ojú rẹ sí inú ìtọ́sọ́nà kí o sì parí gbogbo àyẹ̀wò.",
+    "face_gallery_consent": "Mo gbà kí a fi ojú mi wé ẹ̀rí ìdánimọ̀ mi, kí a sì tọ́jú rẹ̀ nínú àkójọpọ̀ ojú àdáni Prembly láti dènà àkọọlẹ́ ẹ̀ẹ̀mejì. Bí mi ò bá gbà, òṣìṣẹ́ yóò ṣe àyẹ̀wò fọ́tò mi.",
+    "photo_review_pending": "A ti fi fọ́tò pamọ́. Àyẹ̀wò ìdánimọ̀ ń dúró de òṣìṣẹ́."
   },
   "property_types": {
     "apartment": "Apartment",

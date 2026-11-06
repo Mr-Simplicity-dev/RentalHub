@@ -280,6 +280,10 @@ const applyResultWithClient = async (client, attempt, result, source) => {
     ]
   );
   const updated = updatedAttempt.rows[0];
+  if (result.verified && result.reference_photo) {
+    const encrypted = require('../config/utils/ninEncryption').encryptNIN(result.reference_photo);
+    if (encrypted) await client.query('UPDATE prembly_verification_attempts SET reference_photo_encrypted=$2 WHERE id=$1',[attempt.id,encrypted]);
+  }
   const notifications = [];
 
   if (attempt.context_type === 'credential_revalidation') {

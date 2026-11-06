@@ -331,7 +331,9 @@
     "open_live_camera": "Ouvrir la caméra en direct",
     "captured_preview": "Aperçu du passeport capturé",
     "preview_hint": "Assurez-vous que votre visage est net et entièrement visible avant le téléversement.",
-    "camera_guide": "Gardez votre visage dans le guide et terminez tous les contrôles."
+    "camera_guide": "Gardez votre visage dans le guide et terminez tous les contrôles.",
+    "face_gallery_consent": "J’accepte la comparaison de mon visage et sa conservation dans la galerie privée de Prembly pour vérifier mon identité et éviter les comptes en double. Sans mon accord, ma photo sera examinée manuellement.",
+    "photo_review_pending": "Photo enregistrée. La vérification de votre identité est en cours d’examen."
   },
   "property_types": {
     "apartment": "Appartement",

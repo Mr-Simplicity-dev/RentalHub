@@ -667,6 +667,7 @@ exports.reviewRequest = async (req, res) => {
         });
       }
 
+      try{await require('./identityPhotoService').guardManualVerification(request.user_id,req.user.id);}catch(error){await client.query('ROLLBACK');return res.status(error.statusCode || 503).json({success:false,message:error.message});}
       const updates = [
         'identity_verified = TRUE',
         "identity_verification_status = 'verified'",

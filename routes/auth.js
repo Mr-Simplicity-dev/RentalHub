@@ -289,8 +289,11 @@ router.post('/verify-phone', authenticate, otpLimiter, authController.verifyPhon
 router.post(
   '/upload-passport',
   authenticate,
+  sensitiveActionLimiter,
   uploadPassportLocal,
   validateFileMagicBytesMiddleware,
+  require('../config/middleware/upload').reprocessPassportImage,
+  require('../config/middleware/upload').scanUploadForMalware,
   authController.uploadPassport
 );
 

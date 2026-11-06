@@ -19,6 +19,19 @@ const logger = require('../config/utils/logger');
  * All admin routes require authentication
  */
 router.use(authenticate);
+router.patch('/users/:id/identity-flags/:flagId/review',superAdminOnly,async(req,res)=>{
+  const note=String(req.body?.note || '').trim();
+  if(note.length<10 || note.length>2000)return res.status(400).json({success:false,message:'Write a review note of 10–2000 characters.'});
+  if(Number(req.params.id)===Number(req.user.id))return res.status(403).json({success:false,message:'You cannot review your own identity.'});
+  const db=require('../config/middleware/database');const client=await db.connect();
+  try{
+    await client.query('BEGIN');
+    const result=await client.query("UPDATE identity_review_flags SET status='reviewed',reviewed_by=$3,review_note=$4,reviewed_at=NOW() WHERE id=$1 AND user_id=$2 AND status='pending' RETURNING id",[req.params.flagId,req.params.id,req.user.id,note]);
+    if(!result.rows.length){await client.query('ROLLBACK');return res.status(404).json({success:false,message:'Pending flag not found.'});}
+    await client.query("INSERT INTO audit_logs(actor_id,action,target_type,target_id,metadata) VALUES($1,'IDENTITY_FLAG_REVIEWED','user',$2,$3)",[req.user.id,req.params.id,JSON.stringify({flag_id:result.rows[0].id,note})]);
+    await client.query('COMMIT');return res.json({success:true,message:'Review recorded. This does not approve the account.'});
+  }catch(error){await client.query('ROLLBACK');return res.status(500).json({success:false,message:'Could not record the review.'});}finally{client.release();}
+});
 
 /**
  * =========================

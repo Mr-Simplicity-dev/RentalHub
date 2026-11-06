@@ -1,3 +1,4 @@
+const identityPhotos = require('./identityPhotoService');
 const db = require('../config/middleware/database');
 const {
   LAWYER_DIRECTORY_UNLOCK_PRICE_NGN,
@@ -111,6 +112,9 @@ const getLawyerDisputeAccess = async (lawyerId, disputeId) => {
     return null;
   }
 
+  const parties=await db.query('SELECT d.opened_by,d.against_user,p.owner_id FROM disputes d JOIN properties p ON p.id=d.property_id WHERE d.id=$1',[disputeId]);
+  const party=parties.rows[0];
+  if(!party || await identityPhotos.legalConflict(lawyerId,[party.opened_by,party.against_user,party.owner_id]))return null;
   return row;
 };
 
@@ -573,6 +577,9 @@ exports.grantLawyerAccess = async (req, res) => {
         message: "The client is not connected to this property"
       });
     }
+
+    const propertyParties=await db.query("SELECT owner_id AS id FROM properties WHERE id=$1 UNION SELECT tenant_id AS id FROM rental_applications WHERE property_id=$1 AND status='approved'",[property_id]);
+    if(await identityPhotos.legalConflict(lawyer_id,[client_user_id,...propertyParties.rows.map(r=>r.id)]))return res.status(409).json({success:false,message:'This legal assignment requires identity conflict review. Contact support.'});
 
     // Prevent duplicate active authorizations
     const dupCheck = await db.query(
