@@ -251,14 +251,6 @@ const AgentDashboard = () => {
                       <p className="mt-1 font-semibold text-gray-900">{assignment.landlord_name}</p>
                     </div>
                     <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{t('agent_dashboard.email')}</p>
-                      <p className="mt-1 font-medium text-gray-800">{assignment.landlord_email || t('agent_dashboard.na')}</p>
-                    </div>
-                    <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{t('agent_dashboard.phone')}</p>
-                      <p className="mt-1 font-medium text-gray-800">{assignment.landlord_phone || 'N/A'}</p>
-                    </div>
-                    <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
                       <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{t('agent_dashboard.status')}</p>
                       <span className={`mt-1 inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
                         assignment.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'

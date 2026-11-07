@@ -866,7 +866,7 @@ exports.getPropertyById = async (req, res) => {
     res.json({
       success: true,
       data: property,
-      message: 'Pay to view landlord contact and full address for this property'
+      message: 'Pay to view the full address and property details. Phone and email contacts are not included.'
     });
   } catch (error) {
     res.status(500).json({
@@ -912,7 +912,6 @@ exports.getFullPropertyDetails = async (req, res) => {
         p.*,
         s.state_name, s.state_code,
         u.id AS landlord_id, u.full_name AS landlord_name,
-        u.email AS landlord_email, u.phone AS landlord_phone,
         u.identity_verified AS landlord_verified,
         (SELECT AVG(rating) FROM reviews WHERE property_id = p.id) AS avg_rating,
         (SELECT COUNT(*) FROM reviews WHERE property_id = p.id) AS review_count

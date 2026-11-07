@@ -1,3 +1,4 @@
+import DisputeHandoverPanel from '../components/common/DisputeHandoverPanel';
 import SupportContactForms from '../components/common/SupportContactForms';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
@@ -326,6 +327,7 @@ const Messages = () => {
         <BackToDashboard />
       </div>
 
+      <DisputeHandoverPanel />
       <SupportContactForms peerId={selectedConversation?.other_user_id} />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="card lg:col-span-1" data-tour-id="messages-conversations-workflow">

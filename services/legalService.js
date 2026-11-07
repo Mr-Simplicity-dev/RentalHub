@@ -1,3 +1,4 @@
+const {notifyDispute}=require('./disputeNotificationService');
 const identityPhotos = require('./identityPhotoService');
 const db = require('../config/middleware/database');
 const {
@@ -770,6 +771,7 @@ exports.resolveDispute = async (req, res) => {
       ]
     );
 
+    await notifyDispute(disputeId,'resolved',lawyerId);
     return res.json({
       success: true,
       message: "Dispute resolved successfully",
@@ -951,6 +953,7 @@ exports.verifyEvidence = async (req, res) => {
       ]
     );
 
+    await notifyDispute(disputeId,'evidence_review',lawyerId);
     return res.json({
       success: true,
       message: `Evidence marked as ${verificationStatus}`,
@@ -1323,6 +1326,7 @@ exports.updateDisputeSummary = async (req, res) => {
       ]
     );
 
+    await notifyDispute(disputeId,'summary',lawyerId);
     return res.json({
       success: true,
       message: 'Dispute summary updated successfully',

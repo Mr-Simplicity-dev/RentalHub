@@ -1,3 +1,4 @@
+import handoverCopy from '../i18n/handoverCopy';
 import { useEffect, useState, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import api from '../services/api';
@@ -14,7 +15,7 @@ const getEvidenceStatusBadge = (status) => {
 };
 
 export default function DisputeDetails() {
-  const { t } = useTranslation();
+  const { t,i18n } = useTranslation();
   const formatDateTime = (value) => {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? t('dispute_details.na') : date.toLocaleString();
@@ -152,6 +153,7 @@ export default function DisputeDetails() {
                 {dispute.title || `${t('dispute_details.dispute_prefix')}${dispute.id}`}
               </h1>
               <p className="mt-3 max-w-3xl text-sm leading-7 text-gray-600">{dispute.description}</p>
+              {dispute.responsible_support_name&&<p className="mt-2 text-sm">{(handoverCopy[i18n.language?.split('-')[0]]||handoverCopy.en).lead}: {dispute.responsible_support_name}</p>}
             </div>
 
             <div className="rounded-2xl border border-gray-200 p-4 text-sm text-gray-600">
@@ -171,12 +173,10 @@ export default function DisputeDetails() {
             <div className="rounded-2xl bg-stone-100 p-4">
               <p className="text-xs uppercase tracking-wide text-gray-500">{t('dispute_details.opened_by')}</p>
               <p className="mt-2 font-semibold text-gray-900">{dispute.opened_by_name || t('dispute_details.na')}</p>
-              <p className="text-sm text-gray-600">{dispute.opened_by_email || t('dispute_details.na')}</p>
             </div>
             <div className="rounded-2xl bg-stone-100 p-4">
               <p className="text-xs uppercase tracking-wide text-gray-500">{t('dispute_details.against')}</p>
               <p className="mt-2 font-semibold text-gray-900">{dispute.against_name || t('dispute_details.na')}</p>
-              <p className="text-sm text-gray-600">{dispute.against_email || t('dispute_details.na')}</p>
             </div>
             <div className="rounded-2xl bg-stone-100 p-4">
               <p className="text-xs uppercase tracking-wide text-gray-500">{t('dispute_details.property')}</p>

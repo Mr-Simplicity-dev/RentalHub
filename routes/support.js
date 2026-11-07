@@ -10,6 +10,8 @@ const validateRequest = require('../config/middleware/validateRequest');
 const { ZONE_STATES, canonicalZone, zoneContainsState, zoneForState } = require('../config/utils/territorialZones');
 
 const router = express.Router();
+router.use('/tickets/:ticketId/dispute-handover',require('./supportDisputes'));
+router.get('/dispute-handovers',authenticate,async(req,res,next)=>{try{res.json({success:true,data:await require('../services/supportDisputeHandoverService').listOwn(req)});}catch(error){next(error);}});
 const logger = require('../config/utils/logger');
 const activityLogger = require('../services/activityLogger');
 

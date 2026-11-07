@@ -1,3 +1,5 @@
+import DisputeHandoverPanel from './DisputeHandoverPanel';
+import SupportContactForms from './SupportContactForms';
 import WhatsAppBotWidget from './WhatsAppBotWidget';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
@@ -1034,6 +1036,7 @@ const FloatingContactWidget = () => {
             {/* ─── CONVERSATION VIEW (authenticated) ─── */}
             {view === 'conversation' && activeTicket && (
               <div className="space-y-3">
+                <DisputeHandoverPanel ticketId={activeTicket.id} /><SupportContactForms ticketId={activeTicket.id} />
                 <p className="text-xs font-semibold text-slate-500 dark:text-gray-400 truncate">{activeTicket.subject}</p>
                 {loadingConv ? (
                   <div className="space-y-3 py-2">

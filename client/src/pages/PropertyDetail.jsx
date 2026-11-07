@@ -348,9 +348,6 @@ const PropertyDetail = () => {
     );
   }
 
-  const landlordWhatsappLink = property?.landlord_phone
-    ? `https://wa.me/${String(property.landlord_phone).replace(/[^\d]/g, '')}`
-    : null;
   const propertyLocation = [property?.area, property?.city, property?.state_name]
     .filter(Boolean)
     .join(', ');
@@ -360,7 +357,7 @@ const PropertyDetail = () => {
       )}`
     : property.title;
   const propertySeoDescription = propertyLocation
-    ? `Browse verified details for ${property.title} in ${propertyLocation}. See rent, property features, photos, and landlord contact options on RentalHub.`
+    ? `Browse verified details for ${property.title} in ${propertyLocation}. See rent, property features, photos, and in-platform enquiries on RentalHub.`
     : `Browse verified details for ${property.title} on RentalHub.`;
   const propertyCanonical = `${window.location.origin}/properties/${property.id}`;
   const propertyShareImageRaw =
@@ -631,39 +628,6 @@ const PropertyDetail = () => {
                   <div className="mt-2">
                     <OnlineStatusBadge userId={property.landlord_id} />
                   </div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-600">{t('property_detail.phone')}</div>
-                  <a
-                    href={`tel:${property.landlord_phone}`}
-                    className="font-semibold text-primary-600 hover:text-primary-700 flex items-center"
-                  >
-                    <FaPhone className="mr-2" />
-                    {property.landlord_phone}
-                  </a>
-                </div>
-                {landlordWhatsappLink && (
-                  <div>
-                    <div className="text-sm text-gray-600">{t('property_detail.whatsapp')}</div>
-                    <a
-                      href={landlordWhatsappLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-semibold text-green-600 hover:text-green-700"
-                    >
-                      {t('property_detail.chat_whatsapp')}
-                    </a>
-                  </div>
-                )}
-                <div>
-                  <div className="text-sm text-gray-600">{t('property_detail.email')}</div>
-                  <a
-                    href={`mailto:${property.landlord_email}`}
-                    className="font-semibold text-primary-600 hover:text-primary-700 flex items-center"
-                  >
-                    <FaEnvelope className="mr-2" />
-                    {property.landlord_email}
-                  </a>
                 </div>
                 {isAuthenticated && user?.user_type === 'tenant' && (
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">

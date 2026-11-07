@@ -1,7 +1,7 @@
 const db = require('../middleware/database');
 
-const getPropertyDisputeParticipants = async (propertyId) => {
-  const propertyResult = await db.query(
+const getPropertyDisputeParticipants = async (propertyId, queryable = db) => {
+  const propertyResult = await queryable.query(
     `SELECT
        p.id,
        p.title,
@@ -17,12 +17,11 @@ const getPropertyDisputeParticipants = async (propertyId) => {
   }
 
   const property = propertyResult.rows[0];
-  const participantsResult = await db.query(
+  const participantsResult = await queryable.query(
     `WITH property_people AS (
        SELECT
          u.id,
          u.full_name,
-         u.email,
          u.user_type,
          'landlord'::text AS relation,
          NULL::text AS application_status
@@ -34,7 +33,6 @@ const getPropertyDisputeParticipants = async (propertyId) => {
        SELECT
          tenant.id,
          tenant.full_name,
-         tenant.email,
          tenant.user_type,
          'tenant'::text AS relation,
          a.status::text AS application_status
@@ -48,7 +46,6 @@ const getPropertyDisputeParticipants = async (propertyId) => {
      SELECT DISTINCT
        id,
        full_name,
-       email,
        user_type,
        relation,
        application_status

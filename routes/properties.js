@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+router.use(require('../config/utils/propertyContactPrivacy').hidePropertyContacts);
 const { body } = require('express-validator');
 const validateRequest = require('../config/middleware/validateRequest');
 const propertyController = require('../controllers/propertyController');

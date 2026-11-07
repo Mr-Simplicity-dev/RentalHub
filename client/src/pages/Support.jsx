@@ -1,3 +1,5 @@
+import DisputeHandoverPanel from '../components/common/DisputeHandoverPanel';
+import SupportContactForms from '../components/common/SupportContactForms';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../services/api';
 import { toast } from 'react-toastify';
@@ -310,6 +312,7 @@ const Support = () => {
           </button>
         </div>
 
+        <DisputeHandoverPanel/><SupportContactForms/>
         {showForm && (
           <form onSubmit={handleSubmit} className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm" data-tour-id="support-form-workflow">
             <h2 className="text-lg font-semibold text-gray-900">{t('support.form_title')}</h2>
