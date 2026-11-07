@@ -102,6 +102,8 @@ const financeOpsLimiter = buildLimiter({
   message: 'Too many financial operations. Please wait and retry.',
 });
 
+const supportCustomerLookupLimiter = buildLimiter({name:'support-customer-lookup',windowMs:60*1000,max:60,message:'Too many customer lookups. Please wait a moment and retry.'});
+
 const sensitiveActionLimiter = buildLimiter({
   windowMs: Number(process.env.SENSITIVE_ACTION_WINDOW_MS) || 10 * 60 * 1000,
   max: Number(process.env.SENSITIVE_ACTION_MAX) || 12,
@@ -224,6 +226,7 @@ module.exports = {
   verificationOpsLimiter,
   financeOpsLimiter,
   sensitiveActionLimiter,
+  supportCustomerLookupLimiter,
   criticalFinanceOpsLimiter,
   recruitmentApplyLimiter,
   recruitmentPaymentLimiter,

@@ -1,3 +1,4 @@
+import SupportCustomerCard from '../admin/SupportCustomerCard';
 import DisputeHandoverPanel from './DisputeHandoverPanel';
 import SupportContactForms from './SupportContactForms';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -180,6 +181,7 @@ const TicketConversationModal = ({
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-4">
+          <SupportCustomerCard ticketId={ticket.id}/>
           <DisputeHandoverPanel ticketId={ticket.id} />
           <SupportContactForms ticketId={ticket.id} peerId={ticket.user_id} />
           {chatTab === 'user' ? (

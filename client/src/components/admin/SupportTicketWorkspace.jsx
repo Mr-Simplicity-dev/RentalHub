@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import api from '../../services/api';
+import React, { useMemo, useState, useEffect } from 'react';
 import { FaArrowUp, FaCheckCircle, FaFilter, FaReply, FaSearch, FaUserCheck } from 'react-icons/fa';
 
 const normalize = (value) => String(value || '').toLowerCase().trim();
@@ -51,8 +52,12 @@ const SupportTicketWorkspace = ({
     assignment: '',
   });
 
+  const [remote,setRemote]=useState(null),[searchError,setSearchError]=useState(''),[searching,setSearching]=useState(false);
+  const searchKey=String(user?.id)+':'+filters.search.trim();
+  useEffect(()=>{let active=true;const text=filters.search.trim();setRemote(null);setSearchError('');if(text.length<3){setSearching(false);return;}setSearching(true);const timer=setTimeout(()=>{api.post('/support/tickets/search',{search:text}).then(response=>{if(active)setRemote({key:searchKey,rows:response.data.data||[]});}).catch(error=>{if(active)setSearchError(error.response?.data?.message||'Search failed. Try again.');}).finally(()=>{if(active)setSearching(false);});},400);return()=>{active=false;clearTimeout(timer);};},[searchKey]);
+  const remoteRows=remote?.key===searchKey?remote.rows:null;
   const visibleTickets = useMemo(() => {
-    return tickets.filter((ticket) => {
+    return (remoteRows||tickets).filter((ticket) => {
       if (mode === 'escalations' && (!ticket.escalation_status || ticket.escalation_status === 'none')) return false;
       if (filters.status && ticket.status !== filters.status) return false;
       if (filters.priority && ticket.priority !== filters.priority) return false;
@@ -63,19 +68,23 @@ const SupportTicketWorkspace = ({
       if (filters.assignment === 'unassigned' && ticket.assigned_to) return false;
 
       const search = normalize(filters.search);
-      if (!search) return true;
+      if (!search||remoteRows) return true;
       return [
         ticket.id,
         ticket.subject,
         ticket.description,
         ticket.user_name,
         ticket.user_email,
+        ticket.user_phone,
+        ticket.contact_email,
+        ticket.contact_phone,
+        ticket.contact_name,
         ticket.category,
         ticket.related_type,
         ticket.escalation_department,
       ].some((value) => normalize(value).includes(search));
     });
-  }, [filters, mode, tickets, user?.id]);
+  }, [filters, mode, tickets, user?.id, remoteRows]);
 
   const title = mode === 'escalations' ? 'Escalation Inbox' : 'Support Ticket Workspace';
   const subtitle = mode === 'escalations'
@@ -96,10 +105,11 @@ const SupportTicketWorkspace = ({
 
       <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
         <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500"><FaFilter /> Filters</div>
-        <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-7">
+        {searching&&<p className="text-sm text-slate-500">Searching your permitted tickets…</p>}{searchError&&<p role="alert" className="text-sm text-red-700">{searchError}</p>}
+      <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-7">
           <label className="relative md:col-span-2 xl:col-span-1">
             <FaSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={12} />
-            <input value={filters.search} onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))} placeholder="Search tickets" className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-8 pr-3 text-sm text-gray-700 outline-none focus:border-indigo-400" />
+            <input value={filters.search} onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))} placeholder="Name, phone, email or ticket" aria-label="Search customers and tickets" className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-8 pr-3 text-sm text-gray-700 outline-none focus:border-indigo-400" />
           </label>
           <select value={filters.status} onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700">
             <option value="">All statuses</option>
