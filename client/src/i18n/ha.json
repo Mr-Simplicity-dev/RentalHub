@@ -337,7 +337,7 @@
     "captured_preview": "Samfuran fasfon da aka ɗauka",
     "preview_hint": "Tabbatar cewa fuskarka tana da haske kuma a bayyane take kafin ɗauka.",
     "camera_guide": "Ki riƙe fuskarki a cikin jagora kuma ki kammala duk dubawa.",
-    "face_gallery_consent": "Na yarda a kwatanta fuskata kuma a adana ta a kundin fuska na sirri na Prembly domin tabbatar da shaidata da hana maimaita asusu. Idan ban yarda ba, ma’aikaci zai duba hotona.",
+    "face_gallery_consent": "Na yarda a kwatanta fuskata kuma a adana bayananta a uwar garken sirri ta RentalHub domin tabbatar da shaidata da hana maimaita asusu. Idan ban yarda ba, ma’aikaci zai duba hotona.",
     "photo_review_pending": "An ajiye hoton. Tabbatar da shaida na jiran dubawa."
   },
   "property_types": {
@@ -632,7 +632,8 @@
       "send_message": "Aika saƙo",
       "start_conversation_btn": "Fara tattaunawa",
       "lookup": "Duba matsayin tikiti"
-    }
+    },
+    "private_documents": "Aika takardu ta tikitin tallafi na sirri."
   },
   "about_us": {
     "hero": {

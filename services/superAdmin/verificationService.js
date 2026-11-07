@@ -356,6 +356,7 @@ const approveIdentityVerification = async (req, res) => {
     });
 
     await db.query('COMMIT');
+    await require('../identityPhotoService').approveCurrentPhotoTemplate(userId);
     await logAction(req.user.id, 'VERIFY_USER', 'user', userId);
 
     res.json({ success: true, message: 'User verified' });

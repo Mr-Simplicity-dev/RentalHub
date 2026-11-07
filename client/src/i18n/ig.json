@@ -337,7 +337,7 @@
     "captured_preview": "Nlele paspọtụ esere",
     "preview_hint": "Gbaa mbọ hụ na ihu gị doro anya ma pụta ìhè zuru ezu tupu ibulite.",
     "camera_guide": "Debe ihu gị n'ime ntuziaka ahụ ma mezue nyocha niile.",
-    "face_gallery_consent": "Ekwenyere m ka e jiri ihu m tụnyere njirimara m ma chekwaa ya na ebe nchekwa ihu nzuzo Prembly iji gbochie akaụntụ abụọ. Ọ bụrụ na ekweghị m, onye ọrụ ga-enyocha foto m.",
+    "face_gallery_consent": "Ekwenyere m ka e jiri ihu m tụnyere njirimara m ma chekwaa ya na sava nzuzo RentalHub iji gbochie akaụntụ abụọ. Ọ bụrụ na ekweghị m, onye ọrụ ga-enyocha foto m.",
     "photo_review_pending": "Echekwara foto. Nyocha njirimara na-eche nyocha onye ọrụ."
   },
   "property_types": {
@@ -632,7 +632,8 @@
       "send_message": "Ziga ozi",
       "start_conversation_btn": "Malite mkparịta ụka",
       "lookup": "Lelee ọnọdụ tiketi"
-    }
+    },
+    "private_documents": "Ziga akwụkwọ site na tiketi nkwado nzuzo."
   },
   "about_us": {
     "hero": {

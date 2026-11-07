@@ -2,7 +2,7 @@ const logger = require('../utils/logger');
 const db = require('./database');
 const crypto = require('crypto');
 
-const SENSITIVE_FIELDS = new Set(['password', 'current_password', 'new_password', 'nin', 'token', 'reset_token', 'otp', 'secret', 'international_passport_number', 'passport_document_image', 'reference_photo', 'image_one', 'image_two', 'selfie_image', 'doc_image', 'phone_verification_token', 'completion_token', 'card_number', 'cvv']);
+const SENSITIVE_FIELDS = new Set(['password', 'current_password', 'new_password', 'nin', 'token', 'reset_token', 'otp', 'secret', 'international_passport_number', 'passport_document_image', 'live_capture_token', 'payload_encrypted', 'email', 'phone', 'template_encrypted', 'embedding', 'base64Image', 'reference_photo', 'image_one', 'image_two', 'selfie_image', 'doc_image', 'phone_verification_token', 'completion_token', 'card_number', 'cvv']);
 
 const safeInt = (value) => {
   if (value === null || value === undefined) return null;

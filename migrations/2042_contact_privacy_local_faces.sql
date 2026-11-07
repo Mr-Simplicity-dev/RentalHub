@@ -1,0 +1,14 @@
+BEGIN;
+CREATE TABLE IF NOT EXISTS communication_policy_violations(id BIGSERIAL PRIMARY KEY,user_id INTEGER NOT NULL REFERENCES users(id),channel VARCHAR(30) NOT NULL,context_key VARCHAR(120) NOT NULL,reason VARCHAR(40) NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+CREATE INDEX IF NOT EXISTS communication_policy_violations_actor_time ON communication_policy_violations(user_id,created_at);
+CREATE TABLE IF NOT EXISTS communication_policy_alerts(user_id INTEGER NOT NULL REFERENCES users(id),window_start TIMESTAMPTZ NOT NULL,PRIMARY KEY(user_id,window_start));
+CREATE TABLE IF NOT EXISTS support_contact_requests(id UUID PRIMARY KEY,requester_id INTEGER NOT NULL REFERENCES users(id),customer_id INTEGER NOT NULL REFERENCES users(id),fields TEXT[] NOT NULL,purpose TEXT NOT NULL,status VARCHAR(20) NOT NULL DEFAULT 'requested' CHECK(status IN ('requested','submitted','withdrawn')),payload_encrypted TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),expires_at TIMESTAMPTZ NOT NULL DEFAULT NOW()+INTERVAL '24 hours',submitted_at TIMESTAMPTZ,withdrawn_at TIMESTAMPTZ);
+CREATE INDEX IF NOT EXISTS support_contact_requests_customer ON support_contact_requests(customer_id,created_at);
+CREATE INDEX IF NOT EXISTS support_contact_requests_staff ON support_contact_requests(requester_id,created_at);
+CREATE TABLE IF NOT EXISTS local_face_templates(user_id INTEGER PRIMARY KEY REFERENCES users(id),image_hash VARCHAR(64) NOT NULL,engine VARCHAR(80) NOT NULL,template_encrypted TEXT NOT NULL,consent_version VARCHAR(60) NOT NULL,consent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+ALTER TABLE identity_photo_checks ADD COLUMN IF NOT EXISTS engine_revision VARCHAR(100) NOT NULL DEFAULT 'prembly-legacy',ADD COLUMN IF NOT EXISTS consent_revoked_at TIMESTAMPTZ;
+ALTER TABLE identity_photo_checks DROP CONSTRAINT IF EXISTS identity_photo_checks_user_id_image_hash_key;
+ALTER TABLE identity_photo_checks ADD CONSTRAINT identity_photo_checks_engine_unique UNIQUE(user_id,image_hash,engine_revision);
+ALTER TABLE support_contact_requests ADD COLUMN IF NOT EXISTS ticket_id INTEGER;
+CREATE INDEX IF NOT EXISTS support_contact_requests_expiry ON support_contact_requests(expires_at) WHERE payload_encrypted IS NOT NULL;
+COMMIT;

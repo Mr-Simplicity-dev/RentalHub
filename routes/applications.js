@@ -4,16 +4,14 @@ const { body, validationResult } = require('express-validator');
 const applicationController = require('../controllers/applicationController');
 const { authenticate, isTenant, isLandlord, isVerified } = require('../config/middleware/auth');
 
-// Security: Block phone number sharing during negotiation
-const phoneNumberRegex = /(\+?[\d-\s()]{7,})|(\d{3}[-.]?\d{3}[-.]?\d{4})|(\d{10})/i;
-const noPhoneNumbersValidator = body('note', 'Phone numbers cannot be shared during negotiation')
-  .if(body('note').exists({ checkFalsy: false }))
-  .custom(value => {
-    if (value && typeof value === 'string' && phoneNumberRegex.test(value)) {
-      throw new Error('Phone numbers cannot be shared during negotiation. Please use only in-app messaging.');
-    }
-    return true;
-  });
+const noPhoneNumbersValidator=async(req,res,next)=>{
+ try{
+ const service=require('../services/contactPolicyService');
+ const id=req.params?.applicationId;
+ const history=id?(await require('../config/middleware/database').query("SELECT note FROM application_negotiations WHERE application_id=$1 AND actor_user_id=$2 AND created_at>NOW()-INTERVAL '15 minutes' ORDER BY created_at DESC LIMIT 5",[id,req.user.id])).rows.reverse().map(row=>row.note):[];
+ await service.enforce({userId:req.user.id,channel:'negotiation',contextKey:id || req.body.property_id || 'new',texts:[req.body.note,req.body.message,req.body.reason,req.body.rejection_reason],history});next();
+ }catch(error){if(error.code==='CONTACT_SHARING_BLOCKED')return res.status(400).json({success:false,code:error.code,message:error.message});next(error);}
+};
 
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
@@ -30,6 +28,7 @@ router.post('/',
   authenticate,
   isTenant,
   isVerified,
+  noPhoneNumbersValidator,
   [
     body('property_id').isInt(),
     body('message').optional().trim(),
@@ -57,6 +56,7 @@ router.get('/:applicationId',
 router.patch('/:applicationId/withdraw',
   authenticate,
   isTenant,
+  noPhoneNumbersValidator,
   applicationController.withdrawApplication
 );
 
@@ -102,6 +102,7 @@ router.get('/property/:propertyId',
 router.patch('/:applicationId/approve',
   authenticate,
   isLandlord,
+  noPhoneNumbersValidator,
   applicationController.approveApplication
 );
 
@@ -128,6 +129,7 @@ router.patch('/:applicationId/counter-offer',
 router.patch('/:applicationId/reject',
   authenticate,
   isLandlord,
+  noPhoneNumbersValidator,
   [body('reason').optional().trim()],
   applicationController.rejectApplication
 );

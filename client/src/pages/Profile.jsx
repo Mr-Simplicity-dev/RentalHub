@@ -633,6 +633,7 @@ const Profile = () => {
         formData.append('passport', passport);
         formData.append('capture_source', 'live_camera');
         formData.append('biometric_consent',photoConsent ? 'true' : 'false');
+        formData.append('biometric_consent_version','local-face-2026-11');
         if (token) {
           formData.append('live_capture_token', token);
         }

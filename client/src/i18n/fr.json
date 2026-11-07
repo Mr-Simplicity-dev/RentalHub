@@ -332,7 +332,7 @@
     "captured_preview": "Aperçu du passeport capturé",
     "preview_hint": "Assurez-vous que votre visage est net et entièrement visible avant le téléversement.",
     "camera_guide": "Gardez votre visage dans le guide et terminez tous les contrôles.",
-    "face_gallery_consent": "J’accepte la comparaison de mon visage et sa conservation dans la galerie privée de Prembly pour vérifier mon identité et éviter les comptes en double. Sans mon accord, ma photo sera examinée manuellement.",
+    "face_gallery_consent": "J’accepte la comparaison de mon visage et son stockage sécurisé sur le serveur privé de RentalHub pour vérifier mon identité et éviter les comptes en double. Sans mon accord, le personnel examinera ma photo manuellement.",
     "photo_review_pending": "Photo enregistrée. La vérification de votre identité est en cours d’examen."
   },
   "property_types": {
@@ -627,7 +627,8 @@
       "send_message": "Envoyer le message",
       "start_conversation_btn": "Démarrer la conversation",
       "lookup": "Vérifier le statut des tickets"
-    }
+    },
+    "private_documents": "Envoyez les documents dans un ticket privé d’assistance."
   },
   "about_us": {
     "hero": {

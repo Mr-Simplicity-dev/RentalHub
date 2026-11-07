@@ -46,6 +46,7 @@ async function fixture(options = {}) {
       if(sql.includes('SELECT user_id,image_hash FROM identity_photo_checks'))return {rows:options.legalConsents?[{user_id:5,image_hash:params[1][0]},{user_id:6,image_hash:params[1][1]}]:[]};
       if(sql.includes('INSERT INTO identity_face_comparisons'))return {rows:[{pair_key:'claimed'}]};
       if(sql.includes('SELECT face_gallery_enrolled'))return {rows:[{face_gallery_enrolled:options.enrolled===true}]};
+      if(sql.includes('FROM local_face_templates t JOIN users'))return{rows:options.galleryDuplicate?[{user_id:6,template_encrypted:'encrypted-template'}]:[]};
       if (sql.includes('SELECT * FROM users')) return {
         rows: [user]
       };
@@ -155,6 +156,8 @@ async function fixture(options = {}) {
       };
     }
   };
+  const vector=Array(128).fill(0);vector[0]=1;
+  const local={health:async()=>{if(options.outage)throw Error('local down');return{ready:true,engine:'local-test-v1'};},validEmbedding:require('../../services/localFaceService').validEmbedding,similarity:require('../../services/localFaceService').similarity,analyze:async()=>{calls.push({localAnalyze:true});if(options.outage)throw Error('local down');return{status:'analyzed',engine:'local-test-v1',embedding:vector,liveness_status:options.lowLiveness||options.noValidation?'review_required':'live',automation_validated:!options.noValidation};},compare:async()=>{calls.push({localCompare:true});return{status:options.differentFaces?'different':'match',confidence:options.differentFaces?0.1:0.9,engine:'local-test-v1'};}};
   const module = {
     exports: {}
   };
@@ -169,9 +172,9 @@ async function fixture(options = {}) {
       }
     },
     __dirname: path.dirname(require.resolve('../../services/identityPhotoService')),
-    require: name => name === 'fs' && options.legalImages ? {...fs,promises:{...fs.promises,readFile:async filename=>String(filename).includes('passport_5_')?image:await sharp({create:{width:500,height:500,channels:3,background:'#abcdef'}}).jpeg().toBuffer()}} : name === 'axios' ? axios : name === '../config/middleware/database' ? db : name === '../config/utils/ninEncryption' ? {
+    require: name => name === './localFaceService' ? local : name === 'fs' && options.legalImages ? {...fs,promises:{...fs.promises,readFile:async filename=>String(filename).includes('passport_5_')?image:await sharp({create:{width:500,height:500,channels:3,background:'#abcdef'}}).jpeg().toBuffer()}} : name === 'axios' ? axios : name === '../config/middleware/database' ? db : name === '../config/utils/ninEncryption' ? {
       encryptNIN: v => v,
-      decryptNIN: v => v === 'encrypted-nin' ? '12345678901' : 'data:image/jpeg;base64,' + image.toString('base64')
+      decryptNIN: v => v === 'encrypted-template' ? JSON.stringify(vector) : v === 'encrypted-nin' ? '12345678901' : 'data:image/jpeg;base64,' + image.toString('base64')
     } : name === '../config/utils/notificationService' ? {
       createNotification: async () => {}
     } : require(name)
@@ -203,21 +206,7 @@ test('identity conflicts cover same account, phone, NIN, passport, email and exa
   }), false);
   assert.equal(api.normalName('Ada Obi'), api.normalName('OBI ADA'));
 });
-test('face comparison rejects ambiguous or malformed scores rather than declaring identity verified', async () => {
-  const {
-    api
-  } = await fixture();
-  for (const confidence of [null, '99', 0.9, 80, NaN, 101]) assert.equal(api.faceVerdict({
-    confidence
-  }).status, 'review_required');
-  assert.equal(api.faceVerdict({
-    confidence: 99
-  }).status, 'match');
-  assert.equal(api.faceVerdict({
-    message: 'No Match',
-    confidence: 20
-  }).status, 'different');
-});
+test('local face math rejects malformed templates and calculates bounded similarity',()=>{const local=require('../../services/localFaceService');const a=Array(128).fill(0),b=Array(128).fill(0);a[0]=1;b[1]=1;assert.equal(local.similarity(a,a),1);assert.equal(local.similarity(a,b),0);for(const bad of [[],[1],Array(128).fill(NaN),Array(128).fill(1)])assert.equal(local.validEmbedding(bad),false);});
 test('declining gallery consent saves a manual-review result without sending any biometric provider request', async () => {
   const f = await fixture();
   const result = await f.api.screenPhoto({
@@ -229,19 +218,8 @@ test('declining gallery consent saves a manual-review result without sending any
   assert.equal(f.calls.length, 0);
   assert.ok(result.reasons.includes('biometric_consent_not_given'));
 });
-test('successful live capture, trusted identity portrait and gallery search are all required for automatic verification', async () => {
-  const f = await fixture();
-  const result = await f.api.screenPhoto({
-    userId: 5,
-    buffer: f.image,
-    consent: true
-  });
-  assert.equal(result.status, 'verified');
-  assert.ok(f.calls.some(c => c.url.includes('/enroll/')));
-  const enroll = f.calls.find(c => c.url.includes('/enroll/'));
-  assert.equal(enroll.body.consent, true);
-  assert.ok(enroll.body.consent_reference.includes('check-10'));
-});
+test('local liveness, trusted portrait and private duplicate checks are required for automatic verification',async()=>{const f=await fixture();const result=await f.api.screenPhoto({userId:5,buffer:f.image,consent:true});assert.equal(result.status,'verified');assert.ok(f.queries.some(q=>q.sql.includes('INSERT INTO local_face_templates')));assert.equal(f.calls.some(call=>call.url),false);});
+test('local models without physical spoof validation never automatically verify a capture',async()=>{const f=await fixture({noValidation:true}),result=await f.api.screenPhoto({userId:5,buffer:f.image,consent:true});assert.equal(result.status,'review_required');assert.ok(result.reasons.includes('local_spoof_validation_required'));assert.equal(f.calls.some(call=>call.url),false);});
 test('provider outage, missing portrait, same name, duplicate face and assisted capture never auto-verify', async () => {
   for (const options of [{
     outage: true
@@ -264,7 +242,7 @@ test('provider outage, missing portrait, same name, duplicate face and assisted 
         assisted: options.assisted
       });
     assert.notEqual(result.status, 'verified', JSON.stringify(options));
-    assert.equal(f.calls.some(c => c.url.includes('/enroll/')), false);
+    assert.equal(f.calls.some(c => c.url?.includes('/enroll/')), false);
   }
 });
 test('duplicate identity stops biometric calls and cached submissions do not repeat paid checks', async () => {
@@ -342,6 +320,6 @@ test('gallery erasure is required before clearing enrolment and is skipped for u
   assert.equal(empty.calls.length, 0);
 });
 
-test('legal face processing requires both consents; manual review is bound to the current photo pair',async()=>{const none=await fixture({legalImages:true});assert.equal(await none.api.legalConflict(5,[6]),true);assert.equal(none.calls.length,0);const flag=none.queries.find(q=>q.sql.includes('INSERT INTO identity_review_flags'));assert.equal(flag.params[3].length,64);const manual=await fixture({legalImages:true,manualLegalReview:true});assert.equal(await manual.api.legalConflict(5,[6]),false);assert.equal(manual.calls.length,0);const consented=await fixture({legalImages:true,legalConsents:true,differentFaces:true});assert.equal(await consented.api.legalConflict(5,[6]),false);assert.ok(consented.calls.some(call=>call.url?.endsWith('/face/comparison')));});
+test('legal face processing requires both consents; manual review is bound to the current photo pair',async()=>{const none=await fixture({legalImages:true});assert.equal(await none.api.legalConflict(5,[6]),true);assert.equal(none.calls.length,0);const flag=none.queries.find(q=>q.sql.includes('INSERT INTO identity_review_flags'));assert.equal(flag.params[3].length,64);const manual=await fixture({legalImages:true,manualLegalReview:true});assert.equal(await manual.api.legalConflict(5,[6]),false);assert.equal(manual.calls.length,0);const consented=await fixture({legalImages:true,legalConsents:true,differentFaces:true});assert.equal(await consented.api.legalConflict(5,[6]),false);assert.ok(consented.calls.some(call=>call.localCompare));});
 
 test('only verified provider responses can supply a bounded JPEG or PNG reference portrait',async()=>{const {normalizePremblyResponse}=require('../../config/utils/premblyResponse');const f=await fixture();const image=f.image.toString('base64');const good=normalizePremblyResponse({status:true,response_code:'00',nin_data:{base64Image:image}});assert.equal(good.reference_photo,'data:image/jpeg;base64,'+image);assert.equal(normalizePremblyResponse({status:false,response_code:'01',data:{photo:image}}).reference_photo,null);for(const photo of ['https://example.invalid/image.jpg','data:image/svg+xml;base64,PHN2Zz4='])assert.equal(normalizePremblyResponse({status:true,response_code:'00',data:{photo}}).reference_photo,null);});

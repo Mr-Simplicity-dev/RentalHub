@@ -71,7 +71,7 @@ const bulkUserAction = async (req, res) => {
     const actionResult = await db.query(query, params);
 
     if(action==='verify'){
-      for(const row of actionResult.rows)await createIdentityVerificationOperation({userId:row.id,actorId:req.user.id,actorName:getAdminOperationActorName(req.user),eventType:'identity_verified',note:reason,userSnapshot:row,metadata:{bulk_action:true}});
+      for(const row of actionResult.rows){await require('../identityPhotoService').approveCurrentPhotoTemplate(row.id);await createIdentityVerificationOperation({userId:row.id,actorId:req.user.id,actorName:getAdminOperationActorName(req.user),eventType:'identity_verified',note:reason,userSnapshot:row,metadata:{bulk_action:true}});}
     }
     if (action === 'ban') {
       for (const row of actionResult.rows) {

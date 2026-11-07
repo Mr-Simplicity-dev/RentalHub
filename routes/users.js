@@ -2351,7 +2351,7 @@ const handlePassportUpload = async (req, res) => {
 
     const relativePath = `/uploads/passports/${req.file.filename}`;
 
-    const photoCheck = await identityPhotos.screenPhoto({userId,buffer:fs.readFileSync(req.file.path),consent:req.body?.biometric_consent === 'true',assisted:Boolean(req.assistedPassportSubject)});
+    const photoCheck = await identityPhotos.screenPhoto({userId,buffer:fs.readFileSync(req.file.path),consent:req.body?.biometric_consent === 'true' && req.body?.biometric_consent_version === identityPhotos.CONSENT_VERSION,assisted:Boolean(req.assistedPassportSubject)});
     if(photoCheck.status==='rejected'){
       cleanupUploadedFile(req.file);
       return res.status(400).json({success:false,message:'Your photo could not be verified. Please retake it or contact support.',code:'PHOTO_VERIFICATION_FAILED'});

@@ -747,6 +747,7 @@ exports.reviewRequest = async (req, res) => {
       [requestId, decision, req.user.id, reviewNote || null]
     );
     await client.query('COMMIT');
+    if(decision==='approved')await require('./identityPhotoService').approveCurrentPhotoTemplate(request.user_id);
 
     await createNotification(
       request.user_id,

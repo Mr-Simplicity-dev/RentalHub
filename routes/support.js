@@ -2739,6 +2739,10 @@ router.post('/tickets/:id/reply', authenticate, uploadAttachment.single('attachm
       return res.status(403).json({ success: false, message: 'You cannot reply to this ticket' });
     }
 
+    try{
+      const history=(await db.query("SELECT message FROM support_ticket_replies WHERE ticket_id=$1 AND user_id=$2 AND created_at>NOW()-INTERVAL '15 minutes' ORDER BY created_at DESC LIMIT 5",[ticketId,req.user.id])).rows.reverse().map(row=>row.message);
+      await require('../services/contactPolicyService').enforce({userId:req.user.id,channel:'support_ticket',contextKey:ticketId,texts:[message],history});
+    }catch(error){if(error.code==='CONTACT_SHARING_BLOCKED'){if(req.file?.path){try{require('fs').unlinkSync(req.file.path);}catch{}}return res.status(400).json({success:false,code:error.code,message:error.message});}throw error;}
     const isAdminReply = isSupportAdmin || isDeptAdmin;
 
     // The auto-handover rule: an admin reply ends the 90-second clock for good.
@@ -2923,6 +2927,7 @@ router.patch('/tickets/:ticketId/reply/:replyId', authenticate, async (req, res)
       }
     }
 
+    try{const history=(await db.query("SELECT message FROM support_ticket_replies WHERE ticket_id=$1 AND user_id=$2 AND id<>$3 AND created_at>NOW()-INTERVAL '15 minutes' ORDER BY created_at DESC LIMIT 5",[ticketId,req.user.id,replyId])).rows.reverse().map(row=>row.message);await require('../services/contactPolicyService').enforce({userId:req.user.id,channel:'support_ticket',contextKey:ticketId,texts:[message],history});}catch(error){if(error.code==='CONTACT_SHARING_BLOCKED')return res.status(400).json({success:false,code:error.code,message:error.message});throw error;}
     const result = await db.query(
       `UPDATE support_ticket_replies SET message = $1, edited_at = CURRENT_TIMESTAMP
        WHERE id = $2 RETURNING *`,
@@ -3840,6 +3845,7 @@ router.get('/admin/dashboard', authenticate, requireSupportAdmin, async (req, re
 router.createVoiceEscalatedTicket = createVoiceEscalatedTicket;
 router.getVoiceTicketDepartment = getVoiceTicketDepartment;
 
+router.canSupportAdminAccessTicket = canSupportAdminAccessTicket;
 router._supportScopeForTest = {
   canSupportAdminAccessTicket,
   normalizeSupportCategory,

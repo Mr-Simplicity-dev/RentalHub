@@ -337,7 +337,7 @@
     "captured_preview": "Captured passport preview",
     "preview_hint": "Ensure your face is sharp and fully visible before uploading.",
     "camera_guide": "Keep your face inside the guide and complete all checks.",
-    "face_gallery_consent": "I agree to secure face matching and storage in Prembly’s private face gallery to verify my identity and prevent duplicate accounts. Without consent, my photo will be reviewed manually.",
+    "face_gallery_consent": "I agree to private face matching and secure storage on RentalHub’s own server to verify my identity and prevent duplicate accounts. Without consent, staff will review my photo manually.",
     "photo_review_pending": "Photo saved. Identity verification is awaiting review."
   },
   "property_types": {
@@ -632,7 +632,8 @@
       "send_message": "Send message",
       "start_conversation_btn": "Start conversation",
       "lookup": "Check Tickets Status"
-    }
+    },
+    "private_documents": "Send documents through a private support ticket."
   },
   "about_us": {
     "hero": {

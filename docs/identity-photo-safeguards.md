@@ -21,3 +21,68 @@ Gallery enrolment has an uncertainty marker for lost provider replies. Account d
 Read-only audit: `node scripts/auditIdentitySafeguards.js`. It prints aggregate duplicate counts and photo/enrolment totals, without names, identifiers, photos or provider calls.
 
 Android release source: 1.0.58 / 69. iOS source: 1.0.58 / 63; building and distribution require macOS/Xcode and signing. Web/native code share server rules. Manually validate a consenting test user, an outage, two different people with a shared name, a matching legal-party identity, avatar load/error and token refresh on devices before broader rollout.
+
+## Verification results
+
+VPS backend: 60 tests passed. Web: 140 tests in 20 files passed. React production build passed. Temporary PostgreSQL probes passed for concurrent-identity protection and one-use capture tokens. Registration and embedded-payment regression scripts passed. Unauthenticated private-photo access returns 401; the public uploads path returns 403; unauthenticated flag review returns 401. Read-only Prembly gallery lookup returned the expected missing-subject result, confirming route access without enrolling a face or billing a verification. No real-person biometric check was performed.
+
+The read-only live-record audit found zero duplicate NIN, passport or normalized-phone groups. Historical gallery enrolment remains zero; existing photos were not enrolled without consent. Existing build-size and React Native deprecation warnings were not suppressed. Android and iOS device acceptance testing remains distinct from these automated tests.
+
+## Exact implementation files
+
+Web/backend paths are relative to the main project root:
+
+- `client/src/components/admin/UsersTab.identity.test.jsx`
+- `client/src/components/admin/UsersTab.jsx`
+- `client/src/components/admin/VerificationsTab.jsx`
+- `client/src/components/common/Header.jsx`
+- `client/src/components/common/UserAvatar.jsx`
+- `client/src/components/common/UserAvatar.test.jsx`
+- `client/src/i18n/ar.json`
+- `client/src/i18n/en.json`
+- `client/src/i18n/fr.json`
+- `client/src/i18n/ha.json`
+- `client/src/i18n/ig.json`
+- `client/src/i18n/ru.json`
+- `client/src/i18n/yo.json`
+- `client/src/i18n/zh.json`
+- `client/src/pages/Profile.jsx`
+- `client/src/pages/SuperAdminDashboard.jsx`
+- `config/middleware/auditMiddleware.js`
+- `config/middleware/upload.js`
+- `config/utils/premblyResponse.js`
+- `docs/identity-photo-safeguards.md`
+- `migrations/2040_identity_photo_safeguards.sql`
+- `migrations/2041_legal_identity_review.sql`
+- `routes/admin.js`
+- `routes/auth.js`
+- `routes/users.js`
+- `scripts/auditIdentitySafeguards.js`
+- `services/adminService.js`
+- `services/authService.js`
+- `services/credentialRevalidationService.js`
+- `services/identityPhotoService.js`
+- `services/legalService.js`
+- `services/premblyRecoveryService.js`
+- `services/superAdmin/bulkActionService.js`
+- `services/superAdmin/schemaHelpers.js`
+- `services/superAdmin/userService.js`
+- `services/superAdmin/verificationService.js`
+- `tests/services/identityApproval.test.js`
+- `tests/services/identityPhoto.test.js`
+
+Android/iOS paths are relative to RentalHubMobile:
+
+- `src/components/common/UserAvatar.js`
+- `src/i18n/identityPhotoCopy.cjs`
+- `src/screens/dashboard/ProfileScreen.js`
+- `src/screens/dashboard/DashboardScreen.js`
+- `src/screens/admin/SuperAdminDashboardScreen.js`
+- `src/services/authService.js`
+- `src/services/superAdminService.js`
+- `src/navigation/AppNavigator.js`
+- `android/app/build.gradle`
+- `ios/RentalHubMobile.xcodeproj/project.pbxproj`
+- `app.json`
+- `package.json`
+- `package-lock.json`

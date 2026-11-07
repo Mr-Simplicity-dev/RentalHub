@@ -1,3 +1,4 @@
+import SupportContactForms from '../components/common/SupportContactForms';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { messageService } from '../services/messageService';
@@ -386,6 +387,7 @@ const Messages = () => {
         <BackToDashboard />
       </div>
 
+      <SupportContactForms peerId={selectedConversation?.other_user_id} />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="card lg:col-span-1" data-tour-id="messages-conversations-workflow">
           <div className="flex items-center justify-between mb-4">
@@ -513,7 +515,7 @@ const Messages = () => {
                   <div className="flex items-center gap-2 mt-2">
                     <button
                       type="button"
-                      onClick={() => fileInputRef.current?.click()}
+                      onClick={() => toast.info(t('messages.private_documents', 'Send documents through a private support ticket.'))}
                       className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                       title={t('messages.attachment')}
                     >

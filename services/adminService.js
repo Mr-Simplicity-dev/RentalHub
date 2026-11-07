@@ -1032,6 +1032,7 @@ exports.approveVerification = async (req, res) => {
 
     await db.query("UPDATE identity_review_flags SET status='reviewed',reviewed_by=$2,review_note=$3,reviewed_at=NOW() WHERE user_id=$1 AND status='pending'",[userId,adminId,reviewNote]);
     await db.query("INSERT INTO audit_logs(actor_id,action,target_type,target_id,metadata) VALUES($1,'IDENTITY_MANUALLY_APPROVED','user',$2,$3)",[adminId,userId,JSON.stringify({note:reviewNote})]);
+    await require('./identityPhotoService').approveCurrentPhotoTemplate(userId);
     res.json({ success: true, message: 'User verified successfully' });
   } catch (err) {
     req.logger.error('Approve verification error:', err);
@@ -1756,6 +1757,7 @@ exports.verifyUser = async (req, res) => {
     }
 
     const verifiedUser = result.rows[0];
+    await require('./identityPhotoService').approveCurrentPhotoTemplate(verifiedUser.id);
     await recordUserAccountOperation({
       userId: verifiedUser.id,
       actor: req.user,

@@ -332,7 +332,7 @@
     "captured_preview": "已拍摄护照预览",
     "preview_hint": "上传前请确保您的脸部清晰且完全可见。",
     "camera_guide": "请将脸部保持在引导框内并完成所有检测。",
-    "face_gallery_consent": "我同意进行人脸比对，并将人脸保存在Prembly的私有图库中，以验证身份并防止重复账户。如不同意，工作人员将人工审核我的照片。",
+    "face_gallery_consent": "我同意在RentalHub自己的私有服务器上进行人脸比对并安全存储，以验证身份并防止重复账户。如不同意，工作人员将人工审核我的照片。",
     "photo_review_pending": "照片已保存，身份验证等待审核。"
   },
   "property_types": {
@@ -627,7 +627,8 @@
       "send_message": "发送消息",
       "start_conversation_btn": "开始会话",
       "lookup": "查看工单状态"
-    }
+    },
+    "private_documents": "请通过私密支持工单发送文件。"
   },
   "about_us": {
     "hero": {

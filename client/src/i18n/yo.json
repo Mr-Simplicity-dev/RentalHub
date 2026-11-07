@@ -337,7 +337,7 @@
     "captured_preview": "Àwòrán ìwé ìrìnnà tí a yà",
     "preview_hint": "Rí i dájú pé ojú rẹ ṣe pọ́n tó kí o tó gbé sílẹ̀.",
     "camera_guide": "Mú ojú rẹ sí inú ìtọ́sọ́nà kí o sì parí gbogbo àyẹ̀wò.",
-    "face_gallery_consent": "Mo gbà kí a fi ojú mi wé ẹ̀rí ìdánimọ̀ mi, kí a sì tọ́jú rẹ̀ nínú àkójọpọ̀ ojú àdáni Prembly láti dènà àkọọlẹ́ ẹ̀ẹ̀mejì. Bí mi ò bá gbà, òṣìṣẹ́ yóò ṣe àyẹ̀wò fọ́tò mi.",
+    "face_gallery_consent": "Mo gbà kí a fi ojú mi wé ẹ̀rí ìdánimọ̀ mi, kí a sì tọ́jú rẹ̀ láìléwu lórí ẹ̀rọ ìpamọ́ àdáni RentalHub láti dènà àkọọlẹ́ ẹ̀ẹ̀mejì. Bí mi ò bá gbà, òṣìṣẹ́ yóò ṣe àyẹ̀wò fọ́tò mi.",
     "photo_review_pending": "A ti fi fọ́tò pamọ́. Àyẹ̀wò ìdánimọ̀ ń dúró de òṣìṣẹ́."
   },
   "property_types": {
@@ -632,7 +632,8 @@
       "send_message": "Firanṣẹ́ ifiranṣẹ́",
       "start_conversation_btn": "Bẹ̀rẹ̀ ìbárasọ̀rọ̀",
       "lookup": "Ṣàyẹ̀wò ipò tíketì"
-    }
+    },
+    "private_documents": "Fi àwọn ìwé ránṣẹ́ nípasẹ̀ tìkẹ́ẹ̀tì ìrànlọ́wọ́ àdáni."
   },
   "about_us": {
     "hero": {
