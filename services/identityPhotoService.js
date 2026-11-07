@@ -96,9 +96,10 @@ const saveLocalTemplate=async(userId,hash,analysis)=>{
 const screenPhotoUnlocked=async({userId,buffer,consent,assisted=false})=>{
  const image=await canonicalPhoto(buffer),hash=digest(image);
  const user=(await db.query('SELECT * FROM users WHERE id=$1 AND deleted_at IS NULL',[userId])).rows[0];if(!user)throw Error('USER_NOT_FOUND');
+ if(!consent){await db.query('UPDATE identity_photo_checks SET consent_revoked_at=NOW() WHERE user_id=$1 AND consent_version=$2 AND consent_revoked_at IS NULL',[userId,CONSENT_VERSION]);await db.query('DELETE FROM local_face_templates WHERE user_id=$1',[userId]);}
  let revision='local-consent-declined';if(consent){try{revision=(await localFaces.health()).engine || 'local-unavailable';}catch{revision='local-unavailable';}}
  const claim=await db.query("INSERT INTO identity_photo_checks(user_id,image_hash,consent_version,consent_at,engine_revision) VALUES($1,$2,$3,CASE WHEN $3::text IS NOT NULL THEN NOW() ELSE NULL END,$4) ON CONFLICT DO NOTHING RETURNING id",[userId,hash,consent?CONSENT_VERSION:null,revision]);
- if(!claim.rows.length){const cached=(await db.query('SELECT status,reasons FROM identity_photo_checks WHERE user_id=$1 AND image_hash=$2 AND engine_revision=$3',[userId,hash,revision])).rows[0];return {hash,status:cached?.status==='verified'?'verified':'review_required',reasons:cached?.reasons||['local_check_pending']};}
+ if(!claim.rows.length){const cached=(await db.query('SELECT status,reasons,consent_revoked_at FROM identity_photo_checks WHERE user_id=$1 AND image_hash=$2 AND engine_revision=$3',[userId,hash,revision])).rows[0];return {hash,status:cached?.status==='verified'&&!cached.consent_revoked_at?'verified':'review_required',reasons:cached?.reasons||['local_check_pending']};}
  const reasons=[];
  const duplicates=await db.query("SELECT id,passport_photo_hash,nin_hash FROM users WHERE id<>$1 AND deleted_at IS NULL AND (passport_photo_hash=$2 OR (nin_hash IS NOT NULL AND nin_hash=$3) OR (international_passport_number IS NOT NULL AND international_passport_number=$4))",[userId,hash,user.nin_hash,user.international_passport_number]);
  for(const row of duplicates.rows){const reason=row.passport_photo_hash===hash?'duplicate_photo':'duplicate_identity';reasons.push(reason);await recordFlag(userId,reason,row.id);}
@@ -106,7 +107,7 @@ const screenPhotoUnlocked=async({userId,buffer,consent,assisted=false})=>{
  for(const row of legacy.rows){const old=await privatePhoto(row.passport_photo_url);if(!old)continue;try{const oldHash=digest(await canonicalPhoto(old));await db.query('UPDATE users SET passport_photo_hash=$2 WHERE id=$1 AND passport_photo_hash IS NULL',[row.id,oldHash]);if(oldHash===hash){reasons.push('duplicate_photo');await recordFlag(userId,'duplicate_photo',row.id);}}catch{}}
  const names=await db.query('SELECT id,full_name FROM users WHERE id<>$1 AND deleted_at IS NULL',[userId]);for(const row of names.rows)if(normalName(row.full_name)===normalName(user.full_name)){reasons.push('matching_name');await recordFlag(userId,'matching_name',row.id);}
  let analysis;
- if(!consent){reasons.push('local_biometric_consent_not_given');await db.query('DELETE FROM local_face_templates WHERE user_id=$1',[userId]);}
+ if(!consent){reasons.push('local_biometric_consent_not_given');}
  else if(!reasons.some(reason=>['duplicate_identity','duplicate_photo'].includes(reason))){
   try{
    analysis=await localFaces.analyze(image);

@@ -3,12 +3,12 @@ const STAFF=new Set(['admin','lga_admin','super_admin','lga_support_admin','stat
 const metadata=row=>({id:row.id,requester_id:row.requester_id,customer_id:row.customer_id,fields:row.fields,purpose:row.purpose,status:row.status,expires_at:row.expires_at,created_at:row.created_at,submitted_at:row.submitted_at,ticket_id:row.ticket_id});
 const staffAllowed=async(actor,customerId,ticketId)=>{
  if(!STAFF.has(actor.user_type)||Number(actor.id)===Number(customerId))return false;
+ const customer=(await db.query("SELECT id,user_type,is_active,deleted_at,preferred_state_id,preferred_lga_name FROM users WHERE id=$1",[customerId])).rows[0];
+ if(!customer||!['tenant','landlord'].includes(customer.user_type)||customer.deleted_at||customer.is_active===false)return false;
  if(ticketId){const ticket=(await db.query('SELECT * FROM support_tickets WHERE id=$1 AND user_id=$2',[ticketId,customerId])).rows[0];if(!ticket||['closed','resolved','cancelled'].includes(ticket.status))return false;return require('../routes/support').canSupportAdminAccessTicket(actor,ticket);}
  if(!['admin','lga_admin','super_admin'].includes(actor.user_type))return false;
  const conversation=await db.query('SELECT 1 FROM messages WHERE (sender_id=$1 AND receiver_id=$2) OR (sender_id=$2 AND receiver_id=$1) LIMIT 1',[actor.id,customerId]);
  if(!conversation.rows.length)return false;
- const customer=(await db.query("SELECT id,user_type,is_active,deleted_at,preferred_state_id,preferred_lga_name FROM users WHERE id=$1",[customerId])).rows[0];
- if(!customer||!['tenant','landlord'].includes(customer.user_type)||customer.deleted_at||customer.is_active===false)return false;
  if(actor.user_type==='super_admin')return true;
  const scope=await db.query(`SELECT 1 FROM users u LEFT JOIN states s ON s.id=u.preferred_state_id WHERE u.id=$1 AND LOWER(TRIM(s.state_name))=LOWER(TRIM($2)) AND LOWER(TRIM(u.preferred_lga_name))=LOWER(TRIM($3))`,[customerId,actor.assigned_state||'',actor.assigned_city||actor.assigned_lga||'']);
  return scope.rows.length>0;

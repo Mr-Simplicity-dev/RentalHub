@@ -216,7 +216,9 @@ test('declining gallery consent saves a manual-review result without sending any
   });
   assert.equal(result.status, 'review_required');
   assert.equal(f.calls.length, 0);
-  assert.ok(result.reasons.includes('biometric_consent_not_given'));
+  assert.ok(result.reasons.includes('local_biometric_consent_not_given'));
+  assert.ok(f.queries.some(q=>q.sql.includes('SET consent_revoked_at=NOW()')));
+  assert.ok(f.queries.some(q=>q.sql.startsWith('DELETE FROM local_face_templates')));
 });
 test('local liveness, trusted portrait and private duplicate checks are required for automatic verification',async()=>{const f=await fixture();const result=await f.api.screenPhoto({userId:5,buffer:f.image,consent:true});assert.equal(result.status,'verified');assert.ok(f.queries.some(q=>q.sql.includes('INSERT INTO local_face_templates')));assert.equal(f.calls.some(call=>call.url),false);});
 test('local models without physical spoof validation never automatically verify a capture',async()=>{const f=await fixture({noValidation:true}),result=await f.api.screenPhoto({userId:5,buffer:f.image,consent:true});assert.equal(result.status,'review_required');assert.ok(result.reasons.includes('local_spoof_validation_required'));assert.equal(f.calls.some(call=>call.url),false);});

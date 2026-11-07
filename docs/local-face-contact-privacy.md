@@ -1,0 +1,15 @@
+# Local identity checks and private support contact forms
+
+Migration: 2042_contact_privacy_local_faces.sql. Existing identity and application records remain intact.
+
+Prembly remains responsible for official NIN/passport checks and retrieval of verified identity evidence. Face comparison and new face templates use the isolated local SFace/MiniFAS worker. No paid face API fallback exists. Model sources, revisions, hashes and licences are in tools/local-face. Runtime: Python 3.12, numpy 1.26.4, opencv-python-headless 4.11.0.86, torch 2.5.1+cpu, installed in .local-face-venv. Installer downloads only pinned public model assets; inference has no external service calls.
+
+Automatic liveness acceptance is deliberately disabled until real camera validation. Unit tests and model health do not establish resistance to physical impersonation. Test at least 20 consenting genuine captures and 20 attacks each using printed photos, phone/computer screens and recorded video, on the supported capture devices and lighting conditions. Record the engine revision, results, reviewer and evidence hash. Any false acceptance or uncertain comparison requires manual review and further calibration. Do not fabricate validation.json to unlock automatic approval. No physical attack validation has been completed in this change.
+
+New local biometric consent version: local-face-2026-11. Old clients cannot silently enrol users under the previous provider consent. Their captures remain eligible for manual review. Templates are encrypted with the existing identity encryption mechanism, scoped to the current image and consent. Existing verified identity requirements and role permissions remain enforced.
+
+The shared server contact policy covers inbox text, application/negotiation notes and rejection reasons, and public support replies/edits. It blocks detected phone/email/outside contact links and credential requests, including selected Unicode/word obfuscations and split fragments. It allows ordinary rent amounts, dates and RentalHub links. Detection is heuristic: images, audio and novel obfuscations still need staff review. Monitoring persists violation metadata, never raw message text, across workers and successful messages. Old stored messages are not deleted.
+
+Private support forms require an existing scoped staff conversation or accessible active ticket. Staff may request email and/or phone only, with a stated purpose. The exact customer must explicitly consent. Values are encrypted, excluded from list responses and audit metadata, and readable only by the initiating staff member while still authorised and before the 24-hour expiry. These forms do not change account details. The customer can withdraw the specific submission. Expiry denies access; no automatic deletion of stored history or encrypted payloads is scheduled. Retention remains an administrative policy decision.
+
+Android and iOS share src/components/common/SupportContactForms.js; web uses the corresponding common React component. Customer labels support the existing eight languages; staff controls remain English. No new external messaging or AI provider is used.
