@@ -1,3 +1,4 @@
+const {removePropertyContacts}=require('../config/utils/propertyContactPrivacy');
 // ====================== IMPORTS ======================
 const db = require('../config/middleware/database');
 
@@ -135,7 +136,7 @@ exports.getPropertiesByState = async (req, res) => {
     
     res.json({
       success: true,
-      data: result.rows,
+      data: removePropertyContacts(result.rows),
       statistics: statsResult.rows[0],
       pagination: {
         page: parseInt(page),

@@ -37,3 +37,5 @@ test('contact values are fetched only after an authorised staff view action',asy
  expect(api.get).toHaveBeenCalledWith('/messages/private-contact-forms/request-one/details');
  expect(container.textContent).toContain('private@example.test');
 });
+
+test('guests do not request or display private contact forms',async()=>{session.user=null;await act(async()=>root.render(<SupportContactForms/>));expect(api.get).not.toHaveBeenCalled();expect(container.textContent).toBe('');});

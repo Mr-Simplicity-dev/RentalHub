@@ -78,7 +78,7 @@ const ChatMessage = ({ reply, isOwn, onEdit, onDelete, ticketId }) => {
   );
 };
 
-const Support = () => {
+const Support = ({initialTicketId}) => {
   const { t } = useTranslation();
   const priorityOptions = [
     { value: 'low', label: t('support.low'), color: 'bg-gray-100 text-gray-600' },
@@ -293,6 +293,8 @@ const Support = () => {
     }));
   };
 
+  const openedLink=useRef(null);
+  useEffect(()=>{if(!initialTicketId||openedLink.current===initialTicketId||!tickets.some(ticket=>Number(ticket.id)===Number(initialTicketId)))return;openedLink.current=initialTicketId;setExpandedTicket(Number(initialTicketId));loadConversation(Number(initialTicketId));},[initialTicketId,tickets,loadConversation]);
   if (loading) return <Loader />;
 
   return (

@@ -5,7 +5,7 @@ const {notifyDispute}=require('./disputeNotificationService');
 const policy=require('./contactPolicyService');
 const STAFF=new Set(['super_admin','super_support_admin','zonal_admin','state_support_admin','lga_support_admin']);
 const fail=(status,message)=>Object.assign(new Error(message),{statusCode:status});
-const positive=value=>Number.isSafeInteger(Number(value))&&Number(value)>0;
+const positive=value=>Number.isSafeInteger(Number(value))&&Number(value)>0&&/^\d+$/.test(String(value));
 const mayAccess=(actor,ticket)=>require('../routes/support').canSupportAdminAccessTicket(actor,ticket);
 const getTicket=async(req,queryable=db)=>{
  if(!positive(req.params.ticketId))throw fail(400,'Choose a valid support ticket.');
@@ -20,14 +20,14 @@ const proposal=async(ticketId,queryable=db)=>(await queryable.query(`SELECT h.id
  JOIN users u ON u.id=h.against_user_id JOIN users lead ON lead.id=h.responsible_support_id
  LEFT JOIN disputes linked ON linked.id=h.dispute_id LEFT JOIN users actual_lead ON actual_lead.id=linked.responsible_support_id
  WHERE h.ticket_id=$1 ORDER BY h.id DESC LIMIT 1`,[ticketId])).rows[0]||null;
-const properties=async(customerId)=>(await db.query(`SELECT p.id,p.title,s.state_name,p.city
+const properties=async(customerId)=>(await db.query(`SELECT p.id,p.title,s.state_name,COALESCE(NULLIF(TRIM(p.lga_name),''),p.city) AS city
  FROM properties p LEFT JOIN states s ON s.id=p.state_id
  WHERE p.deleted_at IS NULL AND (p.landlord_id=$1 OR p.user_id=$1 OR EXISTS(
  SELECT 1 FROM applications a WHERE a.property_id=p.id AND a.tenant_id=$1 AND a.status='approved'))
  ORDER BY p.id DESC LIMIT 200`,[customerId])).rows;
 const propertyAccess=async(actor,customerId,propertyId,queryable=db)=>{
  if(!positive(propertyId))throw fail(400,'Choose a property connected to this customer.');
- const property=(await queryable.query('SELECT p.id,p.title,p.city,s.state_name FROM properties p LEFT JOIN states s ON s.id=p.state_id WHERE p.id=$1 AND p.deleted_at IS NULL',[propertyId])).rows[0];
+ const property=(await queryable.query("SELECT p.id,p.title,COALESCE(NULLIF(TRIM(p.lga_name),''),p.city) AS city,s.state_name FROM properties p LEFT JOIN states s ON s.id=p.state_id WHERE p.id=$1 AND p.deleted_at IS NULL",[propertyId])).rows[0];
  if(!property||!mayAccess(actor,{state:property.state_name,lga:property.city}))throw fail(403,'This property is outside your support area.');
  const people=await getPropertyDisputeParticipants(propertyId,queryable);
  if(!people?.participants.some(person=>Number(person.id)===Number(customerId)))throw fail(403,'The customer is not connected to this property.');
@@ -57,12 +57,15 @@ exports.request=async req=>{
  const title=String(req.body.title||'').trim(),summary=String(req.body.shared_summary||'').trim();
  if(title.length<5||title.length>160||summary.length<20||summary.length>5000)throw fail(400,'Write a title (5–160 characters) and a shared summary (20–5,000 characters).');
  await policy.enforce({userId:req.user.id,channel:'dispute_handover',contextKey:ticket.id,texts:[title,summary]});
+ if(req.body.existing_dispute_id&&!positive(req.body.existing_dispute_id))throw fail(400,'Choose a valid existing dispute.');
  const existing=req.body.existing_dispute_id?Number(req.body.existing_dispute_id):null;
- if(existing){const match=(await db.query("SELECT id FROM disputes WHERE id=$1 AND property_id=$2 AND ((opened_by=$3 AND against_user=$4) OR (opened_by=$4 AND against_user=$3)) AND status='open' AND is_legally_sealed=FALSE",[existing,req.body.property_id,ticket.user_id,target])).rows[0];if(!match)throw fail(400,'Choose an open dispute between these same two people for this property.');}
+ let existingCase;
+ if(existing){const match=(await db.query("SELECT id,responsible_support_id FROM disputes WHERE id=$1 AND property_id=$2 AND ((opened_by=$3 AND against_user=$4) OR (opened_by=$4 AND against_user=$3)) AND status='open' AND is_legally_sealed=FALSE",[existing,req.body.property_id,ticket.user_id,target])).rows[0];if(!match)throw fail(400,'Choose an open dispute between these same two people for this property.');existingCase=match;}
  const active=(await db.query("SELECT id FROM support_dispute_handovers WHERE ticket_id=$1 AND status IN ('pending','accepted') LIMIT 1",[ticket.id])).rows[0];
  if(active)throw fail(409,'This ticket already has a pending or accepted handover.');
  let responsible=req.user.id;
  if(ticket.assigned_to){const lead=(await db.query("SELECT * FROM users WHERE id=$1 AND deleted_at IS NULL AND is_active IS DISTINCT FROM FALSE AND account_suspended_at IS NULL",[ticket.assigned_to])).rows[0];if(lead&&STAFF.has(lead.user_type)&&mayAccess(lead,ticket)&&mayAccess(lead,{state:property.state_name,lga:property.city}))responsible=lead.id;}
+ if(existingCase?.responsible_support_id){const lead=(await db.query("SELECT * FROM users WHERE id=$1 AND deleted_at IS NULL AND is_active IS DISTINCT FROM FALSE AND account_suspended_at IS NULL",[existingCase.responsible_support_id])).rows[0];if(!lead||!STAFF.has(lead.user_type)||!mayAccess(lead,{state:property.state_name,lga:property.city}))throw fail(409,'The existing case officer needs a support review before linking.');responsible=lead.id;}
  const client=await db.connect();
  try{
   await client.query('BEGIN');
@@ -96,8 +99,10 @@ exports.respond=async req=>{
    if(h.existing_dispute_id){
     const existing=(await client.query("SELECT * FROM disputes WHERE id=$1 AND property_id=$2 AND ((opened_by=$3 AND against_user=$4) OR (opened_by=$4 AND against_user=$3)) AND status='open' AND is_legally_sealed=FALSE FOR UPDATE",[h.existing_dispute_id,h.property_id,h.customer_id,h.against_user_id])).rows[0];
     if(!existing)throw fail(409,'The chosen dispute is no longer available for linking.');
+    if(existing.responsible_support_id&&Number(existing.responsible_support_id)!==Number(h.responsible_support_id))throw fail(409,'The case officer has changed. Decline this proposal and ask support for a new review.');
     caseId=existing.id;
     await client.query('UPDATE disputes SET responsible_support_id=COALESCE(responsible_support_id,$2) WHERE id=$1',[caseId,staff.id]);
+    await client.query('INSERT INTO dispute_messages(dispute_id,sender_id,message) VALUES($1,$2,$3)',[caseId,h.customer_id,h.title+'\n\n'+h.shared_summary]);
    }else{
     caseId=(await client.query("INSERT INTO disputes(property_id,opened_by,against_user,title,description,priority,responsible_support_id) VALUES($1,$2,$3,$4,$5,'normal',$6) RETURNING id",[h.property_id,h.customer_id,h.against_user_id,h.title,h.shared_summary,staff.id])).rows[0].id;
    }
