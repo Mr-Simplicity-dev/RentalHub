@@ -2,7 +2,7 @@ const logger = require('../utils/logger');
 const db = require('./database');
 const crypto = require('crypto');
 
-const SENSITIVE_FIELDS = new Set(['password', 'current_password', 'new_password', 'nin', 'token', 'reset_token', 'otp', 'secret', 'international_passport_number', 'passport_document_image', 'live_capture_token', 'payload_encrypted', 'email', 'phone', 'contact_email', 'contact_phone', 'search', 'template_encrypted', 'embedding', 'base64Image', 'reference_photo', 'image_one', 'image_two', 'selfie_image', 'doc_image', 'phone_verification_token', 'completion_token', 'card_number', 'cvv']);
+const SENSITIVE_FIELDS = new Set(['password', 'current_password', 'new_password', 'nin', 'token', 'reset_token', 'otp', 'secret', 'card_number', 'cvv']);
 
 const safeInt = (value) => {
   if (value === null || value === undefined) return null;
@@ -58,8 +58,7 @@ const audit = (action, targetType) => {
           null
         );
 
-        const safeRoute = String(req.originalUrl || '').replace(/(\/auth\/verify-email\/)[^/?]+/gi, '$1[REDACTED]').replace(/([?&](?:token|phone_verification_token|completion_token)=)[^&]*/gi, '$1[REDACTED]');
-        const actionText = action || `${req.method} ${safeRoute}`;
+        const actionText = action || `${req.method} ${req.originalUrl}`;
 
         // Create deterministic data string
         const dataString =
@@ -91,12 +90,12 @@ const audit = (action, targetType) => {
             targetId,
             req.ip || null,
             req.method,
-            safeRoute,
+            req.originalUrl,
             res.statusCode,
             req.headers['user-agent'] || null,
             JSON.stringify({
               responseTimeMs: Date.now() - start,
-              query: sanitizeBody(req.query || {}),
+              query: req.query || {},
               body: req.method !== 'GET' ? sanitizeBody(req.body) : undefined
             }),
             previousHash,

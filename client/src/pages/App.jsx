@@ -105,7 +105,6 @@ const TenancyAgreements = React.lazy(() => import('./TenancyAgreements'));
 const TenancyAgreementDetail = React.lazy(() => import('./TenancyAgreementDetail'));
 const SubscribedProperties = React.lazy(() => import('./SubscribedProperties'));
 const Support = React.lazy(() => import('./Support'));
-const SupportTicketEntry = React.lazy(() => import('./SupportTicketEntry'));
 const AcceptLawyerInvite = React.lazy(() => import('./AcceptLawyerInvite'));
 const AcceptAgentInvite = React.lazy(() => import('./AcceptAgentInvite'));
 const LocationPage = React.lazy(() => import('./LocationPage'));
@@ -965,7 +964,6 @@ function App() {
               <Route path="/tenancy-agreements/:id" element={<TenancyAgreementDetail />} />
               <Route path="/subscribed-properties" element={<SubscribedProperties />} />
               <Route path="/support" element={<Support />} />
-              <Route path="/support/tickets/:ticketId" element={<ProtectedRoute><SupportTicketEntry /></ProtectedRoute>} />
               <Route path="/dispute/:disputeId" element={<DisputeDetails />} />
               <Route path="/nigeria" element={<NigeriaPage />} />
               <Route path="/nigeria/:stateSlug" element={<LocationPage />} />

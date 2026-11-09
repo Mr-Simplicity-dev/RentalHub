@@ -1,5 +1,3 @@
-import DisputeHandoverPanel from '../components/common/DisputeHandoverPanel';
-import SupportContactForms from '../components/common/SupportContactForms';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { messageService } from '../services/messageService';
@@ -7,6 +5,64 @@ import { toast } from 'react-toastify';
 import BackToDashboard from '../components/common/BackToDashboard';
 import { useTranslation } from 'react-i18next';
 import { FaPaperclip, FaFile, FaTimes } from 'react-icons/fa';
+
+const PHONE_DIGIT_RE = /(?:\+?234[\s\-.]?0?|0)[789]\d[\s\-.]?\d{3}[\s\-.]?\d{3}[\s\-.]?\d{3,4}|\b0\d{10}\b|\+\d{1,3}[\s\-.]?\d{4,}[\s\-.]?\d{4,}/;
+const WORD_NUM = { zero:0,oh:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9 };
+const WORD_SET = new Set(Object.keys(WORD_NUM));
+const LEET_MAP = { o:'0',q:'0',d:'0',l:'1',i:'1','|':'1','!':'1',z:'2',e:'3',a:'4',h:'4',s:'5','$':'5',g:'9',t:'7',b:'8' };
+const LEET_SET = new Set(Object.keys(LEET_MAP));
+
+const isNigerianPhone = (s) => /^0[789]\d{9}$/.test(s) || /^\d{11,15}$/.test(s);
+
+const detectPhone = (text) => {
+  if (!text) return false;
+  if (PHONE_DIGIT_RE.test(text)) return true;
+
+  const tokens = text.toLowerCase().split(/[\s,;:!?()]+/).filter(Boolean);
+
+  // Word-form phone detection
+  let buf = [];
+  for (const t of tokens) {
+    if (WORD_SET.has(t) || /^\d+$/.test(t)) {
+      buf.push(WORD_SET.has(t) ? String(WORD_NUM[t]) : t);
+      if (buf.length > 15) buf.shift();
+      const s = buf.join('');
+      if (isNigerianPhone(s)) return true;
+    } else {
+      const s = buf.join('');
+      if (isNigerianPhone(s) && buf.length >= 10) return true;
+      buf = [];
+    }
+  }
+  if (isNigerianPhone(buf.join('')) && buf.length >= 10) return true;
+
+  // List bypass detection: extract leading digits from numbered lines
+  const lines = text.split('\n');
+  const leadingDigits = [];
+  for (const line of lines) {
+    const m = line.trim().match(/^(\d+)\s*[.):\]>-]/);
+    if (m) leadingDigits.push(m[1][0]);
+  }
+  for (let i = 0; i <= leadingDigits.length - 11; i++) {
+    if (isNigerianPhone(leadingDigits.slice(i, i + 11).join(''))) return true;
+  }
+
+  // Leet encoding detection: words where every char is leet-encodable
+  let leetBuf = [];
+  for (const word of tokens) {
+    const allLeet = [...word].every(c => LEET_SET.has(c) || /^\d$/.test(c));
+    if (allLeet && word.length > 0) {
+      leetBuf.push([...word].map(c => LEET_MAP[c] || c).join(''));
+      if (leetBuf.join('').length >= 10 && isNigerianPhone(leetBuf.join(''))) return true;
+    } else {
+      if (leetBuf.length > 0 && leetBuf.join('').length >= 10 && isNigerianPhone(leetBuf.join(''))) return true;
+      leetBuf = [];
+    }
+  }
+  if (leetBuf.length > 0 && leetBuf.join('').length >= 10 && isNigerianPhone(leetBuf.join(''))) return true;
+
+  return false;
+};
 
 const roleLabel = (role, t) => {
   if (role === 'super_admin') return t('messages.roles.super_admin');
@@ -184,6 +240,9 @@ const Messages = () => {
     if (compose.message_type === 'escalation' && !compose.subject.trim())
       return toast.error(t('messages.escalation_subject_required'));
 
+    if (detectPhone(compose.message_text) || detectPhone(compose.subject)) {
+      return toast.error('Messages cannot contain phone numbers for security reasons.');
+    }
 
     setSending(true);
 
@@ -327,8 +386,6 @@ const Messages = () => {
         <BackToDashboard />
       </div>
 
-      <DisputeHandoverPanel />
-      <SupportContactForms peerId={selectedConversation?.other_user_id} />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="card lg:col-span-1" data-tour-id="messages-conversations-workflow">
           <div className="flex items-center justify-between mb-4">
@@ -456,7 +513,7 @@ const Messages = () => {
                   <div className="flex items-center gap-2 mt-2">
                     <button
                       type="button"
-                      onClick={() => toast.info(t('messages.private_documents', 'Send documents through a private support ticket.'))}
+                      onClick={() => fileInputRef.current?.click()}
                       className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                       title={t('messages.attachment')}
                     >

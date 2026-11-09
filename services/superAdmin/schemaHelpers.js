@@ -279,7 +279,6 @@ const getDashboardPathForRole = (userType) => {
 
 
 module.exports = {
-  getAdminOperationActorName,
   ensureVerificationAuditSchema,
   ensureUserSuspensionSchema,
   ensureAdminAccountOperationSchema,

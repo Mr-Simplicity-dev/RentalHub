@@ -144,8 +144,8 @@ const create = async (actor, body) => {
       state_id: pricing.location.state_id,
       lga_name: pricing.location.lga_name
     };
-    if (input.lawyer_email && !require('validator').isEmail(input.lawyer_email)) throw fail(400, "Enter a valid legal representative's email");
-    if (!input.lawyer_email && !input.use_rentalhub_lawyers) throw fail(400, 'A legal representative selection is required');
+    if (input.lawyer_email && !require('validator').isEmail(input.lawyer_email)) throw fail(400, 'Enter a valid lawyer email');
+    if (!input.lawyer_email && !input.use_rentalhub_lawyers) throw fail(400, 'A lawyer selection is required');
     if (input.email && !require('validator').isEmail(input.email)) throw fail(400, 'Enter a valid email');
     const prepared = await auth().validateAndPrepareRegistration(input, {
       allowMissingEmail: true,

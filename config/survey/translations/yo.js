@@ -178,7 +178,7 @@
     'L5.8': 'N ó mọyì àǹfààní sí àwọn ẹlẹ́rù tí a fìdí rẹ̀ múlẹ̀ fún ìfọ̀wẹ́/fumigation tàbí ìtọ́jú.',
     'L5.9': 'Mo ń bẹ̀rù nípa fífi àwọn ẹlẹ́rù ìkẹta wọ ilé mi.',
     'L5.10': 'N ó fẹ́ wo ìdánimọ̀ ẹlẹ́rù, ìgbéléwọ́n àti ìtàn iṣẹ́ rẹ̀ kí n tó fọ̀wé-àṣẹ́.',
-    // ── Landlord L6: Caution deposits, inspections, disputes and Dispute support ──
+    // ── Landlord L6: Caution deposits, inspections, disputes and legal support ──
     'L6.1': 'Ṣé o máa ń gba caution/ẹ̀wọn ilé?',
     'L6.2': 'Ṣé o ti ní àríyànjiyàn pàtàkì nípa dídá caution padà tàbí yíyọ owó nínú rẹ̀?',
     'L6.3': 'Ṣé o máa ń ṣe àbẹ̀wò ilé lọ́pọ̀ ìgbà nígbà yíyá?',

@@ -1,6 +1,6 @@
 const db = require('../../config/middleware/database');
 const logger = require('../../config/utils/logger');
-const { logAction, ensureVerificationAuditSchema, ensureAdminAccountOperationSchema, createAdminAccountOperation, getAdminOperationActorName, ensureIdentityVerificationOperationSchema, createIdentityVerificationOperation } = require('./schemaHelpers');
+const { logAction } = require('./schemaHelpers');
 
 // Bulk actions
 const bulkUserAction = async (req, res) => {
@@ -40,9 +40,6 @@ const bulkUserAction = async (req, res) => {
         logActionName = 'BULK_BAN_USERS';
         break;
       case 'verify':
-        await ensureIdentityVerificationOperationSchema();
-        if(!reason)return res.status(400).json({message:'A bulk verification review note is required.'});
-        for(const id of ids){try{await require('../identityPhotoService').guardManualVerification(id,req.user.id);}catch(error){return res.status(error.statusCode || 503).json({message:error.message});}}
         query = `
           UPDATE users
           SET identity_verified = TRUE,
@@ -54,8 +51,6 @@ const bulkUserAction = async (req, res) => {
             AND user_type <> 'super_admin'
             AND passport_photo_url IS NOT NULL
             AND (nin IS NOT NULL OR international_passport_number IS NOT NULL)
-            AND deleted_at IS NULL
-          RETURNING id,full_name,email,user_type
         `;
         params = [ids, req.user.id];
         logActionName = 'BULK_VERIFY_USERS';
@@ -70,9 +65,6 @@ const bulkUserAction = async (req, res) => {
 
     const actionResult = await db.query(query, params);
 
-    if(action==='verify'){
-      for(const row of actionResult.rows){await require('../identityPhotoService').approveCurrentPhotoTemplate(row.id);await createIdentityVerificationOperation({userId:row.id,actorId:req.user.id,actorName:getAdminOperationActorName(req.user),eventType:'identity_verified',note:reason,userSnapshot:row,metadata:{bulk_action:true}});}
-    }
     if (action === 'ban') {
       for (const row of actionResult.rows) {
         await createAdminAccountOperation({

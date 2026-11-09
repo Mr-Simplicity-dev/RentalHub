@@ -1,6 +1,5 @@
-import { preparePassportDocument } from '../utils/passportDocument';
 import {readRegistrationDraft,saveRegistrationDraft,clearRegistrationDraft} from '../utils/registrationDraft';
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { toast } from 'react-toastify';
@@ -11,7 +10,6 @@ import FloatingContactWidget from '../components/common/FloatingContactWidget';
 import WhatsAppBotWidget from '../components/common/WhatsAppBotWidget';
 import TurnstileWidget from '../components/common/TurnstileWidget';
 import BankTransferCheckout from '../components/BankTransferCheckout';
-import RegistrationPhoneVerification from '../components/RegistrationPhoneVerification';
 import VirtualAccountCheckout from '../components/VirtualAccountCheckout';
 import { setAuthSession } from '../services/authStorage';
 import { getStoredUtm } from '../hooks/useUtmParams';
@@ -40,7 +38,6 @@ const buildInitialRegistrationForm = (referralCode = '') => ({
   is_foreigner: false,
   nin: '',
   international_passport_number: '',
-  passport_document_image: '',
   nationality: '',
   state_id: '',
   lga_name: '',
@@ -83,8 +80,6 @@ const formatNaira = (amount) => `₦${Number(amount || 0).toLocaleString()}`;
 const formatUsd = (amount) => `$${Number(amount || 0).toFixed(2)}`;
 
 const Register = () => {
-  const { t, i18n } = useTranslation();
-  const countryLabels = useMemo(() => { try { return new Intl.DisplayNames([i18n.resolvedLanguage || 'en'], { type: 'region' }); } catch { return null; } }, [i18n.resolvedLanguage]);
   const [searchParams] = useSearchParams();
   const registrationReference =
     searchParams.get('registration_ref') ||
@@ -102,7 +97,6 @@ const Register = () => {
   const draftCompletedRef=useRef(false);
   const completeRegistrationDraft=()=>{draftCompletedRef.current=true;clearRegistrationDraft();};
   const [loading, setLoading] = useState(false);
-  const [passportPreparing, setPassportPreparing] = useState(false);
   const [locationOptions, setLocationOptions] = useState([]);
   const [registrationFlags, setRegistrationFlags] = useState(initialRegistrationFlags);
   const [registrationPricing, setRegistrationPricing] = useState(() =>
@@ -119,29 +113,6 @@ const Register = () => {
   const [foreignCardAdjustment, setForeignCardAdjustment] = useState(null);
   const [showOtpStep, setShowOtpStep] = useState(false);
   const [otpCode, setOtpCode] = useState('');
-  const [phoneVerification, setPhoneVerification] = useState(null);
-  const [legacyCodeSent, setLegacyCodeSent] = useState(false);
-  const legacyInitialSend = useRef(null);
-  const applyVerifiedRegistration = async data => {
-    if (data.token && data.user) {
-      completeRegistrationDraft(); setAuthSession(data.token, data.user);
-      window.location.assign(data.user.user_type === 'tenant' ? '/tenant/dashboard' : '/dashboard');
-      return;
-    }
-    if (data.reference && data.completion_token) sessionStorage.setItem('rentalhub.registration-proof:' + data.reference, data.completion_token);
-    if (data.payment_method === 'bank_transfer') { setBankTransfer(data); setPaymentMethod(null); setPhoneVerification(null); return; }
-    if (!data.authorization_url) throw new Error(t('register.registration_failed'));
-    window.location.assign(data.authorization_url);
-  };
-  useEffect(() => {
-    if (!showOtpStep || !registrationReference || legacyInitialSend.current === registrationReference) return;
-    legacyInitialSend.current = registrationReference;
-    setOtpSending(true); setLegacyCodeSent(false);
-    api.post('/auth/register/payment/otp/' + registrationReference, {}, { skipAuth: true, skipAuthRefresh: true })
-      .then(() => setLegacyCodeSent(true))
-      .catch(error => toast.error(error.response?.data?.message || t('register.otp_send_failed')))
-      .finally(() => setOtpSending(false));
-  }, [showOtpStep, registrationReference, t]);
   const [otpSending, setOtpSending] = useState(false);
   const [otpCompleting, setOtpCompleting] = useState(false);
   const [premblyPending, setPremblyPending] = useState(null);
@@ -157,6 +128,7 @@ const Register = () => {
   setTurnstileToken(null);
   turnstileRef.current?.reset();
 };
+  const { t } = useTranslation();
   const { register } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(initialDraft?.step||1);
@@ -201,7 +173,6 @@ const Register = () => {
       registrationData.nin = '';
       if (!registrationFlags.passport_number) {
         registrationData.international_passport_number = '';
-        registrationData.passport_document_image = '';
       }
     } else {
       registrationData.international_passport_number = '';
@@ -242,7 +213,6 @@ const Register = () => {
       registrationData.utm_content = utm.utm_content || '';
     }
 
-    registrationData.passport_document_image = registrationData.is_foreigner && registrationFlags.passport_number ? registrationData.passport_document_image : '';
     return registrationData;
   };
 
@@ -298,7 +268,6 @@ const Register = () => {
           registration_access_message: data.registration_access_message || null,
           nin_number: data.nin_number !== false,
           passport_number: data.passport_number !== false,
-          passport_country_choices: Array.isArray(data.passport_country_choices) ? data.passport_country_choices : [],
           diaspora_registration: data.diaspora_registration === true,
           diaspora_registration_payment: data.diaspora_registration_payment === true,
           diaspora_base_fee_usd:
@@ -467,9 +436,7 @@ const Register = () => {
 
       try {
         const response = await api.post(
-          `/auth/register/payment/complete/${registrationReference}`,
-          { completion_token: sessionStorage.getItem('rentalhub.registration-proof:' + registrationReference) },
-          { skipAuth: true, skipAuthRefresh: true }
+          `/auth/register/payment/complete/${registrationReference}`
         );
 
         if (!active) return;
@@ -477,7 +444,6 @@ const Register = () => {
         if (response.data?.success) {
           const { token, user } = response.data.data;
 
-          sessionStorage.removeItem('rentalhub.registration-proof:' + registrationReference);
           completeRegistrationDraft();
           setAuthSession(token, user);
           api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
@@ -756,8 +722,6 @@ const Register = () => {
       }
     }
 
-  if (formData.is_foreigner && registrationFlags.passport_number && !formData.passport_document_image) { toast.error(t('register.passport_image_required')); return; }
-  if (passportPreparing) return;
   if (!termsAccepted) {
     toast.error(t('register.terms_required'));
     return;
@@ -838,12 +802,6 @@ const Register = () => {
   return;
 }
 
-      if (paymentResponse.data?.code === 'PHONE_VERIFICATION_REQUIRED') {
-        resetTurnstile();
-        setPhoneVerification({ payload: { ...registrationData, payment_method: paymentMethod }, challenge: paymentResponse.data.data.phone_challenge, flow: 'paid' });
-        return;
-      }
-
       if (
         paymentResponse.data?.success &&
         paymentResponse.data?.data?.payment_method === 'bank_transfer'
@@ -879,11 +837,6 @@ return;
 
     // Roles without registration payment create the account immediately
     const response = await register(registrationData);
-    if (response.code === 'PHONE_VERIFICATION_REQUIRED') {
-      resetTurnstile();
-      setPhoneVerification({ payload: registrationData, challenge: response.data.phone_challenge, flow: 'free' });
-      return;
-    }
 
     if (response.success) {
   completeRegistrationDraft();
@@ -1362,7 +1315,6 @@ return (
       </div>
     )}
 
-    {phoneVerification ? <RegistrationPhoneVerification key={phoneVerification.challenge} pending={phoneVerification} onVerified={applyVerifiedRegistration} onClose={() => setPhoneVerification(null)} /> : null}
     {showOtpStep && (      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-4">
         <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
           <div className="flex shrink-0 items-start justify-between gap-4">
@@ -1386,7 +1338,7 @@ return (
           </div>
 
           <p className="mt-3 text-sm text-gray-600">
-            {otpSending ? t('register.otp_sending') : legacyCodeSent ? t('register.otp_body') : t('register.otp_send_failed')}
+            {t('register.otp_body')}
           </p>
 
           <input
@@ -1409,7 +1361,6 @@ return (
                 await api.post(
                   `/auth/register/payment/otp/${registrationReference}`
                 );
-                setLegacyCodeSent(true);
                 toast.success(t('register.otp_sent'));
               } catch (sendError) {
                 toast.error(sendError?.response?.data?.message || t('register.otp_send_failed'));
@@ -2070,7 +2021,7 @@ return (
                   )}
                 </div>
 
-                {/* Your legal representative's email */}
+                {/* Lawyer Email */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.lawyer_email')} *</label>
                   <div className="relative">
@@ -2327,23 +2278,15 @@ return (
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.passport_country_label')}</label>
-                      {registrationFlags.passport_country_choices?.length ? <select name="nationality" value={formData.nationality} onChange={handleChange} className={inputClass('nationality')}>
-                        <option value="">{t('register.nationality_placeholder')}</option>
-                        {registrationFlags.passport_country_choices.map(item => <option key={item.code} value={item.name}>{countryLabels?.of(item.code) || item.name}</option>)}
-                      </select> : <input name="nationality" value={formData.nationality} onChange={handleChange} className={inputClass('nationality')} placeholder={t('register.nationality_placeholder')} />}
+                      <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.nationality_label')}</label>
+                      <input
+                        name="nationality"
+                        value={formData.nationality}
+                        onChange={(e) => { handleChange(e); setErrors(p => ({ ...p, nationality: null })); }}
+                        className={inputClass('nationality')}
+                        placeholder={t('register.nationality_placeholder')}
+                      />
                       {errors.nationality && <p className="text-red-500 text-sm mt-1">{errors.nationality}</p>}
-                    </div>
-                    <div>
-                      <label htmlFor="passport-document" className="mb-1 block text-sm font-medium text-gray-700">{t('register.passport_image_label')}</label>
-                      <input id="passport-document" type="file" accept="image/jpeg,image/png" disabled={loading || passportPreparing} className="block w-full rounded-lg border p-3 text-sm" onChange={async event => {
-                        const file = event.target.files?.[0]; if (!file) return; setPassportPreparing(true);
-                        try { const image = await preparePassportDocument(file); setFormData(current => ({ ...current, passport_document_image: image })); }
-                        catch (error) { setFormData(current => ({ ...current, passport_document_image: '' })); toast.error(error.message || t('register.passport_image_required')); }
-                        finally { setPassportPreparing(false); }
-                      }} />
-                      <p className="mt-2 text-xs text-gray-600">{t('register.passport_image_help')}</p>
-                      {formData.passport_document_image ? <img src={formData.passport_document_image} alt={t('register.passport_image_label')} className="mx-auto mt-3 max-h-40 max-w-full rounded-lg object-contain" /> : null}
                     </div>
                   </>
                 )}

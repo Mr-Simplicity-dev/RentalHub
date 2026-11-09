@@ -79,7 +79,7 @@ const faqData = {
   general: [
     {
       q: 'What is Amana RentalHub NG?',
-      a: 'Amana RentalHub NG is Nigeria\'s most trusted property technology platform. We connect tenants, landlords, agents, and legal professionals across all 36 states and the Federal Capital Territory. Our platform offers verified property listings, identity verification, Dispute support, dispute resolution, and additional services like fumigation/cleaning and transportation.',
+      a: 'Amana RentalHub NG is Nigeria\'s most trusted property technology platform. We connect tenants, landlords, agents, and legal professionals across all 36 states and the Federal Capital Territory. Our platform offers verified property listings, identity verification, legal support, dispute resolution, and additional services like fumigation/cleaning and transportation.',
     },
     {
       q: 'Is Amana RentalHub NG free to use?',
@@ -87,7 +87,7 @@ const faqData = {
     },
     {
       q: 'How does Amana RentalHub NG ensure trust and safety?',
-      a: 'Every user — tenant, landlord, and agent — undergoes NIN-linked identity verification. Properties are reviewed before listing approval. We also provide Dispute support, evidence verification, and structured dispute resolution to protect all parties on the platform.',
+      a: 'Every user — tenant, landlord, and agent — undergoes NIN-linked identity verification. Properties are reviewed before listing approval. We also provide legal support, evidence verification, and structured dispute resolution to protect all parties on the platform.',
     },
     {
       q: 'Which states does Amana RentalHub NG cover?',
@@ -208,12 +208,12 @@ const faqData = {
   ],
   legal: [
     {
-      q: 'What Dispute support does Amana RentalHub NG offer?',
-      a: 'Amana RentalHub NG provides access to qualified lawyers, evidence verification tools, and structured dispute resolution processes. Premium plan users get direct Dispute support access.',
+      q: 'What legal support does Amana RentalHub NG offer?',
+      a: 'Amana RentalHub NG provides access to qualified lawyers, evidence verification tools, and structured dispute resolution processes. Premium plan users get direct legal support access.',
     },
     {
       q: 'How are disputes resolved on the platform?',
-      a: 'Amana RentalHub NG offers a structured dispute resolution process. You can submit evidence through our platform, request Dispute support, and our admin team will help mediate between parties to find a fair resolution.',
+      a: 'Amana RentalHub NG offers a structured dispute resolution process. You can submit evidence through our platform, request legal support, and our admin team will help mediate between parties to find a fair resolution.',
     },
     {
       q: 'Does Amana RentalHub NG provide tenancy agreements?',

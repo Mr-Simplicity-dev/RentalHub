@@ -1,4 +1,3 @@
-const {notifyDispute}=require('./disputeNotificationService');
 const db = require('../config/middleware/database');
 const { logAction } = require('../config/utils/auditLogger');
 const fs = require('fs');
@@ -136,7 +135,6 @@ exports.createDispute = async (req, res) => {
       ip: req.ip
     });
 
-    await notifyDispute(result.rows[0].id,'created',openedBy,{includeActor:true});
     res.status(201).json({
       success: true,
       data: result.rows[0]
@@ -205,7 +203,6 @@ exports.getDisputeDetails = async (req, res) => {
          against_user.user_type AS against_role,
          resolver.full_name AS resolved_by_name,
          sealer.full_name AS sealed_by_name,
-         lead.full_name AS responsible_support_name,
          summary_author.full_name AS lawyer_summary_by_name
        FROM disputes d
        LEFT JOIN properties p ON p.id = d.property_id
@@ -214,7 +211,6 @@ exports.getDisputeDetails = async (req, res) => {
        LEFT JOIN users against_user ON against_user.id = d.against_user
        LEFT JOIN users resolver ON resolver.id = d.resolved_by
        LEFT JOIN users sealer ON sealer.id = d.sealed_by
-       LEFT JOIN users lead ON lead.id=d.responsible_support_id
        LEFT JOIN users summary_author ON summary_author.id = d.lawyer_summary_by
        WHERE d.id = $1
        LIMIT 1`,
@@ -490,7 +486,6 @@ exports.addDisputeMessage = async (req, res) => {
       ip: req.ip
     });
 
-    await notifyDispute(disputeId,'message',senderId);
     res.status(201).json({
       success: true,
       data: sanitizeEvidenceRow(result.rows[0])
@@ -562,7 +557,6 @@ exports.editDisputeMessage = async (req, res) => {
       ip: req.ip
     });
 
-    await notifyDispute(disputeId,'message',userId);
     res.json({
       success: true,
       data: sanitizeEvidenceRow(result.rows[0])
@@ -611,7 +605,6 @@ exports.resolveDispute = async (req, res) => {
       ip: req.ip
     });
 
-    await notifyDispute(disputeId,'resolved',req.user.id);
     res.json({
       success: true,
       data: result.rows[0]
@@ -761,7 +754,6 @@ exports.uploadEvidence = async (req, res) => {
       [req.user.id, 'Uploaded dispute evidence (hashed)', 'dispute', disputeId]
     );
 
-    await notifyDispute(disputeId,'evidence',req.user.id);
     res.status(201).json({
       success: true,
       data: result.rows[0]
@@ -783,7 +775,7 @@ exports.getEvidence = async (req, res) => {
   const userType = req.user?.user_type;
 
   const result = await db.query(
-    `SELECT de.*, d.opened_by, d.against_user, d.property_id, d.responsible_support_id
+    `SELECT de.*, d.opened_by, d.against_user, d.property_id
      FROM dispute_evidence de
      JOIN disputes d ON d.id = de.dispute_id
      WHERE de.id = $1`,
@@ -795,7 +787,7 @@ exports.getEvidence = async (req, res) => {
   }
 
   const evidence = result.rows[0];
-  const isPrivileged = userType==='super_admin'||Number(evidence.responsible_support_id)===Number(userId)&&['super_support_admin','zonal_admin','state_support_admin','lga_support_admin'].includes(userType);
+  const isPrivileged = ['super_admin'].includes(userType);
   const isParticipant = [evidence.opened_by, evidence.against_user].includes(Number(userId));
 
   if (!isPrivileged && !isParticipant) {
@@ -846,7 +838,7 @@ exports.verifyEvidenceIntegrity = async (req, res) => {
     const userType = req.user?.user_type;
 
     const result = await db.query(
-      `SELECT de.*, d.opened_by, d.against_user, d.property_id, d.responsible_support_id
+      `SELECT de.*, d.opened_by, d.against_user, d.property_id
        FROM dispute_evidence de
        JOIN disputes d ON d.id = de.dispute_id
        WHERE de.id = $1`,
@@ -858,7 +850,7 @@ exports.verifyEvidenceIntegrity = async (req, res) => {
     }
 
     const evidence = result.rows[0];
-    const isPrivileged = userType==='super_admin'||Number(evidence.responsible_support_id)===Number(userId)&&['super_support_admin','zonal_admin','state_support_admin','lga_support_admin'].includes(userType);
+    const isPrivileged = ['super_admin'].includes(userType);
     const isParticipant = [evidence.opened_by, evidence.against_user].includes(Number(userId));
 
     if (!isPrivileged && !isParticipant) {
@@ -1023,7 +1015,6 @@ exports.sealDispute = async (req, res) => {
             ]
             );
 
-            await notifyDispute(disputeId,'sealed',actorId);
             res.json({
             success: true,
             message: 'Dispute sealed successfully',

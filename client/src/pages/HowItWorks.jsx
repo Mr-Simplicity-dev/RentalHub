@@ -55,7 +55,7 @@ const faqs = [
   },
   {
     q: 'How are disputes resolved?',
-    a: 'Amana RentalHub NG provides a structured dispute resolution process. You can submit evidence, request Dispute support, and our admin team will help mediate.',
+    a: 'Amana RentalHub NG provides a structured dispute resolution process. You can submit evidence, request legal support, and our admin team will help mediate.',
   },
   {
     q: 'What payment methods are accepted?',

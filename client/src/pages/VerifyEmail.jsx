@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { setAuthSession } from '../services/authStorage';
 import { useTranslation } from 'react-i18next';
@@ -7,16 +7,11 @@ import { useTranslation } from 'react-i18next';
 const VerifyEmail = () => {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
-  const params = useParams();
-  const token = searchParams.get('token') || params.token;
-  const [destination, setDestination] = useState('/login');
+  const token = searchParams.get('token');
   const navigate = useNavigate();
 
   const [status, setStatus] = useState('verifying'); // verifying | success | error
   const [message, setMessage] = useState('');
-  const [email, setEmail] = useState('');
-  const [sending, setSending] = useState(false);
-  const [sendMessage, setSendMessage] = useState('');
   const [countdown, setCountdown] = useState(3); // seconds before redirect
 
   useEffect(() => {
@@ -28,10 +23,10 @@ const VerifyEmail = () => {
 
     const verify = async () => {
       try {
-        const res = await api.get(`/auth/verify-email/${encodeURIComponent(token)}`, { skipAuth: true, skipAuthRefresh: true });
+        const res = await api.get(`/auth/verify-email/${token}`);
 
         if (res.data?.success) {
-          const { token: authToken, user } = res.data.data || res.data;
+          const { token: authToken, user } = res.data;
 
           // 🔐 Auto-login
           setAuthSession(authToken, user);
@@ -60,7 +55,7 @@ const VerifyEmail = () => {
     if (status !== 'success') return;
 
     if (countdown <= 0) {
-      navigate(destination);
+      navigate('/verify-phone');
       return;
     }
 
@@ -69,7 +64,7 @@ const VerifyEmail = () => {
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [status, countdown, navigate, destination]);
+  }, [status, countdown, navigate]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -95,17 +90,6 @@ const VerifyEmail = () => {
           </>
         )}
 
-        {(status === 'error' || status === 'resend') && <form className="mb-6 space-y-3" onSubmit={async event => {
-          event.preventDefault(); if (sending) return; setSending(true); setSendMessage('');
-          try { await api.post('/auth/resend-verification', { email }, { skipAuth: true, skipAuthRefresh: true }); setSendMessage(t('register.email_sent')); }
-          catch (error) { setSendMessage(error.response?.data?.message || t('register.email_send_failed')); }
-          finally { setSending(false); }
-        }}>
-          <label className="block text-sm font-semibold" htmlFor="verification-email">{t('register.email')}</label>
-          <input id="verification-email" type="email" autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} className="w-full rounded-lg border px-3 py-3" />
-          <button className="btn-primary w-full" type="submit" disabled={sending}>{t('register.email_send')}</button>
-          {sendMessage ? <p role="status" className="text-sm text-gray-700">{sendMessage}</p> : null}
-        </form>}
         {status === 'error' && (
           <>
             <h2 className="text-xl font-semibold text-red-700 mb-2">

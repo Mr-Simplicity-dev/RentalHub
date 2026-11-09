@@ -331,9 +331,7 @@
     "open_live_camera": "打开实时摄像头",
     "captured_preview": "已拍摄护照预览",
     "preview_hint": "上传前请确保您的脸部清晰且完全可见。",
-    "camera_guide": "请将脸部保持在引导框内并完成所有检测。",
-    "face_gallery_consent": "我同意在RentalHub自己的私有服务器上进行人脸比对并安全存储，以验证身份并防止重复账户。如不同意，工作人员将人工审核我的照片。",
-    "photo_review_pending": "照片已保存，身份验证等待审核。"
+    "camera_guide": "请将脸部保持在引导框内并完成所有检测。"
   },
   "property_types": {
     "apartment": "公寓",
@@ -402,7 +400,7 @@
     "not_found": "未找到房产",
     "no_photos": "暂无照片",
     "unlock_title": "支付以解锁完整房产详情",
-    "unlock_text": "一次付费即可解锁完整房产详情和额外媒体，不包括电话号码或电子邮件。",
+    "unlock_text": "完整详情（完整地址、房东联系方式和高清媒体）在为此房产一次性支付后可用。",
     "pay_unlock_details": "支付以解锁详情",
     "login_continue": "登录以继续",
     "per_period": "每{{period}}",
@@ -416,7 +414,7 @@
     "amenities": "配套设施",
     "video_tour": "视频看房",
     "full_address": "完整地址",
-    "contact_landlord": "房产咨询",
+    "contact_landlord": "联系房东",
     "name": "姓名",
     "phone": "电话",
     "whatsapp": "WhatsApp",
@@ -425,8 +423,8 @@
     "audio_call": "语音通话",
     "video_call": "视频通话",
     "start_virtual_tour": "开始虚拟看房",
-    "subscribe_contact_title": "房产咨询",
-    "subscribe_contact_text": "一次付费即可解锁完整房产详情和额外媒体，不包括电话号码或电子邮件。",
+    "subscribe_contact_title": "订阅以查看联系方式",
+    "subscribe_contact_text": "一次性支付以获取房东联系信息和此房产的完整详情。",
     "pay_to_unlock": "支付以解锁",
     "apply_property": "申请此房产",
     "report_dispute": "举报纠纷",
@@ -627,8 +625,7 @@
       "send_message": "发送消息",
       "start_conversation_btn": "开始会话",
       "lookup": "查看工单状态"
-    },
-    "private_documents": "请通过私密支持工单发送文件。"
+    }
   },
   "about_us": {
     "hero": {
@@ -642,7 +639,7 @@
       "section_label": "Our Mission",
       "heading": "Transforming Nigeria's Rental Landscape",
       "paragraph_1": "At Amana RentalHub NG, we believe everyone deserves a safe, transparent, and hassle-free experience when finding a home. Our mission is to eliminate the friction, fraud, and frustration from the Nigerian rental market.",
-      "paragraph_2": "By combining technology with rigorous verification processes, Dispute support, and nationwide coverage, we empower tenants to find verified properties and landlords to connect with qualified tenants — all in one trusted ecosystem.",
+      "paragraph_2": "By combining technology with rigorous verification processes, legal support, and nationwide coverage, we empower tenants to find verified properties and landlords to connect with qualified tenants — all in one trusted ecosystem.",
       "badge_verified": "Verified properties",
       "badge_secure": "Secure payments",
       "badge_legal": "Legal protection",
@@ -669,7 +666,7 @@
         "desc": "Every landlord, tenant, and property goes through identity verification. Our superb verification system ensures only genuine participants on the platform."
       },
       "legal": {
-        "title": "Dispute support & Dispute Resolution",
+        "title": "Legal Support & Dispute Resolution",
         "desc": "Access to qualified lawyers, evidence verification, and structured dispute resolution processes to protect all parties."
       },
       "marketplace": {
@@ -706,7 +703,7 @@
       "year_2020": "Amana RentalHub NG was founded with a vision to transform the Nigerian rental market.",
       "year_2021": "Launched property listing framework to onboard landlords across Lagos and Abuja.",
       "year_2022": "Expanded to all 36 states + FCT; introduced identity verification.",
-      "year_2023": "Launched Dispute support services, dispute resolution, and fumigation/cleaning marketplace.",
+      "year_2023": "Launched legal support services, dispute resolution, and fumigation/cleaning marketplace.",
       "year_2024": "Introduced transportation services, evidence verification, and virtual property tours.",
       "year_2025": "Reached 50,000+ active users; launched mobile app with real-time chat and notifications."
     },
@@ -739,7 +736,7 @@
       },
       "6": {
         "title": "Innovation",
-        "desc": "Leveraging cutting-edge technology including property verification, digital evidence, and Dispute support tools."
+        "desc": "Leveraging cutting-edge technology including property verification, digital evidence, and legal support tools."
       }
     },
     "cta": {
@@ -791,14 +788,14 @@
   },
   "mobile_app": {
     "title": "Mobile App",
-    "subtitle": "Manage your rentals, chat with landlords and tenants, and access Dispute support — all from your phone.",
+    "subtitle": "Manage your rentals, chat with landlords and tenants, and access legal support — all from your phone.",
     "feature_instant_alerts": "Instant Alerts",
     "feature_instant_alerts_desc": "Get notified when new properties match your search criteria.",
     "feature_in_app_chat": "In-App Chat",
     "feature_in_app_chat_desc": "Message landlords and tenants directly from your phone.",
     "feature_browse_properties": "Browse Properties",
     "feature_browse_properties_desc": "Search, filter, and save your favourite listings on the go.",
-    "feature_legal_support": "Dispute support",
+    "feature_legal_support": "Legal Support",
     "feature_legal_support_desc": "Submit legal assistance requests and track case progress.",
     "features_heading": "Everything in the app",
     "apk_heading": "APK direct download",
@@ -882,7 +879,7 @@
     },
     "benefit_6": {
       "title": "Dispute Protection",
-      "desc": "Access Dispute support and structured dispute resolution if any issues arise with tenants."
+      "desc": "Access legal support and structured dispute resolution if any issues arise with tenants."
     },
     "plan": {
       "free": {
@@ -915,7 +912,7 @@
         "feature_4": "Featured badge & top placement",
         "feature_5": "Advanced analytics dashboard",
         "feature_6": "Dedicated agent support",
-        "feature_7": "Dispute support access",
+        "feature_7": "Legal support access",
         "cta": "Choose Premium"
       },
       "popular_badge": "Most Popular"
@@ -930,7 +927,7 @@
     },
     "testimonial_3": {
       "role": "Landlord, Kano",
-      "text": "The Dispute support feature is a game-changer. I had a dispute resolved quickly without the usual stress."
+      "text": "The legal support feature is a game-changer. I had a dispute resolved quickly without the usual stress."
     },
     "faq_1": {
       "q": "Who can list properties on Amana RentalHub NG?",
@@ -1074,7 +1071,7 @@
     "tenants_step_2_hl_2": "Virtual property tours",
     "tenants_step_2_hl_3": "Save favorites",
     "tenants_step_3_title": "Unlock Full Details",
-    "tenants_step_3_desc": "一次付费即可解锁完整房产详情和额外媒体，不包括电话号码或电子邮件。",
+    "tenants_step_3_desc": "Make a one-time payment to unlock full property details, including the landlord contact information and premium media.",
     "tenants_step_3_hl_1": "Full address revealed",
     "tenants_step_3_hl_2": "Landlord contact info",
     "tenants_step_3_hl_3": "HD photos & video",
@@ -1116,7 +1113,7 @@
     "features_verification_desc": "Every user — tenant, landlord, and agent — goes through NIN-linked identity verification for a trusted ecosystem.",
     "features_secure_title": "Secure Transactions",
     "features_secure_desc": "Applications and communications are handled securely within the platform. Clear terms protect all parties.",
-    "features_legal_title": "Dispute support",
+    "features_legal_title": "Legal Support",
     "features_legal_desc": "Access qualified lawyers, evidence verification, and structured dispute resolution when you need it.",
     "features_ratings_title": "Ratings & Reviews",
     "features_ratings_desc": "Transparent ratings and verified reviews help tenants and landlords make informed decisions.",
@@ -1178,7 +1175,7 @@
     "plan_premium_feat_4": "Featured badge & top placement",
     "plan_premium_feat_5": "Advanced analytics dashboard",
     "plan_premium_feat_6": "Dedicated agent support",
-    "plan_premium_feat_7": "Dispute support access",
+    "plan_premium_feat_7": "Legal support access",
     "plan_premium_feat_8": "Priority listing reviews",
     "plan_premium_cta": "Choose Premium",
     "save_annual": "Save 15% with annual billing",
@@ -1198,7 +1195,7 @@
     "compare_row_badge": "Featured badge",
     "compare_row_analytics": "Analytics",
     "compare_row_support": "Support",
-    "compare_row_legal": "Dispute support",
+    "compare_row_legal": "Legal support",
     "compare_row_reviews": "Listing reviews",
     "addons_badge": "Add-On Services",
     "addons_heading": "Enhance Your Listing",
@@ -2794,8 +2791,8 @@
     "evidence_queue_desc": "Review integrity checks and dispute uploads.",
     "messages": "Messages",
     "messages_desc": "Continue escalations and legal coordination.",
-    "legal_support": "Dispute support",
-    "legal_support_desc": "View Dispute support requests and assistance.",
+    "legal_support": "Legal Support",
+    "legal_support_desc": "View legal support requests and assistance.",
     "cross_state": "Cross-State Review",
     "cross_state_desc": "Open the shared evidence queue for escalated matters.",
     "state_evidence": "State Evidence",
@@ -2933,7 +2930,7 @@
     "super_dashboard": "Super Lawyer Dashboard",
     "verify_evidence": "Verify Evidence",
     "messages": "Messages",
-    "legal_support": "Dispute support",
+    "legal_support": "Legal Support",
     "verification_status": "Verification Status",
     "profile": "Profile",
     "legal_console": "Legal Console",
@@ -3183,20 +3180,7 @@
     "adjustment_body": "您的支付卡由尼日利亚境外机构签发。要完成本地费率注册，需要在账户激活前补缴",
     "adjustment_body_2": "（黑市汇率差额 + 5美元手续费）。",
     "adjustment_pay": "立即支付差额",
-    "adjustment_failed": "无法发起差额支付，请重试。",
-    "otp_pre_payment_body": "验证码已发送到您的手机，10分钟内有效。请先验证手机号，再继续付款。",
-    "otp_verify_payment": "验证并继续付款",
-    "phone_verified_continue": "手机号已验证。无需再次输入验证码即可继续注册。",
-    "phone_checking_identity": "手机号已验证。正在核验您的身份，请稍候。",
-    "otp_resend_wait": "{{count}}秒后可重新发送",
-    "email_send": "发送验证邮件",
-    "email_sent": "请查看收件箱和垃圾邮件文件夹，打开验证链接以确认邮箱。",
-    "email_send_failed": "无法发送验证邮件，请重试。",
-    "passport_image_label": "护照个人资料页",
-    "passport_image_choose": "选择护照资料页",
-    "passport_image_required": "请上传清晰的护照个人资料页图片后继续。",
-    "passport_image_help": "请包含整页照片和护照信息，使用清晰的JPEG或PNG图片。图片不会保存在注册草稿中。",
-    "passport_country_label": "护照签发国家"
+    "adjustment_failed": "无法发起差额支付，请重试。"
   },
   "careers": {
     "recruitment_closed_title": "招聘已关闭",

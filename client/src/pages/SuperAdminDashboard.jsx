@@ -1038,10 +1038,8 @@ export default function SuperAdminDashboard() {
         loadVerifications(verificationPage);
         loadAdminPerformance();
       }
-      return true;
     } catch (err) {
       toast.error(err.response?.data?.message || "Bulk action failed");
-      return false;
     }
   };
 
@@ -1606,7 +1604,7 @@ export default function SuperAdminDashboard() {
       {tab === "lawyer_invites" && (
         <LawyerInvitesManager
           title="Lawyer Invites"
-          description="Resend pending lawyer invitations or change the invited legal representative's email."
+          description="Resend pending lawyer invitations or change the invited lawyer email."
         />
       )}
 

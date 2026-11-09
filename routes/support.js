@@ -10,9 +10,6 @@ const validateRequest = require('../config/middleware/validateRequest');
 const { ZONE_STATES, canonicalZone, zoneContainsState, zoneForState } = require('../config/utils/territorialZones');
 
 const router = express.Router();
-router.use('/tickets/:ticketId/dispute-handover',require('./supportDisputes'));
-router.get('/tickets/:id/customer',authenticate,require('../config/utils/twoFactor').requirePrivilegedMfa,require('../config/middleware/securityRateLimiters').supportCustomerLookupLimiter,async(req,res,next)=>{try{res.set('Cache-Control','no-store');res.json({success:true,data:await require('../services/supportCustomerService').getCustomer(req.user,req.params.id)});}catch(error){if(error.statusCode)return res.status(error.statusCode).json({success:false,message:error.message});next(error);}});
-router.get('/dispute-handovers',authenticate,async(req,res,next)=>{try{res.json({success:true,data:await require('../services/supportDisputeHandoverService').listOwn(req)});}catch(error){next(error);}});
 const logger = require('../config/utils/logger');
 const activityLogger = require('../services/activityLogger');
 
@@ -1413,7 +1410,6 @@ router.post('/contact', contactFormLimiter, [
     await ensureSupportSchema();
 
     const { name, email, state, lga, subject, message, priority, related_id } = req.body;
-    const guestContact=require('../services/supportCustomerService').captureGuestContact(req.body);
     const relatedType = normalizeRelatedType(req.body.related_type);
     const category = normalizeSupportCategory(req.body.category, relatedType);
     const relatedId = relatedType && Number.isInteger(Number(related_id)) ? Number(related_id) : null;
@@ -1426,8 +1422,8 @@ router.post('/contact', contactFormLimiter, [
       `INSERT INTO support_tickets
          (subject, description, state, lga, contact_email, priority, status, user_id,
           category, related_type, related_id, escalation_department, sla_due_at,
-          guest_access_token_hash, guest_access_token_created_at, contact_name, contact_phone)
-       VALUES ($1, $2, $3, $4, $5, $6, 'open', NULL, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP, $13, $14)
+          guest_access_token_hash, guest_access_token_created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 'open', NULL, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP)
        RETURNING id`,
       [
         subject?.trim() ? `[Contact] ${subject.trim()}` : `[Contact] ${name.trim()}`,
@@ -1444,8 +1440,6 @@ router.post('/contact', contactFormLimiter, [
         escalationDepartment,
         slaDueAt,
         guestAccessTokenHash,
-        guestContact.name,
-        guestContact.phone,
       ]
     );
 
@@ -1574,7 +1568,6 @@ router.post('/contact', contactFormLimiter, [
       data: { ticketId, guestAccessToken },
     });
   } catch (error) {
-    if(error.statusCode)return res.status(error.statusCode).json({success:false,message:error.message});
     req.logger.error('Contact form error:', error);
     res.status(500).json({ success: false, message: 'Failed to send message' });
   }
@@ -1797,27 +1790,24 @@ router.get('/tickets/my', authenticate, async (req, res) => {
 
 // Admin ticket listing
 
-const listSupportTickets = async (req, res) => {
-  res.set('Cache-Control','no-store');
-  const criteria=req.method==='POST'?(req.body||{}):req.query;
+router.get('/tickets', authenticate, requireSupportAdmin, async (req, res) => {
   try {
     await ensureSupportSchema();
 
     const where = [];
     const params = [];
 
-    if (criteria.status && criteria.status !== 'all') {
-      params.push(String(criteria.status));
+    if (req.query.status && req.query.status !== 'all') {
+      params.push(String(req.query.status));
       where.push(`st.status = $${params.length}`);
     }
 
-    if (criteria.priority && criteria.priority !== 'all') {
-      params.push(String(criteria.priority));
+    if (req.query.priority && req.query.priority !== 'all') {
+      params.push(String(req.query.priority));
       where.push(`st.priority = $${params.length}`);
     }
 
     addSupportTicketScope(where, params, req.user);
-    require('../services/supportCustomerService').addTicketSearch(where,params,criteria.search);
 
     const result = await db.query(
       `SELECT st.id, st.subject, st.description, st.state, st.lga, st.priority, st.status,
@@ -1832,7 +1822,7 @@ const listSupportTickets = async (req, res) => {
               END AS sla_status,
               st.created_at, st.updated_at, st.escalated_at, st.resolved_at,
               st.assigned_to,
-              u.email AS user_email, u.phone AS user_phone, st.contact_email, st.contact_phone, st.contact_name, u.full_name AS user_name,
+              u.email AS user_email, u.full_name AS user_name,
               a.email AS assigned_email, a.full_name AS assigned_name,
               (SELECT COUNT(*) FROM support_ticket_replies str WHERE str.ticket_id = st.id AND str.is_admin = FALSE AND (str.read_at IS NULL))::int AS unread_user_replies
        FROM support_tickets st
@@ -1851,9 +1841,7 @@ const listSupportTickets = async (req, res) => {
     req.logger.error('Support tickets error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch support tickets' });
   }
-};
-router.get('/tickets', authenticate, requireSupportAdmin, listSupportTickets);
-router.post('/tickets/search', authenticate, requireSupportAdmin, require('../config/utils/twoFactor').requirePrivilegedMfa, require('../config/middleware/securityRateLimiters').supportCustomerLookupLimiter, listSupportTickets);
+});
 
 // ─── Escalate ──────────────────────────────────────────────────────────────
 
@@ -1872,7 +1860,7 @@ router.post('/tickets/escalate', authenticate, requireSupportAdmin, async (req, 
     const { status, ticket } = await getScopedTicket(
       ticketId,
       req.user,
-      'st.*, u.email AS user_email, u.phone AS user_phone, st.contact_email, st.contact_phone, st.contact_name, u.full_name AS user_name'
+      'st.*, u.email AS user_email, u.full_name AS user_name'
     );
 
     if (status === 404) {
@@ -2158,13 +2146,13 @@ router.get('/tickets/:id/context', authenticate, async (req, res) => {
     let ticket;
 
     if (isSupportAdmin) {
-      const scoped = await getScopedTicket(ticketId, req.user, 'st.*, u.email AS user_email, u.phone AS user_phone, st.contact_email, st.contact_phone, st.contact_name, u.full_name AS user_name');
+      const scoped = await getScopedTicket(ticketId, req.user, 'st.*, u.email AS user_email, u.full_name AS user_name');
       if (scoped.status === 404) return res.status(404).json({ success: false, message: 'Ticket not found' });
       if (scoped.status === 403) return res.status(403).json({ success: false, message: 'Access denied' });
       ticket = scoped.ticket;
     } else {
       const ownerResult = await db.query(
-        `SELECT st.*, u.email AS user_email, u.phone AS user_phone, st.contact_email, st.contact_phone, st.contact_name, u.full_name AS user_name
+        `SELECT st.*, u.email AS user_email, u.full_name AS user_name
          FROM support_tickets st
          LEFT JOIN users u ON u.id = st.user_id
          WHERE st.id = $1 AND st.user_id = $2`,
@@ -2327,7 +2315,7 @@ router.get('/department-escalations', authenticate, async (req, res) => {
               END AS sla_status,
               st.created_at, st.updated_at, st.escalated_at, st.resolved_at,
               st.assigned_to,
-              u.email AS user_email, u.phone AS user_phone, st.contact_email, st.contact_phone, st.contact_name, u.full_name AS user_name,
+              u.email AS user_email, u.full_name AS user_name,
               a.email AS assigned_email, a.full_name AS assigned_name,
               (SELECT COUNT(*) FROM support_ticket_replies str WHERE str.ticket_id = st.id AND str.is_admin = FALSE AND str.read_at IS NULL)::int AS unread_user_replies
        FROM support_tickets st
@@ -2527,7 +2515,7 @@ router.get('/governance/export', authenticate, requireSupportAdmin, async (req, 
                 WHEN st.sla_due_at < CURRENT_TIMESTAMP + INTERVAL '2 hours' THEN 'due_soon'
                 ELSE 'on_track'
               END AS sla_status,
-              u.email AS user_email, u.phone AS user_phone, st.contact_email, st.contact_phone, st.contact_name, u.full_name AS user_name,
+              u.email AS user_email, u.full_name AS user_name,
               a.email AS assigned_email, a.full_name AS assigned_name
        FROM support_tickets st
        LEFT JOIN users u ON u.id = st.user_id
@@ -2751,10 +2739,6 @@ router.post('/tickets/:id/reply', authenticate, uploadAttachment.single('attachm
       return res.status(403).json({ success: false, message: 'You cannot reply to this ticket' });
     }
 
-    try{
-      const history=(await db.query("SELECT message FROM support_ticket_replies WHERE ticket_id=$1 AND user_id=$2 AND created_at>NOW()-INTERVAL '15 minutes' ORDER BY created_at DESC LIMIT 5",[ticketId,req.user.id])).rows.reverse().map(row=>row.message);
-      await require('../services/contactPolicyService').enforce({userId:req.user.id,channel:'support_ticket',contextKey:ticketId,texts:[message],history});
-    }catch(error){if(error.code==='CONTACT_SHARING_BLOCKED'){if(req.file?.path){try{require('fs').unlinkSync(req.file.path);}catch{}}return res.status(400).json({success:false,code:error.code,message:error.message});}throw error;}
     const isAdminReply = isSupportAdmin || isDeptAdmin;
 
     // The auto-handover rule: an admin reply ends the 90-second clock for good.
@@ -2939,7 +2923,6 @@ router.patch('/tickets/:ticketId/reply/:replyId', authenticate, async (req, res)
       }
     }
 
-    try{const history=(await db.query("SELECT message FROM support_ticket_replies WHERE ticket_id=$1 AND user_id=$2 AND id<>$3 AND created_at>NOW()-INTERVAL '15 minutes' ORDER BY created_at DESC LIMIT 5",[ticketId,req.user.id,replyId])).rows.reverse().map(row=>row.message);await require('../services/contactPolicyService').enforce({userId:req.user.id,channel:'support_ticket',contextKey:ticketId,texts:[message],history});}catch(error){if(error.code==='CONTACT_SHARING_BLOCKED')return res.status(400).json({success:false,code:error.code,message:error.message});throw error;}
     const result = await db.query(
       `UPDATE support_ticket_replies SET message = $1, edited_at = CURRENT_TIMESTAMP
        WHERE id = $2 RETURNING *`,
@@ -3857,7 +3840,6 @@ router.get('/admin/dashboard', authenticate, requireSupportAdmin, async (req, re
 router.createVoiceEscalatedTicket = createVoiceEscalatedTicket;
 router.getVoiceTicketDepartment = getVoiceTicketDepartment;
 
-router.canSupportAdminAccessTicket = canSupportAdminAccessTicket;
 router._supportScopeForTest = {
   canSupportAdminAccessTicket,
   normalizeSupportCategory,

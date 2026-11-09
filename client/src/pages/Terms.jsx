@@ -115,7 +115,7 @@ const Terms = () => {
       icon: FaUsers,
       title: t('terms.services.title', 'Bookings, agents, lawyers and other services'),
       body: [
-        t('terms.services.1', 'Transportation, cleaning, fumigation, inspections, Dispute support, agents and other service workflows may involve independent providers. You must give accurate addresses, timing, safety information and instructions and provide safe, lawful access where required.'),
+        t('terms.services.1', 'Transportation, cleaning, fumigation, inspections, legal support, agents and other service workflows may involve independent providers. You must give accurate addresses, timing, safety information and instructions and provide safe, lawful access where required.'),
         t('terms.services.2', 'A lawyer-client, agency, service or employment relationship is created only under the applicable engagement or appointment—not merely because a directory profile, invitation or matching tool appears on Amana RentalHub NG. Emergency, medical or time-critical services should be obtained from the appropriate public authority or qualified provider, not ordinary platform support.'),
       ],
     },

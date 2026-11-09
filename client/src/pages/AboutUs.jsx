@@ -349,7 +349,7 @@ const AboutUs = () => {
               <ShareButton
                 section="Why Choose Us"
                 title="Why Choose Amana RentalHub NG"
-                description="Verified ecosystem, Dispute support, full-service marketplace, and nationwide coverage — see what makes Amana RentalHub NG different."
+                description="Verified ecosystem, legal support, full-service marketplace, and nationwide coverage — see what makes Amana RentalHub NG different."
               />
             </div>
             <p className="text-gray-600">
@@ -385,8 +385,8 @@ const AboutUs = () => {
                 <div className="flex items-start justify-between gap-4">
                   <h3 className="text-lg font-bold text-gray-900 mb-2">{t('about_us.different.legal.title')}</h3>
                   <ShareButton
-                    section="Dispute support"
-                    title="Amana RentalHub NG — Dispute support & Dispute Resolution"
+                    section="Legal Support"
+                    title="Amana RentalHub NG — Legal Support & Dispute Resolution"
                     description="Access to qualified lawyers, evidence verification, and structured dispute resolution processes to protect all parties."
                   />
                 </div>

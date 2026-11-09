@@ -12,7 +12,6 @@ const audit = require('../config/middleware/auditMiddleware');
 const validateRequest = require('../config/middleware/validateRequest');
 const { grantLawyerAccessValidators } = require('../config/validators/securityValidators');
 
-const sharedCaseContactGuard=async(req,res,next)=>{try{await require('../services/contactPolicyService').enforce({userId:req.user.id,channel:'dispute',contextKey:req.params.disputeId,texts:[req.body.resolution_note,req.body.resolution,req.body.lawyer_summary,req.body.summary]});next();}catch(error){if(error.code==='CONTACT_SHARING_BLOCKED')return res.status(400).json({success:false,code:error.code,message:error.message});next(error);}};
 const LAWYER_ROLES = ['lawyer', 'state_lawyer', 'zonal_lawyer', 'super_lawyer'];
 
 const INTERNAL_LEGAL_ACCESS_ROLES = [
@@ -120,7 +119,6 @@ router.patch(
   audit('resolve_dispute', 'dispute'),
   [param('disputeId').isInt(), body('resolution').optional().isString().trim().isLength({ max: 5000 })],
   validateRequest,
-  sharedCaseContactGuard,
   legalController.resolveDispute
 );
 
@@ -216,7 +214,6 @@ router.patch(
   audit('update_dispute_summary', 'dispute'),
   [param('disputeId').isInt(), body('summary').optional().isString().trim().isLength({ max: 10000 })],
   validateRequest,
-  sharedCaseContactGuard,
   legalController.updateDisputeSummary
 );
 

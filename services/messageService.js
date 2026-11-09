@@ -251,8 +251,41 @@ exports.sendMessage = async (req, res) => {
       });
     }
 
-    const contacts=require('./contactPolicyService');
-    try{await contacts.enforce({userId:senderId,channel:'inbox',contextKey:receiver_id,texts:[message_text,subject],history:await contacts.messageHistory(senderId,receiver_id)});}catch(error){if(error.code==='CONTACT_SHARING_BLOCKED')return res.status(400).json({success:false,code:error.code,message:error.message});throw error;}
+    // Block messages containing phone numbers (security: prevent contact exchange)
+    if (detectPhoneNumber(message_text).detected || (subject && detectPhoneNumber(subject).detected)) {
+      const shouldFlag = trackFailedAttempt(senderId);
+      if (shouldFlag) {
+        // User has repeatedly tried to send phone numbers — flag for admin
+        await db.query(
+          `INSERT INTO audit_logs (actor_id, action, target_type, target_id)
+           VALUES ($1, $2, $3, $4)`,
+          [senderId, 'REPEATED_PHONE_BLOCK', 'user', senderId]
+        );
+      }
+      return res.status(400).json({
+        success: false,
+        message: 'Messages cannot contain phone numbers. Please remove any phone numbers and try again.',
+      });
+    }
+
+    // Block messages with shortened links or off-platform payment requests.
+    const suspicious =
+      detectSuspiciousContent(message_text).detected ||
+      (subject && detectSuspiciousContent(subject).detected);
+    if (suspicious) {
+      const shouldFlag = trackFailedAttempt(senderId);
+      if (shouldFlag) {
+        await db.query(
+          `INSERT INTO audit_logs (actor_id, action, target_type, target_id)
+           VALUES ($1, $2, $3, $4)`,
+          [senderId, 'REPEATED_SUSPICIOUS_CONTENT_BLOCK', 'user', senderId]
+        );
+      }
+      return res.status(400).json({
+        success: false,
+        message: 'Messages cannot contain external links or requests to pay outside RentalHub. Keep communication and payments on the platform.',
+      });
+    }
 
     // Rate limiting
     const rateCheck = await checkRateLimit(senderId, receiver_id);

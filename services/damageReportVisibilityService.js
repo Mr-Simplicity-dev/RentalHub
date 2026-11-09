@@ -8,7 +8,7 @@ class DamageReportVisibilityService {
   static async getLatestPublishedReport(propertyId) {
     try {
       const result = await db.query(
-        `SELECT dr.*, u.full_name as landlord_name
+        `SELECT dr.*, u.full_name as landlord_name, u.email as landlord_email
          FROM property_damage_reports dr
          LEFT JOIN users u ON dr.landlord_id = u.id
          WHERE dr.property_id = $1 AND dr.status = 'published'
@@ -36,7 +36,7 @@ class DamageReportVisibilityService {
 
     try {
       let query = `
-        SELECT dr.*, u.full_name as landlord_name
+        SELECT dr.*, u.full_name as landlord_name, u.email as landlord_email
         FROM property_damage_reports dr
         LEFT JOIN users u ON dr.landlord_id = u.id
         WHERE dr.property_id = $1

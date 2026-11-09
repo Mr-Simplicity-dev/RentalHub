@@ -46,7 +46,7 @@ const features = (t) => [
   {
     icon: FaShieldAlt,
     title: t('app_landing.feature_dispute_title', 'Dispute Resolution'),
-    desc: t('app_landing.feature_dispute_desc', 'Dispute support and dispute resolution built right into the platform.'),
+    desc: t('app_landing.feature_dispute_desc', 'Legal support and dispute resolution built right into the platform.'),
   },
 ];
 

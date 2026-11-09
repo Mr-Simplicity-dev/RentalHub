@@ -1,5 +1,3 @@
-import DisputeHandoverPanel from '../components/common/DisputeHandoverPanel';
-import SupportContactForms from '../components/common/SupportContactForms';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../services/api';
 import { toast } from 'react-toastify';
@@ -78,7 +76,7 @@ const ChatMessage = ({ reply, isOwn, onEdit, onDelete, ticketId }) => {
   );
 };
 
-const Support = ({initialTicketId}) => {
+const Support = () => {
   const { t } = useTranslation();
   const priorityOptions = [
     { value: 'low', label: t('support.low'), color: 'bg-gray-100 text-gray-600' },
@@ -293,8 +291,6 @@ const Support = ({initialTicketId}) => {
     }));
   };
 
-  const openedLink=useRef(null);
-  useEffect(()=>{if(!initialTicketId||openedLink.current===initialTicketId||!tickets.some(ticket=>Number(ticket.id)===Number(initialTicketId)))return;openedLink.current=initialTicketId;setExpandedTicket(Number(initialTicketId));loadConversation(Number(initialTicketId));},[initialTicketId,tickets,loadConversation]);
   if (loading) return <Loader />;
 
   return (
@@ -314,7 +310,6 @@ const Support = ({initialTicketId}) => {
           </button>
         </div>
 
-        <DisputeHandoverPanel/><SupportContactForms/>
         {showForm && (
           <form onSubmit={handleSubmit} className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm" data-tour-id="support-form-workflow">
             <h2 className="text-lg font-semibold text-gray-900">{t('support.form_title')}</h2>

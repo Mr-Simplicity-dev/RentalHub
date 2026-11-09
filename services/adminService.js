@@ -110,7 +110,94 @@ const ensureAdminRoleSchema = async () => {
       ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
+    DO $$
+    DECLARE
+      existing_check_name TEXT;
+      current_len INTEGER;
+      col_has_views INTEGER;
+    BEGIN
+      SELECT COALESCE(character_maximum_length, 0)
+      INTO current_len
+      FROM information_schema.columns
+      WHERE table_name = 'users'
+        AND column_name = 'user_type';
 
+      IF current_len < 50 THEN
+        SELECT COUNT(*)
+        INTO col_has_views
+        FROM pg_depend d
+        JOIN pg_rewrite r ON r.oid = d.objid
+        JOIN pg_class v ON v.oid = r.ev_class
+        JOIN pg_attribute a ON a.attrelid = d.refobjid AND a.attnum = d.refobjsubid
+        WHERE d.refclassid = 'pg_class'::regclass
+          AND d.classid = 'pg_rewrite'::regclass
+          AND d.refobjsubid > 0
+          AND a.attrelid = 'users'::regclass
+          AND v.relkind = 'v'
+          AND a.attname = 'user_type';
+
+        IF col_has_views > 0 THEN
+          DROP VIEW IF EXISTS financial_admin_dashboard CASCADE;
+          DROP VIEW IF EXISTS lga_admin_hierarchy CASCADE;
+          DROP VIEW IF EXISTS state_admin_earnings CASCADE;
+          DROP VIEW IF EXISTS state_admin_transportation_view CASCADE;
+          DROP VIEW IF EXISTS super_admin_transportation_oversight_view CASCADE;
+          DROP VIEW IF EXISTS transportation_system_health_view CASCADE;
+        END IF;
+
+        ALTER TABLE users ALTER COLUMN user_type TYPE VARCHAR(50);
+      END IF;
+
+      SELECT c.conname
+      INTO existing_check_name
+      FROM pg_constraint c
+      JOIN pg_class t ON t.oid = c.conrelid
+      WHERE t.relname = 'users'
+        AND c.contype = 'c'
+        AND pg_get_constraintdef(c.oid) ILIKE '%user_type%';
+
+      IF existing_check_name IS NOT NULL THEN
+        EXECUTE format('ALTER TABLE users DROP CONSTRAINT %I', existing_check_name);
+      END IF;
+    END $$;
+
+    ALTER TABLE users
+      ADD CONSTRAINT users_user_type_check
+      CHECK (
+        user_type IN (
+          'tenant',
+          'landlord',
+          'lawyer',
+          'state_lawyer',
+          'zonal_lawyer',
+          'super_lawyer',
+          'admin',
+          'lga_admin',
+          'lga_support_admin',
+          'state_admin',
+          'zonal_admin',
+          'zonal_financial_admin',
+          'zonal_fumigation_admin',
+          'zonal_transportation_admin',
+          'lga_financial_admin',
+          'lga_transportation_admin',
+          'state_transportation_admin',
+          'super_transportation_admin',
+          'lga_fumigation_admin',
+          'state_fumigation_admin',
+          'super_fumigation_admin',
+          'state_financial_admin',
+          'state_support_admin',
+          'super_admin',
+          'financial_admin',
+          'super_financial_admin',
+          'super_support_admin',
+          'recruitment_admin',
+          'agent',
+          'fumigation_admin',
+          'transportation_admin'
+        )
+      );
   `);
 
   adminRoleSchemaReady = true;
@@ -906,8 +993,7 @@ exports.getPendingVerifications = async (req, res) => {
     const dataQuery = `
       SELECT id, full_name, email, nin, identity_document_type,
              international_passport_number, nationality,
-             passport_photo_url, user_type, created_at,
-             (SELECT COALESCE(jsonb_agg(jsonb_build_object('id',f.id,'reason',f.reason,'status',f.status,'related_user_id',f.related_user_id)),'[]'::jsonb) FROM identity_review_flags f WHERE f.user_id=users.id AND f.status='pending') AS identity_review_flags
+             passport_photo_url, user_type, created_at
       FROM users
       ${whereClause}
       ORDER BY created_at ASC
@@ -939,9 +1025,6 @@ exports.approveVerification = async (req, res) => {
     await ensureVerificationAuditSchema();
 
     const userId = req.params.id;
-    try { await require('./identityPhotoService').guardManualVerification(userId,req.user.id); } catch(error){return res.status(error.statusCode || 503).json({success:false,message:error.message});}
-    const reviewNote=String(req.body?.note || '').trim();
-    if(!reviewNote)return res.status(400).json({success:false,message:'An approval note is required.'});
     const adminId = req.user.id;
     const { assignedState, assignedCity } = await getRequesterScope(req.user);
 
@@ -1030,9 +1113,6 @@ exports.approveVerification = async (req, res) => {
       });
     }
 
-    await db.query("UPDATE identity_review_flags SET status='reviewed',reviewed_by=$2,review_note=$3,reviewed_at=NOW() WHERE user_id=$1 AND status='pending'",[userId,adminId,reviewNote]);
-    await db.query("INSERT INTO audit_logs(actor_id,action,target_type,target_id,metadata) VALUES($1,'IDENTITY_MANUALLY_APPROVED','user',$2,$3)",[adminId,userId,JSON.stringify({note:reviewNote})]);
-    await require('./identityPhotoService').approveCurrentPhotoTemplate(userId);
     res.json({ success: true, message: 'User verified successfully' });
   } catch (err) {
     req.logger.error('Approve verification error:', err);
@@ -1672,7 +1752,6 @@ exports.deleteUser = async (req, res) => {
     // their assigned territory.
     const { clause: userScopeClause, params: userScopeParams } = await buildUserScopeClause(req.user);
 
-    await require('./identityPhotoService').eraseGallery(id);
     const updateResult = await db.query(
       `UPDATE users
        SET deleted_at = NOW(),
@@ -1724,7 +1803,6 @@ exports.verifyUser = async (req, res) => {
     await ensureUserAccountOperationSchema();
 
     const { id } = req.params;
-    try { await require('./identityPhotoService').guardManualVerification(id,req.user.id); } catch(error) { return res.status(error.statusCode || 503).json({success:false,message:error.message}); }
     const adminId = req.user.id;
     const note = requireOperationNote(req.body, 'A verification note is required');
 
@@ -1757,7 +1835,6 @@ exports.verifyUser = async (req, res) => {
     }
 
     const verifiedUser = result.rows[0];
-    await require('./identityPhotoService').approveCurrentPhotoTemplate(verifiedUser.id);
     await recordUserAccountOperation({
       userId: verifiedUser.id,
       actor: req.user,

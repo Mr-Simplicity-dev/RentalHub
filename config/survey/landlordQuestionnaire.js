@@ -348,7 +348,7 @@ L.push(q('L5.5', 'L5', 'B', 'single', 'What most delays repairs?', [
   L.push(q(key, 'L5', 'B', 'likert', text, SCALE_1_5, { ...LIKERT_PAIN }));
 });
 
-// ── L6 Caution deposits, inspections, disputes and Dispute support ──────────
+// ── L6 Caution deposits, inspections, disputes and legal support ──────────
 L.push(q('L6.1', 'L6', 'B', 'single', 'Do you normally collect a caution/security deposit?', [
   ['always', 'Always'],
   ['usually', 'Usually'],
@@ -568,7 +568,7 @@ L.push(q('L9.6', 'L9', 'B', 'single', 'If Amana RentalHub NG successfully introd
   ['not_sure', 'Not sure'],
 ], { analysis: 'fee' }));
 
-L.push(q('L9.7', 'L9', 'B', 'single', 'Would you pay separately for optional tenant verification, Dispute support, property promotion or maintenance services?', [
+L.push(q('L9.7', 'L9', 'B', 'single', 'Would you pay separately for optional tenant verification, legal support, property promotion or maintenance services?', [
   ['yes', 'Yes'],
   ['maybe', 'Maybe'],
   ['no', 'No'],

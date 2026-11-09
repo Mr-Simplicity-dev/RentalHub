@@ -1,5 +1,3 @@
-import DisputeHandoverPanel from './DisputeHandoverPanel';
-import SupportContactForms from './SupportContactForms';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { FaWhatsapp, FaTimes, FaPaperPlane, FaHeadset, FaExternalLinkAlt, FaListUl } from 'react-icons/fa';
@@ -421,7 +419,6 @@ const WhatsAppBotWidget = ({embedded=false,onHumanRequest}) => {
             </div>
 
             <div ref={messageListRef} className="min-h-0 flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
-              <DisputeHandoverPanel /><SupportContactForms />
               {messages.filter(message=>!message.owner || message.owner===authKey).map((msg) => (
                 <div key={msg.id} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div

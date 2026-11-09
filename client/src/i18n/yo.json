@@ -336,9 +336,7 @@
     "open_live_camera": "Ṣí Kámẹ́rà Láàyè",
     "captured_preview": "Àwòrán ìwé ìrìnnà tí a yà",
     "preview_hint": "Rí i dájú pé ojú rẹ ṣe pọ́n tó kí o tó gbé sílẹ̀.",
-    "camera_guide": "Mú ojú rẹ sí inú ìtọ́sọ́nà kí o sì parí gbogbo àyẹ̀wò.",
-    "face_gallery_consent": "Mo gbà kí a fi ojú mi wé ẹ̀rí ìdánimọ̀ mi, kí a sì tọ́jú rẹ̀ láìléwu lórí ẹ̀rọ ìpamọ́ àdáni RentalHub láti dènà àkọọlẹ́ ẹ̀ẹ̀mejì. Bí mi ò bá gbà, òṣìṣẹ́ yóò ṣe àyẹ̀wò fọ́tò mi.",
-    "photo_review_pending": "A ti fi fọ́tò pamọ́. Àyẹ̀wò ìdánimọ̀ ń dúró de òṣìṣẹ́."
+    "camera_guide": "Mú ojú rẹ sí inú ìtọ́sọ́nà kí o sì parí gbogbo àyẹ̀wò."
   },
   "property_types": {
     "apartment": "Apartment",
@@ -407,7 +405,7 @@
     "not_found": "A kò rí ohun-inì náà",
     "no_photos": "Kò sí àwòrán kankan",
     "unlock_title": "Sanwó láti tú gbogbo àwọn ìsọfúnni ohun-inì kí",
-    "unlock_text": "San owó ẹ̀ẹ̀kan láti ṣí ẹ̀kúnrẹ́rẹ́ àlàyé ilé àti àwọn àwòrán àfikún. Nọ́mbà fóònù àti ímeèlì kò sí nínú rẹ̀.",
+    "unlock_text": "Gbogbo ìsọfúnni (àdírẹ́sì kíkún, ìsọfúnni ìkànṣo onílé, àti àwọn ohun tó pọ́n lórí) wà lẹ́yìn sísanwó ẹ̀ẹ̀kan fún ohun-inì yìí.",
     "pay_unlock_details": "Sanwó Láti Tú Àwọn Ìsọfúnni Kí",
     "login_continue": "Wọlé Láti Tẹ̀ Síwájú",
     "per_period": "ní {{period}}",
@@ -421,7 +419,7 @@
     "amenities": "Àwọn Ohun Èlò",
     "video_tour": "Ìrìn-Àjò Fídíò",
     "full_address": "Àdírẹ́sì Kíkún",
-    "contact_landlord": "Ìbéèrè nípa ilé",
+    "contact_landlord": "Kàn Sí Onílé",
     "name": "Orúkọ",
     "phone": "Fóònù",
     "whatsapp": "WhatsApp",
@@ -430,8 +428,8 @@
     "audio_call": "Ìpè Ohùn",
     "video_call": "Ìpè Fídíò",
     "start_virtual_tour": "Bẹ̀rẹ̀ Ìrìn-Àjò Afẹ̀fẹ́",
-    "subscribe_contact_title": "Ìbéèrè nípa ilé",
-    "subscribe_contact_text": "San owó ẹ̀ẹ̀kan láti ṣí ẹ̀kúnrẹ́rẹ́ àlàyé ilé àti àwọn àwòrán àfikún. Nọ́mbà fóònù àti ímeèlì kò sí nínú rẹ̀.",
+    "subscribe_contact_title": "Forúkọ Sílẹ̀ Láti Wo Ìkànṣo",
+    "subscribe_contact_text": "Sanwó ẹ̀ẹ̀kan láti wọ ìsọfúnni ìkànṣo onílé àti gbogbo ìsọfúnni ohun-inì fún ohun-inì yìí.",
     "pay_to_unlock": "Sanwó Láti Tú Kí",
     "apply_property": "Béèrè Fún Ohun-Inì Yìí",
     "report_dispute": "Ròyìn Àríyànjiyàn",
@@ -632,8 +630,7 @@
       "send_message": "Firanṣẹ́ ifiranṣẹ́",
       "start_conversation_btn": "Bẹ̀rẹ̀ ìbárasọ̀rọ̀",
       "lookup": "Ṣàyẹ̀wò ipò tíketì"
-    },
-    "private_documents": "Fi àwọn ìwé ránṣẹ́ nípasẹ̀ tìkẹ́ẹ̀tì ìrànlọ́wọ́ àdáni."
+    }
   },
   "about_us": {
     "hero": {
@@ -1079,7 +1076,7 @@
     "tenants_step_2_hl_2": "Àwọn ìrìn-àjò afẹ̀fẹ́ ohun-inì",
     "tenants_step_2_hl_3": "Fipamọ́ àwọn ààyàn",
     "tenants_step_3_title": "Tú Àwọn Ìsọfúnni Kíkún Kí",
-    "tenants_step_3_desc": "San owó ẹ̀ẹ̀kan láti ṣí ẹ̀kúnrẹ́rẹ́ àlàyé ilé àti àwọn àwòrán àfikún. Nọ́mbà fóònù àti ímeèlì kò sí nínú rẹ̀.",
+    "tenants_step_3_desc": "Sanwó ẹ̀ẹ̀kan láti tú gbogbo àwọn ìsọfúnni ohun-inì kí, pẹ̀lú ìsọfúnni ìkànṣo onílé àti àwọn ohun tó pọ́n.",
     "tenants_step_3_hl_1": "Àdírẹ́sì kíkún ti fara hàn",
     "tenants_step_3_hl_2": "Ìsọfúnni ìkànṣo onílé",
     "tenants_step_3_hl_3": "Àwọn àwòrán HD & fídíò",
@@ -3572,20 +3569,7 @@
     "adjustment_body": "Kaadi isanwo rẹ ni a fun ni ita Naijiria. Lati pari iforukọsilẹ owo agbegbe rẹ, afikun",
     "adjustment_body_2": "(iyipada ọja + $5 owo iṣẹ) ni a nilo ki a to le mu akọọlẹ rẹ ṣiṣẹ.",
     "adjustment_pay": "San iyatọ ni bayi",
-    "adjustment_failed": "Ko le bẹrẹ isanwo iyatọ. Jọwọ gbiyanju lẹẹkansi.",
-    "otp_pre_payment_body": "A ti fi kóòdù ìmúdájú ránṣẹ́ sí fóònù rẹ. Ó wúlò fún ìṣẹ́jú mẹ́wàá. Jẹ́rìí nọ́mbà fóònù rẹ kí o tó tẹ̀síwájú sí ìsanwó.",
-    "otp_verify_payment": "Jẹ́rìí kí o sì tẹ̀síwájú sí ìsanwó",
-    "phone_verified_continue": "A ti jẹ́rìí fóònù rẹ. Tẹ̀síwájú láì tún kóòdù náà tẹ̀.",
-    "phone_checking_identity": "A ti jẹ́rìí fóònù rẹ. À ń ṣàyẹ̀wò ìdánimọ̀ rẹ kí o tó tẹ̀síwájú.",
-    "otp_resend_wait": "O lè tún ránṣẹ́ ní ìṣẹ́jú-àáyá {{count}}",
-    "email_send": "Fi ímeèlì ìmúdájú ránṣẹ́",
-    "email_sent": "Ṣàyẹ̀wò àpótí ímeèlì rẹ àti àpótí àwúrúju. Ṣí ọ̀nà ìmúdájú láti jẹ́rìí ímeèlì rẹ.",
-    "email_send_failed": "A kò lè fi ímeèlì ìmúdájú ránṣẹ́. Jọ̀wọ́ tún gbìyànjú.",
-    "passport_image_label": "Ojú ìwé àlàyé ìwé ìrìnnà",
-    "passport_image_choose": "Yan ojú ìwé ìrìnnà",
-    "passport_image_required": "So àwòrán kedere ti ojú ìwé àlàyé ìwé ìrìnnà rẹ pọ̀ kí o tó tẹ̀síwájú.",
-    "passport_image_help": "Fi gbogbo ojú ìwé tí ó ní fọ́tò àti àlàyé ìwé ìrìnnà rẹ hàn. Lo JPEG tàbí PNG tó ṣe kedere. A kò ní fi àwòrán náà pamọ́ sínú àkọ́pamọ́ ìforúkọsílẹ̀.",
-    "passport_country_label": "Orílẹ̀-èdè tó fún ọ ní ìwé ìrìnnà"
+    "adjustment_failed": "Ko le bẹrẹ isanwo iyatọ. Jọwọ gbiyanju lẹẹkansi."
   },
   "widget": {
     "support_title": "Ìrànwọ́ RentalHub",

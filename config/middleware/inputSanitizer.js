@@ -44,9 +44,7 @@ const sanitizeObject = (obj, depth = 0) => {
     }
     const value = obj[key];
 
-    if (key === 'passport_document_image' && typeof value === 'string' && /^data:image\/(?:jpeg|png);base64,[A-Za-z0-9+/]+={0,2}$/.test(value.trim())) {
-      sanitized[key] = truncate(value.trim(), 710001);
-    } else if (SANITIZED_KEYS.has(key) && typeof value === 'string') {
+    if (SANITIZED_KEYS.has(key) && typeof value === 'string') {
       sanitized[key] = value.trim();
     } else {
       sanitized[key] = sanitizeValue(value, depth === 0 ? MAX_STRING_LENGTH : 5000);

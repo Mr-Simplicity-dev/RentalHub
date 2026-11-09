@@ -237,7 +237,6 @@ const VerificationStatus = () => {
             </div>
           </div>
 
-          {user?.email && !user.email_verified ? <button type="button" className="btn-outline mt-4 w-full" onClick={() => navigate('/verify-email')}>{t('register.email_send')}</button> : null}
           {error && (
             <p className="mt-4 text-sm text-red-600">{error}</p>
           )}

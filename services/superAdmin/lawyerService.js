@@ -325,7 +325,7 @@ const createManualPlatformLawyer = async (req, res) => {
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
 
-      return res.status(400).json({ message: "Enter a valid legal representative's email address" });
+      return res.status(400).json({ message: 'Enter a valid lawyer email address' });
     }
 
 
@@ -749,7 +749,7 @@ const updatePlatformLawyer = async (req, res) => {
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
 
-      return res.status(400).json({ message: 'Enter a valid email address' });
+      return res.status(400).json({ message: 'Enter a valid lawyer email address' });
 
     }
 
