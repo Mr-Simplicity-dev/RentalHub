@@ -979,7 +979,7 @@ async function sendVerificationCode(phoneNumber) {
   const crypto = require('crypto');
   const code = crypto.randomInt(100000, 999999);
   const expiresAt = Date.now() + DEFAULT_SMS_TRACKING_TTL_MS;
-  const message = `Your Rental Hub NG verification code is: ${code}. Valid for 10 minutes. Do not share this code.`;
+  const message = `Your Amana RentalHub NG verification code is: ${code}. Do not share this code.`;
 
   const result = await sendSMS(phoneNumber, message, {
     purpose: 'otp_verification',
