@@ -141,6 +141,22 @@ function createService({
       matched_id: match.id
     })]);
   };
+  const sweepDuplicates = async () => {
+    const rows = (await db.query('SELECT p.*,s.state_name FROM protection_properties p JOIN states s ON s.id=p.state_id ORDER BY COALESCE(p.last_compared_at,p.created_at) LIMIT 25')).rows;
+    for (const p of rows) await transaction(async c => {
+      await duplicates(p, c);
+      await c.query('UPDATE protection_properties SET last_compared_at=NOW() WHERE id=$1', [p.id]);
+    });
+    const alerts = (await db.query("SELECT a.id,p.id AS property_id,p.owner_id,p.state_id,s.state_name FROM protection_alerts a JOIN protection_properties p ON p.id=a.property_id JOIN states s ON s.id=p.state_id WHERE a.status='open' AND NOT EXISTS(SELECT 1 FROM notifications n WHERE n.user_id=p.owner_id AND n.dedup_key='pp:alert:'||a.id::text) ORDER BY a.id LIMIT 50")).rows;
+    for (const alert of alerts) {
+      await setStatus(alert.property_id, 'under_review');
+      await notifyOperations({
+        ...alert,
+        id: alert.property_id
+      }, 'property_protection', 'Property finding needs review', 'An observation or possible matching record needs investigation. It is not an ownership or fraud decision.', 'pp:alert:' + alert.id);
+      await notify(alert.owner_id, 'property_protection', 'Property record alert', 'An observation or possible match needs review. A match is not proof of fraud. Open the record for the recorded findings.', '/property-protection?property=' + alert.property_id, 'pp:alert:' + alert.id);
+    }
+  };
   const create = async (actor, body) => {
     if (!uuid(body.submission_id)) fail(400, "A registration retry identifier is required.");
     const p = propertyInput(body),
@@ -336,7 +352,8 @@ function createService({
       await c.query("UPDATE protection_properties SET " + columns.map((k, i) => k + "=$" + (i + 2)).join(",") + ",pending_update=NULL,verification_status='under_review',verified_at=NULL,verified_until=NULL,case_officer_id=NULL,updated_at=NOW() WHERE id=$1", [id, ...columns.map(k => k === "ownership_details" ? JSON.stringify(next[k]) : next[k])]);
       await c.query("UPDATE protection_checks SET history=history||jsonb_build_array(to_jsonb(protection_checks)-'history'),status='pending',assigned_to=NULL,private_findings=NULL,public_summary=NULL,source_details='{}',document_ids='[]',submitted_by=NULL,reviewed_by=NULL,updated_at=NOW() WHERE property_id=$1", [id]);
     } else await c.query("UPDATE protection_properties SET pending_update=NULL,updated_at=NOW() WHERE id=$1", [id]);
-    if(body.status==="approved")await setStatus(id,"under_review",c);await operation(actor, "RECORD_CORRECTION_" + body.status.toUpperCase(), id);
+    if (body.status === "approved") await setStatus(id, "under_review", c);
+    await operation(actor, "RECORD_CORRECTION_" + body.status.toUpperCase(), id);
     return {
       success: true
     };
@@ -626,7 +643,8 @@ function createService({
     duplicates,
     operation,
     transaction,
-    setStatus
+    setStatus,
+    sweepDuplicates
   };
 }
 let instance;

@@ -7,12 +7,15 @@ CREATE TABLE IF NOT EXISTS protection_properties (
  ownership_capacity VARCHAR(30) NOT NULL CHECK(ownership_capacity IN ('individual','family','joint','company')),
  ownership_details JSONB NOT NULL DEFAULT '{}',seller_details TEXT,
  pending_update JSONB,update_requested_by INTEGER REFERENCES users(id),update_reason TEXT,record_history JSONB NOT NULL DEFAULT '[]',verification_status VARCHAR(40) NOT NULL DEFAULT 'unregistered',verification_scope TEXT,verification_limitations TEXT,verified_at TIMESTAMPTZ,verified_until TIMESTAMPTZ,
- case_officer_id INTEGER REFERENCES users(id),created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+ case_officer_id INTEGER REFERENCES users(id),last_compared_at TIMESTAMPTZ,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS protection_registration_retry ON protection_properties(owner_id,submission_id);
 CREATE INDEX IF NOT EXISTS protection_properties_owner ON protection_properties(owner_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS protection_properties_location ON protection_properties(state_id,lga_name);
 CREATE INDEX IF NOT EXISTS protection_properties_parcel ON protection_properties(state_id,lower(parcel_number)) WHERE parcel_number IS NOT NULL;
+CREATE INDEX IF NOT EXISTS protection_compare_rotation ON protection_properties(COALESCE(last_compared_at,created_at));
+CREATE INDEX IF NOT EXISTS protection_parcel_match ON protection_properties(state_id,lower(lga_name),regexp_replace(lower(parcel_number),'[^a-z0-9]','','g')) WHERE parcel_number IS NOT NULL;
+CREATE INDEX IF NOT EXISTS protection_survey_match ON protection_properties(state_id,lower(lga_name),regexp_replace(lower(survey_number),'[^a-z0-9]','','g')) WHERE survey_number IS NOT NULL;
 CREATE TABLE IF NOT EXISTS protection_representatives (
  id BIGSERIAL PRIMARY KEY,property_id BIGINT NOT NULL REFERENCES protection_properties(id),user_id INTEGER NOT NULL REFERENCES users(id),
  capacity TEXT NOT NULL,authority_description TEXT NOT NULL,can_upload BOOLEAN NOT NULL DEFAULT FALSE,can_open_cases BOOLEAN NOT NULL DEFAULT FALSE,can_request_services BOOLEAN NOT NULL DEFAULT FALSE,
@@ -55,6 +58,7 @@ CREATE TABLE IF NOT EXISTS protection_documents (
  original_name VARCHAR(255) NOT NULL,storage_name VARCHAR(100) NOT NULL UNIQUE,mime_type VARCHAR(100) NOT NULL,file_size BIGINT NOT NULL,sha256 CHAR(64) NOT NULL,scan_status VARCHAR(20) NOT NULL CHECK(scan_status='clean'),
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),retention_consent BOOLEAN NOT NULL DEFAULT FALSE,retain_until TIMESTAMPTZ NOT NULL,withdrawn_at TIMESTAMPTZ
 );
+CREATE INDEX IF NOT EXISTS protection_document_hash ON protection_documents(sha256);
 CREATE INDEX IF NOT EXISTS protection_documents_property ON protection_documents(property_id,created_at DESC);
 ALTER TABLE disputes ADD COLUMN IF NOT EXISTS protection_property_id BIGINT REFERENCES protection_properties(id),ADD COLUMN IF NOT EXISTS protection_request_key UUID,ADD COLUMN IF NOT EXISTS protection_outcome_history JSONB NOT NULL DEFAULT '[]',ADD COLUMN IF NOT EXISTS protection_outcome VARCHAR(50),ADD COLUMN IF NOT EXISTS outcome_limitations TEXT;
 DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='dispute_evidence' AND column_name='created_at') THEN ALTER TABLE dispute_evidence ADD COLUMN created_at TIMESTAMP;UPDATE dispute_evidence SET created_at=uploaded_at;ALTER TABLE dispute_evidence ALTER COLUMN created_at SET DEFAULT NOW();END IF;END $$;

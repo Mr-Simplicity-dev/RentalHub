@@ -1,6 +1,7 @@
 const db = require("../config/middleware/database");
 const { createNotification } = require("../config/utils/notificationService");
 async function runProtectionMaintenance() {
+  await require('./propertyProtectionService').getService().sweepDuplicates();
   await require("./propertyProtectionPayments").sweep();
   const expired = (
     await db.query(

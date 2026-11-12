@@ -24,6 +24,7 @@ const db = new Pool({
  CREATE TABLE dispute_evidence(id SERIAL PRIMARY KEY,dispute_id INTEGER,file_hash TEXT,uploaded_at TIMESTAMP DEFAULT NOW());
  INSERT INTO dispute_evidence(dispute_id,uploaded_at,file_hash) VALUES(NULL,'2020-01-01',repeat('c',64));
  CREATE TABLE call_sessions(id UUID PRIMARY KEY,status TEXT,ended_at TIMESTAMPTZ);
+ CREATE TABLE notifications(id SERIAL PRIMARY KEY,user_id INTEGER,dedup_key TEXT);
  CREATE TABLE audit_logs(id SERIAL PRIMARY KEY,actor_id INTEGER,action TEXT,target_type TEXT,target_id INTEGER,created_at TIMESTAMPTZ DEFAULT NOW());
  CREATE TABLE platform_lawyers(id SERIAL PRIMARY KEY,lawyer_user_id INTEGER,is_active BOOLEAN);
  CREATE TABLE platform_agents(id SERIAL PRIMARY KEY,agent_user_id INTEGER,is_active BOOLEAN);
@@ -502,6 +503,7 @@ const db = new Pool({
     "PASS reviewed record correction keeps history, resets checks and cannot transfer account ownership",
   );
 
+  await db.query('INSERT INTO properties(landlord_id,state_id,full_address) VALUES(2,1,$1)',[input.address]);await svc.sweepDuplicates();assert.ok((await db.query("SELECT 1 FROM protection_alerts WHERE property_id=$1 AND rule_key LIKE 'listing:%'",[id])).rows.length);console.log('PASS ongoing matching detects a listing added after the private property record');
   await require("./testProtectionCallWorkers")(db, reported.id);
   assert.ok(audit.length > 0);
   console.log(
