@@ -1470,8 +1470,8 @@ exports.submitSupportRequest = async (req, res) => {
         const { sendNotification } = require('../config/utils/notificationService');
         await sendNotification(
           assignedLawyerId,
-          'New Legal Assistance Request',
-          `A client you are assigned to has submitted a legal assistance request: ${subject.trim()}`,
+          'New Case Support Request',
+          `A client you are assigned to has submitted a case-support request: ${subject.trim()}`,
           'legal_request',
           userId,
           'client'
@@ -1483,7 +1483,7 @@ exports.submitSupportRequest = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: 'Your legal assistance request has been submitted',
+      message: 'Your case-support request has been submitted',
       data: result.rows[0],
     });
   } catch (error) {

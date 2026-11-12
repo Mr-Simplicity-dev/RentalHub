@@ -4208,7 +4208,7 @@ exports.paystackWebhook = async (req, res) => {
 // Handle successful payment
 async function handleSuccessfulPayment(data, webhookLogger) {
   try {
-    if(String(data.reference||'').startsWith('ARH_PP_')&&await require('./propertyProtectionPayments').byReference(data.reference))return;
+    if(/^ARH(?:-PP-|_PP_)/.test(String(data.reference||''))&&await require('./propertyProtectionPayments').byReference(data.reference))return;
     const reference = data.reference;
     const metadata = data.metadata || {};
 

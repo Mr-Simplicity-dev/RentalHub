@@ -267,7 +267,7 @@ exports.getDisputeDetails = async (req, res) => {
       ),
       db.query(
         `SELECT
-           l.*,
+           l.id,l.actor_id,l.action,l.target_type,l.target_id,l.created_at,l.current_hash,l.previous_hash,l.metadata,
            u.full_name AS actor_name,
            u.email AS actor_email,
            u.user_type AS actor_role
@@ -322,7 +322,8 @@ exports.getDisputeDetails = async (req, res) => {
       ),
     ]);
 
-    if(!canViewAllCaseNotes)for(const e of evidenceResult.rows)delete e.lawyer_notes;
+    const auditFields=['id','actor_id','action','target_type','target_id','created_at','current_hash','previous_hash','metadata','actor_name','actor_role'];auditResult.rows=auditResult.rows.map(row=>Object.fromEntries(auditFields.filter(key=>row[key]!==undefined).map(key=>[key,row[key]])));
+    if(!canViewAllCaseNotes){for(const e of evidenceResult.rows)delete e.lawyer_notes;const visible=new Set(caseNotesResult.rows.map(n=>Number(n.id)));auditResult.rows=auditResult.rows.filter(log=>!log.metadata?.note_id||visible.has(Number(log.metadata.note_id))).map(log=>({...log,metadata:null}));}
     if(dispute.protection_property_id){lawyerResult.rows=[];const members=(await db.query("SELECT u.id,u.full_name,u.user_type FROM protection_case_participants m JOIN users u ON u.id=m.user_id WHERE m.dispute_id=$1 AND m.capacity='professional' AND m.revoked_at IS NULL",[disputeId])).rows;lawyerResult.rows=members;}
     if(['tenant','landlord','agent','marketing_agent'].includes(req.user.user_type)){for(const item of [dispute,...messagesResult.rows,...evidenceResult.rows,...auditResult.rows,...lawyerResult.rows,...caseNotesResult.rows])for(const k of Object.keys(item))if(/(^|_)(email|phone)$/.test(k))delete item[k];}
     const timeline = [
@@ -835,7 +836,8 @@ exports.getEvidence = async (req, res) => {
     return res.status(404).json({ success: false, message: 'Evidence file not found' });
   }
 
-  if(evidence.protection_property_id&&crypto.createHash('sha256').update(fs.readFileSync(evidencePath)).digest('hex')!==evidence.file_hash)return res.status(409).json({success:false,message:'Evidence integrity could not be confirmed.'});
+  if(evidence.protection_property_id){try{if(crypto.createHash('sha256').update(fs.readFileSync(evidencePath)).digest('hex')!==evidence.file_hash)return res.status(409).json({success:false,message:'Evidence integrity could not be confirmed.'});}catch{return res.status(409).json({success:false,message:'Evidence integrity could not be confirmed.'});}}
+  if(evidence.protection_property_id)await logAction({actorId:userId,action:'PROTECTION_CASE_EVIDENCE_DOWNLOADED',targetType:'dispute',targetId:evidence.dispute_id,ip:req.ip});
   res.setHeader('Cache-Control','no-store');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.sendFile(evidencePath);

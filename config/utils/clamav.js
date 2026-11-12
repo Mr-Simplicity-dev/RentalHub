@@ -1,5 +1,5 @@
-// ClamAV malware scanning for uploaded files. Best-effort: if the scanner is
-// unavailable it fails open (does not block uploads), but logs the problem.
+// Scanning reports whether a file was actually checked. Required callers reject
+// scanned:false; existing best-effort callers keep their previous behaviour.
 const { execFile } = require('child_process');
 const logger = require('./logger');
 

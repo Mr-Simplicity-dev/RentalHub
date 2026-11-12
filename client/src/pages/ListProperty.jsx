@@ -162,12 +162,7 @@ const ListProperty = () => {
       text: t('list_property.testimonial_2.text'),
       rating: 5,
     },
-    {
-      name: 'Ibrahim Musa',
-      role: t('list_property.testimonial_3.role'),
-      text: t('list_property.testimonial_3.text'),
-      rating: 4,
-    },
+
   ];
 
   const faqs = [

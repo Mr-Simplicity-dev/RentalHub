@@ -165,7 +165,7 @@ const shortcutCategories = [
   },
   {
     key: "trust",
-    label: "Legal & Trust",
+    label: "Trust & Safety",
     color: "rose",
     items: [
       { name: "flags", label: "Flags", detail: "Toggle platform-wide operational controls" },

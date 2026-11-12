@@ -344,7 +344,7 @@ const WhatsAppBotWidget = ({embedded=false,onHumanRequest}) => {
   const quickReplies = isAuthenticated ? ['My wallet balance','My payments','My verification status','My support tickets','Create a ticket'] : [
     t('messages.whatsapp.qr_find', 'How do I find a property?'),
     t('messages.whatsapp.qr_list', 'How do I list my property?'),
-    t('messages.whatsapp.qr_legal', 'Tell me about Legal Protection'),
+    t('messages.whatsapp.qr_legal', 'Tell me about Property Protection'),
     t('messages.whatsapp.qr_payment', 'How does payment work?'),
   ];
 

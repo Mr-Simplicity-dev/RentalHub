@@ -33,7 +33,7 @@ const milestones = [
   { year: '2020', event: 'Amana RentalHub NG was founded with a vision to transform the Nigerian rental market.' },
   { year: '2021', event: 'Launched property listing framework to ackwonledge onboarding landlords across Lagos and Abuja by creating a platform.' },
   { year: '2022', event: 'Expanded the framework to all 36 states + FCT; introduced identity verification for landlords and tenants.' },
-  { year: '2023', event: 'Launched legal framework support services, dispute resolution, and fumigation/cleaning marketplace.' },
+  { year: '2023', event: 'Launched case support, dispute resolution, and the fumigation/cleaning marketplace.' },
   { year: '2024', event: 'Introduced Rental Platform, transportation services, evidence verification, and virtual property tours.' },
   { year: '2025', event: 'Harnessed and reaching 50,000+ active users; launched mobile app with real-time chat and notifications.' },
 ];
@@ -146,7 +146,7 @@ const AboutUs = () => {
               <ShareButton
                 section="About Us"
                 title="Amana RentalHub NG — Nigeria's Most Trusted Property Platform"
-                description="Nigeria's most trusted property technology platform — connecting tenants, landlords, agents, and legal professionals across all 36 states and the Federal Capital Territory."
+                description="Built for tenants, landlords and approved platform staff."
               />
             </div>
           </div>
@@ -349,7 +349,7 @@ const AboutUs = () => {
               <ShareButton
                 section="Why Choose Us"
                 title="Why Choose Amana RentalHub NG"
-                description="Verified ecosystem, legal support, full-service marketplace, and nationwide coverage — see what makes Amana RentalHub NG different."
+                description="Register property records, request available checks and follow cases."
               />
             </div>
             <p className="text-gray-600">
@@ -385,9 +385,9 @@ const AboutUs = () => {
                 <div className="flex items-start justify-between gap-4">
                   <h3 className="text-lg font-bold text-gray-900 mb-2">{t('about_us.different.legal.title')}</h3>
                   <ShareButton
-                    section="Legal Support"
-                    title="Amana RentalHub NG — Legal Support & Dispute Resolution"
-                    description="Access to qualified lawyers, evidence verification, and structured dispute resolution processes to protect all parties."
+                    section="Case Support"
+                    title="Amana RentalHub NG — Case Support & Dispute Resolution"
+                    description="Assigned reviewers check documents and record findings and limitations."
                   />
                 </div>
                 <p className="text-gray-600 text-sm leading-relaxed">

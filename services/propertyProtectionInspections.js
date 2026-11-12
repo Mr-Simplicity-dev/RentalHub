@@ -1,35 +1,281 @@
-const {fail,text}=require('./propertyProtectionPolicy');
-function createInspections({db,protection,audit,notify}){
- const tasks=async(actor)=>{if(!['agent','super_admin','state_admin','admin','lga_admin','zonal_admin'].includes(actor.user_type))fail(403,'Assigned inspection access required.');const rows=(await db.query("SELECT i.*,p.title,p.state_id,p.lga_name,p.address,s.state_name FROM property_inspection_requests i JOIN protection_properties p ON p.id=i.protection_property_id JOIN states s ON s.id=p.state_id WHERE i.protection_property_id IS NOT NULL AND ($1::boolean OR i.assigned_agent_id=$2) ORDER BY i.requested_at DESC LIMIT 200",[actor.user_type==='super_admin',actor.id])).rows;return rows.map(r=>({...r,inspection_proof_urls:undefined}));};
- const action=async(actor,taskId,body)=>{
-  const task=(await db.query('SELECT * FROM property_inspection_requests WHERE id=$1 AND protection_property_id IS NOT NULL',[taskId])).rows[0];if(!task)fail(404,'Inspection task not found.');const a=await protection.access(actor,task.protection_property_id);const worker=Number(task.assigned_agent_id)===Number(actor.id)&&!a.owner&&!a.rep;
-  if(body.action==='assign'){
-   if(!a.manager)fail(403,'An independent supervisor must assign this task.');const target=Number(body.agent_id);const agent=(await db.query("SELECT u.id,u.identity_verified,u.assigned_state_id,u.assigned_lga_name FROM users u JOIN platform_agents pa ON pa.agent_user_id=u.id AND pa.is_active=TRUE WHERE u.id=$1 AND u.user_type='agent' AND u.is_active=TRUE AND u.deleted_at IS NULL AND u.account_suspended_at IS NULL",[target])).rows[0];
-   if(!agent||!agent.identity_verified||Number(agent.assigned_state_id)!==Number(a.p.state_id)||(agent.assigned_lga_name&&agent.assigned_lga_name.toLowerCase()!==a.p.lga_name.toLowerCase())||Number(target)===Number(a.p.owner_id))fail(403,'Choose an approved independent platform agent for this location.');
-   if((await db.query("SELECT 1 FROM protection_representatives WHERE property_id=$1 AND user_id=$2 AND status IN ('pending','approved')",[a.p.id,target])).rows.length)fail(403,'A representative cannot inspect the same property.');
-   await db.query("UPDATE property_inspection_requests SET assigned_agent_id=$2,status='assigned',updated_at=NOW() WHERE id=$1 AND status IN ('paid','assigned')",[taskId,target]);if(task.protection_purpose==='verification')await db.query("UPDATE protection_checks SET assigned_to=$2,status='assigned' WHERE property_id=$1 AND stage='inspection'",[task.protection_property_id,target]);await notify(target,'property_protection','Field inspection assigned','Open your assigned property task for the instructions.','/property-protection?view=assigned',`pp:inspection:${taskId}:${target}`);
-  }else if(body.action==='schedule'){
-   if(!worker&&!a.manager)fail(403,'Only the assigned worker or supervisor can coordinate this inspection.');const date=new Date(body.scheduled_at);if(!Number.isFinite(date.getTime())||date<new Date())fail(400,'Choose a future inspection time.');await db.query('UPDATE property_inspection_requests SET scheduled_at=$2,updated_at=NOW() WHERE id=$1',[taskId,date]);
-  }else if(body.action==='start'){
-   if(!worker||!['assigned','inspecting'].includes(task.status))fail(403,'Only the assigned agent can start an assigned inspection.');await db.query("UPDATE property_inspection_requests SET status='inspecting',started_at=COALESCE(started_at,NOW()),updated_at=NOW() WHERE id=$1",[taskId]);
-  }else if(body.action==='submit'){
-   if(!worker||!['assigned','inspecting'].includes(task.status))fail(403,'Only the independent assigned agent can submit this inspection.');
-   if(!['attended','unable_to_access'].includes(body.attendance)||text(body.summary).length<20)fail(400,'Record attendance, conditions, discrepancies and a clear report.');
-   const ids=Array.isArray(body.document_ids)?body.document_ids:[];if(body.attendance==='attended'&&!ids.length)fail(400,'Attach inspection photographs, video or a report.');if(ids.length){const files=(await db.query('SELECT id FROM protection_documents WHERE property_id=$1 AND inspection_id=$2 AND id=ANY($3::uuid[]) AND uploaded_by=$4 AND withdrawn_at IS NULL',[task.protection_property_id,taskId,ids,actor.id])).rows;if(files.length!==ids.length)fail(403,'Inspection evidence must belong to this assigned task.');}
-   const gps=body.location_permission===true?{latitude:Number(body.latitude),longitude:Number(body.longitude),accuracy:Number(body.accuracy)||null}:null;if(gps&&(!Number.isFinite(gps.latitude)||Math.abs(gps.latitude)>90||!Number.isFinite(gps.longitude)||Math.abs(gps.longitude)>180))fail(400,'Enter valid permitted location observations.');
-   const findings={attendance:body.attendance,conditions:text(body.conditions),occupants:text(body.occupants),discrepancies:text(body.discrepancies),gps,document_ids:ids,submitted_at:new Date().toISOString(),submitted_by:actor.id,supervisor_review:'pending',location_source:'Agent/device observation; not proof of ownership or unlawful occupation'};
-   await db.query("UPDATE property_inspection_requests SET status='inspecting',inspection_summary=$2,inspection_findings=$3,updated_at=NOW() WHERE id=$1",[taskId,text(body.summary),JSON.stringify(findings)]);
-   if(task.protection_purpose==='verification')await db.query("UPDATE protection_checks SET status='submitted',public_summary=$2,source_details=$3,document_ids=$4,submitted_by=$5,submitted_at=NOW() WHERE property_id=$1 AND stage='inspection'",[task.protection_property_id,text(body.summary),JSON.stringify(findings),JSON.stringify(ids),actor.id]);
-  }else if(body.action==='review'){
-   if(!a.manager||Number(task.assigned_agent_id)===Number(actor.id))fail(403,'A different authorised supervisor must review this inspection.');if(!['approved','returned'].includes(body.decision)||text(body.reason).length<15||!task.inspection_findings?.submitted_at)fail(400,'Choose a review decision and record the reason.');
-   if(body.decision==='approved'&&task.inspection_findings.attendance!=='attended')fail(409,'An inaccessible property cannot pass physical inspection.');
-   if(task.protection_purpose==='verification')await protection.reviewCheck(actor,task.protection_property_id,'inspection',{status:body.decision,reason:body.reason});
-   await db.query("UPDATE property_inspection_requests SET status=$2::text,completed_at=CASE WHEN $2::text='completed' THEN NOW() ELSE NULL END,supervisor_note=$3,inspection_findings=jsonb_set(COALESCE(inspection_findings,'{}'),'{supervisor_review}',to_jsonb($4::text)),updated_at=NOW() WHERE id=$1",[taskId,body.decision==='approved'?'completed':'assigned',text(body.reason),body.decision]);
-   if(task.protection_purpose==='monitoring'&&body.decision==='approved')await db.query("INSERT INTO protection_alerts(property_id,category,rule_key,summary,source_details,created_by) VALUES($1,'independent_finding',$2,$3,$4,$5) ON CONFLICT DO NOTHING",[task.protection_property_id,'inspection:'+task.id,task.inspection_summary,JSON.stringify({inspection_id:task.id,observed_at:task.started_at,limitations:'Field observation only. This does not confirm ownership or unlawful occupation.'}),actor.id]);
-  }else fail(400,'Choose a supported inspection action.');
-  await db.query('INSERT INTO property_inspection_operations(inspection_id,admin_id,actor_name,event_type,note,metadata) VALUES($1,$2,$3,$4,$5,$6)',[taskId,actor.id,actor.full_name||'Assigned staff','protection_'+body.action,text(body.reason||body.summary),JSON.stringify({protection_property_id:task.protection_property_id})]);await audit({actorId:actor.id,action:'PROTECTION_INSPECTION_'+body.action.toUpperCase(),targetType:'protection_property',targetId:task.protection_property_id});return{success:true};
- };
- return{tasks,action};
+const { fail, text } = require("./propertyProtectionPolicy");
+function createInspections({ db, protection, audit, notify }) {
+  const tasks = async (actor) => {
+    if (
+      ![
+        "agent",
+        "super_admin",
+        "state_admin",
+        "admin",
+        "lga_admin",
+        "zonal_admin",
+      ].includes(actor.user_type)
+    )
+      fail(403, "Assigned inspection access required.");
+    const rows = (
+      await db.query(
+        "SELECT i.*,p.title,p.state_id,p.lga_name,p.address,s.state_name FROM property_inspection_requests i JOIN protection_properties p ON p.id=i.protection_property_id JOIN states s ON s.id=p.state_id WHERE i.protection_property_id IS NOT NULL AND ($1::boolean OR i.assigned_agent_id=$2) ORDER BY i.requested_at DESC LIMIT 200",
+        [actor.user_type === "super_admin", actor.id],
+      )
+    ).rows;
+    return rows.map((r) => ({ ...r, inspection_proof_urls: undefined }));
+  };
+  const action = async (actor, taskId, body) => {
+    const task = (
+      await db.query(
+        "SELECT * FROM property_inspection_requests WHERE id=$1 AND protection_property_id IS NOT NULL",
+        [taskId],
+      )
+    ).rows[0];
+    if (!task) fail(404, "Inspection task not found.");
+    const a = await protection.access(actor, task.protection_property_id);
+    const worker =
+      Number(task.assigned_agent_id) === Number(actor.id) && !a.owner && !a.rep;
+    if (body.action === "assign") {
+      if (!a.manager)
+        fail(403, "An independent supervisor must assign this task.");
+      const target = Number(body.agent_id);
+      const agent = (
+        await db.query(
+          "SELECT u.id,u.identity_verified,u.assigned_state_id,u.assigned_lga_name FROM users u JOIN platform_agents pa ON pa.agent_user_id=u.id AND pa.is_active=TRUE WHERE u.id=$1 AND u.user_type='agent' AND u.is_active=TRUE AND u.deleted_at IS NULL AND u.account_suspended_at IS NULL",
+          [target],
+        )
+      ).rows[0];
+      if (
+        !agent ||
+        !agent.identity_verified ||
+        Number(agent.assigned_state_id) !== Number(a.p.state_id) ||
+        (agent.assigned_lga_name &&
+          agent.assigned_lga_name.toLowerCase() !==
+            a.p.lga_name.toLowerCase()) ||
+        Number(target) === Number(a.p.owner_id)
+      )
+        fail(
+          403,
+          "Choose an approved independent platform agent for this location.",
+        );
+      if (
+        (
+          await db.query(
+            "SELECT 1 FROM protection_representatives WHERE property_id=$1 AND user_id=$2 AND status IN ('pending','approved')",
+            [a.p.id, target],
+          )
+        ).rows.length
+      )
+        fail(403, "A representative cannot inspect the same property.");
+      await db.query(
+        "UPDATE property_inspection_requests SET assigned_agent_id=$2,status='assigned',updated_at=NOW() WHERE id=$1 AND status IN ('paid','assigned')",
+        [taskId, target],
+      );
+      if (task.protection_purpose === "verification")
+        await db.query(
+          "UPDATE protection_checks SET assigned_to=$2,status='assigned' WHERE property_id=$1 AND stage='inspection'",
+          [task.protection_property_id, target],
+        );
+      await notify(
+        target,
+        "property_protection",
+        "Field inspection assigned",
+        "Open your assigned property task for the instructions.",
+        "/property-protection?view=assigned",
+        `pp:inspection:${taskId}:${target}`,
+      );
+    } else if (body.action === "schedule") {
+      if (!worker && !a.manager)
+        fail(
+          403,
+          "Only the assigned worker or supervisor can coordinate this inspection.",
+        );
+      const date = new Date(body.scheduled_at);
+      if (!Number.isFinite(date.getTime()) || date < new Date())
+        fail(400, "Choose a future inspection time.");
+      await db.query(
+        "UPDATE property_inspection_requests SET scheduled_at=$2,updated_at=NOW() WHERE id=$1",
+        [taskId, date],
+      );
+    } else if (body.action === "start") {
+      if (!worker || !["assigned", "inspecting"].includes(task.status))
+        fail(403, "Only the assigned agent can start an assigned inspection.");
+      await db.query(
+        "UPDATE property_inspection_requests SET status='inspecting',started_at=COALESCE(started_at,NOW()),updated_at=NOW() WHERE id=$1",
+        [taskId],
+      );
+    } else if (body.action === "submit") {
+      if (!worker || !["assigned", "inspecting"].includes(task.status))
+        fail(
+          403,
+          "Only the independent assigned agent can submit this inspection.",
+        );
+      if (
+        !["attended", "unable_to_access"].includes(body.attendance) ||
+        text(body.summary).length < 20
+      )
+        fail(
+          400,
+          "Record attendance, conditions, discrepancies and a clear report.",
+        );
+      const ids = Array.isArray(body.document_ids) ? body.document_ids : [];
+      if (body.attendance === "attended" && !ids.length)
+        fail(400, "Attach inspection photographs, video or a report.");
+      if (ids.length) {
+        const files = (
+          await db.query(
+            "SELECT id FROM protection_documents WHERE property_id=$1 AND inspection_id=$2 AND id=ANY($3::uuid[]) AND uploaded_by=$4 AND withdrawn_at IS NULL",
+            [task.protection_property_id, taskId, ids, actor.id],
+          )
+        ).rows;
+        if (files.length !== ids.length)
+          fail(403, "Inspection evidence must belong to this assigned task.");
+      }
+      const gps =
+        body.location_permission === true
+          ? {
+              latitude: Number(body.latitude),
+              longitude: Number(body.longitude),
+              accuracy: Number(body.accuracy) || null,
+            }
+          : null;
+      if (
+        gps &&
+        (!Number.isFinite(gps.latitude) ||
+          Math.abs(gps.latitude) > 90 ||
+          !Number.isFinite(gps.longitude) ||
+          Math.abs(gps.longitude) > 180)
+      )
+        fail(400, "Enter valid permitted location observations.");
+      const findings = {
+        attendance: body.attendance,
+        conditions: text(body.conditions),
+        occupants: text(body.occupants),
+        discrepancies: text(body.discrepancies),
+        gps,
+        document_ids: ids,
+        submitted_at: new Date().toISOString(),
+        submitted_by: actor.id,
+        supervisor_review: "pending",
+        location_source:
+          "Agent/device observation; not proof of ownership or unlawful occupation",
+      };
+      await db.query(
+        "UPDATE property_inspection_requests SET status='inspecting',inspection_summary=$2,inspection_findings=$3,updated_at=NOW() WHERE id=$1",
+        [taskId, text(body.summary), JSON.stringify(findings)],
+      );
+      if (task.protection_purpose === "verification")
+        await db.query(
+          "UPDATE protection_checks SET status='submitted',public_summary=$2,source_details=$3,document_ids=$4,submitted_by=$5,submitted_at=NOW() WHERE property_id=$1 AND stage='inspection'",
+          [
+            task.protection_property_id,
+            text(body.summary),
+            JSON.stringify(findings),
+            JSON.stringify(ids),
+            actor.id,
+          ],
+        );
+    } else if (body.action === "review") {
+      if (!a.manager || Number(task.assigned_agent_id) === Number(actor.id))
+        fail(
+          403,
+          "A different authorised supervisor must review this inspection.",
+        );
+      if (
+        !["approved", "returned"].includes(body.decision) ||
+        text(body.reason).length < 15 ||
+        !task.inspection_findings?.submitted_at
+      )
+        fail(400, "Choose a review decision and record the reason.");
+      if (
+        body.decision === "approved" &&
+        task.inspection_findings.attendance !== "attended"
+      )
+        fail(409, "An inaccessible property cannot pass physical inspection.");
+      if (task.protection_purpose === "verification")
+        await protection.reviewCheck(
+          actor,
+          task.protection_property_id,
+          "inspection",
+          { status: body.decision, reason: body.reason },
+        );
+      await db.query(
+        "UPDATE property_inspection_requests SET status=$2::text,completed_at=CASE WHEN $2::text='completed' THEN NOW() ELSE NULL END,supervisor_note=$3,inspection_findings=jsonb_set(COALESCE(inspection_findings,'{}'),'{supervisor_review}',to_jsonb($4::text)),updated_at=NOW() WHERE id=$1",
+        [
+          taskId,
+          body.decision === "approved" ? "completed" : "assigned",
+          text(body.reason),
+          body.decision,
+        ],
+      );
+      if (
+        task.protection_purpose === "monitoring" &&
+        body.decision === "approved"
+      )
+        await db.query(
+          "INSERT INTO protection_alerts(property_id,category,rule_key,summary,source_details,created_by) VALUES($1,'independent_finding',$2,$3,$4,$5) ON CONFLICT DO NOTHING",
+          [
+            task.protection_property_id,
+            "inspection:" + task.id,
+            task.inspection_summary,
+            JSON.stringify({
+              inspection_id: task.id,
+              observed_at: task.started_at,
+              limitations:
+                "Field observation only. This does not confirm ownership or unlawful occupation.",
+            }),
+            actor.id,
+          ],
+        );
+    } else fail(400, "Choose a supported inspection action.");
+    await db.query(
+      "INSERT INTO property_inspection_operations(inspection_id,admin_id,actor_name,event_type,note,metadata) VALUES($1,$2,$3,$4,$5,$6)",
+      [
+        taskId,
+        actor.id,
+        actor.full_name || "Assigned staff",
+        "protection_" + body.action,
+        text(body.reason || body.summary),
+        JSON.stringify({ protection_property_id: task.protection_property_id }),
+      ],
+    );
+    await audit({
+      actorId: actor.id,
+      action: "PROTECTION_INSPECTION_" + body.action.toUpperCase(),
+      targetType: "protection_property",
+      targetId: task.protection_property_id,
+    });
+    if (["review", "schedule"].includes(body.action))
+      await notify(
+        a.p.owner_id,
+        "property_protection",
+        "Property inspection update",
+        "Your inspection schedule or reviewed report has changed. Read the record for details and limitations.",
+        "/property-protection?property=" + a.p.id,
+        `pp:inspection:${taskId}:${body.action}:${body.decision || body.scheduled_at}`,
+      );
+    if (body.action === "submit" && protection.notifyOperations)
+      await protection.notifyOperations(
+        a.p,
+        "property_protection",
+        "Inspection report needs review",
+        "An assigned field report is ready for independent supervisor review.",
+        `pp:report:${taskId}:${task.updated_at}`,
+      );
+    return { success: true };
+  };
+  return { tasks, action };
 }
-let instance;const service=()=>instance||(instance=createInspections({db:require('../config/middleware/database'),protection:require('./propertyProtectionService').getService(),audit:require('../config/utils/auditLogger').logAction,notify:(...args)=>require('../config/utils/notificationService').createNotification(...args)}));
-module.exports={createInspections,tasks:(...args)=>service().tasks(...args),action:(...args)=>service().action(...args)};
+let instance;
+const service = () =>
+  instance ||
+  (instance = createInspections({
+    db: require("../config/middleware/database"),
+    protection: require("./propertyProtectionService").getService(),
+    audit: require("../config/utils/auditLogger").logAction,
+    notify: (...args) =>
+      require("../config/utils/notificationService").createNotification(
+        ...args,
+      ),
+  }));
+module.exports = {
+  createInspections,
+  tasks: (...args) => service().tasks(...args),
+  action: (...args) => service().action(...args),
+};

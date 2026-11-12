@@ -1,3 +1,4 @@
+import protectionCopy from './propertyProtectionCopy.json';
 import { TOUR_STEPS } from '../config/tourConfig';
 import { WORKFLOW_TOURS } from '../config/tourWorkflows';
 import tourHa from './tourTranslations.ha.js';
@@ -391,6 +392,7 @@ const analytics = {
   ig: tourIg.analytics,
 };
 
+for(const [lang,values]of Object.entries(protectionCopy)){if(titleTranslations[lang]){titleTranslations[lang]['Request Case Support']=values.request;titleTranslations[lang]['Trust & Safety']=values.trust;}}
 const tourTranslations = Object.fromEntries(['en', 'fr', 'ar', 'ru', 'zh', 'ha', 'yo', 'ig'].map((locale) => [locale, {
   ...common[locale],
   locale_code: locale,

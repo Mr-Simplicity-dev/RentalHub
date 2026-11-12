@@ -39,13 +39,14 @@ CREATE TABLE IF NOT EXISTS protection_service_requests (
  id UUID PRIMARY KEY,property_id BIGINT NOT NULL REFERENCES protection_properties(id),service_code VARCHAR(40) NOT NULL REFERENCES protection_services(code),user_id INTEGER NOT NULL REFERENCES users(id),payment_id INTEGER UNIQUE REFERENCES payments(id),
  amount NUMERIC(14,2) NOT NULL CHECK(amount>0),currency VARCHAR(3) NOT NULL DEFAULT 'NGN',payment_email TEXT NOT NULL,scope_snapshot TEXT NOT NULL,period_days INTEGER,cadence_days INTEGER,
  status VARCHAR(25) NOT NULL DEFAULT 'pending_payment' CHECK(status IN ('pending_payment','paid','in_progress','completed','cancelled')),
- authorization_url TEXT,access_code TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),paid_at TIMESTAMPTZ,completed_at TIMESTAMPTZ
+ authorization_url TEXT,access_code TEXT,last_checked_at TIMESTAMPTZ,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),paid_at TIMESTAMPTZ,completed_at TIMESTAMPTZ
 );
+CREATE INDEX IF NOT EXISTS protection_payment_reconcile ON protection_service_requests(COALESCE(last_checked_at,created_at)) WHERE status='pending_payment';
 CREATE UNIQUE INDEX IF NOT EXISTS protection_service_one_open ON protection_service_requests(property_id,service_code) WHERE status IN ('pending_payment','paid','in_progress');
 ALTER TABLE property_inspection_requests ALTER COLUMN property_id DROP NOT NULL;
 ALTER TABLE property_inspection_requests ALTER COLUMN application_id DROP NOT NULL;
 ALTER TABLE property_inspection_requests ADD COLUMN IF NOT EXISTS protection_property_id BIGINT REFERENCES protection_properties(id),ADD COLUMN IF NOT EXISTS protection_request_id UUID REFERENCES protection_service_requests(id),ADD COLUMN IF NOT EXISTS protection_purpose VARCHAR(20),ADD COLUMN IF NOT EXISTS assigned_agent_id INTEGER REFERENCES users(id),ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ,ADD COLUMN IF NOT EXISTS supervisor_note TEXT;
-DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conname='inspection_source_required') THEN ALTER TABLE property_inspection_requests ADD CONSTRAINT inspection_source_required CHECK((protection_property_id IS NULL AND property_id IS NOT NULL AND application_id IS NOT NULL) OR protection_property_id IS NOT NULL);END IF;END $$;
+DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conname='inspection_source_required' AND conrelid='property_inspection_requests'::regclass) THEN ALTER TABLE property_inspection_requests ADD CONSTRAINT inspection_source_required CHECK((protection_property_id IS NULL AND property_id IS NOT NULL AND application_id IS NOT NULL) OR protection_property_id IS NOT NULL);END IF;END $$;
 CREATE INDEX IF NOT EXISTS protection_inspection_assigned ON property_inspection_requests(assigned_agent_id,status) WHERE protection_property_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS protection_inspection_request ON property_inspection_requests(protection_request_id) WHERE protection_purpose='verification';
 CREATE TABLE IF NOT EXISTS property_inspection_operations(id SERIAL PRIMARY KEY,inspection_id INTEGER NOT NULL REFERENCES property_inspection_requests(id) ON DELETE CASCADE,admin_id INTEGER REFERENCES users(id),actor_name VARCHAR(255),event_type VARCHAR(80) NOT NULL,note TEXT,proof_url TEXT,metadata JSONB DEFAULT '{}',created_at TIMESTAMP DEFAULT NOW());
@@ -55,7 +56,8 @@ CREATE TABLE IF NOT EXISTS protection_documents (
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),retention_consent BOOLEAN NOT NULL DEFAULT FALSE,retain_until TIMESTAMPTZ NOT NULL,withdrawn_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS protection_documents_property ON protection_documents(property_id,created_at DESC);
-ALTER TABLE disputes ADD COLUMN IF NOT EXISTS protection_property_id BIGINT REFERENCES protection_properties(id),ADD COLUMN IF NOT EXISTS protection_request_key UUID,ADD COLUMN IF NOT EXISTS protection_outcome VARCHAR(50),ADD COLUMN IF NOT EXISTS outcome_limitations TEXT;
+ALTER TABLE disputes ADD COLUMN IF NOT EXISTS protection_property_id BIGINT REFERENCES protection_properties(id),ADD COLUMN IF NOT EXISTS protection_request_key UUID,ADD COLUMN IF NOT EXISTS protection_outcome_history JSONB NOT NULL DEFAULT '[]',ADD COLUMN IF NOT EXISTS protection_outcome VARCHAR(50),ADD COLUMN IF NOT EXISTS outcome_limitations TEXT;
+DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='dispute_evidence' AND column_name='created_at') THEN ALTER TABLE dispute_evidence ADD COLUMN created_at TIMESTAMP;UPDATE dispute_evidence SET created_at=uploaded_at;ALTER TABLE dispute_evidence ALTER COLUMN created_at SET DEFAULT NOW();END IF;END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS protection_case_retry ON disputes(opened_by,protection_request_key) WHERE protection_request_key IS NOT NULL;
 CREATE INDEX IF NOT EXISTS protection_disputes ON disputes(protection_property_id) WHERE protection_property_id IS NOT NULL;
 CREATE TABLE IF NOT EXISTS protection_case_participants (

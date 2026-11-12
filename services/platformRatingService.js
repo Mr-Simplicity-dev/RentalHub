@@ -21,7 +21,7 @@ const CONTEXT_LABELS = {
   property_secured: 'secured a property',
   property_listed: 'listed a property',
   property_rented: 'rented out a property',
-  legal_support: 'used legal support',
+  legal_support: 'used case support',
   fumigation_cleaning: 'used fumigation/cleaning',
   transportation: 'used transportation support',
   virtual_tour: 'completed a virtual tour',
@@ -519,7 +519,7 @@ const getEligibleOpportunities = async (user, { limit = 6 } = {}) => {
   if (await tableExists('legal_authorizations')) {
     const rows = await runOpportunityQuery(
       `SELECT la.id::text AS source_ref,
-              COALESCE(p.title, 'Amana RentalHub NG legal support') AS source_title,
+              COALESCE(p.title, 'Amana RentalHub NG case support') AS source_title,
               p.state_id, s.state_name, p.lga_name, p.city
        FROM legal_authorizations la
        LEFT JOIN properties p ON p.id = la.property_id
@@ -540,7 +540,7 @@ const getEligibleOpportunities = async (user, { limit = 6 } = {}) => {
 
     rows.forEach((row) => {
       opportunities.push(
-        mapOpportunity(row, 'legal_support', 'legal_authorization', 'Rate Amana RentalHub NG legal support', 'Tell us how the legal support experience helped you.')
+        mapOpportunity(row, 'legal_support', 'legal_authorization', 'Rate Amana RentalHub NG case support', 'Tell us how the case-support experience helped you.')
       );
     });
   }

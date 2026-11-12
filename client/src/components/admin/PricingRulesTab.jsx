@@ -253,7 +253,7 @@ const PricingRulesTab = () => {
                 {target.label}
               </p>
               <p className="mt-1 text-sm text-gray-600">
-                Base fee: ₦{Number(target.base_amount || 0).toLocaleString()}
+                {target.base_amount==null?'No base price. Set a location price.':`Base fee: ${new Intl.NumberFormat('en-NG',{style:'currency',currency:target.currency||'NGN'}).format(Number(target.base_amount))}`}
               </p>
             </div>
           ))}

@@ -1,3 +1,4 @@
+import '../i18n';
 import React from 'react';
 import {act} from 'react-dom/test-utils';
 import {createRoot} from 'react-dom/client';

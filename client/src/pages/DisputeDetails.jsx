@@ -409,7 +409,7 @@ export default function DisputeDetails() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".pdf,.png,.jpg,.jpeg,.mp4,.mov,.avi,.zip,.doc,.docx"
+                  accept=".pdf,.png,.jpg,.jpeg"
                   onChange={handleFileSelect}
                   className="max-w-48 text-sm text-gray-600 file:mr-3 file:rounded-full file:border-0 file:bg-primary-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary-700 hover:file:bg-primary-100"
                 />
