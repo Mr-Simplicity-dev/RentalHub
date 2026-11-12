@@ -1,3 +1,4 @@
+import WhatsAppSupportEntry from './WhatsAppSupportEntry';
 import LanguageSkillsField from './LanguageSkillsField';
 import contactCopy from '../../i18n/contactPrivacyCopy';
 import DisputeHandoverPanel from './DisputeHandoverPanel';
@@ -109,6 +110,7 @@ const FloatingContactWidget = () => {
   const [activeTicket, setActiveTicket] = useState(null);
   const [conversation, setConversation] = useState([]);
   const [loadingConv, setLoadingConv] = useState(false);
+  const [supportLoadError,setSupportLoadError]=useState(false);
   const [replyText, setReplyText] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
   const [attachmentFile, setAttachmentFile] = useState(null);
@@ -390,8 +392,8 @@ const FloatingContactWidget = () => {
     setLoadingConv(true);
     try {
       const res = await api.get(`/support/tickets/${ticketId}/conversation?limit=200`);
-      if(identity===identityRef.current)setConversation(res.data?.data || []);
-    } catch { setConversation([]); } finally { setLoadingConv(false); }
+      if(identity===identityRef.current){setConversation(res.data?.data || []);setSupportLoadError(false);}
+    } catch { if(identity===identityRef.current)setSupportLoadError(true); } finally { setLoadingConv(false); }
   }, []);
 
   const openTicketChat = (ticket) => {
@@ -454,6 +456,7 @@ const FloatingContactWidget = () => {
 
   // ── Send reply (authenticated) with optimistic update ──
   const handleSendReply = async () => {
+    if(activeTicket?.is_whatsapp){setError(t("supportChannel.hint"));return;}
     const msg = replyText.trim();
     if (!msg && !attachmentFile) return;
     const tempId = `temp_${Date.now()}`;
@@ -1044,8 +1047,9 @@ const FloatingContactWidget = () => {
             {/* ─── CONVERSATION VIEW (authenticated) ─── */}
             {view === 'conversation' && activeTicket && (
               <div className="space-y-3">
-                <DisputeHandoverPanel ticketId={activeTicket.id} /><SupportContactForms ticketId={activeTicket.id} />
+                {activeTicket.is_whatsapp&&<WhatsAppSupportEntry />}<DisputeHandoverPanel ticketId={activeTicket.id} /><SupportContactForms ticketId={activeTicket.id} />
                 <p className="text-xs font-semibold text-slate-500 dark:text-gray-400 truncate">{activeTicket.subject}</p>
+                {supportLoadError&&<button type="button" className="rounded border p-3 text-sm text-amber-800" onClick={()=>loadConversation(activeTicket.id)}>{t('support.conversation_failed')}</button>}
                 {loadingConv ? (
                   <div className="space-y-3 py-2">
                     {[1,2].map((i) => <div key={i} className={`h-12 rounded-xl bg-slate-100 dark:bg-gray-700 animate-pulse ${i % 2 === 0 ? 'ml-12' : 'mr-12'}`} />)}

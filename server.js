@@ -840,6 +840,8 @@ app.use('/api/withdrawals', financeOpsLimiter, agentWithdrawalRoutes);
 app.use('/api/state-migrations', generalOpsLimiter, stateMigrationRoutes);
 app.use('/api/admin-conduct', adminLimiter, require('./routes/adminConduct'));
 app.use('/api/support-languages', adminLimiter, require('./routes/supportLanguages'));
+app.get('/api/support-channels',(_req,res)=>{const phone=require('./config/utils/whatsappPolicy').normalizeWhatsAppPhone(process.env.WHATSAPP_SUPPORT_PHONE);res.json({success:true,data:{whatsapp_url:phone?'https://wa.me/'+phone:null,whatsapp_ready:Boolean(phone&&process.env.WHATSAPP_PHONE_NUMBER_ID&&process.env.WHATSAPP_META_TOKEN)}});});
+app.use('/api/whatsapp-support', adminLimiter, require('./routes/whatsappSupport'));
 app.use('/api/support', adminLimiter, supportRoutes);
 app.use('/api/system', adminLimiter, systemRoutes);
 app.use('/api/mobile', generalOpsLimiter, mobileDiagnosticsRoutes);

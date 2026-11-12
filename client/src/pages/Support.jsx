@@ -1,3 +1,4 @@
+import WhatsAppSupportEntry from '../components/common/WhatsAppSupportEntry';
 import DisputeHandoverPanel from '../components/common/DisputeHandoverPanel';
 import SupportContactForms from '../components/common/SupportContactForms';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -453,12 +454,13 @@ const Support = ({initialTicketId}) => {
                         </div>
                       )}
 
+                      {ticket.is_whatsapp&&<WhatsAppSupportEntry />}
                       {convLoading ? (
                         <div className="py-4 text-center text-sm text-gray-400">{t('support.loading_messages')}</div>
                       ) : conv.length > 0 ? (
                         <div className="mt-3 space-y-3">
                           {conv.map((reply) => (
-                            <ChatMessage key={reply.id} reply={reply} isOwn={!reply.is_admin} ticketId={ticket.id}
+                            <ChatMessage key={reply.id} reply={reply} isOwn={!reply.is_admin&&!ticket.is_whatsapp} ticketId={ticket.id}
                               onEdit={(rid, updated) => handleEditReply(ticket.id, rid, updated)}
                               onDelete={(rid) => handleDeleteReply(ticket.id, rid)} />
                           ))}
@@ -473,7 +475,7 @@ const Support = ({initialTicketId}) => {
                         </div>
                       )}
 
-                      {ticket.status !== 'resolved' && ticket.status !== 'closed' && (
+                      {!ticket.is_whatsapp && ticket.status !== 'resolved' && ticket.status !== 'closed' && (
                         <div className="mt-4 space-y-2">
                           {attachmentFiles[ticket.id] && (
                             <div className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-xs text-gray-600">

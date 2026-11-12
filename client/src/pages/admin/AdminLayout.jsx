@@ -1667,6 +1667,7 @@ const AdminLayout = () => {
           )}
           <Link className="my-3 inline-block rounded border p-3" to="/admin/code-of-conduct">Code of Conduct: download, sign and submit</Link>
           {isSuperAdmin&&<Link to="/admin/background-jobs" className="mx-3 inline-block rounded border p-3">Background jobs</Link>}
+          {["super_admin","super_support_admin","state_support_admin","lga_support_admin"].includes(user?.user_type)&&<Link to="/admin/whatsapp-support" className="mx-3 inline-block rounded border p-3">WhatsApp human support inbox</Link>}
           <SupportLanguageDesk user={user}/>
           <Outlet />
         </main>

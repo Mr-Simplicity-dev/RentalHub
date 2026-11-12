@@ -11,7 +11,7 @@ const recipientPolicy = async phone => {
   } catch {return {success:false,policyBlocked:true,message:'WhatsApp opt-out check unavailable'};}
 };
 
-exports.sendWhatsAppText = async ({ to, message }) => {
+exports.sendWhatsAppText = async ({ to, message, callbackData }) => {
   const provider = (process.env.WHATSAPP_PROVIDER || 'meta').toLowerCase();
 
   if (provider !== 'meta') {
@@ -30,6 +30,8 @@ exports.sendWhatsAppText = async ({ to, message }) => {
     return { success: false, message: 'Invalid recipient phone number' };
   }
   const policy=await recipientPolicy(recipient);if(policy)return policy;
+  const windowResult=await require('../middleware/database').query("SELECT 1 FROM support_tickets WHERE whatsapp_phone=$1 AND whatsapp_last_inbound_at>NOW()-INTERVAL '24 hours' AND whatsapp_last_inbound_at<=NOW()",[recipient]);
+  if(!windowResult.rows.length)return {success:false,policyBlocked:true,message:'WhatsApp customer-service window is closed'};
 
   try {
     const { data } = await axios.post(
@@ -38,6 +40,7 @@ exports.sendWhatsAppText = async ({ to, message }) => {
         messaging_product: 'whatsapp',
         to: recipient,
         type: 'text',
+        ...(callbackData ? {biz_opaque_callback_data:String(callbackData).slice(0,100)} : {}),
         text: { body: message },
       },
       {
@@ -53,6 +56,7 @@ exports.sendWhatsAppText = async ({ to, message }) => {
   } catch (error) {
     return {
       success: false,
+      uncertain: !error.response,
       message: error.response?.data?.error?.message || error.message,
     };
   }

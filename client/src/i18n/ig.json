@@ -4684,5 +4684,12 @@
     "loading": "Na-ebudata…",
     "additional": "Nkọwa ndị ọzọ",
     "withdraw_failed": "Enweghị ike iweghachite mgbanwe."
+  },
+  "supportChannel": {
+    "label": "Gaa n’ihu na WhatsApp",
+    "hint": "Nke a bụ mkparịta ụka WhatsApp dị iche. Ziga ozi gị ebe ahụ. A naghị ebufe nnọkọ akaụntụ gị.",
+    "unavailable": "WhatsApp adịbeghị njikere. Jiri fọm enyemaka.",
+    "failed": "Enweghị ike imeghe WhatsApp. Nwaa ọzọ ma ọ bụ jiri fọm enyemaka.",
+    "ai": "Onye enyemaka AI · ọ bụghị mmadụ"
   }
 }

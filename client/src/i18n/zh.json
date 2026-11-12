@@ -4429,5 +4429,12 @@
     "loading": "正在加载…",
     "additional": "其他详情",
     "withdraw_failed": "无法撤回更新。"
+  },
+  "supportChannel": {
+    "label": "在 WhatsApp 上继续",
+    "hint": "这是独立的 WhatsApp 对话。请在那里发送消息。您的账户登录状态不会转移。",
+    "unavailable": "WhatsApp 尚未就绪。请使用支持表单。",
+    "failed": "无法打开 WhatsApp。请重试或使用支持表单。",
+    "ai": "AI 助手 · 非人工客服"
   }
 }

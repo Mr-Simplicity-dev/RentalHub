@@ -23,7 +23,7 @@ const serviceSummary = (ticket) => (
   </div>
 );
 
-const TicketActions = ({ ticket, user, onOpen, onAction }) => (
+const TicketActions = ({ ticket, user, onOpen, onAction }) => ticket.is_whatsapp ? <a href="/admin/whatsapp-support" className="rounded-lg border border-green-300 px-3 py-2 text-sm font-semibold text-green-800">WhatsApp inbox</a> : (
   <div className="flex flex-wrap items-center gap-2">
     <button onClick={() => onOpen(ticket)} className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"><FaReply size={12} /> View</button>
     <button onClick={() => onAction('assign_me', ticket)} disabled={Number(ticket.assigned_to) === Number(user?.id)} className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"><FaUserCheck size={12} /> Assign</button>

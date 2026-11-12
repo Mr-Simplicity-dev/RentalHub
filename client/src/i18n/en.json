@@ -4683,5 +4683,12 @@
     "loading": "Loading…",
     "additional": "Additional details",
     "withdraw_failed": "Unable to withdraw update."
+  },
+  "supportChannel": {
+    "label": "Continue on WhatsApp",
+    "hint": "A separate WhatsApp chat. Send your message there. Your account session is not transferred.",
+    "unavailable": "WhatsApp is not ready. Please use the support form.",
+    "failed": "Could not open WhatsApp. Try again or use the support form.",
+    "ai": "AI assistant · not a human agent"
   }
 }

@@ -35,16 +35,18 @@ const createNotificationTable = async (retries = 5, delayMs = 3000) => {
 };
 
 // Create notification
-exports.createNotification = async (userId, type, title, message, link = null) => {
+exports.createNotification = async (userId, type, title, message, link = null, dedupKey = null) => {
   try {
     const result = await db.query(
-      `INSERT INTO notifications (user_id, type, title, message, link)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO notifications (user_id, type, title, message, link, dedup_key)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (user_id,dedup_key) WHERE dedup_key IS NOT NULL DO NOTHING
        RETURNING *`,
-      [userId, type, title, message, link]
+      [userId, type, title, message, link, dedupKey]
     );
 
     const notification = result.rows[0];
+    if (!notification) return null;
 
     // Send the real unread total so the icon badge counts (1, 2, 3...) even
     // when the push lands while the app is closed. Falls back to 1 if the

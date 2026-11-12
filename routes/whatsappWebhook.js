@@ -1,7 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 
-const createWebhookRouter = ({processEvents=body=>require('../services/propertyAlertDeliveryService').handleWebhook(body)}={}) => {
+const createWebhookRouter = ({processEvents=async body=>{await require('../services/propertyAlertDeliveryService').handleWebhook(body);await require('../services/whatsappSupportService').webhook(body);}}={}) => {
 const router = express.Router();
 
 const timingSafeEqualStrings = (a, b) => {

@@ -1,3 +1,5 @@
+import api from '../../services/api';
+import WhatsAppSupportEntry from './WhatsAppSupportEntry';
 import DisputeHandoverPanel from './DisputeHandoverPanel';
 import SupportContactForms from './SupportContactForms';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
@@ -9,7 +11,6 @@ import {useAuth} from '../../hooks/useAuth';
 import {askAccountAssistant, askPublicAssistant, submitAssistantTicket, needsAccount} from '../../services/accountAssistant';
 import WidgetErrorBoundary from './WidgetErrorBoundary';
 
-const WHATSAPP_NUMBER = '2348030601238';
 const BOT_DELAY = 1000;
 const GREETING_DELAY = 6000;
 
@@ -226,13 +227,12 @@ const WhatsAppBotWidget = ({embedded=false,onHumanRequest}) => {
     }, 600);
   }, [addBotMessage, t]);
 
-  const handleTalkToAgent = useCallback(() => {
-    if(onHumanRequest){onHumanRequest({summary:messages.filter(m=>m.type==='user' && (!m.owner || m.owner===authKeyRef.current)).slice(-3).map(m=>m.text).join('\n')});return;}
+  const handleTalkToAgent = useCallback(async () => {
+    if(onHumanRequest){setConnectedToAgent(true);setIsBotTyping(false);onHumanRequest({summary:messages.filter(m=>m.type==='user' && (!m.owner || m.owner===authKeyRef.current)).slice(-3).map(m=>m.text).join('\n')});return;}
     setConnectedToAgent(true);
     setAwaitingResponse(null);
-    const waMsg = t('home.whatsapp_message', 'Hello Amana RentalHub NG, I need help finding a home.');
-    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(waMsg)}%0A%0A${encodeURIComponent(window.location.origin + window.location.pathname)}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    setIsBotTyping(false);
+    try{const r=await api.get('/support-channels');const channel=r.data.data;if(!channel?.whatsapp_ready||!/^https:\/\/wa\.me\/\d+$/.test(channel.whatsapp_url||'')){setConnectedToAgent(false);addBotMessage(t('supportChannel.unavailable'));return;}window.location.assign(channel.whatsapp_url);}catch{setConnectedToAgent(false);addBotMessage(t('supportChannel.failed'));}
   }, [t,onHumanRequest,messages]);
 
   const tryAccountReply = useCallback(async msg => {
@@ -264,7 +264,7 @@ const WhatsAppBotWidget = ({embedded=false,onHumanRequest}) => {
   },[isAuthenticated,addBotMessage]);
   const handleSend = useCallback(
     async (text) => {
-      if(requestBusy.current)return;
+      if(requestBusy.current||connectedToAgent)return;
       const msg = (text || input).trim();
       if (!msg) return;
       setInput('');
@@ -329,7 +329,7 @@ const WhatsAppBotWidget = ({embedded=false,onHumanRequest}) => {
         finally {requestBusy.current=false;if(mountedRef.current){setRequestPending(false);setIsBotTyping(false);}}
       }
     },
-    [input, addUserMessage, addBotMessage, botReplyWithTyping, t, askAnythingElse, handleTalkToAgent, tryAccountReply, isAuthenticated, user?.user_type,messages]
+    [connectedToAgent,input, addUserMessage, addBotMessage, botReplyWithTyping, t, askAnythingElse, handleTalkToAgent, tryAccountReply, isAuthenticated, user?.user_type,messages]
   );
 
   const handleQuickReply = question => handleSend(question);
@@ -421,7 +421,7 @@ const WhatsAppBotWidget = ({embedded=false,onHumanRequest}) => {
             </div>
 
             <div ref={messageListRef} className="min-h-0 flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
-              <DisputeHandoverPanel /><SupportContactForms />
+              <WhatsAppSupportEntry /><DisputeHandoverPanel /><SupportContactForms />
               {messages.filter(message=>!message.owner || message.owner===authKey).map((msg) => (
                 <div key={msg.id} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div
@@ -435,7 +435,7 @@ const WhatsAppBotWidget = ({embedded=false,onHumanRequest}) => {
                       <span className="flex items-center gap-1.5 mb-1">
                         <img src="/rentalhub-mark.svg" alt="" className="w-4 h-4 shrink-0" />
                         <span className="text-xs font-semibold text-green-700 tracking-wide">
-                          {t('messages.whatsapp.bot_label', 'Amana RentalHub NG')}{msg.engine==='ai'?' · AI guidance':msg.engine==='verified'?' · Account record':''}
+                          {t('supportChannel.ai')}{msg.engine==='ai'?' · AI guidance':msg.engine==='verified'?' · Account record':''}
                         </span>
                       </span>
                     )}

@@ -10,6 +10,15 @@ const validateRequest = require('../config/middleware/validateRequest');
 const { ZONE_STATES, canonicalZone, zoneContainsState, zoneForState } = require('../config/utils/territorialZones');
 
 const router = express.Router();
+router.use('/tickets/:id',(req,res,next)=>{
+ if(!/^\d+$/.test(req.params.id)||['GET','HEAD'].includes(req.method)||req.path.includes('internal-notes')||req.path.includes('typing')||req.path.endsWith('/read'))return next();
+ return authenticate(req,res,async()=>{
+  try{const row=(await db.query('SELECT whatsapp_phone,user_id,assigned_to,state,lga FROM support_tickets WHERE id=$1',[req.params.id])).rows[0];
+   if(row?.whatsapp_phone&&(Number(row.user_id)===Number(req.user.id)||canSupportAdminAccessTicket(req.user,row)))return res.status(409).json({success:false,message:'Continue this conversation through WhatsApp. Staff should use the WhatsApp support inbox.',channel:'whatsapp'});
+   next();
+  }catch(e){next(e);}
+ });
+});
 router.use('/tickets/:ticketId/dispute-handover',require('./supportDisputes'));
 router.get('/tickets/:id/customer',authenticate,require('../config/utils/twoFactor').requirePrivilegedMfa,require('../config/middleware/securityRateLimiters').supportCustomerLookupLimiter,async(req,res,next)=>{try{res.set('Cache-Control','no-store');res.json({success:true,data:await require('../services/supportCustomerService').getCustomer(req.user,req.params.id)});}catch(error){if(error.statusCode)return res.status(error.statusCode).json({success:false,message:error.message});next(error);}});
 router.get('/dispute-handovers',authenticate,async(req,res,next)=>{try{res.json({success:true,data:await require('../services/supportDisputeHandoverService').listOwn(req)});}catch(error){next(error);}});
@@ -1631,10 +1640,10 @@ router.get('/tickets/my', authenticate, async (req, res) => {
 
     const result = await db.query(
       `SELECT st.id, st.subject, st.description, st.state, st.lga, st.priority, st.status,
-              st.preferred_language, st.category, st.related_type, st.related_id, st.escalation_department,
+              (st.whatsapp_phone IS NOT NULL) AS is_whatsapp, st.preferred_language, st.category, st.related_type, st.related_id, st.escalation_department,
               st.escalation_status, st.sla_due_at, st.last_escalated_at,
               st.escalated_at, st.resolved_at, st.created_at, st.updated_at,
-              (SELECT COUNT(*) FROM support_ticket_replies str WHERE str.ticket_id = st.id AND str.is_admin = TRUE AND (str.read_at IS NULL OR str.read_at < st.updated_at))::int AS unread_admin_replies
+              (SELECT COUNT(*) FROM support_ticket_replies str WHERE str.ticket_id = st.id AND str.is_admin = TRUE AND (str.whatsapp_delivery IS NULL OR str.whatsapp_delivery IN ('sent','delivered','read')) AND (str.read_at IS NULL OR str.read_at < st.updated_at))::int AS unread_admin_replies
        FROM support_tickets st
        WHERE st.user_id = $1
        ORDER BY st.created_at DESC LIMIT 50`,
@@ -1674,7 +1683,7 @@ const listSupportTickets = async (req, res) => {
 
     const result = await db.query(
       `SELECT st.id, st.subject, st.description, st.state, st.lga, st.priority, st.status,
-              st.preferred_language, st.category, st.related_type, st.related_id, st.escalation_department,
+              (st.whatsapp_phone IS NOT NULL) AS is_whatsapp, st.preferred_language, st.category, st.related_type, st.related_id, st.escalation_department,
               st.escalation_status, st.escalation_note, st.sla_due_at, st.last_escalated_at,
               CASE
                 WHEN st.status = 'resolved' THEN 'met'
@@ -2171,7 +2180,7 @@ router.get('/department-escalations', authenticate, async (req, res) => {
 
     const result = await db.query(
       `SELECT st.id, st.subject, st.description, st.state, st.lga, st.priority, st.status,
-              st.preferred_language, st.category, st.related_type, st.related_id, st.escalation_department,
+              (st.whatsapp_phone IS NOT NULL) AS is_whatsapp, st.preferred_language, st.category, st.related_type, st.related_id, st.escalation_department,
               st.escalation_status, st.escalation_note, st.sla_due_at, st.last_escalated_at,
               CASE
                 WHEN st.status = 'resolved' THEN 'met'
@@ -2508,10 +2517,10 @@ router.get('/tickets/:id/conversation', authenticate, async (req, res) => {
       `SELECT str.id, str.ticket_id, str.user_id, str.author_name, str.message,
               str.is_admin, str.attachment_url, str.attachment_name, str.attachment_type,
               str.edited_at, str.read_at, str.created_at,
-              u.email AS user_email
+              CASE WHEN str.is_admin THEN NULL ELSE u.email END AS user_email
        FROM support_ticket_replies str
        LEFT JOIN users u ON u.id = str.user_id
-       WHERE str.ticket_id = $1
+       WHERE str.ticket_id = $1 AND (str.whatsapp_delivery IS NULL OR str.whatsapp_delivery IN ('received','sent','delivered','read'))
        ORDER BY str.created_at ASC, str.id ASC
        LIMIT $2 OFFSET $3`,
       [ticketId, limit, offset]
@@ -2519,7 +2528,7 @@ router.get('/tickets/:id/conversation', authenticate, async (req, res) => {
 
     // Count total for pagination
     const countResult = await db.query(
-      'SELECT COUNT(*) FROM support_ticket_replies WHERE ticket_id = $1',
+      "SELECT COUNT(*) FROM support_ticket_replies WHERE ticket_id = $1 AND (whatsapp_delivery IS NULL OR whatsapp_delivery IN ('received','sent','delivered','read'))",
       [ticketId]
     );
 

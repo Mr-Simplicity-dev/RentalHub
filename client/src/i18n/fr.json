@@ -4429,5 +4429,12 @@
     "loading": "Chargement…",
     "additional": "Détails supplémentaires",
     "withdraw_failed": "Impossible de retirer la demande."
+  },
+  "supportChannel": {
+    "label": "Continuer sur WhatsApp",
+    "hint": "Une conversation WhatsApp séparée. Envoyez votre message là-bas. Votre session de compte ne sera pas transférée.",
+    "unavailable": "WhatsApp est indisponible. Utilisez le formulaire d’assistance.",
+    "failed": "Impossible d’ouvrir WhatsApp. Réessayez ou utilisez le formulaire.",
+    "ai": "Assistant IA · pas un agent humain"
   }
 }

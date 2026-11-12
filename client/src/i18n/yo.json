@@ -4684,5 +4684,12 @@
     "loading": "Ń gbé wọlé…",
     "additional": "Àfikún àlàyé",
     "withdraw_failed": "A kò lè fa àtúnṣe padà."
+  },
+  "supportChannel": {
+    "label": "Tẹ̀síwájú lórí WhatsApp",
+    "hint": "Ìjíròrò WhatsApp yàtọ̀ ni. Fi ọ̀rọ̀ rẹ ránṣẹ́ níbẹ̀. A kò gbe ìwọlé àkọọ́lẹ̀ rẹ lọ.",
+    "unavailable": "WhatsApp kò tíì ṣetán. Lo fọ́ọ̀mù ìrànlọ́wọ́.",
+    "failed": "A kò lè ṣí WhatsApp. Gbìyànjú lẹ́ẹ̀kan sí i tàbí lo fọ́ọ̀mù ìrànlọ́wọ́.",
+    "ai": "Olùrànlọ́wọ́ AI · kì í ṣe òṣìṣẹ́ ènìyàn"
   }
 }

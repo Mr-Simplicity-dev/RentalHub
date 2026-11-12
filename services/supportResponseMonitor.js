@@ -12,7 +12,7 @@ async function runResponseMonitor() {
       return;
     }
     const rows = await client.query(`SELECT t.*, COALESCE(t.waiting_customer_since,t.assigned_at,t.created_at) AS waiting_since
-  FROM support_tickets t WHERE t.status NOT IN ('resolved','closed') AND t.assigned_to IS NOT NULL AND t.escalation_status='none' AND EXISTS(SELECT 1 FROM users owner WHERE owner.id=t.assigned_to AND owner.user_type IN ('lga_support_admin','state_support_admin','super_support_admin'))
+  FROM support_tickets t WHERE (t.whatsapp_phone IS NULL OR t.status IN ('open','in_progress')) AND t.status NOT IN ('resolved','closed') AND t.assigned_to IS NOT NULL AND t.escalation_status='none' AND EXISTS(SELECT 1 FROM users owner WHERE owner.id=t.assigned_to AND owner.user_type IN ('lga_support_admin','state_support_admin','super_support_admin'))
   AND (t.waiting_customer_since IS NOT NULL OR t.first_response_at IS NULL)
   AND COALESCE(t.waiting_customer_since,t.assigned_at,t.created_at)<NOW()-($1::int*INTERVAL '1 second')
   AND (t.last_typing_at IS NULL OR t.last_typing_at<NOW()-($2::int*INTERVAL '1 second') OR COALESCE(t.waiting_customer_since,t.assigned_at,t.created_at)<NOW()-($3::int*INTERVAL '1 second'))
@@ -27,7 +27,7 @@ async function runResponseMonitor() {
       await client.query(`INSERT INTO support_ticket_assignments(ticket_id,assigned_to,reason,handover_count) VALUES($1,$2,$3,$4)`, [ticket.id, next, next ? 'auto_reassign_timeout' : 'supervisor_review', Number(ticket.handover_count || 0) + 1]);
       if(next)newAssignments.push({id:ticket.id,agent:next});
     }
-    const waiting = await client.query("SELECT * FROM support_tickets WHERE assigned_to IS NULL AND status NOT IN ('resolved','closed') AND escalation_status='none' AND COALESCE(handover_count,0)<$1 ORDER BY created_at LIMIT 50 FOR UPDATE SKIP LOCKED",[maxHandovers]);
+    const waiting = await client.query("SELECT * FROM support_tickets WHERE (whatsapp_phone IS NULL OR status IN ('open','in_progress')) AND assigned_to IS NULL AND status NOT IN ('resolved','closed') AND escalation_status='none' AND COALESCE(handover_count,0)<$1 ORDER BY created_at LIMIT 50 FOR UPDATE SKIP LOCKED",[maxHandovers]);
 
     for (const ticket of waiting.rows) {
       const next = await require('./supportLanguageService').chooseAgent(ticket);

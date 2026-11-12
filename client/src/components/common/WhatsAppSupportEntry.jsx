@@ -1,0 +1,4 @@
+import React,{useState} from 'react';
+import {useTranslation} from 'react-i18next';
+import api from '../../services/api';
+export default function WhatsAppSupportEntry(){const {t}=useTranslation(),[busy,setBusy]=useState(false),[error,setError]=useState('');return <div className="border-t border-slate-100 p-3"><button type="button" disabled={busy} className="min-h-11 rounded-xl border px-4 py-2 text-sm disabled:opacity-50" onClick={async()=>{if(busy)return;setBusy(true);setError('');try{const r=await api.get('/support-channels');const data=r.data.data;if(!data?.whatsapp_ready||!/^https:\/\/wa\.me\/\d+$/.test(data.whatsapp_url||'')){setError(t('supportChannel.unavailable'));return;}window.location.assign(data.whatsapp_url);}catch{setError(t('supportChannel.failed'));}finally{setBusy(false);}}}>{busy?'…':t('supportChannel.label')}</button><p role={error?'alert':undefined} className="mt-2 text-xs text-slate-600">{error||t('supportChannel.hint')}</p></div>;}

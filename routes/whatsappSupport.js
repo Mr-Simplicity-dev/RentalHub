@@ -1,0 +1,17 @@
+const express=require('express');
+const {authenticate,requireNotImpersonating}=require('../config/middleware/auth');
+const {requirePrivilegedMfa}=require('../config/utils/twoFactor');
+const rateLimit=require('express-rate-limit');
+const service=require('../services/whatsappSupportService');
+const router=express.Router();
+router.use(authenticate,requirePrivilegedMfa,requireNotImpersonating,rateLimit({windowMs:60000,max:60,standardHeaders:true,legacyHeaders:false}));
+router.use((req,res,next)=>service.STAFF.has(req.user.user_type)?next():res.status(403).json({success:false,message:'Support staff access required.'}));
+const safe=fn=>async(req,res)=>{res.set('Cache-Control','no-store');try{await fn(req,res);}catch(e){req.logger?.error('WhatsApp support action failed',{code:e.code||'support_error'});res.status(e.status||500).json({success:false,message:e.status?e.message:'Support could not be loaded. Please retry.'});}};
+router.get('/',safe(async(req,res)=>res.json({success:true,data:await service.list(req.user,req.query)})));
+router.get('/send-key',safe(async(_req,res)=>res.json({data:{request_id:require('crypto').randomUUID()}})));
+router.get('/agents',safe(async(req,res)=>{if(!['super_admin','super_support_admin'].includes(req.user.user_type))return res.status(403).json({message:'Senior support access required.'});res.json({data:(await require('../config/middleware/database').query("SELECT id,full_name,user_type FROM users WHERE user_type IN ('super_admin','super_support_admin','state_support_admin','lga_support_admin') AND is_active=TRUE AND deleted_at IS NULL ORDER BY full_name")).rows});}));
+router.use('/:id',(req,res,next)=>/^\d{1,10}$/.test(req.params.id)?next():res.status(400).json({message:'Valid conversation ID required.'}));
+router.get('/:id',safe(async(req,res)=>res.json({success:true,data:await service.history(req.user,Number(req.params.id),req.query.before)})));
+router.patch('/:id',safe(async(req,res)=>res.json(await service.update(req.user,Number(req.params.id),req.body))));
+router.post('/:id/reply',rateLimit({windowMs:60000,max:15,standardHeaders:true,legacyHeaders:false}),safe(async(req,res)=>{const result=await service.reply(req.user,Number(req.params.id),req.body);res.status(result.success?200:409).json(result);}));
+module.exports=router;

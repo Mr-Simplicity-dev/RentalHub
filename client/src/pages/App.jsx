@@ -1,3 +1,4 @@
+import WhatsAppSupport from './admin/WhatsAppSupport';
 import BackgroundJobs from './admin/BackgroundJobs';
 import AdminConduct from './admin/AdminConduct';
 import React, { Suspense, useEffect, useRef, useState } from 'react';
@@ -837,6 +838,7 @@ function App() {
               <AssistedSessionGate><Routes>
               <Route path="/registration-payment" element={<ProtectedRoute><RegistrationPayment /></ProtectedRoute>} />
               <Route path="/admin/background-jobs" element={<ProtectedRoute><BackgroundJobs /></ProtectedRoute>} />
+              <Route path="/admin/whatsapp-support" element={<ProtectedRoute><WhatsAppSupport /></ProtectedRoute>} />
               <Route path="/admin/code-of-conduct" element={<ProtectedRoute><AdminConduct /></ProtectedRoute>} />
               <Route path="/admin/assisted-registration" element={<ProtectedRoute><AssistedRegistration /></ProtectedRoute>} />
               {/* Public Routes */}
