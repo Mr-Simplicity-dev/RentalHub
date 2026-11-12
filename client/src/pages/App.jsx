@@ -1,3 +1,4 @@
+const PropertyProtection = React.lazy(() => import('./PropertyProtection'));
 import WhatsAppSupport from './admin/WhatsAppSupport';
 import BackgroundJobs from './admin/BackgroundJobs';
 import AdminConduct from './admin/AdminConduct';
@@ -965,6 +966,7 @@ function App() {
                             <Route path="/agent/withdrawals" element={<AgentRoute><AgentWithdrawalPage /></AgentRoute>} />
               <Route path="/verify" element={<VerifyCase />} />
               <Route path="/verify-case" element={<VerifyCase />} />
+              <Route path="/property-protection" element={<ProtectedRoute><PropertyProtection /></ProtectedRoute>} />
               <Route path="/my-disputes" element={<MyDisputes />} />
               <Route path="/my-damage-reports" element={<MyDamageReports />} />
               <Route path="/tenancy-agreements" element={<TenancyAgreements />} />

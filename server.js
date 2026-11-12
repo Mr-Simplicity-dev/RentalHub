@@ -841,6 +841,7 @@ app.use('/api/state-migrations', generalOpsLimiter, stateMigrationRoutes);
 app.use('/api/admin-conduct', adminLimiter, require('./routes/adminConduct'));
 app.use('/api/support-languages', adminLimiter, require('./routes/supportLanguages'));
 app.get('/api/support-channels',(_req,res)=>{const phone=require('./config/utils/whatsappPolicy').normalizeWhatsAppPhone(process.env.WHATSAPP_SUPPORT_PHONE);res.json({success:true,data:{whatsapp_url:phone?'https://wa.me/'+phone:null,whatsapp_ready:Boolean(phone&&process.env.WHATSAPP_PHONE_NUMBER_ID&&process.env.WHATSAPP_META_TOKEN)}});});
+app.use('/api/property-protection', adminLimiter, require('./routes/propertyProtection'));
 app.use('/api/whatsapp-support', adminLimiter, require('./routes/whatsappSupport'));
 app.use('/api/support', adminLimiter, supportRoutes);
 app.use('/api/system', adminLimiter, systemRoutes);
@@ -970,6 +971,7 @@ startMarketingCommissionJobs();
   startPremblyRecoveryJobs();
   startRegistrationReminderJobs();
   startSupportReassignJobs();
+  require('./jobs/propertyProtectionJobs').startPropertyProtectionJobs();
   require('./services/conductPaymentService').startConductReconciliation();
   startPropertyTourJobs();
   startScheduler();
@@ -1026,6 +1028,8 @@ const gracefulShutdown = async (signal) => {
   try {
     const jobsDrained=await require('./services/backgroundJobRuntime').stop();
     if(!jobsDrained)process.exit(0);
+    await require('./services/callStateBridge').getBridge().stop();
+    await new Promise(resolve=>io.close(resolve));
     // Close DB pool
     await db.end().catch((err) => logger.error('DB pool close error:', err.message));
     logger.info('Database pool closed.');
@@ -1064,6 +1068,8 @@ const io = new Server(server, {
     credentials: true,
   },
 });
+
+if(process.env.NODE_ENV==='production')io.adapter(require('@socket.io/postgres-adapter').createAdapter(db,{channelPrefix:'rentalhub.socket'}));
 
 // Socket.io authentication middleware
 io.use(async (socket, next) => {

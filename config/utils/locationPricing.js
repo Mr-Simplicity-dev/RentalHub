@@ -2,6 +2,11 @@ const db = require('../middleware/database');
 const { resolveLocationSelection } = require('./locationDirectory');
 
 const PRICING_TARGETS = {
+  protection_registry: {key:'protection_registry',label:'Property Protection: registry',base_amount:null,currency:'NGN'},
+  protection_survey: {key:'protection_survey',label:'Property Protection: survey',base_amount:null,currency:'NGN'},
+  protection_inspection: {key:'protection_inspection',label:'Property Protection: inspection',base_amount:null,currency:'NGN'},
+  protection_professional: {key:'protection_professional',label:'Property Protection: professional',base_amount:null,currency:'NGN'},
+  protection_monitoring: {key:'protection_monitoring',label:'Property Protection: monitoring',base_amount:null,currency:'NGN'},
   tenant_registration: {
     key: 'tenant_registration',
     label: 'Tenant Registration',
@@ -85,7 +90,12 @@ const ensureLocationPricingSchema = async () => {
           'landlord_annual_listing_renewal_fee',
           'landlord_monthly_maintenance_fee',
           'tenant_registration_diaspora',
-          'landlord_registration_diaspora'
+          'landlord_registration_diaspora',
+          'protection_registry',
+          'protection_survey',
+          'protection_inspection',
+          'protection_professional',
+          'protection_monitoring'
         )
       ),
       state_id INTEGER NOT NULL REFERENCES states(id) ON DELETE CASCADE,
@@ -130,7 +140,12 @@ const ensureLocationPricingSchema = async () => {
           'landlord_annual_listing_renewal_fee',
           'landlord_monthly_maintenance_fee',
           'tenant_registration_diaspora',
-          'landlord_registration_diaspora'
+          'landlord_registration_diaspora',
+          'protection_registry',
+          'protection_survey',
+          'protection_inspection',
+          'protection_professional',
+          'protection_monitoring'
         )
       );
   `);

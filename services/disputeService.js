@@ -64,9 +64,10 @@ const isValidEvidenceSignature = (buffer, mimeType) => {
   return false;
 };
 
-const sanitizeEvidenceRow = (row) => {
+const sanitizeEvidenceRow = (row,{professional=false}={}) => {
   if (!row) return row;
   const { file_path, ...safeRow } = row;
+  if(!professional)delete safeRow.lawyer_notes;
   return safeRow;
 };
 
@@ -162,7 +163,7 @@ exports.getDisputes = async (req, res) => {
               u2.full_name as against_name
        FROM disputes d
        JOIN users u1 ON d.opened_by = u1.id
-       JOIN users u2 ON d.against_user = u2.id
+       LEFT JOIN users u2 ON d.against_user = u2.id
        WHERE d.property_id = $1
        ORDER BY d.created_at DESC`,
       [propertyId]
@@ -230,14 +231,8 @@ exports.getDisputeDetails = async (req, res) => {
 
     const dispute = disputeResult.rows[0];
 
-    const canViewAllCaseNotes = [
-      'lawyer',
-      'state_lawyer',
-      'zonal_lawyer',
-      'super_lawyer',
-      'admin',
-      'super_admin',
-    ].includes(req.user?.user_type);
+    if(dispute.protection_property_id){const p=(await db.query('SELECT p.title,s.state_name,p.lga_name AS city,p.area,p.address AS full_address FROM protection_properties p JOIN states s ON s.id=p.state_id WHERE p.id=$1',[dispute.protection_property_id])).rows[0];if(p)Object.assign(dispute,{property_title:p.title,state:p.state_name,city:p.city,area:p.area,full_address:p.full_address});}
+    const canViewAllCaseNotes=['lawyer','state_lawyer','zonal_lawyer','super_lawyer'].includes(req.user?.user_type)&&Boolean(await require('./legalService').getAssignedDisputeAccess(req.user.id,disputeId));
 
     const [messagesResult, evidenceResult, auditResult, lawyerResult, caseNotesResult] = await Promise.all([
       db.query(
@@ -321,12 +316,15 @@ exports.getDisputeDetails = async (req, res) => {
          FROM lawyer_case_notes lcn
          LEFT JOIN users lawyer ON lawyer.id = lcn.lawyer_user_id
          WHERE lcn.dispute_id = $1
-           AND ($2::boolean = TRUE OR lcn.is_visible_to_client = TRUE)
+           AND ($2::boolean = TRUE OR (lcn.is_visible_to_client = TRUE AND lcn.client_user_id=$3))
          ORDER BY lcn.updated_at DESC, lcn.id DESC`,
-        [disputeId, canViewAllCaseNotes]
+        [disputeId, canViewAllCaseNotes,req.user.id]
       ),
     ]);
 
+    if(!canViewAllCaseNotes)for(const e of evidenceResult.rows)delete e.lawyer_notes;
+    if(dispute.protection_property_id){lawyerResult.rows=[];const members=(await db.query("SELECT u.id,u.full_name,u.user_type FROM protection_case_participants m JOIN users u ON u.id=m.user_id WHERE m.dispute_id=$1 AND m.capacity='professional' AND m.revoked_at IS NULL",[disputeId])).rows;lawyerResult.rows=members;}
+    if(['tenant','landlord','agent','marketing_agent'].includes(req.user.user_type)){for(const item of [dispute,...messagesResult.rows,...evidenceResult.rows,...auditResult.rows,...lawyerResult.rows,...caseNotesResult.rows])for(const k of Object.keys(item))if(/(^|_)(email|phone)$/.test(k))delete item[k];}
     const timeline = [
       dispute.created_at
         ? {
@@ -391,6 +389,7 @@ exports.getDisputeDetails = async (req, res) => {
         messages: messagesResult.rows,
         evidence: (evidenceResult.rows || []).map(sanitizeEvidenceRow),
         case_notes: caseNotesResult.rows,
+        professional_review_allowed:canViewAllCaseNotes,
         audit_logs: auditResult.rows,
         authorized_lawyers: lawyerResult.rows,
         timeline,
@@ -580,6 +579,7 @@ exports.editDisputeMessage = async (req, res) => {
 // Resolve dispute (Admin only)
 exports.resolveDispute = async (req, res) => {
   try {
+    const linked=(await db.query('SELECT protection_property_id FROM disputes WHERE id=$1',[req.params.disputeId])).rows[0];if(linked?.protection_property_id)return res.status(409).json({success:false,message:'Record the structured Property Protection case outcome and limitations.'});
     const { disputeId } = req.params;
 
     // Prevent resolving a legally sealed dispute
@@ -783,7 +783,7 @@ exports.getEvidence = async (req, res) => {
   const userType = req.user?.user_type;
 
   const result = await db.query(
-    `SELECT de.*, d.opened_by, d.against_user, d.property_id, d.responsible_support_id
+    `SELECT de.*, d.opened_by, d.against_user, d.property_id, d.responsible_support_id,d.protection_property_id
      FROM dispute_evidence de
      JOIN disputes d ON d.id = de.dispute_id
      WHERE de.id = $1`,
@@ -795,7 +795,8 @@ exports.getEvidence = async (req, res) => {
   }
 
   const evidence = result.rows[0];
-  const isPrivileged = userType==='super_admin'||Number(evidence.responsible_support_id)===Number(userId)&&['super_support_admin','zonal_admin','state_support_admin','lga_support_admin'].includes(userType);
+  if(evidence.protection_property_id){try{await require('./propertyProtectionService').caseAccess(req.user,evidence.dispute_id);}catch{return res.status(403).json({success:false,message:'You cannot access this case evidence.'});}}
+  const isPrivileged = Boolean(evidence.protection_property_id)||userType==='super_admin'||Number(evidence.responsible_support_id)===Number(userId)&&['super_support_admin','zonal_admin','state_support_admin','lga_support_admin'].includes(userType);
   const isParticipant = [evidence.opened_by, evidence.against_user].includes(Number(userId));
 
   if (!isPrivileged && !isParticipant) {
@@ -834,6 +835,8 @@ exports.getEvidence = async (req, res) => {
     return res.status(404).json({ success: false, message: 'Evidence file not found' });
   }
 
+  if(evidence.protection_property_id&&crypto.createHash('sha256').update(fs.readFileSync(evidencePath)).digest('hex')!==evidence.file_hash)return res.status(409).json({success:false,message:'Evidence integrity could not be confirmed.'});
+  res.setHeader('Cache-Control','no-store');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.sendFile(evidencePath);
 };
@@ -846,7 +849,7 @@ exports.verifyEvidenceIntegrity = async (req, res) => {
     const userType = req.user?.user_type;
 
     const result = await db.query(
-      `SELECT de.*, d.opened_by, d.against_user, d.property_id, d.responsible_support_id
+      `SELECT de.*, d.opened_by, d.against_user, d.property_id, d.responsible_support_id,d.protection_property_id
        FROM dispute_evidence de
        JOIN disputes d ON d.id = de.dispute_id
        WHERE de.id = $1`,
@@ -858,7 +861,8 @@ exports.verifyEvidenceIntegrity = async (req, res) => {
     }
 
     const evidence = result.rows[0];
-    const isPrivileged = userType==='super_admin'||Number(evidence.responsible_support_id)===Number(userId)&&['super_support_admin','zonal_admin','state_support_admin','lga_support_admin'].includes(userType);
+    if(evidence.protection_property_id){try{await require('./propertyProtectionService').caseAccess(req.user,evidence.dispute_id);}catch{return res.status(403).json({success:false,message:'You cannot access this case evidence.'});}}
+  const isPrivileged = Boolean(evidence.protection_property_id)||userType==='super_admin'||Number(evidence.responsible_support_id)===Number(userId)&&['super_support_admin','zonal_admin','state_support_admin','lga_support_admin'].includes(userType);
     const isParticipant = [evidence.opened_by, evidence.against_user].includes(Number(userId));
 
     if (!isPrivileged && !isParticipant) {

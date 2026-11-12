@@ -25,6 +25,7 @@
     "security:check": "npm audit && node -e \"try { require('helmet'); require('hpp'); require('express-rate-limit'); console.log('All security dependencies present'); } catch(e) { console.error('MISSING:', e.message); process.exit(1); }\""
   },
   "dependencies": {
+    "@socket.io/postgres-adapter": "0.5.0",
     "archiver": "^8.0.0",
     "axios": "^1.6.2",
     "bcryptjs": "^2.4.3",

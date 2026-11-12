@@ -498,6 +498,7 @@ const LawyerDashboardContent = ({
 
   const quickActions = useMemo(() => {
     const base = [
+      {to:'/property-protection?view=assigned',label:'Property Protection',description:'Assigned title reviews, private findings and case evidence'},
       {
         to: '/verify-case',
         label: t('lawyer_dashboard.evidence_queue'),

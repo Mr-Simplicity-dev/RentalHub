@@ -6,6 +6,8 @@ exports.canAccessDispute = async (req, res, next) => {
   try {
     const userId = req.user.id;
     const { disputeId } = req.params;
+    const linked=(await db.query('SELECT protection_property_id FROM disputes WHERE id=$1',[disputeId])).rows[0];
+    if(linked?.protection_property_id){await require('../../services/propertyProtectionService').caseAccess(req.user,disputeId);return next();}
     const lead=await db.query('SELECT id FROM disputes WHERE id=$1 AND responsible_support_id=$2',[disputeId,userId]);
     if(lead.rows.length&&['super_admin','super_support_admin','zonal_admin','state_support_admin','lga_support_admin'].includes(req.user.user_type))return next();
     const lawyerRoles = ['lawyer', 'state_lawyer', 'zonal_lawyer', 'super_lawyer'];

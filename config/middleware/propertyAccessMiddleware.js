@@ -16,7 +16,6 @@ exports.canAccessProperty = async (req, res, next) => {
          AND deleted_at IS NULL
          AND (
            landlord_id = $2
-           OR user_id = $2
            OR EXISTS (
              SELECT 1 FROM applications a
              WHERE a.property_id = properties.id

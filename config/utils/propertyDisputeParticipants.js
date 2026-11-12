@@ -5,7 +5,7 @@ const getPropertyDisputeParticipants = async (propertyId, queryable = db) => {
     `SELECT
        p.id,
        p.title,
-       COALESCE(p.landlord_id, p.user_id) AS landlord_user_id
+       p.landlord_id AS landlord_user_id
      FROM properties p
      WHERE p.id = $1
      LIMIT 1`,

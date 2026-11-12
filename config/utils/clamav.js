@@ -3,21 +3,21 @@
 const { execFile } = require('child_process');
 const logger = require('./logger');
 
-const scanFileForMalware = (filePath) =>
+const scanFileForMalware = (filePath, {required=false}={}) =>
   new Promise((resolve) => {
     execFile(
       'clamdscan',
-      ['--no-summary', '--stdout', filePath],
+      ['--no-summary', '--stdout', '--fdpass', filePath],
       { timeout: 30000 },
       (error, stdout) => {
         if (error && error.code === 1) {
           // exit 1 == infection found
-          resolve({ infected: true, detail: String(stdout || '').trim() });
+          resolve({ infected: true, scanned: true, detail: String(stdout || '').trim() });
         } else if (error) {
-          logger.warn('ClamAV scan unavailable (failing open):', error.message);
-          resolve({ infected: false });
+          logger.warn(required?'Required ClamAV scan unavailable':'ClamAV scan unavailable',{code:error.code});
+          resolve({ infected: false, scanned: false, unavailable: true });
         } else {
-          resolve({ infected: false });
+          resolve({ infected: false, scanned: true });
         }
       }
     );

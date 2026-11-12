@@ -340,6 +340,8 @@ const emitCallRoomUpdate = (io, call, extra = {}) => {
     callId: call.id,
     callType: call.callType,
     propertyId: call.propertyId,
+    disputeId:call.disputeId||null,
+    protectionPropertyId:call.protectionPropertyId||null,
     propertyTitle: call.propertyTitle,
     status: call.status,
     participants: room?.participants || [],
@@ -357,6 +359,7 @@ const emitCallEvent = (io, call, eventName, payload = {}) => {
     callId: call.id,
     callType: call.callType,
     propertyId: call.propertyId,
+    ...(call.disputeId?{disputeId:call.disputeId,protectionPropertyId:call.protectionPropertyId}:{}),
     propertyTitle: call.propertyTitle,
     status: call.status,
     caller: call.caller,
@@ -481,6 +484,7 @@ const buildSignalPayload = (call, userId, payload = {}) => ({
   callId: call.id,
   callType: call.callType,
   propertyId: call.propertyId,
+    ...(call.disputeId?{disputeId:call.disputeId,protectionPropertyId:call.protectionPropertyId}:{}),
   propertyTitle: call.propertyTitle,
   caller: call.caller,
   receiver: call.receiver,
@@ -583,6 +587,7 @@ const recordCallRoomEvent = async ({ callId, action, actorUserId, targetUserId, 
         event.createdAt,
       ]
     );
+    const call=activeCalls.get(callId);if(call)await require('../../services/callStateBridge').getBridge().save(call);
   } catch (error) {
     logger.error('Call room event audit failed:', error.message);
   }
@@ -604,9 +609,9 @@ const recordCallSession = async (call, status, timestamps = {}) => {
          support_tier,
          requested_at,
          started_at,
-         ended_at
+         ended_at,dispute_id,protection_property_id
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,$12,$13)
        ON CONFLICT (id) DO UPDATE SET
          status = EXCLUDED.status,
          started_at = COALESCE(EXCLUDED.started_at, call_sessions.started_at),
@@ -624,10 +629,14 @@ const recordCallSession = async (call, status, timestamps = {}) => {
         call.createdAt || new Date().toISOString(),
         timestamps.startedAt || null,
         timestamps.endedAt || null,
+        call.disputeId||null,
+        call.protectionPropertyId||null,
       ]
     );
+    await require('../../services/callStateBridge').getBridge().save(call);
   } catch (error) {
     logger.error('Call session history failed:', error.message);
+    if(call.disputeId)throw error;
   }
 };
 
@@ -722,6 +731,8 @@ const findAvailableSupportAgent = async (callerLoc) => {
 };
 
 const configureRealtimeSocket = (io) => {
+  const bridge=require('../../services/callStateBridge').configure({db,logger,emit:require('./realtimeEmitter').emitToUser,onUpdate:state=>{const old=activeCalls.get(state.id);if(['ringing','accepted'].includes(state.status)){activeCalls.set(state.id,{...state,timeoutId:old?.timeoutId});multiPartyCallRooms.delete(state.id);}else{if(old)clearCallTimer(old);activeCalls.delete(state.id);multiPartyCallRooms.delete(state.id);}}});
+  if(process.env.NODE_ENV==='production')void bridge.start();
   io.use(async (socket, next) => {
     try {
       const token = getSocketAuthToken(socket);
@@ -739,6 +750,7 @@ const configureRealtimeSocket = (io) => {
 
   io.on('connection', (socket) => {
     const user = socket.user;
+    socket.use(async(packet,next)=>{const [event,payload]=packet;if(payload?.callId&&String(event).startsWith('call:')){try{const loaded=await bridge.load(payload.callId);if(loaded){const old=activeCalls.get(loaded.id);activeCalls.set(loaded.id,{...loaded,timeoutId:old?.timeoutId});multiPartyCallRooms.delete(loaded.id);}}catch{const ack=packet[packet.length-1];if(typeof ack==='function')ack({success:false,message:'Call state is temporarily unavailable.'});return next(new Error('Call state unavailable'));}}const call=payload?.callId?activeCalls.get(payload.callId):null;if(!call?.disputeId||!String(event).startsWith('call:')||['call:end','call:reject','call:room:leave'].includes(event))return next();try{const other=Number(call.caller.id)===Number(user.id)?call.receiver.id:call.caller.id;await require('../../services/propertyProtectionService').meeting(user.id,other,call.disputeId);next();}catch{const ack=packet[packet.length-1];if(typeof ack==='function')ack({success:false,message:'Your case meeting access is no longer active.'});next(new Error('Case meeting access denied'));}});
     const wasOffline = addOnlineSocket(socket);
 
     socket.join(toUserRoom(user.id));
@@ -1013,11 +1025,12 @@ const configureRealtimeSocket = (io) => {
     socket.on('call:invite', async (payload = {}, callback) => {
       try {
         const receiverId = Number(payload.receiverId || payload.receiver_id);
+        const caseContext=payload.disputeId?await require('../../services/propertyProtectionService').meeting(user.id,receiverId,Number(payload.disputeId)):null;
         const callType = CALL_TYPES.has(payload.callType)
           ? payload.callType
           : 'audio';
 
-        if (!CALL_ALLOWED_ROLES.has(user.user_type)) {
+        if (!caseContext && !CALL_ALLOWED_ROLES.has(user.user_type)) {
           throw new Error('Only tenants, landlords and agents can start calls');
         }
 
@@ -1038,11 +1051,12 @@ const configureRealtimeSocket = (io) => {
           throw new Error('Call recipient is not available');
         }
 
-        if (!CALL_ALLOWED_ROLES.has(receiver.user_type)) {
+        if (!caseContext && !CALL_ALLOWED_ROLES.has(receiver.user_type)) {
           throw new Error('Calls can only be sent to tenants, landlords or agents');
         }
 
-        if (payload.propertyId) {
+        if(caseContext&&!['audio','video'].includes(callType))throw new Error('Case meetings use audio or video.');
+        if (payload.propertyId && !caseContext) {
           const access = await validateCallRoomParticipantAccess({
             propertyId: payload.propertyId,
             userId: user.id,
@@ -1058,13 +1072,16 @@ const configureRealtimeSocket = (io) => {
           caller: getPublicUser(user),
           receiver: getPublicUser(receiver),
           callType,
-          propertyId: payload.propertyId ? Number(payload.propertyId) : null,
-          propertyTitle: payload.propertyTitle || '',
+          propertyId: caseContext?caseContext.property_id:(payload.propertyId ? Number(payload.propertyId) : null),
+          disputeId:caseContext?.id||null,
+          protectionPropertyId:caseContext?.protection_property_id||null,
+          propertyTitle: caseContext?.title||payload.propertyTitle || '',
           status: 'ringing',
           createdAt: new Date().toISOString(),
         };
 
-        call.timeoutId = setTimeout(() => {
+        call.timeoutId = setTimeout(async () => {
+          try{const stored=await bridge.load(call.id);if(stored&&stored.status!=='ringing')return;}catch{return;}
           const currentCall = activeCalls.get(call.id);
           if (!currentCall || currentCall.status !== 'ringing') return;
 
@@ -1098,6 +1115,7 @@ const configureRealtimeSocket = (io) => {
           metadata: {
             callType: call.callType,
             propertyId: call.propertyId,
+    ...(call.disputeId?{disputeId:call.disputeId,protectionPropertyId:call.protectionPropertyId}:{}),
             propertyTitle: call.propertyTitle,
           },
         });
@@ -1107,6 +1125,7 @@ const configureRealtimeSocket = (io) => {
           callId: call.id,
           callType: call.callType,
           propertyId: call.propertyId,
+    ...(call.disputeId?{disputeId:call.disputeId,protectionPropertyId:call.protectionPropertyId}:{}),
           propertyTitle: call.propertyTitle,
           status: call.status,
           caller: call.caller,
@@ -1117,6 +1136,7 @@ const configureRealtimeSocket = (io) => {
           callId: call.id,
           callType: call.callType,
           propertyId: call.propertyId,
+    ...(call.disputeId?{disputeId:call.disputeId,protectionPropertyId:call.protectionPropertyId}:{}),
           propertyTitle: call.propertyTitle,
           status: call.status,
           receiver: call.receiver,
@@ -1206,6 +1226,7 @@ const configureRealtimeSocket = (io) => {
           callId: call.id,
           callType: call.callType,
           propertyId: call.propertyId,
+    ...(call.disputeId?{disputeId:call.disputeId,protectionPropertyId:call.protectionPropertyId}:{}),
           propertyTitle: call.propertyTitle,
           status: call.status,
           caller: call.caller,
@@ -1218,6 +1239,7 @@ const configureRealtimeSocket = (io) => {
           callId: call.id,
           callType: call.callType,
           propertyId: call.propertyId,
+    ...(call.disputeId?{disputeId:call.disputeId,protectionPropertyId:call.protectionPropertyId}:{}),
           propertyTitle: call.propertyTitle,
           status: call.status,
           receiver: call.receiver,
@@ -1440,13 +1462,15 @@ const configureRealtimeSocket = (io) => {
           throw new Error('That user is not available to join the call');
         }
 
-        if (!CALL_ALLOWED_ROLES.has(invitedUser.user_type)) {
+        if(call.disputeId)await require('../../services/propertyProtectionService').meeting(user.id,invitedUser.id,call.disputeId);
+        if (!call.disputeId&&!CALL_ALLOWED_ROLES.has(invitedUser.user_type)) {
           throw new Error('Only tenants, landlords and agents can join an in-app call room');
         }
 
-        if (call.propertyId) {
+        if (call.propertyId&&!call.disputeId) {
           const access = await validateCallRoomParticipantAccess({
             propertyId: call.propertyId,
+    ...(call.disputeId?{disputeId:call.disputeId,protectionPropertyId:call.protectionPropertyId}:{}),
             userId: user.id,
             targetUserId: invitedUser.id,
           });
@@ -1496,6 +1520,7 @@ const configureRealtimeSocket = (io) => {
           callId: call.id,
           callType: call.callType,
           propertyId: call.propertyId,
+    ...(call.disputeId?{disputeId:call.disputeId,protectionPropertyId:call.protectionPropertyId}:{}),
           propertyTitle: call.propertyTitle,
           status: call.status,
           caller: call.caller,

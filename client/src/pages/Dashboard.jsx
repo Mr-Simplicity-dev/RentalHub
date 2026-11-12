@@ -1964,8 +1964,8 @@ const Dashboard = () => {
                 icon={<FaFileAlt />}
                 onClick={() => navigate('/payment-history')}
               />
-              <QuickActionCard
-                title={t('dashboardUx.my_disputes')}
+              <QuickActionCard title="Amana Property Protection" description="Private property records, checks and cases" icon={<FaBalanceScale />} onClick={()=>navigate('/property-protection')} />
+              <QuickActionCard title={t('dashboardUx.my_disputes')}
                 description={t('my_disputes.desc')}
                 icon={<FaBalanceScale />}
                 onClick={() => navigate('/my-disputes')}
@@ -2115,6 +2115,7 @@ const Dashboard = () => {
                 icon={<FaFileAlt />}
                 onClick={() => navigate('/applications')}
               />
+              <QuickActionCard title="Amana Property Protection" description="Private property records, checks and cases" icon={<FaBalanceScale />} onClick={()=>navigate('/property-protection')} />
               <QuickActionCard title={t('dashboardUx.my_disputes')} description="Open and track disputes connected to your account." icon={<FaBalanceScale />} onClick={()=>navigate('/my-disputes')} dataTourId="action-disputes" />
               <QuickActionCard title={t('dashboardUx.damage_reports')} description="Review property issues and submitted reports." icon={<FaHome />} onClick={()=>navigate('/my-damage-reports')} dataTourId="action-damage" />
               <QuickActionCard
@@ -2133,8 +2134,8 @@ const Dashboard = () => {
                 note={graceCountdown?.label}
                 noteClass={graceCountdown?.className}
               />
-              <QuickActionCard
-                title={t('dashboardUx.my_disputes')}
+              <QuickActionCard title="Amana Property Protection" description="Private property records, checks and cases" icon={<FaBalanceScale />} onClick={()=>navigate('/property-protection')} />
+              <QuickActionCard title={t('dashboardUx.my_disputes')}
                 description="View and manage disputes you are involved in"
                 icon={<FaBalanceScale />}
                 onClick={() => navigate('/my-disputes')}

@@ -78,6 +78,8 @@ const ALLOWED_EVIDENCE_STATUSES = new Set([
 ]);
 
 const getLawyerDisputeAccess = async (lawyerId, disputeId) => {
+  const linked=(await db.query('SELECT protection_property_id FROM disputes WHERE id=$1',[disputeId])).rows[0];
+  if(linked?.protection_property_id){const actor=(await db.query('SELECT * FROM users WHERE id=$1 AND is_active=TRUE AND deleted_at IS NULL',[lawyerId])).rows[0];if(!actor)return null;try{const d=await require('./propertyProtectionService').caseAccess(actor,disputeId);return d?.professional?{dispute_id:d.id,dispute_status:d.status,client_user_id:d.record_owner_id,protection_property_id:d.protection_property_id}:null;}catch{return null;}}
   const result = await db.query(
     `SELECT
        la.id,
@@ -114,7 +116,7 @@ const getLawyerDisputeAccess = async (lawyerId, disputeId) => {
     return null;
   }
 
-  const parties=await db.query('SELECT d.opened_by,d.against_user,p.owner_id FROM disputes d JOIN properties p ON p.id=d.property_id WHERE d.id=$1',[disputeId]);
+  const parties=await db.query('SELECT d.opened_by,d.against_user,p.landlord_id AS owner_id FROM disputes d JOIN properties p ON p.id=d.property_id WHERE d.id=$1',[disputeId]);
   const party=parties.rows[0];
   if(!party || await identityPhotos.legalConflict(lawyerId,[party.opened_by,party.against_user,party.owner_id]))return null;
   return row;
@@ -206,7 +208,7 @@ exports.getTreatedCases = async (req, res) => {
                 COUNT(*) FILTER (WHERE ou.user_type = 'landlord')::int AS landlord_against_tenant
          FROM disputes d
          JOIN users ou ON ou.id = d.opened_by
-         WHERE d.status = 'resolved'`
+         WHERE d.status = 'resolved' AND d.protection_property_id IS NULL`
       ),
       db.query(
         `SELECT d.id, d.resolved_at, ou.user_type AS direction, s.state_name AS state
@@ -214,7 +216,7 @@ exports.getTreatedCases = async (req, res) => {
          JOIN users ou ON ou.id = d.opened_by
          LEFT JOIN properties p ON p.id = d.property_id
          LEFT JOIN states s ON s.id = p.state_id
-         WHERE d.status = 'resolved'
+         WHERE d.status = 'resolved' AND d.protection_property_id IS NULL
          ORDER BY d.resolved_at DESC
          LIMIT 50`
       ),
@@ -718,6 +720,7 @@ exports.resolveDispute = async (req, res) => {
 
     const { disputeId } = req.params;
     const { resolution_note } = req.body;
+    const linked=(await db.query('SELECT protection_property_id FROM disputes WHERE id=$1',[disputeId])).rows[0];if(linked?.protection_property_id)return res.status(409).json({success:false,message:'Submit a closure recommendation in the case conversation. An authorised case officer must record the structured outcome.'});
     const lawyerId = req.user?.id;
 
     if (!disputeId) {
@@ -1050,8 +1053,8 @@ exports.createCaseNote = async (req, res) => {
 
     const result = await db.query(
       `INSERT INTO lawyer_case_notes
-       (dispute_id, lawyer_user_id, title, content, note_type, is_visible_to_client)
-       VALUES ($1, $2, $3, $4, $5, $6)
+       (dispute_id, lawyer_user_id, title, content, note_type, is_visible_to_client,client_user_id)
+       VALUES ($1, $2, $3, $4, $5, $6,$7)
        RETURNING *`,
       [
         disputeId,
@@ -1060,6 +1063,7 @@ exports.createCaseNote = async (req, res) => {
         content,
         note_type,
         is_visible_to_client,
+        access.client_user_id||null,
       ]
     );
 
@@ -1490,3 +1494,5 @@ exports.submitSupportRequest = async (req, res) => {
     });
   }
 };
+
+exports.getAssignedDisputeAccess=getLawyerDisputeAccess;

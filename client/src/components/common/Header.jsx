@@ -618,8 +618,8 @@ return (
                       )}
                     </Link>
 
-                    <Link
-                      to="/profile"
+                    <Link to="/property-protection" className="block px-4 py-3 text-sm text-gray-700 hover:bg-primary-50" onClick={()=>handleHeaderNavigation('/property-protection')}>Amana Property Protection</Link>
+                    <Link to="/profile"
                       className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 transition-colors duration-150 hover:bg-primary-50 hover:text-primary-700"
                       onClick={() => handleHeaderNavigation('/profile')}
                     >

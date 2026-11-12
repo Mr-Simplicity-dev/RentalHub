@@ -102,6 +102,7 @@ router.post(
   [param('disputeId').isInt({ min: 1 }).withMessage('disputeId must be a positive integer'), validateRequest],
   upload.single('file'),
   upload.validateEvidenceMagicBytes,
+  upload.validateProtectionEvidence,
   disputeController.uploadEvidence
 );
 

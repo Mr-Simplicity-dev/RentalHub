@@ -91,3 +91,5 @@ const uploadEvidenceMiddleware = multer({
 
 module.exports = uploadEvidenceMiddleware;
 module.exports.validateEvidenceMagicBytes = validateEvidenceMagicBytes;
+
+module.exports.validateProtectionEvidence=async(req,res,next)=>{try{const d=(await require('./database').query('SELECT protection_property_id FROM disputes WHERE id=$1',[req.params.disputeId])).rows[0];if(d?.protection_property_id&&req.file){const result=await require('../utils/clamav').scanFileForMalware(req.file.path,{required:true});if(!result.scanned||result.infected){try{fs.unlinkSync(req.file.path);}catch{}return res.status(result.infected?400:503).json({success:false,message:result.infected?'The file did not pass the security scan.':'Secure evidence scanning is unavailable. Please retry later.'});}}next();}catch(e){next(e);}};

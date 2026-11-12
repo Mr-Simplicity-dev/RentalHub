@@ -1,3 +1,4 @@
+import PropertyCaseTools from '../components/common/PropertyCaseTools';
 import handoverCopy from '../i18n/handoverCopy';
 import { useEffect, useState, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
@@ -143,6 +144,7 @@ export default function DisputeDetails() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-8">
+        {dispute.protection_property_id&&<PropertyCaseTools dispute={dispute} professional={payload.professional_review_allowed} onSaved={loadDispute}/>}
         <div className="rounded-3xl bg-white p-8 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>

@@ -4,6 +4,7 @@ const card = (text, link, linkText, extra = {}) => ({handled: true, text, link, 
 const ownQuestion = text => /\b(my|mine|who am i|do i have|am i|have i|i paid|i was charged|i submitted|i applied|status|pending|balance|withdrawal|withdrawals|ticket|tickets)\b/i.test(text);
 const ticketIntent = text => /\b(open|raise|create|submit|file|lodge|send)\b.{0,45}\b(ticket|complaint|support request)\b/i.test(text);
 const TOPICS = [
+ ['protection', /\b(property protection|property monitoring|registered land|parcel|survey)\b/i],
  ['withdrawals', /\b(withdraw\w*|payout\w*)\b/i],
  ['wallet', /\b(wallet|balance)\b/i],
  ['coverage', /\b(coverage|assistance|protection)\b/i],
@@ -56,6 +57,7 @@ const createAccountAssistant = ({query}) => async ({user, message, mode, previou
   const w=(await rows('SELECT balance, reserved_balance FROM wallets WHERE user_id = $1 LIMIT 1'))[0]||{};
   return reply('Your recorded wallet balance is '+money(w.balance)+'. Reserved amount: '+money(w.reserved_balance)+'. Withdrawal eligibility can also depend on rent deductions, holds and account checks; open your dashboard for the current withdrawal quote.','/dashboard','Open wallet on dashboard');
  }
+ if(selected==='protection'){const properties=await rows("SELECT p.id,p.title,p.verification_status FROM protection_properties p WHERE p.owner_id=$1 OR EXISTS(SELECT 1 FROM protection_representatives r WHERE r.property_id=p.id AND r.user_id=$1 AND r.status='approved' AND r.expires_at>NOW()) ORDER BY p.created_at DESC LIMIT 10");return reply(properties.length?('Your property records: '+properties.map(p=>clean(p.title)+' — '+p.verification_status.replaceAll('_',' ')).join('; ')+'. Open Property Protection for the checked scope, outstanding requirements and private case updates.'):'You have no property-protection records yet. Basic property registration and case reporting are free. Optional checks show their scope and price before payment. A platform check is not proof of ownership.','/property-protection','Property Protection');}
  if(selected==='coverage') {
   const paid=await rows("SELECT id FROM payments WHERE user_id = $1 AND payment_type = 'lawyer_access_fee' AND payment_status = 'completed' LIMIT 1");
   return reply(paid.length?'Your paid assistance coverage is active. You can submit a private assistance request.':'I found no completed assistance coverage payment on your account. Paid coverage is required before submitting an assistance request.','/assistance','Open coverage assistance');
