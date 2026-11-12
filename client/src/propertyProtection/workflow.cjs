@@ -192,7 +192,33 @@ const valuesFor = (form, data) =>
       get(data?.property, f.name) ?? "",
     ]),
   );
-function viewsFor(user){const role=user?.user_type,operations=['super_admin','state_admin','admin','lga_admin','zonal_admin'];return ['owner',...([...operations,'agent','lawyer','state_lawyer','zonal_lawyer','super_lawyer','super_support_admin','state_support_admin','lga_support_admin'].includes(role)?['assigned']:[]),...(operations.includes(role)?['operations']:[])];}
+function viewsFor(user) {
+  const role = user?.user_type,
+    operations = [
+      "super_admin",
+      "state_admin",
+      "admin",
+      "lga_admin",
+      "zonal_admin",
+    ];
+  return [
+    "owner",
+    ...([
+      ...operations,
+      "agent",
+      "lawyer",
+      "state_lawyer",
+      "zonal_lawyer",
+      "super_lawyer",
+      "super_support_admin",
+      "state_support_admin",
+      "lga_support_admin",
+    ].includes(role)
+      ? ["assigned"]
+      : []),
+    ...(operations.includes(role) ? ["operations"] : []),
+  ];
+}
 module.exports = {
   viewsFor,
   labels,

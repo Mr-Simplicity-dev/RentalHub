@@ -568,7 +568,7 @@ L.push(q('L9.6', 'L9', 'B', 'single', 'If Amana RentalHub NG successfully introd
   ['not_sure', 'Not sure'],
 ], { analysis: 'fee' }));
 
-L.push(q('L9.7', 'L9', 'B', 'single', 'Would you pay separately for optional tenant verification, legal support, property promotion or maintenance services?', [
+L.push(q('L9.7', 'L9', 'B', 'single', 'Would you pay separately for optional tenant verification, case support, property promotion or maintenance services?', [
   ['yes', 'Yes'],
   ['maybe', 'Maybe'],
   ['no', 'No'],

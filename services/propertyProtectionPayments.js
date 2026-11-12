@@ -106,7 +106,9 @@ function createPaymentService({
       action: "PROTECTION_SERVICE_CONFIGURED",
       targetType: "protection_service",
     });
-    return { success: true };
+    return {
+      success: true,
+    };
   };
   const request = async (actor, id, body) => {
     if (!env.PAYSTACK_SECRET_KEY)
@@ -187,7 +189,11 @@ function createPaymentService({
           ],
         )
       ).rows[0];
-      return { ...r, transaction_reference: reference, new_request: true };
+      return {
+        ...r,
+        transaction_reference: reference,
+        new_request: true,
+      };
     });
     if (
       !order.new_request &&
@@ -222,7 +228,9 @@ function createPaymentService({
           }),
         },
         {
-          headers: { Authorization: "Bearer " + env.PAYSTACK_SECRET_KEY },
+          headers: {
+            Authorization: "Bearer " + env.PAYSTACK_SECRET_KEY,
+          },
           timeout: 20000,
         },
       );
@@ -277,7 +285,9 @@ function createPaymentService({
       "https://api.paystack.co/transaction/verify/" +
         encodeURIComponent(order.transaction_reference),
       {
-        headers: { Authorization: "Bearer " + env.PAYSTACK_SECRET_KEY },
+        headers: {
+          Authorization: "Bearer " + env.PAYSTACK_SECRET_KEY,
+        },
         timeout: 20000,
       },
     );
@@ -319,10 +329,7 @@ function createPaymentService({
           "UPDATE protection_checks SET history=history||jsonb_build_array(to_jsonb(protection_checks)-'history'),status='pending',assigned_to=NULL,public_summary=NULL,private_findings=NULL,source_details='{}',document_ids='[]',submitted_by=NULL,reviewed_by=NULL,review_reason=NULL,submitted_at=NULL,reviewed_at=NULL,updated_at=NOW() WHERE property_id=$1 AND stage IN ($2,'final')",
           [row.property_id, SERVICE_STAGES[row.service_code]],
         );
-        await c.query(
-          "UPDATE protection_properties SET verification_status='under_review',updated_at=NOW() WHERE id=$1",
-          [row.property_id],
-        );
+        await protection.setStatus(row.property_id, "under_review", c);
       }
       if (row.service_code === "monitoring")
         await c.query(

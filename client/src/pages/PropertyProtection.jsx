@@ -3,19 +3,28 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import api from "../services/api";
-import { actionSpec, actionsFor, fieldOptions, labels, valuesFor, viewsFor } from "../propertyProtection/workflow.cjs";
+import {
+  actionSpec,
+  actionsFor,
+  fieldOptions,
+  labels,
+  valuesFor,
+  viewsFor,
+} from "../propertyProtection/workflow.cjs";
 const base = "/property-protection";
-const message = e => e.response?.data?.message || "This action could not be completed. Please try again.";
-const format = value => value ? new Date(value).toLocaleDateString() : "—";
-const button = "min-h-11 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50";
-const money = value => new Intl.NumberFormat("en-NG", {
-  style: "currency",
-  currency: "NGN"
-}).format(value);
+const message = (e) =>
+  e.response?.data?.message ||
+  "This action could not be completed. Please try again.";
+const format = (value) => (value ? new Date(value).toLocaleDateString() : "—");
+const button =
+  "min-h-11 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50";
+const money = (value) =>
+  new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency: "NGN",
+  }).format(value);
 export default function PropertyProtection() {
-  const {
-    user
-  } = useAuth();
+  const { user } = useAuth();
   const ui = useProtectionText(user);
   const [query, setQuery] = useSearchParams(),
     selected = query.get("property"),
@@ -44,9 +53,11 @@ export default function PropertyProtection() {
     setError("");
     try {
       const response = await api.get(selected ? base + "/" + selected : base, {
-        params: selected ? {} : {
-          view
-        }
+        params: selected
+          ? {}
+          : {
+              view,
+            },
       });
       if (run !== epoch.current) return;
       if (selected) {
@@ -73,12 +84,17 @@ export default function PropertyProtection() {
   }, [load]);
   useEffect(() => {
     mounted.current = true;
-    Promise.all([api.get(base + "/forms"), api.get("/property-utils/location-options")]).then(([f, l]) => {
-      if (mounted.current) {
-        setForms(f.data.data);
-        setLocations(l.data.data || []);
-      }
-    }).catch(e => setError(message(e)));
+    Promise.all([
+      api.get(base + "/forms"),
+      api.get("/property-utils/location-options"),
+    ])
+      .then(([f, l]) => {
+        if (mounted.current) {
+          setForms(f.data.data);
+          setLocations(l.data.data || []);
+        }
+      })
+      .catch((e) => setError(message(e)));
     return () => {
       mounted.current = false;
     };
@@ -94,11 +110,11 @@ export default function PropertyProtection() {
       const r = await api.get(base, {
         params: {
           view,
-          before: rows.at(-1).id
-        }
+          before: rows.at(-1).id,
+        },
       });
       if (current === epoch.current) {
-        setRows(previous => [...previous, ...r.data.data]);
+        setRows((previous) => [...previous, ...r.data.data]);
         setHasMore(r.data.data.length === 200);
       }
     } catch (e) {
@@ -107,7 +123,7 @@ export default function PropertyProtection() {
       setBusy(false);
     }
   };
-  const verify = async id => {
+  const verify = async (id) => {
     setBusy(true);
     setError("");
     try {
@@ -124,15 +140,18 @@ export default function PropertyProtection() {
   useEffect(() => {
     const id = query.get("request");
     if (id) {
-      api.get(base + "/requests/" + encodeURIComponent(id)).then(r => {
-        setQuery({
-          property: String(r.data.data.property_id)
-        });
-        return verify(id);
-      }).catch(e => setError(message(e)));
+      api
+        .get(base + "/requests/" + encodeURIComponent(id))
+        .then((r) => {
+          setQuery({
+            property: String(r.data.data.property_id),
+          });
+          return verify(id);
+        })
+        .catch((e) => setError(message(e)));
     }
   }, []); // A provider return never establishes payment without backend verification.
-  const open = async name => {
+  const open = async (name) => {
     if (busy) return;
     setBusy(true);
     setError("");
@@ -148,7 +167,9 @@ export default function PropertyProtection() {
         setConfiguration(c.data.data);
       }
       file.current = null;
-      setValues(name === "requestCorrection" ? valuesFor(forms[name], data) : {});
+      setValues(
+        name === "requestCorrection" ? valuesFor(forms[name], data) : {},
+      );
       setAction(name);
     } catch (e) {
       setError(message(e));
@@ -158,23 +179,25 @@ export default function PropertyProtection() {
   };
   const change = (name, value) => {
     if (name === "code" && action === "configureService") {
-      const current = configuration.find(x => x.code === value);
+      const current = configuration.find((x) => x.code === value);
       setValues({
         ...current,
         code: value,
-        available_states: current?.available_states || []
+        available_states: current?.available_states || [],
       });
       return;
     }
-    setValues(v => ({
+    setValues((v) => ({
       ...v,
       [name]: value,
-      ...(name === "state_id" ? {
-        lga_name: ""
-      } : {})
+      ...(name === "state_id"
+        ? {
+            lga_name: "",
+          }
+        : {}),
     }));
   };
-  const submit = async event => {
+  const submit = async (event) => {
     event.preventDefault();
     if (busy) return;
     setBusy(true);
@@ -189,39 +212,62 @@ export default function PropertyProtection() {
         Object.entries(spec.body).forEach(([k, v]) => body.append(k, v));
         body.append("file", file.current);
         headers = {
-          "Content-Type": "multipart/form-data"
+          "Content-Type": "multipart/form-data",
         };
       }
       const r = await api.request({
         url: spec.url,
         method: spec.method,
         data: body,
-        headers
+        headers,
       });
       setAction(null);
       setNotice("Saved.");
-      if (action === "register") setQuery({
-        property: String(r.data.data.id)
-      });else await load();
+      if (action === "register")
+        setQuery({
+          property: String(r.data.data.id),
+        });
+      else await load();
     } catch (e) {
       setError(e.response ? message(e) : e.message);
     } finally {
       setBusy(false);
     }
   };
-  const activeService = code => data?.requests.find(row => row.service_code === code && ['pending_payment', 'paid', 'in_progress'].includes(row.status));
-  const pay = async service => {
-    if (!window.confirm(service.description + "\n\n" + money(service.amount) + "\n\nRequest this service?")) return;
+  const activeService = (code) =>
+    data?.requests.find(
+      (row) =>
+        row.service_code === code &&
+        ["pending_payment", "paid", "in_progress"].includes(row.status),
+    );
+  const pay = async (service) => {
+    if (
+      !window.confirm(
+        service.description +
+          "\n\n" +
+          money(service.amount) +
+          "\n\nRequest this service?",
+      )
+    )
+      return;
     setBusy(true);
     setError("");
     try {
-      if (!requestKeys.current[selected + ":" + service.code]) requestKeys.current[selected + ":" + service.code] = (await api.get(base + "/key")).data.data.request_id;
+      if (!requestKeys.current[selected + ":" + service.code])
+        requestKeys.current[selected + ":" + service.code] = (
+          await api.get(base + "/key")
+        ).data.data.request_id;
       const r = await api.post(base + "/" + selected + "/services", {
         service_code: service.code,
         request_id: requestKeys.current[selected + ":" + service.code],
-        consent: true
+        consent: true,
       });
-      if (r.data.data.authorization_url) window.location.assign(r.data.data.authorization_url);else setNotice("Your request is saved. Check its payment status below before paying again.");
+      if (r.data.data.authorization_url)
+        window.location.assign(r.data.data.authorization_url);
+      else
+        setNotice(
+          "Your request is saved. Check its payment status below before paying again.",
+        );
       await load();
     } catch (e) {
       setError(message(e));
@@ -230,24 +276,29 @@ export default function PropertyProtection() {
       setBusy(false);
     }
   };
-  const resume = async id => {
+  const resume = async (id) => {
     setBusy(true);
     setError("");
     try {
       const r = await api.post(base + "/requests/" + id + "/resume");
-      if (r.data.data.status === "pending_payment" && r.data.data.authorization_url) window.location.assign(r.data.data.authorization_url);else await load();
+      if (
+        r.data.data.status === "pending_payment" &&
+        r.data.data.authorization_url
+      )
+        window.location.assign(r.data.data.authorization_url);
+      else await load();
     } catch (e) {
       setError(message(e));
     } finally {
       setBusy(false);
     }
   };
-  const download = async doc => {
+  const download = async (doc) => {
     setBusy(true);
     setError("");
     try {
       const r = await api.get(base + "/documents/" + doc.id, {
-        responseType: "blob"
+        responseType: "blob",
       });
       const url = URL.createObjectURL(r.data),
         a = document.createElement("a");
@@ -256,40 +307,114 @@ export default function PropertyProtection() {
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (e) {
-      setError("The private evidence could not be downloaded. Please check access and retention.");
+      setError(
+        "The private evidence could not be downloaded. Please check access and retention.",
+      );
     } finally {
       setBusy(false);
     }
   };
-  const control = field => {
+  const control = (field) => {
     const value = values[field.name] ?? "",
-      options = fieldOptions(field, values, data, locations, staff).filter(o => !(action === "representativeReview" && field.name === "status" && data?.permissions.owner && !data?.permissions.operations) || o.value === "revoked"),
+      options = fieldOptions(field, values, data, locations, staff).filter(
+        (o) =>
+          !(
+            action === "representativeReview" &&
+            field.name === "status" &&
+            data?.permissions.owner &&
+            !data?.permissions.operations
+          ) || o.value === "revoked",
+      ),
       common = {
         id: "pp-" + field.name,
         required: field.required,
         value,
-        onChange: e => change(field.name, e.target.value),
-        className: "mt-1 min-h-11 w-full rounded-xl border border-slate-300 p-3 text-slate-900"
+        onChange: (e) => change(field.name, e.target.value),
+        className:
+          "mt-1 min-h-11 w-full rounded-xl border border-slate-300 p-3 text-slate-900",
       };
-    if (field.type === "checkbox") return <input id={common.id} type="checkbox" checked={Boolean(value)} required={field.required} onChange={e => change(field.name, e.target.checked)} className="mx-2 h-5 w-5" />;
-    if (field.type === "file") return <input id={common.id} type="file" required accept="application/pdf,image/jpeg,image/png,video/mp4" onChange={e => {
-      file.current = e.target.files?.[0];
-    }} className="mt-2 w-full" />;
+    if (field.type === "checkbox")
+      return (
+        <input
+          id={common.id}
+          type="checkbox"
+          checked={Boolean(value)}
+          required={field.required}
+          onChange={(e) => change(field.name, e.target.checked)}
+          className="mx-2 h-5 w-5"
+        />
+      );
+    if (field.type === "file")
+      return (
+        <input
+          id={common.id}
+          type="file"
+          required
+          accept="application/pdf,image/jpeg,image/png,video/mp4"
+          onChange={(e) => {
+            file.current = e.target.files?.[0];
+          }}
+          className="mt-2 w-full"
+        />
+      );
     if (field.type === "textarea") return <textarea {...common} rows={3} />;
-    if (["documents", "states"].includes(field.type)) return <select {...common} multiple required={false} value={value || []} onChange={e => change(field.name, [...e.target.selectedOptions].map(x => x.value))}>
-          {options.map(o => <option key={o.value} value={o.value}>
+    if (["documents", "states"].includes(field.type))
+      return (
+        <select
+          {...common}
+          multiple
+          required={false}
+          value={value || []}
+          onChange={(e) =>
+            change(
+              field.name,
+              [...e.target.selectedOptions].map((x) => x.value),
+            )
+          }
+        >
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>
               {o.label}
-            </option>)}
-        </select>;
-    if (["select", "state", "lga", "staff", "document", "case", "task", "alert"].includes(field.type)) return <select {...common}>
+            </option>
+          ))}
+        </select>
+      );
+    if (
+      [
+        "select",
+        "state",
+        "lga",
+        "staff",
+        "document",
+        "case",
+        "task",
+        "alert",
+      ].includes(field.type)
+    )
+      return (
+        <select {...common}>
           <option value="">{ui("Choose\u2026")}</option>
-          {options.map(o => <option key={o.value} value={o.value}>
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>
               {o.label}
-            </option>)}
-        </select>;
-    return <input {...common} type={["number", "date", "datetime-local"].includes(field.type) ? field.type : "text"} step={field.type === "number" ? "any" : undefined} />;
+            </option>
+          ))}
+        </select>
+      );
+    return (
+      <input
+        {...common}
+        type={
+          ["number", "date", "datetime-local"].includes(field.type)
+            ? field.type
+            : "text"
+        }
+        step={field.type === "number" ? "any" : undefined}
+      />
+    );
   };
-  return <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 text-slate-800">
+  return (
+    <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 text-slate-800">
       <div>
         <Link to="/dashboard" className="text-sm underline">
           {ui("Back to dashboard")}
@@ -298,35 +423,65 @@ export default function PropertyProtection() {
           {ui("Amana Property Protection")}
         </h1>
         <p className="mt-2 max-w-3xl text-sm leading-6">
-          {ui("Basic property registration and case reporting are free. A platform check does not guarantee ownership or freeze an official land record.")}
+          {ui(
+            "Basic property registration and case reporting are free. A platform check does not guarantee ownership or freeze an official land record.",
+          )}
         </p>
       </div>
       <button type="button" className={button} disabled={busy} onClick={load}>
         {ui("Refresh")}
       </button>
-      {error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-800">
+      {error && (
+        <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-800">
           {error}
-        </p>}
-      {notice && <p role="status" className="rounded-xl bg-emerald-50 p-4">
+        </p>
+      )}
+      {notice && (
+        <p role="status" className="rounded-xl bg-emerald-50 p-4">
           {notice}
-        </p>}
-      {!selected ? <>
+        </p>
+      )}
+      {!selected ? (
+        <>
           <nav className="flex flex-wrap gap-2">
-            {viewsFor(user).map(v => <button className={button} key={v} aria-pressed={v === view} onClick={() => setQuery({
-          view: v
-        })}>
+            {viewsFor(user).map((v) => (
+              <button
+                className={button}
+                key={v}
+                aria-pressed={v === view}
+                onClick={() =>
+                  setQuery({
+                    view: v,
+                  })
+                }
+              >
                 {labels(v)}
-              </button>)}
+              </button>
+            ))}
           </nav>
           <div className="flex flex-wrap gap-2">
-            {actionsFor(null, user).map(a => <button key={a} disabled={busy || !forms[a]} className={button} onClick={() => open(a)}>
+            {actionsFor(null, user).map((a) => (
+              <button
+                key={a}
+                disabled={busy || !forms[a]}
+                className={button}
+                onClick={() => open(a)}
+              >
                 {ui(forms[a]?.title || labels(a))}
-              </button>)}
+              </button>
+            ))}
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {rows.map(p => <button key={p.id} className="rounded-2xl border bg-white p-5 text-left shadow-sm" onClick={() => setQuery({
-          property: String(p.id)
-        })}>
+            {rows.map((p) => (
+              <button
+                key={p.id}
+                className="rounded-2xl border bg-white p-5 text-left shadow-sm"
+                onClick={() =>
+                  setQuery({
+                    property: String(p.id),
+                  })
+                }
+              >
                 <h2 className="font-bold">{p.title}</h2>
                 <p className="mt-2 text-sm">
                   {p.lga_name}
@@ -338,16 +493,26 @@ export default function PropertyProtection() {
                   {ui("Registered ")}
                   {format(p.created_at)}
                 </p>
-              </button>)}
+              </button>
+            ))}
           </div>
-          {hasMore && <button className={button} disabled={busy} onClick={more}>
+          {hasMore && (
+            <button className={button} disabled={busy} onClick={more}>
               {ui("Load more properties")}
-            </button>}
+            </button>
+          )}
           {!rows.length && <p>{ui("No property records in this view.")}</p>}
-        </> : data && String(data.property.id) === String(selected) ? <>
-          <button className={button} onClick={() => setQuery({
-        view
-      })}>
+        </>
+      ) : data && String(data.property.id) === String(selected) ? (
+        <>
+          <button
+            className={button}
+            onClick={() =>
+              setQuery({
+                view,
+              })
+            }
+          >
             {ui("Back to properties")}
           </button>
           <section className="rounded-2xl bg-slate-900 p-6 text-white">
@@ -358,9 +523,13 @@ export default function PropertyProtection() {
               {ui("Registered ")}
               {format(data.property.created_at)}
               {ui(" \xB7 Case officer: ")}
-              {data.property.case_officer_name || data.property.case_officer_id || "Awaiting assignment"}
+              {data.property.case_officer_name ||
+                data.property.case_officer_id ||
+                "Awaiting assignment"}
             </p>
-            {data.property.verification_status === "verified_within_scope" && data.property.verification_scope && <p className="mt-3">
+            {data.property.verification_status === "verified_within_scope" &&
+              data.property.verification_scope && (
+                <p className="mt-3">
                   {ui("Checked: ")}
                   {data.property.verification_scope}
                   <br />
@@ -369,63 +538,96 @@ export default function PropertyProtection() {
                   <br />
                   {ui("Valid until ")}
                   {format(data.property.verified_until)}
-                </p>}
+                </p>
+              )}
           </section>
           <section>
-            {data.property.pending_update && <details className="mb-4 rounded-xl border border-amber-200 p-4">
+            {data.property.pending_update && (
+              <details className="mb-4 rounded-xl border border-amber-200 p-4">
                 <summary>{ui("Record correction awaiting review")}</summary>
                 <pre className="overflow-auto whitespace-pre-wrap text-sm">
                   {JSON.stringify(data.property.pending_update, null, 2)}
                 </pre>
                 <p>{data.property.update_reason}</p>
-              </details>}
+              </details>
+            )}
             <div className="flex flex-wrap gap-2">
-              {actionsFor(data, user).map(a => <button key={a} disabled={busy || !forms[a]} className={button} onClick={() => open(a)}>
+              {actionsFor(data, user).map((a) => (
+                <button
+                  key={a}
+                  disabled={busy || !forms[a]}
+                  className={button}
+                  onClick={() => open(a)}
+                >
                   {ui(forms[a]?.title || labels(a))}
-                </button>)}
+                </button>
+              ))}
             </div>
           </section>
           <section className="space-y-3">
             <h2 className="text-xl font-bold">{ui("Verification progress")}</h2>
-            {data.checks.map(c => <details key={c.stage} className="rounded-xl border p-4">
+            {data.checks.map((c) => (
+              <details key={c.stage} className="rounded-xl border p-4">
                 <summary className="cursor-pointer font-semibold">
                   {labels(c.stage)}
                   {ui(" \u2014 ")}
                   {labels(c.status)}
-                </summary><p className="mt-2 text-sm">{ui('Assigned reviewer')}: {c.assigned_name || ui('Awaiting assignment')}</p>
+                </summary>
+                <p className="mt-2 text-sm">
+                  {ui("Assigned reviewer")}:{" "}
+                  {c.assigned_name || ui("Awaiting assignment")}
+                </p>
                 <p className="mt-3 whitespace-pre-wrap">
                   {c.public_summary || "This check is not complete."}
                 </p>
-                {c.review_reason && <p className="mt-2">
+                {c.review_reason && (
+                  <p className="mt-2">
                     {ui("Review: ")}
                     {c.review_reason}
-                  </p>}
-                {c.private_findings && <p className="mt-3 whitespace-pre-wrap rounded-lg bg-amber-50 p-3">
+                  </p>
+                )}
+                {c.private_findings && (
+                  <p className="mt-3 whitespace-pre-wrap rounded-lg bg-amber-50 p-3">
                     {ui("Confidential professional findings: ")}
                     {c.private_findings}
-                  </p>}
+                  </p>
+                )}
                 <pre className="mt-3 overflow-auto whitespace-pre-wrap text-xs">
                   {JSON.stringify(c.source_details, null, 2)}
                 </pre>
-                {c.history?.length > 0 && <details className="mt-3">
+                {c.history?.length > 0 && (
+                  <details className="mt-3">
                     <summary>{ui("Previous decisions")}</summary>
-                    {c.history.map((h, i) => <p key={i} className="mt-2 text-sm">
+                    {c.history.map((h, i) => (
+                      <p key={i} className="mt-2 text-sm">
                         {labels(h.status)}
                         {ui(" \u2014 ")}
                         {h.review_reason || h.public_summary}
-                      </p>)}
-                  </details>}
-              </details>)}
+                      </p>
+                    ))}
+                  </details>
+                )}
+              </details>
+            ))}
           </section>
           <section>
             <h2 className="mb-3 text-xl font-bold">{ui("Private evidence")}</h2>
             <p className="mb-3 text-sm">
-              {ui("No single document proves ownership. Files require security scanning and permission to download.")}
+              {ui(
+                "No single document proves ownership. Files require security scanning and permission to download.",
+              )}
             </p>
             <div className="flex flex-wrap gap-2">
-              {data.documents.map(d => <button key={d.id} className={button} disabled={busy} onClick={() => download(d)}>
+              {data.documents.map((d) => (
+                <button
+                  key={d.id}
+                  className={button}
+                  disabled={busy}
+                  onClick={() => download(d)}
+                >
                   {d.original_name}
-                </button>)}
+                </button>
+              ))}
             </div>
           </section>
           <section>
@@ -433,24 +635,51 @@ export default function PropertyProtection() {
               {ui("Optional paid checks")}
             </h2>
             <div className="grid gap-4 md:grid-cols-2">
-              {services.map(s => <article key={s.code} className="rounded-2xl border p-4">
+              {services.map((s) => (
+                <article key={s.code} className="rounded-2xl border p-4">
                   <h3 className="font-bold">{labels(s.code)}</h3>
                   <p className="my-2 text-sm">{s.description}</p>
-                  {s.code === "monitoring" && s.period_days && <p className="mb-2 text-sm">
+                  {s.code === "monitoring" && s.period_days && (
+                    <p className="mb-2 text-sm">
                       {s.period_days}
                       {ui(" days; checks every ")}
                       {s.cadence_days}
                       {ui(" days. Renewal is optional.")}
-                    </p>}
-                  <button disabled={busy || !s.available || !data.permissions.owner && !data.permissions.can_request_services || Boolean(activeService(s.code))} className={button} onClick={() => pay(s)}>{activeService(s.code) ? ui("Request already in progress") : s.available ? (s.code === "monitoring" && data.monitoring ? ui("Renew monitoring") : ui("Request")) + (" \u2014 " + money(s.amount)) : ui("Not available for this location")}</button>
-                </article>)}
+                    </p>
+                  )}
+                  <button
+                    disabled={
+                      busy ||
+                      !s.available ||
+                      (!data.permissions.owner &&
+                        !data.permissions.can_request_services) ||
+                      Boolean(activeService(s.code))
+                    }
+                    className={button}
+                    onClick={() => pay(s)}
+                  >
+                    {activeService(s.code)
+                      ? ui("Request already in progress")
+                      : s.available
+                        ? (s.code === "monitoring" && data.monitoring
+                            ? ui("Renew monitoring")
+                            : ui("Request")) +
+                          (" \u2014 " + money(s.amount))
+                        : ui("Not available for this location")}
+                  </button>
+                </article>
+              ))}
             </div>
           </section>
           <section>
             <h2 className="mb-3 text-xl font-bold">
               {ui("Service requests and payments")}
             </h2>
-            {data.requests.map(r => <div key={r.id} className="mb-2 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
+            {data.requests.map((r) => (
+              <div
+                key={r.id}
+                className="mb-2 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4"
+              >
                 <div>
                   {labels(r.service_code)}
                   {ui(" \xB7 ")}
@@ -459,17 +688,32 @@ export default function PropertyProtection() {
                   {labels(r.status)}
                   <p className="text-xs">{r.id}</p>
                 </div>
-                {r.status === "pending_payment" && <button className={button} disabled={busy} onClick={() => verify(r.id)}>
+                {r.status === "pending_payment" && (
+                  <button
+                    className={button}
+                    disabled={busy}
+                    onClick={() => verify(r.id)}
+                  >
                     {ui("Check payment status")}
-                  </button>}
-                {r.status === "pending_payment" && Number(r.user_id) === Number(user.id) && <button className={button} disabled={busy} onClick={() => resume(r.id)}>
+                  </button>
+                )}
+                {r.status === "pending_payment" &&
+                  Number(r.user_id) === Number(user.id) && (
+                    <button
+                      className={button}
+                      disabled={busy}
+                      onClick={() => resume(r.id)}
+                    >
                       {ui("Resume checkout")}
-                    </button>}
-              </div>)}
+                    </button>
+                  )}
+              </div>
+            ))}
           </section>
           <section>
             <h2 className="mb-3 text-xl font-bold">{ui("Inspections")}</h2>
-            {data.inspections.map(i => <details key={i.id} className="mb-2 rounded-xl border p-4">
+            {data.inspections.map((i) => (
+              <details key={i.id} className="mb-2 rounded-xl border p-4">
                 <summary>
                   {ui("#")}
                   {i.id}
@@ -485,34 +729,51 @@ export default function PropertyProtection() {
                   {JSON.stringify(i.inspection_findings, null, 2)}
                 </pre>
                 <p>{i.supervisor_note}</p>
-              </details>)}
+              </details>
+            ))}
           </section>
           <section>
             <h2 className="mb-3 text-xl font-bold">{ui("Monitoring")}</h2>
             <p>
-              {data.monitoring ? data.monitoring.cancelled_at ? "Stopped" : "Active until " + format(data.monitoring.active_until) : "Not subscribed"}
+              {data.monitoring
+                ? data.monitoring.cancelled_at
+                  ? "Stopped"
+                  : "Active until " + format(data.monitoring.active_until)
+                : "Not subscribed"}
             </p>
-            {data.monitoring && data.permissions.owner && !data.monitoring.cancelled_at && <button disabled={busy} className={button} onClick={async () => {
-          setBusy(true);
-          try {
-            await api.patch(base + "/" + selected + "/monitoring", {
-              stopped: true
-            });
-            await load();
-          } catch (e) {
-            setError(message(e));
-          } finally {
-            setBusy(false);
-          }
-        }}>
+            {data.monitoring &&
+              data.permissions.owner &&
+              !data.monitoring.cancelled_at && (
+                <button
+                  disabled={busy}
+                  className={button}
+                  onClick={async () => {
+                    setBusy(true);
+                    try {
+                      await api.patch(base + "/" + selected + "/monitoring", {
+                        stopped: true,
+                      });
+                      await load();
+                    } catch (e) {
+                      setError(message(e));
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
                   {ui("Stop future monitoring checks")}
-                </button>}
+                </button>
+              )}
           </section>
           <section>
             <h2 className="mb-3 text-xl font-bold">
               {ui("Alerts for review")}
             </h2>
-            {data.alerts.map(a => <article key={a.id} className="mb-2 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            {data.alerts.map((a) => (
+              <article
+                key={a.id}
+                className="mb-2 rounded-xl border border-amber-200 bg-amber-50 p-4"
+              >
                 <h3 className="font-bold">
                   {labels(a.category)}
                   {ui(" \u2014 ")}
@@ -520,24 +781,34 @@ export default function PropertyProtection() {
                 </h3>
                 <p>{a.summary}</p>
                 <p className="mt-2 text-sm">{a.review_note}</p>
-              </article>)}
+              </article>
+            ))}
           </section>
           <section>
             <h2 className="mb-3 text-xl font-bold">{ui("Cases")}</h2>
             <p className="mb-3 text-sm">
-              {ui("Messages and evidence stay in the existing case conversation. A closed case does not establish ownership.")}
+              {ui(
+                "Messages and evidence stay in the existing case conversation. A closed case does not establish ownership.",
+              )}
             </p>
-            {data.cases.map(c => <Link className="mb-2 block rounded-xl border p-4 underline" key={c.id} to={"/dispute/" + c.id}>
+            {data.cases.map((c) => (
+              <Link
+                className="mb-2 block rounded-xl border p-4 underline"
+                key={c.id}
+                to={"/dispute/" + c.id}
+              >
                 {c.title}
                 {ui(" \u2014 ")}
                 {labels(c.status)}
-              </Link>)}
+              </Link>
+            ))}
           </section>
           <section>
             <h2 className="mb-3 text-xl font-bold">
               {ui("Representative authority")}
             </h2>
-            {data.representatives.map(r => <p key={r.user_id} className="mb-2 rounded-xl border p-3">
+            {data.representatives.map((r) => (
+              <p key={r.user_id} className="mb-2 rounded-xl border p-3">
                 {r.full_name}
                 {ui(" \xB7 Account ")}
                 {r.user_id}
@@ -547,49 +818,105 @@ export default function PropertyProtection() {
                 {format(r.expires_at)}
                 <br />
                 {r.authority_description}
-              </p>)}
+              </p>
+            ))}
           </section>
-        </> : <p>{ui("Loading property\u2026")}</p>}
-      {action && forms[action] && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-3" onKeyDown={e => {
-      if (e.key === "Escape" && !busy) setAction(null);
-      if (e.key === "Tab") {
-        const items = [...dialog.current.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex="0"]')];
-        const first = items[0],
-          last = items.at(-1);
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last?.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first?.focus();
-        }
-      }
-    }}>
-          <section ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="pp-form-title" className="max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
+        </>
+      ) : (
+        <p>{ui("Loading property\u2026")}</p>
+      )}
+      {action && forms[action] && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-3"
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && !busy) setAction(null);
+            if (e.key === "Tab") {
+              const items = [
+                ...dialog.current.querySelectorAll(
+                  'button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex="0"]',
+                ),
+              ];
+              const first = items[0],
+                last = items.at(-1);
+              if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last?.focus();
+              } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first?.focus();
+              }
+            }
+          }}
+        >
+          <section
+            ref={dialog}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pp-form-title"
+            className="max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl"
+          >
             <div className="mb-4 flex items-center justify-between gap-4">
               <h2 id="pp-form-title" className="text-xl font-bold">
                 {ui(forms[action].title)}
               </h2>
-              <button type="button" className={button} disabled={busy} onClick={() => setAction(null)}>
+              <button
+                type="button"
+                className={button}
+                disabled={busy}
+                onClick={() => setAction(null)}
+              >
                 {ui("Close")}
               </button>
             </div>
-            {error && <p role="alert" className="mb-3 text-red-700">
+            {error && (
+              <p role="alert" className="mb-3 text-red-700">
                 {error}
-              </p>}
+              </p>
+            )}
             <form onSubmit={submit} className="space-y-4">
-              {forms[action].fields.map(f => <div key={f.name}>
-                  <label htmlFor={"pp-" + f.name} className="block text-sm font-semibold">
+              {forms[action].fields.map((f) => (
+                <div key={f.name}>
+                  <label
+                    htmlFor={"pp-" + f.name}
+                    className="block text-sm font-semibold"
+                  >
                     {ui(f.label)}
                     {f.required ? " *" : ""}
                   </label>
                   {control(f)}
-                </div>)}
+                </div>
+              ))}
               <button className={button + " bg-amber-300"} disabled={busy}>
                 {busy ? "Saving…" : "Save"}
               </button>
             </form>
           </section>
-        </div>}
-    <>{data?.permissions.operations && <section><h2 className="text-xl font-bold">{ui('Review history')}</h2>{(data.operations || []).map(item => <p key={item.id} className="mt-2 rounded-xl border p-3 text-sm">{format(item.created_at)} — {item.actor_name || ui('Staff')} — {ui(labels(item.action.replace('PROTECTION_', '')))}</p>)}</section>}{data?.property.record_history?.length > 0 && <section><h2 className="text-xl font-bold">{ui('Record history')}</h2>{data.property.record_history.map((item, index) => <p key={index} className="mt-2 text-sm">{format(item.reviewed_at)} — {item.reason}</p>)}</section>}</></main>;
+        </div>
+      )}
+      <>
+        {data?.permissions.operations && (
+          <section>
+            <h2 className="text-xl font-bold">{ui("Review history")}</h2>
+            {(data.operations || []).map((item) => (
+              <p key={item.id} className="mt-2 rounded-xl border p-3 text-sm">
+                {format(item.created_at)} — {item.actor_name || ui("Staff")} —{" "}
+                {ui(labels(item.action.replace("PROTECTION_", "")))}
+              </p>
+            ))}
+          </section>
+        )}
+        {data?.property.record_history?.length > 0 && (
+          <section>
+            <h2 className="text-xl font-bold">{ui("Record history")}</h2>
+            {data.property.record_history.map((item, index) => (
+              <p key={index} className="mt-2 text-sm">
+                {format(item.reviewed_at)} — {item.reason}
+              </p>
+            ))}
+          </section>
+        )}
+      </>
+    </main>
+  );
 }

@@ -15,7 +15,7 @@ const db = new Pool({
   max: 12,
 });
 (async () => {
-  await db.query(`CREATE TABLE users(id INTEGER PRIMARY KEY,user_type TEXT,full_name TEXT,email TEXT,identity_verified BOOLEAN DEFAULT TRUE,is_active BOOLEAN DEFAULT TRUE,deleted_at TIMESTAMP,account_suspended_at TIMESTAMP,assigned_state TEXT,assigned_zone TEXT,assigned_state_id INTEGER,assigned_lga_name TEXT,assigned_city TEXT);
+  await db.query(`CREATE TABLE users(id INTEGER PRIMARY KEY,user_type TEXT,full_name TEXT,email TEXT,identity_verified BOOLEAN DEFAULT TRUE,is_active BOOLEAN DEFAULT TRUE,deleted_at TIMESTAMP,account_suspended_at TIMESTAMP,account_suspended_reason TEXT,assigned_state TEXT,assigned_zone TEXT,assigned_state_id INTEGER,assigned_lga_name TEXT,assigned_city TEXT);
  CREATE TABLE states(id INTEGER PRIMARY KEY,state_name TEXT);
  CREATE TABLE properties(id SERIAL PRIMARY KEY,landlord_id INTEGER REFERENCES users(id),state_id INTEGER REFERENCES states(id),full_address TEXT);
  CREATE TABLE payments(id SERIAL PRIMARY KEY,user_id INTEGER,payer_user_id INTEGER,payment_type TEXT,amount NUMERIC,currency TEXT,transaction_reference TEXT UNIQUE,payment_status TEXT,payment_method TEXT,consent_confirmed BOOLEAN,completed_at TIMESTAMPTZ,gateway_response JSONB);
@@ -37,7 +37,18 @@ const db = new Pool({
   await db.query(migration);
   await db.query(migration);
   console.log("PASS additive migration can be applied twice");
-  const legacyEvidence=(await db.query('SELECT created_at,uploaded_at FROM dispute_evidence WHERE id=1')).rows[0];assert.equal(legacyEvidence.created_at.toISOString(),legacyEvidence.uploaded_at.toISOString());console.log('PASS old evidence timestamps are preserved when adding the compatible history column');
+  const legacyEvidence = (
+    await db.query(
+      "SELECT created_at,uploaded_at FROM dispute_evidence WHERE id=1",
+    )
+  ).rows[0];
+  assert.equal(
+    legacyEvidence.created_at.toISOString(),
+    legacyEvidence.uploaded_at.toISOString(),
+  );
+  console.log(
+    "PASS old evidence timestamps are preserved when adding the compatible history column",
+  );
   const audit = [],
     alerts = [],
     closed = [];
@@ -483,7 +494,25 @@ const db = new Pool({
     limitations: "This is not a land registry title decision.",
   });
   await assert.rejects(svc.meeting(1, 3, reported.id), /not open/);
-  await assert.rejects(svc.outcome(supervisor,reported.id,{outcome:'reopened_with_new_evidence',summary:'Reopen this case with a recorded new evidence item.',limitations:'No ownership decision is made here.'}),/Upload the new case evidence/);assert.ok((await db.query('SELECT protection_outcome_history FROM disputes WHERE id=$1',[reported.id])).rows[0].protection_outcome_history.length>=2);console.log('PASS outcome history is retained and reopening requires new shared evidence');
+  await assert.rejects(
+    svc.outcome(supervisor, reported.id, {
+      outcome: "reopened_with_new_evidence",
+      summary: "Reopen this case with a recorded new evidence item.",
+      limitations: "No ownership decision is made here.",
+    }),
+    /Upload the new case evidence/,
+  );
+  assert.ok(
+    (
+      await db.query(
+        "SELECT protection_outcome_history FROM disputes WHERE id=$1",
+        [reported.id],
+      )
+    ).rows[0].protection_outcome_history.length >= 2,
+  );
+  console.log(
+    "PASS outcome history is retained and reopening requires new shared evidence",
+  );
   await svc.requestCorrection(owner, id, {
     ...input,
     owner_id: 2,
@@ -503,7 +532,22 @@ const db = new Pool({
     "PASS reviewed record correction keeps history, resets checks and cannot transfer account ownership",
   );
 
-  await db.query('INSERT INTO properties(landlord_id,state_id,full_address) VALUES(2,1,$1)',[input.address]);await svc.sweepDuplicates();assert.ok((await db.query("SELECT 1 FROM protection_alerts WHERE property_id=$1 AND rule_key LIKE 'listing:%'",[id])).rows.length);console.log('PASS ongoing matching detects a listing added after the private property record');
+  await db.query(
+    "INSERT INTO properties(landlord_id,state_id,full_address) VALUES(2,1,$1)",
+    [input.address],
+  );
+  await svc.sweepDuplicates();
+  assert.ok(
+    (
+      await db.query(
+        "SELECT 1 FROM protection_alerts WHERE property_id=$1 AND rule_key LIKE 'listing:%'",
+        [id],
+      )
+    ).rows.length,
+  );
+  console.log(
+    "PASS ongoing matching detects a listing added after the private property record",
+  );
   await require("./testProtectionCallWorkers")(db, reported.id);
   assert.ok(audit.length > 0);
   console.log(

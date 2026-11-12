@@ -34,15 +34,13 @@ const safe = (fn) => async (req, res) => {
     req.logger?.error("Property protection request failed", {
       code: e.code || "protection_failed",
     });
-    res
-      .status(e.status || e.statusCode || 500)
-      .json({
-        success: false,
-        message:
-          e.status || e.statusCode
-            ? e.message
-            : "This property action could not be completed. Please retry.",
-      });
+    res.status(e.status || e.statusCode || 500).json({
+      success: false,
+      message:
+        e.status || e.statusCode
+          ? e.message
+          : "This property action could not be completed. Please retry.",
+    });
   }
 };
 for (const name of ["requestId", "documentId"])
@@ -372,11 +370,9 @@ router.post(
 router.post(
   "/:id/cases",
   safe(async (req, res) =>
-    res
-      .status(201)
-      .json({
-        data: await core.openCase(req.user, Number(req.params.id), req.body),
-      }),
+    res.status(201).json({
+      data: await core.openCase(req.user, Number(req.params.id), req.body),
+    }),
   ),
 );
 router.post(
@@ -446,16 +442,14 @@ router.post(
         e ? reject(Object.assign(e, { status: 400 })) : resolve(),
       ),
     );
-    res
-      .status(201)
-      .json({
-        data: await vault.upload(
-          req.user,
-          Number(req.params.id),
-          req.file,
-          req.body,
-        ),
-      });
+    res.status(201).json({
+      data: await vault.upload(
+        req.user,
+        Number(req.params.id),
+        req.file,
+        req.body,
+      ),
+    });
   }),
 );
 module.exports = router;
