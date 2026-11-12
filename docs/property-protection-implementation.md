@@ -67,10 +67,10 @@ POST /api/property-protection/:id/documents
 Also updates existing dispute/evidence/payment-webhook/calling authorisation rather than adding a separate conversation.
 
 ## 10. Tests and build evidence
-- Backend latest: 188 passed, 0 failed (backend-latest.log).
+- Backend final: 189 passed, 0 failed, including the actual socket-configuration startup regression (backend-post-startup-fix.log).
 - Disposable PostgreSQL: additive migration/retry, private findings, representatives, authoritative payments, inspection review, seven stages, case duties/outcome history, later listing matches and two-worker calls/alerts passed (postgres-latest.log). No real payment, message or identity request was sent.
 - Mobile workflow: 7 passed; private file helper: 4 passed. Registration and tour checks passed (87 steps, eight locales).
-- Earlier full web run: 169 passed. Final rerun and build results are recorded in the release evidence addendum below; an interrupted resource-heavy run is not counted as a pass.
+- Final full web run in the isolated server release folder: 169 passed in 27 files, 99.29 seconds. An earlier interrupted resource-heavy local run is not counted as a pass. The new test wording was corrected to match the approved copy.
 - Local browser preview remained blank because an existing development-only CommonJS MFA import failed. No screenshot or real-device visual pass is claimed. Actual Android/iOS camera/call/payment journeys still need device acceptance testing.
 - Existing unrelated mobile baseline check failures are described in docs/unified-human-support.md and were not hidden or weakened.
 
@@ -183,4 +183,44 @@ A	src/services/privatePropertyFileService.js
 Choose service scopes, prices and monitoring periods before enabling paid services. Staff must record real registry sources and professional credentials; the platform does not query or freeze a government title registry automatically. Review retention/erasure policy and translated form wording. Complete real-device testing, especially video calls and weak-network payment return. iOS distribution still needs a signed Apple build. WhatsApp business/template approval is separate. These limits are not represented as completed checks.
 
 ## 14. Release evidence addendum
-Pending final release checks and publication. This section will be updated with actual output, APK hash and download proof before completion.
+Production web/backend deployed. Migration 2049 applied at 2026-11-12T17:22:15.781Z. Backup: /var/backups/rentalhub/release-1.0.63-20261112T172110856Z (database dump, overwritten application files, previous website, previous version metadata and APK). Release stage: /var/www/rentalhub/.release63-z2CvOV.
+
+The first production dependency install removed the website build tool; client development/build dependencies were restored and the website build passed. Startup then exposed a missing logger import in real-time socket configuration. It was fixed using the existing logger, tested by running the real configuration function, and the full backend suite passed again (189/189). Only RentalHub was restarted. This release did not restart the unrelated Tagthemall apps.
+
+Actual final evidence:
+```text
+Backend: tests 189, pass 189, fail 0
+Web: Test Files 27 passed; Tests 169 passed; Duration 99.29s
+Mobile workflow: 7 passed; private file helper: 4 passed
+Registration: consent/password/tenant-landlord payment-selection checks passed
+Tour: 87 steps, eight locales, 15 actionable routes passed
+Android: BUILD SUCCESSFUL in 20m 11s; 686 tasks (22 executed)
+Android: com.rentalhubng versionName 1.0.63 versionCode 74
+Android source map: six key source files CURRENT
+Signing SHA-256: be593ddf8cc4bc731d682390be4d92b9e763441725da368c37c0ca6443a6dd9d
+iOS JavaScript: Bundled 259183ms, 1464 modules; bundle and source map written
+Public health: HTTP 200
+Public APK: HTTP 200; 109266831 bytes
+Public APK SHA-256: 57b9d1eff4ab180f93d36dd7d91b416dca18caa8a73645a2fdcc3fb610731e19
+Public WebSocket without login: rejected — Authentication required
+Deployed version handler 1.0.63/build74: update_available false
+Deployed version handler 1.0.62/build73: update_available true
+```
+
+Download: https://rentalhub.com.ng/api/downloads/app?v=1.0.63
+Local signed archive: RentalHubMobile/build/releases/Amana-RentalHub-NG-v1.0.63.apk.
+
+Important live setting: maintenance_mode was already ON (last changed 2026-11-12T12:39:31.489Z, before this protection deployment). It remains ON. Public downloads, public version metadata and health work; normal customer APIs, including /api/mobile/app-version and private protection routes, return the existing maintenance response. Their 503 response is not counted as a direct authentication test. The version-handler assertions above ran against the deployed handler and deployed version file without changing the maintenance setting. Super Admin can turn maintenance off through the existing controls when ready. All five protection paid services remain disabled.
+
+The published iOS version track was not changed to pretend an iOS binary was shipped. Shared source is v1.0.63/build68; a signed IPA has not been built or uploaded. Existing Gradle deprecation and web chunk-size warnings remain; they did not stop the builds.
+
+Evidence logs are in RentalHubMobile/.codex-tmp/protection/: backend-post-startup-fix.log, frontend-server63-results.log, postgres-latest.log, mobile-latest.log, private-file-latest.log, registration-latest.log, tour-latest.log, android63-final-build.log, ios63-final-build.log, production-final63.log and public63-proof.log. Server build/migration/dependency logs and manifests are in the release stage above.
+
+
+## 15. Deliverable index and inspected files
+
+The before-code inspected-file list and architecture findings are in docs/property-protection-audit.md, section 6. Follow-up inspection also covered the actual production schema, ClamAV state, worker topology, evidence timestamp compatibility, maintenance enforcement, published download metadata, Socket.IO transport/adapter and real-time configuration. No customer document or biometric content was read for the audit.
+
+Required deliverables: inspected files (audit section 6); reused functionality (section 1); new workflow (sections 2–7); exact new/modified files (section 12, A/M); migration (section 5); APIs (section 9); existing web dashboard entry points (section 8); Android and iOS changes (sections 8/14); terminology and public-directory changes (below); tests (sections 10/14); incomplete work and limits (section 13); deployment/migration (sections 11/14).
+
+Terminology: customer-facing case/protection text was updated in dashboards, public marketing, support widgets, tours, pricing descriptions and the eight locale resources. Public directory links and professional lead-acquisition sales were removed; the former new-purchase initializer returns 410 after existing authentication. Existing authorised professional dashboards, internal roster, historical payment verification, necessary terms/privacy disclosures, internal role names and voice department key legal remain. This is a contextual wording change, not a claim that every historic or legally necessary use of that word was deleted.
