@@ -1,3 +1,4 @@
+const logger = require('./logger');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const db = require('../middleware/database');

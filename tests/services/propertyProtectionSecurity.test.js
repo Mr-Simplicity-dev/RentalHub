@@ -143,3 +143,9 @@ test("an unrelated customer cannot download private property evidence", async ()
     /not found/,
   );
 });
+
+test('real-time socket configuration starts with the project logger and namespaces', () => {
+  const { execFileSync } = require('node:child_process');
+  const output = execFileSync(process.execPath, ['-e', `const configure=require('./config/utils/realtimeSocket');const guest={use(){},on(){}};const result=configure({use(){},on(){},of(){return guest}});if(result.guestNsp!==guest)throw Error('Guest namespace missing');console.log('SOCKET_CONFIGURATION_PASS');`], { cwd: path.resolve(__dirname, '../..'), env: {...process.env, NODE_ENV:'test'}, encoding:'utf8', timeout:10000 });
+  assert.match(output, /SOCKET_CONFIGURATION_PASS/);
+});
