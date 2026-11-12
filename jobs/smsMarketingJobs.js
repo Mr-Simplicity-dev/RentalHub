@@ -1,5 +1,5 @@
 const logger = require('../config/utils/logger');
-const cron = require('node-cron');
+const cron = require('../services/backgroundJobRuntime').cron;
 const db = require('../config/middleware/database');
 const { sendSMS } = require('../config/utils/smsService');
 
@@ -93,7 +93,7 @@ const processSmsQueue = async () => {
 
 exports.startSmsMarketingJobs = () => {
   cron.schedule('* * * * *', () => {
-    processSmsQueue();
+    return processSmsQueue();
   });
   logger.info('SMS marketing queue processor started');
 };

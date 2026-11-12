@@ -7,6 +7,7 @@ const {
 } = require('../../controllers/locationController');
 
 const router = express.Router();
+router.use(require('../../config/utils/propertyContactPrivacy').hidePropertyContacts);
 
 router.get('/nigeria', getNigeriaDirectory);
 router.get('/nigeria/:stateSlug/:lgaSlug', getLocationPage);

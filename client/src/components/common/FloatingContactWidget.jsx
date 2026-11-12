@@ -1,3 +1,8 @@
+import LanguageSkillsField from './LanguageSkillsField';
+import contactCopy from '../../i18n/contactPrivacyCopy';
+import DisputeHandoverPanel from './DisputeHandoverPanel';
+import SupportContactForms from './SupportContactForms';
+
 import WhatsAppBotWidget from './WhatsAppBotWidget';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
@@ -83,18 +88,18 @@ const ChatBubble = ({ msg, isOwn, onRetry }) => {
 };
 
 const FloatingContactWidget = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, isAuthenticated } = useAuth();
   const identityKey=isAuthenticated?String(user?.id || ''):'guest';
   const identityRef=useRef(identityKey);identityRef.current=identityKey;
-  useEffect(()=>{setTickets([]);setActiveTicket(null);setConversation([]);setReplyText('');setForm({name:'',email:'',subject:'',message:'',state:'',lga:'',priority:'medium'});setContactConv([]);setViewingContactTicket(null);setView('assistant');},[identityKey]);
+  useEffect(()=>{setTickets([]);setActiveTicket(null);setConversation([]);setReplyText('');setForm({name:'',phone:'',email:'',subject:'',message:'',state:'',lga:'',priority:'medium'});setContactConv([]);setViewingContactTicket(null);setView('assistant');},[identityKey]);
   const { socket, connected, startSupportCall } = useSocket();
   const authRecorder = useVoiceRecorder();
   const contactRecorder = useVoiceRecorder();
 
   const [open, setOpen] = useState(false);
   const [view, setView] = useState('assistant');
-  const [form, setForm] = useState({ name: '', email: '', state: '', lga: '', subject: '', message: '', priority: 'medium' });
+  const [form, setForm] = useState({ name: '', phone: '', email: '', state: '', lga: '', subject: '', message: '', priority: 'medium' });
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [locations, setLocations] = useState([]);
@@ -217,7 +222,7 @@ const FloatingContactWidget = () => {
       guestSocketRef.current.disconnect();
       guestSocketRef.current = null;
     }
-    setForm({ name: '', email: '', state: '', lga: '', subject: '', message: '', priority: 'medium' });
+    setForm({ name: '', phone: '', email: '', state: '', lga: '', subject: '', message: '', priority: 'medium' });
     setError('');
     setView('assistant');
     setActiveTicket(null);
@@ -248,7 +253,7 @@ const FloatingContactWidget = () => {
     const savedEmail = localStorage.getItem(LS_EMAIL);
     const savedName = localStorage.getItem(LS_NAME);
     if (isAuthenticated && user) {
-      setForm((p) => ({ ...p, name: user.full_name || '', email: user.email || '' }));
+      setForm((p) => ({ ...p, name: user.full_name || '', phone: user.phone || '', email: user.email || '' }));
     } else if (savedEmail) {
       setForm((p) => ({ ...p, email: savedEmail, name: savedName || '' }));
     }
@@ -421,6 +426,8 @@ const FloatingContactWidget = () => {
   // ── Contact form submit ──
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if(isAuthenticated){setView('auth-form');return;}
+    if (!form.phone?.trim()){setError((contactCopy[i18n.language?.split('-')[0]]||contactCopy.en).phone+' *');return;}
     if (!form.name.trim() || !form.email.trim() || !form.state || !form.message.trim()) {
       setError(t('messages.widget.fill_required', 'Please fill in name, email, state, and message.'));
       return;
@@ -428,7 +435,7 @@ const FloatingContactWidget = () => {
     setSending(true);
     setError('');
     try {
-      const res = await api.post('/support/contact', form, guestApiConfig());
+      const res = await api.post('/support/contact', {...form,contact_details_version:2}, guestApiConfig());
       const ticketId = Number(res.data?.data?.ticketId);
       const guestAccessToken = res.data?.data?.guestAccessToken;
       localStorage.setItem(LS_EMAIL, form.email.trim());
@@ -827,7 +834,7 @@ const FloatingContactWidget = () => {
 
           <div className={view==='assistant'?'flex min-h-0 flex-1 flex-col':'flex-1 overflow-y-auto p-4 space-y-3'} ref={listRef}>
             {/* ─── FORM VIEW (anonymous/fallback) ─── */}
-            {view === 'assistant' && <><WhatsAppBotWidget embedded onHumanRequest={({summary})=>{setForm(prev=>({...prev,subject:'Support follow-up',message:summary || ''}));setView('form');}}/><div className="flex flex-wrap gap-2 border-t border-slate-200 p-3"><button onClick={()=>setView(isAuthenticated?'tickets':'check-status')} className="min-h-11 rounded-xl border px-3 text-sm">My tickets</button><button data-tour-id="support-new-ticket-workflow" onClick={()=>setView('form')} className="min-h-11 rounded-xl border px-3 text-sm">Submit a ticket</button></div></>}
+            {view === 'assistant' && <><WhatsAppBotWidget embedded onHumanRequest={({summary})=>{setForm(prev=>({...prev,subject:'Support follow-up',message:summary || ''}));setView(isAuthenticated?'auth-form':'form');}}/><div className="flex flex-wrap gap-2 border-t border-slate-200 p-3"><button onClick={()=>setView(isAuthenticated?'tickets':'check-status')} className="min-h-11 rounded-xl border px-3 text-sm">My tickets</button><button data-tour-id="support-new-ticket-workflow" onClick={()=>setView(isAuthenticated?'auth-form':'form')} className="min-h-11 rounded-xl border px-3 text-sm">Submit a ticket</button></div></>}
             {view === 'form' && !isAuthenticated && (
               <form onSubmit={handleSubmit} className="space-y-3">
                 <p className="text-xs text-slate-500 dark:text-gray-400">{t('messages.widget.fill_form', "Fill this form and we'll get back to you via email.")}</p>
@@ -845,6 +852,7 @@ const FloatingContactWidget = () => {
                       placeholder="you@example.com" />
                   </div>
                 </div>
+                <div><label className="block text-xs font-medium text-slate-600 mb-1" htmlFor="support-guest-phone">{(contactCopy[i18n.language?.split('-')[0]]||contactCopy.en).phone} *</label><input id="support-guest-phone" type="tel" autoComplete="tel" required value={form.phone||''} onChange={e=>setForm(p=>({...p,phone:e.target.value}))} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"/></div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">{t('messages.widget.state', 'State')} *</label>
                   <select value={form.state} onChange={(e) => setForm((p) => ({ ...p, state: e.target.value, lga: '' }))}
@@ -885,6 +893,7 @@ const FloatingContactWidget = () => {
                     className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500 resize-none"
                     placeholder={t('messages.widget.tell_us_more', 'Tell us more...')} />
                 </div>
+                <LanguageSkillsField preference value={form.preferred_language||''} onChange={preferred_language=>setForm(old=>({...old,preferred_language}))}/>
                 {error && <p className="text-xs text-red-600">{error}</p>}
                 <button type="submit" disabled={sending}
                   className="flex items-center justify-center gap-2 w-full bg-indigo-600 text-white rounded-lg px-4 py-2.5 text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60 transition">
@@ -918,7 +927,7 @@ const FloatingContactWidget = () => {
                     </div>
                     <div className="flex-1 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs">
                       <span className="text-slate-400 dark:text-gray-400">{t('messages.widget.email', 'Email')}</span>
-                      <p className="text-slate-800 truncate">{user?.email || form.email}</p>
+                      <p className="text-slate-800 truncate">{user?.email || form.email}</p><p className="text-slate-800 truncate">{user?.phone || form.phone}</p>
                     </div>
                   </div>
                   <div>
@@ -955,7 +964,8 @@ const FloatingContactWidget = () => {
                       <option value="urgent">{t('messages.widget.urgent', 'Urgent')}</option>
                     </select>
                   </div>
-                  {error && <p className="text-xs text-red-600">{error}</p>}
+                  
+                {error && <p className="text-xs text-red-600">{error}</p>}
                   <button onClick={async () => {
                     if (!form.state) { setError(t('messages.widget.select_state_error', 'Please select your state.')); return; }
                     if (!form.message.trim()) { setError(t('messages.widget.write_message_error', 'Please write a message.')); return; }
@@ -1034,6 +1044,7 @@ const FloatingContactWidget = () => {
             {/* ─── CONVERSATION VIEW (authenticated) ─── */}
             {view === 'conversation' && activeTicket && (
               <div className="space-y-3">
+                <DisputeHandoverPanel ticketId={activeTicket.id} /><SupportContactForms ticketId={activeTicket.id} />
                 <p className="text-xs font-semibold text-slate-500 dark:text-gray-400 truncate">{activeTicket.subject}</p>
                 {loadingConv ? (
                   <div className="space-y-3 py-2">
@@ -1068,6 +1079,7 @@ const FloatingContactWidget = () => {
                   className="w-full rounded-lg bg-indigo-600 text-white px-4 py-2 text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60">
                   {lookupLoading ? t('messages.widget.searching', 'Searching...') : t('messages.widget.lookup', 'Check Tickets Status')}
                 </button>
+                
                 {error && <p className="text-xs text-red-600">{error}</p>}
                 {lookupTickets.length > 0 && (
                   <div className="space-y-2 mt-3">

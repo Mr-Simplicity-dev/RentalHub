@@ -336,7 +336,9 @@
     "open_live_camera": "Open Live Camera",
     "captured_preview": "Captured passport preview",
     "preview_hint": "Ensure your face is sharp and fully visible before uploading.",
-    "camera_guide": "Keep your face inside the guide and complete all checks."
+    "camera_guide": "Keep your face inside the guide and complete all checks.",
+    "face_gallery_consent": "I agree to private face matching and secure storage on RentalHub’s own server to verify my identity and prevent duplicate accounts. Without consent, staff will review my photo manually.",
+    "photo_review_pending": "Photo saved. Identity verification is awaiting review."
   },
   "property_types": {
     "apartment": "Apartment",
@@ -405,7 +407,7 @@
     "not_found": "Property not found",
     "no_photos": "No photos available",
     "unlock_title": "Pay to unlock full property details",
-    "unlock_text": "Full details (full address, landlord contact, and premium media) are available after one-time payment for this property.",
+    "unlock_text": "Make a one-time payment to unlock full property details and premium media. Phone numbers and emails are not included.",
     "pay_unlock_details": "Pay to Unlock Details",
     "login_continue": "Login to Continue",
     "per_period": "per {{period}}",
@@ -419,7 +421,7 @@
     "amenities": "Amenities",
     "video_tour": "Video Tour",
     "full_address": "Full Address",
-    "contact_landlord": "Contact Landlord",
+    "contact_landlord": "Property enquiries",
     "name": "Name",
     "phone": "Phone",
     "whatsapp": "WhatsApp",
@@ -428,8 +430,8 @@
     "audio_call": "Audio Call",
     "video_call": "Video Call",
     "start_virtual_tour": "Start Virtual Tour",
-    "subscribe_contact_title": "Subscribe to View Contact",
-    "subscribe_contact_text": "Make one-time payment to access landlord contact information and full property details for this property.",
+    "subscribe_contact_title": "Property enquiries",
+    "subscribe_contact_text": "Make a one-time payment to unlock full property details and premium media. Phone numbers and emails are not included.",
     "pay_to_unlock": "Pay to Unlock",
     "apply_property": "Apply for This Property",
     "report_dispute": "Report Dispute",
@@ -630,7 +632,8 @@
       "send_message": "Send message",
       "start_conversation_btn": "Start conversation",
       "lookup": "Check Tickets Status"
-    }
+    },
+    "private_documents": "Send documents through a private support ticket."
   },
   "about_us": {
     "hero": {
@@ -1076,7 +1079,7 @@
     "tenants_step_2_hl_2": "Virtual property tours",
     "tenants_step_2_hl_3": "Save favorites",
     "tenants_step_3_title": "Unlock Full Details",
-    "tenants_step_3_desc": "Make a one-time payment to unlock full property details, including the landlord contact information and premium media.",
+    "tenants_step_3_desc": "Make a one-time payment to unlock full property details and premium media. Phone numbers and emails are not included.",
     "tenants_step_3_hl_1": "Full address revealed",
     "tenants_step_3_hl_2": "Landlord contact info",
     "tenants_step_3_hl_3": "HD photos & video",
@@ -3421,7 +3424,20 @@
     "email_required": "Email address is required.",
     "email_invalid": "Enter a valid email address.",
     "phone_required": "Phone number is required.",
-    "referral_code_invalid": "Referral code can only contain letters, numbers, dashes and underscores."
+    "referral_code_invalid": "Referral code can only contain letters, numbers, dashes and underscores.",
+    "otp_pre_payment_body": "We sent a verification code to your phone. It is valid for 10 minutes. Verify your phone before continuing to payment.",
+    "otp_verify_payment": "Verify and continue to payment",
+    "phone_verified_continue": "Phone verified. Continue registration without entering the code again.",
+    "phone_checking_identity": "Phone verified. Checking your identity before continuing.",
+    "otp_resend_wait": "Resend available in {{count}}s",
+    "email_send": "Send verification email",
+    "email_sent": "Check your inbox and spam folder. Open the verification link to confirm your email.",
+    "email_send_failed": "Could not send the verification email. Please try again.",
+    "passport_image_label": "Passport bio-data page",
+    "passport_image_choose": "Choose passport page",
+    "passport_image_required": "Attach a clear image of your passport bio-data page before continuing.",
+    "passport_image_help": "Include the whole page showing your photograph and passport details. Use a clear JPEG or PNG; the image is not saved in your registration draft.",
+    "passport_country_label": "Passport issuing country"
   },
   "careers": {
     "recruitment_closed_title": "Recruitment Closed",

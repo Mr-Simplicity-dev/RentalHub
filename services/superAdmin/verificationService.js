@@ -2,6 +2,7 @@ const db = require('../../config/middleware/database');
 const logger = require('../../config/utils/logger');
 const { decryptNIN } = require('../../config/utils/ninEncryption');
 const {
+  getAdminOperationActorName,
   ensureVerificationAuditSchema,
   ensureUserSuspensionSchema,
   ensureAdminAccountOperationSchema,
@@ -158,6 +159,7 @@ const getIdentityVerifications = async (req, res) => {
         u.nationality,
 
         u.passport_photo_url,
+        (SELECT COALESCE(jsonb_agg(jsonb_build_object('id',f.id,'reason',f.reason,'status',f.status,'related_user_id',f.related_user_id)),'[]'::jsonb) FROM identity_review_flags f WHERE f.user_id=u.id AND f.status='pending') AS identity_review_flags,
 
         u.identity_verified,
 
@@ -282,6 +284,8 @@ const approveIdentityVerification = async (req, res) => {
   try {
     await ensureVerificationAuditSchema();
     await ensureIdentityVerificationOperationSchema();
+    try{await require('../identityPhotoService').guardManualVerification(userId,req.user.id);}catch(error){return res.status(error.statusCode || 503).json({success:false,message:error.message});}
+    if(!String(req.body?.review_note || req.body?.note || '').trim())return res.status(400).json({success:false,message:'An approval note is required.'});
 
     const reviewNote = String(req.body?.review_note || req.body?.note || '').trim() || null;
 
@@ -352,6 +356,7 @@ const approveIdentityVerification = async (req, res) => {
     });
 
     await db.query('COMMIT');
+    await require('../identityPhotoService').approveCurrentPhotoTemplate(userId);
     await logAction(req.user.id, 'VERIFY_USER', 'user', userId);
 
     res.json({ success: true, message: 'User verified' });

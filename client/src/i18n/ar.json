@@ -331,7 +331,9 @@
     "totp_disable_desc": "أدخل رمزًا من تطبيق المصادقة أو أحد رموز الاسترداد الخاصة بك للتأكيد.",
     "totp_disable_placeholder": "رمز المصادقة أو رمز الاسترداد",
     "totp_disabling": "جارٍ التعطيل...",
-    "totp_confirm_disable": "تعطيل المصادقة الثنائية"
+    "totp_confirm_disable": "تعطيل المصادقة الثنائية",
+    "face_gallery_consent": "أوافق على مطابقة وجهي وتخزينه بأمان على خادم RentalHub الخاص للتحقق من هويتي ومنع الحسابات المكررة. بدون الموافقة سيراجع الموظفون صورتي يدويًا.",
+    "photo_review_pending": "تم حفظ الصورة. التحقق من الهوية بانتظار المراجعة."
   },
   "property_types": {
     "apartment": "شقة",
@@ -400,7 +402,7 @@
     "not_found": "العقار غير موجود",
     "no_photos": "لا توجد صور متاحة",
     "unlock_title": "ادفع لفتح جميع تفاصيل العقار",
-    "unlock_text": "التفاصيل الكاملة (العنوان الكامل وتواصل المالك والوسائط المميزة) متاحة بعد الدفع لمرة واحدة لهذا العقار.",
+    "unlock_text": "ادفع مرة واحدة لفتح تفاصيل العقار الكاملة والوسائط الإضافية. لا يشمل ذلك أرقام الهواتف أو البريد الإلكتروني.",
     "pay_unlock_details": "ادفع لفتح التفاصيل",
     "login_continue": "سجّل الدخول للمتابعة",
     "per_period": "لكل {{period}}",
@@ -414,7 +416,7 @@
     "amenities": "المرافق",
     "video_tour": "جولة بالفيديو",
     "full_address": "العنوان الكامل",
-    "contact_landlord": "تواصل مع المالك",
+    "contact_landlord": "استفسارات العقار",
     "name": "الاسم",
     "phone": "الهاتف",
     "whatsapp": "واتساب",
@@ -423,8 +425,8 @@
     "audio_call": "مكالمة صوتية",
     "video_call": "مكالمة فيديو",
     "start_virtual_tour": "بدء جولة افتراضية",
-    "subscribe_contact_title": "اشترك لعرض جهة التواصل",
-    "subscribe_contact_text": "قم بدفع لمرة واحدة للوصول إلى معلومات تواصل المالك وتفاصيل العقار الكاملة لهذا العقار.",
+    "subscribe_contact_title": "استفسارات العقار",
+    "subscribe_contact_text": "ادفع مرة واحدة لفتح تفاصيل العقار الكاملة والوسائط الإضافية. لا يشمل ذلك أرقام الهواتف أو البريد الإلكتروني.",
     "pay_to_unlock": "ادفع للفتح",
     "apply_property": "قدّم طلبًا لهذا العقار",
     "report_dispute": "الإبلاغ عن نزاع",
@@ -625,7 +627,8 @@
       "send_message": "إرسال الرسالة",
       "start_conversation_btn": "بدء المحادثة",
       "lookup": "التحقق من حالة التذاكر"
-    }
+    },
+    "private_documents": "أرسل المستندات عبر تذكرة دعم خاصة."
   },
   "about_us": {
     "hero": {
@@ -1071,7 +1074,7 @@
     "tenants_step_2_hl_2": "Virtual property tours",
     "tenants_step_2_hl_3": "Save favorites",
     "tenants_step_3_title": "Unlock Full Details",
-    "tenants_step_3_desc": "Make a one-time payment to unlock full property details, including the landlord contact information and premium media.",
+    "tenants_step_3_desc": "ادفع مرة واحدة لفتح تفاصيل العقار الكاملة والوسائط الإضافية. لا يشمل ذلك أرقام الهواتف أو البريد الإلكتروني.",
     "tenants_step_3_hl_1": "Full address revealed",
     "tenants_step_3_hl_2": "Landlord contact info",
     "tenants_step_3_hl_3": "HD photos & video",
@@ -3180,7 +3183,20 @@
     "adjustment_body": "تم إصدار بطاقة الدفع الخاصة بك خارج نيجيريا. لإكمال تسجيلك بالسعر المحلي، يلزم دفع مبلغ إضافي",
     "adjustment_body_2": "(فرق سعر السوق + 5 دولارات رسوم معالجة) قبل تفعيل حسابك.",
     "adjustment_pay": "ادفع الفرق الآن",
-    "adjustment_failed": "تعذر بدء دفع الفرق. يرجى المحاولة مرة أخرى."
+    "adjustment_failed": "تعذر بدء دفع الفرق. يرجى المحاولة مرة أخرى.",
+    "otp_pre_payment_body": "أرسلنا رمز تحقق إلى هاتفك. الرمز صالح لمدة 10 دقائق. تحقّق من رقم هاتفك قبل المتابعة إلى الدفع.",
+    "otp_verify_payment": "التحقق والمتابعة إلى الدفع",
+    "phone_verified_continue": "تم التحقق من الهاتف. تابع التسجيل دون إدخال الرمز مجددًا.",
+    "phone_checking_identity": "تم التحقق من الهاتف. جارٍ التحقق من هويتك قبل المتابعة.",
+    "otp_resend_wait": "يمكن إعادة الإرسال بعد {{count}} ثانية",
+    "email_send": "إرسال رسالة التحقق",
+    "email_sent": "تحقق من صندوق الوارد والبريد غير المرغوب فيه. افتح رابط التحقق لتأكيد بريدك الإلكتروني.",
+    "email_send_failed": "تعذر إرسال رسالة التحقق. حاول مجددًا.",
+    "passport_image_label": "صفحة بيانات جواز السفر",
+    "passport_image_choose": "اختيار صفحة جواز السفر",
+    "passport_image_required": "أرفق صورة واضحة لصفحة بيانات جواز سفرك قبل المتابعة.",
+    "passport_image_help": "أظهر الصفحة كاملة بما فيها صورتك وبيانات الجواز. استخدم صورة JPEG أو PNG واضحة. لن تُحفظ الصورة في مسودة التسجيل.",
+    "passport_country_label": "الدولة المصدرة لجواز السفر"
   },
   "careers": {
     "recruitment_closed_title": "تم إغلاق التوظيف",

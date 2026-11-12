@@ -1,3 +1,4 @@
+const logger=require('../config/utils/logger');
 const crypto = require('crypto');
 const db = require('../config/middleware/database');
 const { createNotification } = require('../config/utils/notificationService');
@@ -28,7 +29,7 @@ const rollbackQuietly = async (client) => {
   try {
     await client.query('ROLLBACK');
   } catch (error) {
-    req.logger.warn('Credential revalidation rollback failed:', error.message);
+    logger.warn('Credential revalidation rollback failed:', error.message);
   }
 };
 
@@ -584,7 +585,7 @@ exports.submitRequest = async (req, res) => {
       reason: 'prembly_not_verified',
       detail: finalResult.message || 'Prembly could not verify this credential',
       revalidation_request_id: requestId,
-      identity_type: identityType,
+      identity_type: providerPlan.identityType,
     }, 70).catch(() => {});
     return res.status(422).json({
       success: false,
@@ -599,14 +600,14 @@ exports.submitRequest = async (req, res) => {
       req.user.id,
       'credential_provider_pending',
       'Credential check is still processing',
-      'Prembly is temporarily unavailable or still processing. RentalHub saved this check and will recover the result automatically without submitting another paid verification.',
+      'NIN Service temporarily unavailable or still processing. The check is saved and will recover the result automatically without submitting another verification.',
       '/verification-status'
     );
   }
   return res.status(202).json({
     success: true,
     code: 'PREMBLY_VERIFICATION_PENDING',
-    message: 'Prembly is temporarily unavailable or still processing. RentalHub will check the same transaction automatically; do not resubmit the credential.',
+    message: 'NIN Service is temporarily unavailable or still processing. The transaction will be checked automatically; do not resubmit the credential.',
     data: serialized,
   });
 };
@@ -619,7 +620,7 @@ exports.reviewRequest = async (req, res) => {
   if (!['approved', 'rejected'].includes(decision)) {
     return res.status(400).json({ success: false, message: 'Decision must be approved or rejected' });
   }
-  if (decision === 'rejected' && reviewNote.length < 5) {
+  if (reviewNote.length < 5) {
     return res.status(400).json({ success: false, message: 'A clear rejection reason is required' });
   }
   if (reviewNote.length > 3000) {
@@ -667,6 +668,7 @@ exports.reviewRequest = async (req, res) => {
         });
       }
 
+      try{await require('./identityPhotoService').guardManualVerification(request.user_id,req.user.id);}catch(error){await client.query('ROLLBACK');return res.status(error.statusCode || 503).json({success:false,message:error.message});}
       const updates = [
         'identity_verified = TRUE',
         "identity_verification_status = 'verified'",
@@ -746,6 +748,7 @@ exports.reviewRequest = async (req, res) => {
       [requestId, decision, req.user.id, reviewNote || null]
     );
     await client.query('COMMIT');
+    if(decision==='approved')await require('./identityPhotoService').approveCurrentPhotoTemplate(request.user_id);
 
     await createNotification(
       request.user_id,

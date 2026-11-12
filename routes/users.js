@@ -33,46 +33,23 @@ const LIVE_CAPTURE_SESSION_TTL_MS = 10 * 60 * 1000;
 const REQUIRE_LIVE_CAPTURE_SESSION =
   process.env.NODE_ENV === 'production' ||
   process.env.REQUIRE_LIVE_CAPTURE_SESSION === 'true';
-const liveCaptureSessions = new Map();
+const identityPhotos = require('../services/identityPhotoService');
 const IDENTITY_PHOTO_SCOPED_ROLES = new Set(['admin', 'lga_admin', 'state_admin']);
 const IDENTITY_PHOTO_LGA_ROLES = new Set(['admin', 'lga_admin']);
 
 router.get('/credential-revalidations', authenticate, credentialRevalidationCtrl.getMyRequests);
 router.post('/credential-revalidations/:requestId/submit', authenticate, sensitiveActionLimiter, credentialRevalidationCtrl.submitRequest);
 
-const getSessionKey = (userId, token) => `${userId}:${token}`;
-
-const pruneExpiredCaptureSessions = () => {
-  const now = Date.now();
-  for (const [key, value] of liveCaptureSessions.entries()) {
-    if (!value || value.expiresAt <= now) {
-      liveCaptureSessions.delete(key);
-    }
-  }
-};
-
-const createLiveCaptureSession = (userId) => {
-  pruneExpiredCaptureSessions();
-  const token = crypto.randomBytes(24).toString('hex');
-  const key = getSessionKey(userId, token);
-
-  liveCaptureSessions.set(key, {
-    expiresAt: Date.now() + LIVE_CAPTURE_SESSION_TTL_MS,
-  });
-
+const createLiveCaptureSession = async userId => {
+  const token=crypto.randomBytes(24).toString('hex');
+  await db.query('DELETE FROM identity_capture_sessions WHERE expires_at<NOW()');
+  await db.query("INSERT INTO identity_capture_sessions(token_hash,user_id,expires_at) VALUES($1,$2,NOW()+INTERVAL '10 minutes')",[identityPhotos.digest(token),userId]);
   return token;
 };
-
-const consumeLiveCaptureSession = (userId, token) => {
-  if (!token || typeof token !== 'string') return false;
-
-  pruneExpiredCaptureSessions();
-  const key = getSessionKey(userId, token);
-  const session = liveCaptureSessions.get(key);
-  if (!session) return false;
-
-  liveCaptureSessions.delete(key);
-  return session.expiresAt > Date.now();
+const consumeLiveCaptureSession = async (userId,token) => {
+  if(typeof token!=='string'||token.length>200)return false;
+  const result=await db.query('DELETE FROM identity_capture_sessions WHERE token_hash=$1 AND user_id=$2 AND expires_at>NOW() RETURNING user_id',[identityPhotos.digest(token),userId]);
+  return result.rows.length===1;
 };
 
 const canViewPassportPhoto = async ({ requester, ownerId, filename }) => {
@@ -1891,6 +1868,10 @@ router.put('/profile', authenticate, [
       });
     }
 
+    if(req.body?.phone){
+      const duplicate=await db.query('SELECT id FROM users WHERE id<>$1 AND deleted_at IS NULL AND rentalhub_phone_key(phone)=rentalhub_phone_key($2) LIMIT 1',[userId,req.body.phone]);
+      if(duplicate.rows.length)return res.status(409).json({success:false,message:'This phone number is already registered.'});
+    }
     updates.push('updated_at = CURRENT_TIMESTAMP');
     params.push(userId);
 
@@ -2122,7 +2103,7 @@ router.post(
       }
 
       const photoResult = await db.query(
-        'SELECT passport_photo_url IS NOT NULL AS has_photo FROM users WHERE id = $1',
+        "SELECT EXISTS(SELECT 1 FROM identity_photo_checks c WHERE c.user_id=users.id AND c.image_hash=users.passport_photo_hash AND c.status='verified') AS has_photo FROM users WHERE id=$1",
         [req.user.id]
       );
       const autoVerified = photoResult.rows[0]?.has_photo === true;
@@ -2167,9 +2148,9 @@ router.post(
 );
 
 // Create a one-time live-capture session for passport upload
-router.post('/verification/live-capture/session', authenticate, async (req, res) => {
+router.post('/verification/live-capture/session', authenticate, sensitiveActionLimiter, async (req, res) => {
   try {
-    const token = createLiveCaptureSession(req.user.id);
+    const token = await createLiveCaptureSession(req.user.id);
 
     res.json({
       success: true,
@@ -2249,6 +2230,8 @@ router.delete('/account', authenticate, sensitiveActionLimiter, async (req, res)
       });
     }
 
+    await identityPhotos.eraseGallery(userId);
+
     // Soft delete: mark as deleted rather than cascade-removing
     await db.query(
       `UPDATE users
@@ -2258,6 +2241,7 @@ router.delete('/account', authenticate, sensitiveActionLimiter, async (req, res)
            phone = CONCAT('deleted_', id, '_', phone),
            password_hash = 'DELETED_ACCOUNT',
            passport_photo_url = NULL,
+           passport_photo_hash = NULL,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $1`,
       [userId]
@@ -2355,7 +2339,7 @@ const handlePassportUpload = async (req, res) => {
     }
 
     if (!req.assistedPassportSubject && REQUIRE_LIVE_CAPTURE_SESSION) {
-      const isValidSession = consumeLiveCaptureSession(userId, liveCaptureToken);
+      const isValidSession = await consumeLiveCaptureSession(userId, liveCaptureToken);
       if (!isValidSession) {
         cleanupUploadedFile(req.file);
         return res.status(403).json({
@@ -2367,26 +2351,10 @@ const handlePassportUpload = async (req, res) => {
 
     const relativePath = `/uploads/passports/${req.file.filename}`;
 
-    // Prembly liveness: verify the photo is a real live person. Soft-fail when
-    // the liveness service is unavailable (never block uploads on service outages).
-    if (isPremblyConfigured()) {
-      try {
-        const imageBuffer = fs.readFileSync(req.file.path);
-        const liveness = await performLivenessCheckWithPrembly(imageBuffer, subject.full_name);
-        if (
-          liveness.status !== 'not_configured' &&
-          liveness.status !== 'service_error' &&
-          !liveness.is_live
-        ) {
-          cleanupUploadedFile(req.file);
-          return res.status(400).json({
-            success: false,
-            message: 'Liveness check failed. Please retake your photo in good lighting.',
-          });
-        }
-      } catch (error) {
-        req.logger.error('Liveness check error:', error.message);
-      }
+    const photoCheck = await identityPhotos.screenPhoto({userId,buffer:fs.readFileSync(req.file.path),consent:req.body?.biometric_consent === 'true' && req.body?.biometric_consent_version === identityPhotos.CONSENT_VERSION,assisted:Boolean(req.assistedPassportSubject)});
+    if(photoCheck.status==='rejected'){
+      cleanupUploadedFile(req.file);
+      return res.status(400).json({success:false,message:'Your photo could not be verified. Please retake it or contact support.',code:'PHOTO_VERIFICATION_FAILED'});
     }
 
     // Check if identity is already verified via Prembly
@@ -2424,11 +2392,12 @@ const handlePassportUpload = async (req, res) => {
             ? 'revalidation_required'
             : null;
 
-    const autoVerified = !req.assistedPassportSubject && hasVerifiedIdentity && hasIdentityNumber && !hasActiveRevalidation;
+    const autoVerified = photoCheck.status === 'verified' && !req.assistedPassportSubject && hasVerifiedIdentity && hasIdentityNumber && !hasActiveRevalidation;
 
     await db.query(
       `UPDATE users
        SET passport_photo_url = $1,
+           passport_photo_hash = $6,
            identity_verified = $2,
            identity_verified_by = NULL,
            identity_verified_at = CASE WHEN $2 THEN CURRENT_TIMESTAMP ELSE NULL END,
@@ -2445,7 +2414,8 @@ const handlePassportUpload = async (req, res) => {
         autoVerified,              // $2: identity_verified (auto by system)
         hasIdentityNumber,         // $3: set pending if identity number exists
         preservedReviewStatus,    // $4: preserve active revalidation task
-        userId                     // $5: WHERE clause
+        userId,                    // $5: WHERE clause
+        photoCheck.hash
       ]
     );
     uploadPersisted = true;
@@ -2472,7 +2442,8 @@ const handlePassportUpload = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Passport uploaded successfully',
+      message: autoVerified ? 'Photo verified and saved as your profile picture.' : 'Photo saved as your profile picture. Identity verification is awaiting review.',
+      verification_pending: !autoVerified,
       url: relativePath,
       user: userData
     });
@@ -2481,14 +2452,15 @@ const handlePassportUpload = async (req, res) => {
     if (!uploadPersisted) {
       cleanupUploadedFile(req.file);
     }
-    req.logger.error('Upload passport error:', error);
+    req.logger.error('Upload passport error:', {code:error.code || 'PHOTO_CHECK_ERROR'});
+    if(error.statusCode===429)return res.status(429).json({success:false,message:error.message});
     res.status(500).json({
       success: false,
       message: 'Failed to upload passport'
     });
   }
 };
-router.post('/upload-passport', authenticate, uploadPassportLocal, validateFileMagicBytesMiddleware, reprocessPassportImage, scanUploadForMalware, handlePassportUpload);
+router.post('/upload-passport', authenticate, sensitiveActionLimiter, uploadPassportLocal, validateFileMagicBytesMiddleware, reprocessPassportImage, scanUploadForMalware, handlePassportUpload);
 router.handlePassportUpload = handlePassportUpload;
 
 // Authenticated passport photo serving (NOT via express.static)
@@ -2531,6 +2503,7 @@ router.get('/passport-photo/:filename', authenticate, async (req, res) => {
       return res.status(404).json({ success: false, message: 'File not found' });
     }
 
+    res.set('Cache-Control','private, no-store');
     res.sendFile(resolvedPath);
   } catch (error) {
     req.logger.error('Serve passport photo error:', error);

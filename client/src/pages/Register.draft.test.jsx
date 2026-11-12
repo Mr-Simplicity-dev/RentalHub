@@ -41,3 +41,17 @@ test('registration introduction displays the naira symbol on each local fee',asy
  for (const amount of ['3,000','5,000','2,000']) expect(container.textContent).toContain('\u20A6'+amount);
  expect(container.textContent).not.toContain(String.fromCodePoint(0xe2,0x201a,0xa6));
 });
+
+test('resuming an existing paid registration automatically sends its phone code',async()=>{
+ api.post.mockRejectedValueOnce({response:{status:428,data:{code:'OTP_REQUIRED'}}}).mockResolvedValueOnce({data:{success:true}});
+ await act(async()=>root.render(<MemoryRouter initialEntries={['/register?reference=existing-payment']}><Register/></MemoryRouter>));
+ await waitFor(()=>expect(api.post.mock.calls.filter(([url])=>url==='/auth/register/payment/otp/existing-payment')).toHaveLength(1));
+ await waitFor(()=>expect(container.textContent).toContain('We sent a verification code'));
+});
+
+test('foreign registration offers passport-page input and never saves the document image in its draft',async()=>{
+ api.get.mockImplementation(async url=>({data:{success:true,data:url.includes('registration-flags')?{registration_allowed:true,nin_number:true,passport_number:true,diaspora_registration:true,passport_country_choices:[{name:'United States',code:'US'},{name:'United Kingdom',code:'GB'}],pricing:{amount:0}}:[]}}));
+ saveRegistrationDraft({is_foreigner:true,nationality:'United States',full_name:'Foreign User',email:'foreign@example.test',passport_document_image:'private-image'},3);
+ await mount();await waitFor(()=>expect(container.querySelector('input[type="file"]')).not.toBeNull());
+ expect(container.querySelector('input[type="file"]').accept).toBe('image/jpeg,image/png');expect(container.querySelector('select[name="nationality"]')).not.toBeNull();expect(readRegistrationDraft().form.passport_document_image).toBeUndefined();
+});

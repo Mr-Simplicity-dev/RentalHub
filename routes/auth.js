@@ -4,7 +4,7 @@ const authController = require('../controllers/authController');
 const { uploadPassportLocal, validateFileMagicBytesMiddleware } = require('../config/middleware/upload');
 const { authenticate, optionalAuthenticate, requireAdminOrSuperAdmin } = require('../config/middleware/auth');
 const { checkLoginRateLimit } = require('../config/middleware/loginRateLimiter');
-const { authSensitiveLimiter, otpLimiter, otpSendLimiter, passwordResetLimiter, registrationLimiter, sensitiveActionLimiter } 
+const { authSensitiveLimiter, verificationOpsLimiter, otpLimiter, otpSendLimiter, passwordResetLimiter, registrationLimiter, sensitiveActionLimiter } 
 = require('../config/middleware/securityRateLimiters');
 const { requireTurnstile } = require('../config/middleware/turnstileVerify');
 
@@ -94,9 +94,15 @@ const registerValidators = [
 // ================= ROUTES =================
 
 router.get('/registration-flags', authController.getRegistrationFlags);
+const registrationPhoneAttemptLimiter = (req, res, next) => (req.body.phone_verification_token ? verificationOpsLimiter : otpLimiter)(req, res, next);
+router.post('/register/payment/verify-phone', optionalAuthenticate, registrationPhoneAttemptLimiter, registerValidators, authController.verifyRegistrationPaymentPhone);
+router.post('/register/verify-phone', registrationPhoneAttemptLimiter, registerValidators, authController.verifyRegistrationFreePhone);
+router.post('/register/phone/resend', otpSendLimiter, registerValidators, authController.resendRegistrationPhone);
+
 
 router.post(
   '/register/payment',
+  otpSendLimiter,
   optionalAuthenticate,
   requireTurnstile('rentalhub_register'),
   registrationLimiter,
@@ -112,6 +118,7 @@ router.post(
 
 router.post(
   '/register/tenant-payment',
+  otpSendLimiter,
   requireTurnstile('rentalhub_register'),
   registrationLimiter,
   registerValidators,
@@ -153,6 +160,7 @@ router.post('/2fa/send-withdrawal-otp', authenticate, otpSendLimiter, authContro
 // Register new user (Landlord or Tenant)
 router.post(
   '/register',
+  otpSendLimiter,
   requireTurnstile('rentalhub_register'),
   registrationLimiter,
   registerValidators,
@@ -281,8 +289,11 @@ router.post('/verify-phone', authenticate, otpLimiter, authController.verifyPhon
 router.post(
   '/upload-passport',
   authenticate,
+  sensitiveActionLimiter,
   uploadPassportLocal,
   validateFileMagicBytesMiddleware,
+  require('../config/middleware/upload').reprocessPassportImage,
+  require('../config/middleware/upload').scanUploadForMalware,
   authController.uploadPassport
 );
 

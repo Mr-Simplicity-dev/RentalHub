@@ -1,5 +1,5 @@
-import React from 'react';
-import {act} from 'react-dom/test-utils';
+import {toast} from 'react-toastify';
+import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {fireEvent,waitFor,within} from '@testing-library/dom';
 import {MemoryRouter} from 'react-router-dom';
@@ -13,8 +13,8 @@ vi.mock('../services/api',()=>({default:{get:vi.fn(),post:vi.fn(),put:vi.fn()}})
 vi.mock('react-toastify',()=>({toast:{success:vi.fn(),error:vi.fn(),warn:vi.fn()}}));
 vi.mock('../components/common/TurnstileWidget',async()=>{const React=await import('react');return{default:React.forwardRef(({onToken},ref)=>{React.useEffect(()=>{onToken?.('test-token');},[onToken]);React.useImperativeHandle(ref,()=>({reset:()=>{}}));return null;})};});
 vi.mock('framer-motion',async()=>{
- const React=await import('react');
- return{AnimatePresence:({children})=>children,motion:new Proxy({},{get:(_,tag)=>React.forwardRef(({initial,animate,exit,transition,whileHover,whileTap,layout,...props},ref)=>React.createElement(tag,{...props,ref}))})};
+ const React=await import('react');const elements={};
+ return{AnimatePresence:({children})=>children,motion:new Proxy({},{get:(_,tag)=>elements[tag]||(elements[tag]=React.forwardRef(({initial,animate,exit,transition,whileHover,whileTap,layout,...props},ref)=>React.createElement(tag,{...props,ref})))})};
 });
 let container,root;
 const roles=[{id:1,title:'Paid Employment Role',opportunity_type:'employment',application_fee:5000,premium_fee:8000},{id:2,title:'Community Volunteer',opportunity_type:'volunteer',application_fee:0,premium_fee:0,description:'Community outreach and support.'}];
@@ -59,7 +59,12 @@ test('submitting a volunteer form shows the receipt and never initializes paymen
  const set=async(name,value)=>{await act(async()=>fireEvent.change(container.querySelector('[name="'+name+'"]'),{target:{value}}));};
  for(const[name,value]of Object.entries({full_name:'Community Applicant',phone_number:'08012345678',email_address:'community@example.test',area_locality:'Kutunku',residential_address:'Local address',suitability_reason:'Relevant experience',volunteer_motivation:'Community support',availability:'Saturdays'}))await set(name,value);
  await set('state_name','Abuja');await waitFor(()=>expect(container.querySelector('select[name="lga_name"]').options.length).toBe(2));await set('lga_name','Gwagwalada');
+ const languageIds=['nige1257','haus1257'];
+ for(const id of languageIds)await act(async()=>fireEvent.change(within(container).getByLabelText('Choose a language'),{target:{value:id}}));
+ for(const select of within(container).getAllByLabelText('Speaking / understanding (or signing)'))await act(async()=>fireEvent.change(select,{target:{value:'conversational'}}));
+ for(const select of within(container).getAllByLabelText('Reading / writing'))await act(async()=>fireEvent.change(select,{target:{value:'basic'}}));
  await act(async()=>fireEvent.submit(container.querySelector('form')));
+ expect(toast.error.mock.calls).toEqual([]);
  await waitFor(()=>expect(container.textContent).toContain(copy.en.volunteer_received));
  expect(api.post.mock.calls.map(([url])=>url)).toEqual(['/recruitment/apply']);expect(container.textContent).not.toContain('Pay Application Access Fee');
 });

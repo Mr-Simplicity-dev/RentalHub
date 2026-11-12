@@ -1,0 +1,2932 @@
+{
+  "source": "https://glottolog.org/glottolog/language.map.html?country=NG",
+  "retrieved": "2026-11-11",
+  "license": "Glottolog data CC BY 4.0; https://glottolog.org/",
+  "languages": [
+    {
+      "id": "aban1242",
+      "name": "Abanyom",
+      "iso": "abm"
+    },
+    {
+      "id": "abon1238",
+      "name": "Abon",
+      "iso": "abo"
+    },
+    {
+      "id": "abua1244",
+      "name": "Abua",
+      "iso": "abn"
+    },
+    {
+      "id": "abur1244",
+      "name": "Abureni",
+      "iso": "mgj"
+    },
+    {
+      "id": "adam1253",
+      "name": "Adamawa Fulfulde",
+      "iso": "fub"
+    },
+    {
+      "id": "adug1238",
+      "name": "Aduge",
+      "iso": "adu"
+    },
+    {
+      "id": "afad1236",
+      "name": "Afade",
+      "iso": "aal"
+    },
+    {
+      "id": "afud1235",
+      "name": "Afudu",
+      "iso": "NOCODE_Afudu"
+    },
+    {
+      "id": "agat1236",
+      "name": "Agatu",
+      "iso": "agc"
+    },
+    {
+      "id": "agwa1247",
+      "name": "Agwagwune",
+      "iso": "yay"
+    },
+    {
+      "id": "ajaw1236",
+      "name": "Ajawa",
+      "iso": "ajw"
+    },
+    {
+      "id": "eloy1241",
+      "name": "Ajiri",
+      "iso": "afo"
+    },
+    {
+      "id": "akpa1238",
+      "name": "Akpa",
+      "iso": "akf"
+    },
+    {
+      "id": "akpe1248",
+      "name": "Akpes",
+      "iso": "ibe"
+    },
+    {
+      "id": "akpo1243",
+      "name": "Akpondu",
+      "iso": "NOCODE_Akpondu"
+    },
+    {
+      "id": "akuk1235",
+      "name": "Akuku",
+      "iso": "ayk"
+    },
+    {
+      "id": "akum1238",
+      "name": "Akum",
+      "iso": "aku"
+    },
+    {
+      "id": "akee1238",
+      "name": "Akye",
+      "iso": "aik"
+    },
+    {
+      "id": "alag1242",
+      "name": "Alago",
+      "iso": "ala"
+    },
+    {
+      "id": "aleg1238",
+      "name": "Alege",
+      "iso": "alf"
+    },
+    {
+      "id": "ambo1249",
+      "name": "Ambo",
+      "iso": "amb"
+    },
+    {
+      "id": "amer1248",
+      "name": "American Sign Language",
+      "iso": "ase"
+    },
+    {
+      "id": "amoo1242",
+      "name": "Amo",
+      "iso": "amo"
+    },
+    {
+      "id": "anaa1238",
+      "name": "Anaang",
+      "iso": "anw"
+    },
+    {
+      "id": "anin1242",
+      "name": "Aninka",
+      "iso": "aqk"
+    },
+    {
+      "id": "arig1246",
+      "name": "Arigidi",
+      "iso": "aqg"
+    },
+    {
+      "id": "alum1246",
+      "name": "Arum",
+      "iso": "aab"
+    },
+    {
+      "id": "ashe1269",
+      "name": "Ashe",
+      "iso": "ahs"
+    },
+    {
+      "id": "asun1235",
+      "name": "Asu (Nigeria)",
+      "iso": "aum"
+    },
+    {
+      "id": "atsa1241",
+      "name": "Atsam",
+      "iso": "cch"
+    },
+    {
+      "id": "auyo1240",
+      "name": "Auyokawa",
+      "iso": "auo"
+    },
+    {
+      "id": "awak1250",
+      "name": "Awak",
+      "iso": "awo"
+    },
+    {
+      "id": "ayer1245",
+      "name": "Ayere",
+      "iso": "aye"
+    },
+    {
+      "id": "ayuu1242",
+      "name": "Ayu",
+      "iso": "ayu"
+    },
+    {
+      "id": "kwaa1262",
+      "name": "Baa",
+      "iso": "kwb"
+    },
+    {
+      "id": "baan1241",
+      "name": "Baan",
+      "iso": "bvj"
+    },
+    {
+      "id": "baan1242",
+      "name": "Baangi",
+      "iso": "bqx"
+    },
+    {
+      "id": "baat1238",
+      "name": "Baatonum",
+      "iso": "bba"
+    },
+    {
+      "id": "baca1246",
+      "name": "Bacama",
+      "iso": "bcy"
+    },
+    {
+      "id": "bada1258",
+      "name": "Bada (Nigeria)",
+      "iso": "bau"
+    },
+    {
+      "id": "bade1248",
+      "name": "Bade",
+      "iso": "bde"
+    },
+    {
+      "id": "bagi1246",
+      "name": "Bagirmi",
+      "iso": "bmi"
+    },
+    {
+      "id": "bais1242",
+      "name": "Baissa Fali",
+      "iso": "fah"
+    },
+    {
+      "id": "bali1245",
+      "name": "Bali (Nigeria)",
+      "iso": "bcn"
+    },
+    {
+      "id": "bang1348",
+      "name": "Bangwinji",
+      "iso": "bsj"
+    },
+    {
+      "id": "bari1241",
+      "name": "Barikanchi",
+      "iso": "bxo"
+    },
+    {
+      "id": "basa1282",
+      "name": "Basa (Nigeria)",
+      "iso": "bzw"
+    },
+    {
+      "id": "basa1280",
+      "name": "Basa-Gumna",
+      "iso": "bsl"
+    },
+    {
+      "id": "basa1281",
+      "name": "Basa-Gurmana",
+      "iso": "buj"
+    },
+    {
+      "id": "bass1259",
+      "name": "Bassa-Kontagora",
+      "iso": "bsr"
+    },
+    {
+      "id": "bata1314",
+      "name": "Bata",
+      "iso": "bta"
+    },
+    {
+      "id": "batu1255",
+      "name": "Batu",
+      "iso": "btu"
+    },
+    {
+      "id": "bauc1238",
+      "name": "Bauchi",
+      "iso": "bsf"
+    },
+    {
+      "id": "beel1236",
+      "name": "Beele",
+      "iso": "bxq"
+    },
+    {
+      "id": "begb1241",
+      "name": "Begbere-Ejar",
+      "iso": "bqv"
+    },
+    {
+      "id": "bekw1241",
+      "name": "Bekwarra",
+      "iso": "bkv"
+    },
+    {
+      "id": "beln1234",
+      "name": "Belneng",
+      "iso": "glb"
+    },
+    {
+      "id": "bena1260",
+      "name": "Bena (Nigeria)",
+      "iso": "yun"
+    },
+    {
+      "id": "bero1242",
+      "name": "Berom",
+      "iso": "bom"
+    },
+    {
+      "id": "bete1261",
+      "name": "Bete (Yukubenic)",
+      "iso": "byf"
+    },
+    {
+      "id": "bete1262",
+      "name": "Bete-Bendi",
+      "iso": "btt"
+    },
+    {
+      "id": "biji1246",
+      "name": "Bijim",
+      "iso": "jbm"
+    },
+    {
+      "id": "bile1244",
+      "name": "Bile",
+      "iso": "bil"
+    },
+    {
+      "id": "bina1270",
+      "name": "Bina (Nigeria)",
+      "iso": "byj"
+    },
+    {
+      "id": "bini1246",
+      "name": "Bini",
+      "iso": "bin"
+    },
+    {
+      "id": "bise1238",
+      "name": "Biseni",
+      "iso": "ije"
+    },
+    {
+      "id": "bita1251",
+      "name": "Bitare",
+      "iso": "brt"
+    },
+    {
+      "id": "boru1244",
+      "name": "Bo-Rukul",
+      "iso": "mae"
+    },
+    {
+      "id": "boga1251",
+      "name": "Boga",
+      "iso": "bvw"
+    },
+    {
+      "id": "bogh1241",
+      "name": "Boghom",
+      "iso": "bux"
+    },
+    {
+      "id": "boko1266",
+      "name": "Boko (Benin)",
+      "iso": "bqc"
+    },
+    {
+      "id": "boko1267",
+      "name": "Bokobaru",
+      "iso": "bus"
+    },
+    {
+      "id": "boky1238",
+      "name": "Bokyi",
+      "iso": "bky"
+    },
+    {
+      "id": "nucl1695",
+      "name": "Bole",
+      "iso": "bol"
+    },
+    {
+      "id": "borg1235",
+      "name": "Borgu Fulfulde",
+      "iso": "fue"
+    },
+    {
+      "id": "buuu1244",
+      "name": "Bu",
+      "iso": "jid"
+    },
+    {
+      "id": "zara1252",
+      "name": "Bu (Zaranda)",
+      "iso": "zbu"
+    },
+    {
+      "id": "budu1265",
+      "name": "Buduma",
+      "iso": "bdm"
+    },
+    {
+      "id": "bukw1238",
+      "name": "Bukwen",
+      "iso": "buz"
+    },
+    {
+      "id": "buli1260",
+      "name": "Buli (Bauchi State)",
+      "iso": "uly"
+    },
+    {
+      "id": "buma1244",
+      "name": "Bumaji",
+      "iso": "byp"
+    },
+    {
+      "id": "bura1295",
+      "name": "Bura Sign Language",
+      "iso": "NOCODE_Bura-Sign"
+    },
+    {
+      "id": "bura1292",
+      "name": "Bura-Pabir",
+      "iso": "bwr"
+    },
+    {
+      "id": "bura1271",
+      "name": "Burak",
+      "iso": "bys"
+    },
+    {
+      "id": "bure1242",
+      "name": "Bure",
+      "iso": "bvh"
+    },
+    {
+      "id": "buru1299",
+      "name": "Buru-Angwe",
+      "iso": "bqw"
+    },
+    {
+      "id": "busa1253",
+      "name": "Busa",
+      "iso": "bqp"
+    },
+    {
+      "id": "clel1238",
+      "name": "C'lela",
+      "iso": "dri"
+    },
+    {
+      "id": "cakf1236",
+      "name": "Cakfem-Mushere",
+      "iso": "cky"
+    },
+    {
+      "id": "cara1270",
+      "name": "Cara",
+      "iso": "cfd"
+    },
+    {
+      "id": "cenn1238",
+      "name": "Cen",
+      "iso": "cen"
+    },
+    {
+      "id": "cent2050",
+      "name": "Central Kanuri",
+      "iso": "knc"
+    },
+    {
+      "id": "cent2018",
+      "name": "Central-Eastern Niger Fulfulde",
+      "iso": "fuq"
+    },
+    {
+      "id": "dans1239",
+      "name": "Chaari",
+      "iso": "cxh"
+    },
+    {
+      "id": "chad1249",
+      "name": "Chadian Arabic",
+      "iso": "shu"
+    },
+    {
+      "id": "chak1275",
+      "name": "Chakato",
+      "iso": "NOCODE_Chakato"
+    },
+    {
+      "id": "chee1238",
+      "name": "Che",
+      "iso": "ruk"
+    },
+    {
+      "id": "ciba1236",
+      "name": "Cibak",
+      "iso": "ckl"
+    },
+    {
+      "id": "cici1237",
+      "name": "Cicipu",
+      "iso": "awc"
+    },
+    {
+      "id": "cine1238",
+      "name": "Cineni",
+      "iso": "cie"
+    },
+    {
+      "id": "ciwo1236",
+      "name": "Ciwogai",
+      "iso": "tgd"
+    },
+    {
+      "id": "como1258",
+      "name": "Como Karim",
+      "iso": "cfg"
+    },
+    {
+      "id": "cros1244",
+      "name": "Cross River Mbembe",
+      "iso": "mfn"
+    },
+    {
+      "id": "cuba1236",
+      "name": "Cuba",
+      "iso": "cbq"
+    },
+    {
+      "id": "nucl1683",
+      "name": "Daba",
+      "iso": "dbq"
+    },
+    {
+      "id": "dadi1249",
+      "name": "Dadiya",
+      "iso": "dbd"
+    },
+    {
+      "id": "dama1268",
+      "name": "Damakawa",
+      "iso": "dam"
+    },
+    {
+      "id": "dass1243",
+      "name": "Dass",
+      "iso": "dot"
+    },
+    {
+      "id": "daza1244",
+      "name": "Daza",
+      "iso": "dzd"
+    },
+    {
+      "id": "defa1248",
+      "name": "Defaka",
+      "iso": "afn"
+    },
+    {
+      "id": "dege1246",
+      "name": "Degema",
+      "iso": "deg"
+    },
+    {
+      "id": "doko1243",
+      "name": "Deko-Dusanga",
+      "iso": "uya"
+    },
+    {
+      "id": "dend1243",
+      "name": "Dendi (Benin)",
+      "iso": "ddn"
+    },
+    {
+      "id": "deno1239",
+      "name": "Deno",
+      "iso": "dbb"
+    },
+    {
+      "id": "deny1238",
+      "name": "Denya",
+      "iso": "anv"
+    },
+    {
+      "id": "dera1248",
+      "name": "Dera (Nigeria)",
+      "iso": "kna"
+    },
+    {
+      "id": "dghw1239",
+      "name": "Dghwede",
+      "iso": "dgh"
+    },
+    {
+      "id": "dibo1247",
+      "name": "Dibo",
+      "iso": "dio"
+    },
+    {
+      "id": "diji1241",
+      "name": "Dijim-Bwilim",
+      "iso": "cfa"
+    },
+    {
+      "id": "lund1276",
+      "name": "Dir-Nyamzak-Mbarimi",
+      "iso": "nzr"
+    },
+    {
+      "id": "diri1259",
+      "name": "Diri",
+      "iso": "dwa"
+    },
+    {
+      "id": "lush1256",
+      "name": "Dokshi",
+      "iso": "dsk"
+    },
+    {
+      "id": "dong1293",
+      "name": "Dong",
+      "iso": "doh"
+    },
+    {
+      "id": "came1252",
+      "name": "Donga Mambila",
+      "iso": "mcu"
+    },
+    {
+      "id": "dugu1249",
+      "name": "Duguri",
+      "iso": "dbm"
+    },
+    {
+      "id": "duhw1236",
+      "name": "Duhwa",
+      "iso": "kbz"
+    },
+    {
+      "id": "dulb1238",
+      "name": "Dulbu",
+      "iso": "dbo"
+    },
+    {
+      "id": "dung1254",
+      "name": "Dungu",
+      "iso": "dbv"
+    },
+    {
+      "id": "duwa1244",
+      "name": "Duwai",
+      "iso": "dbp"
+    },
+    {
+      "id": "dyar1234",
+      "name": "Dyarim",
+      "iso": "dyr"
+    },
+    {
+      "id": "dzaa1238",
+      "name": "Dza",
+      "iso": "jen"
+    },
+    {
+      "id": "dzod1238",
+      "name": "Dzodinka",
+      "iso": "add"
+    },
+    {
+      "id": "idun1241",
+      "name": "Dũya",
+      "iso": "ldb"
+    },
+    {
+      "id": "east2403",
+      "name": "Eastern Acipa",
+      "iso": "acp"
+    },
+    {
+      "id": "ebir1243",
+      "name": "Ebira",
+      "iso": "igb"
+    },
+    {
+      "id": "ebug1241",
+      "name": "Ebughu",
+      "iso": "ebg"
+    },
+    {
+      "id": "edec1238",
+      "name": "Ede Cabe",
+      "iso": "cbj"
+    },
+    {
+      "id": "eden1244",
+      "name": "Ede Nago",
+      "iso": "nqg"
+    },
+    {
+      "id": "efai1241",
+      "name": "Efai",
+      "iso": "efa"
+    },
+    {
+      "id": "efik1245",
+      "name": "Efik",
+      "iso": "efi"
+    },
+    {
+      "id": "efut1242",
+      "name": "Efutop",
+      "iso": "ofu"
+    },
+    {
+      "id": "enge1239",
+      "name": "Egene",
+      "iso": "enn"
+    },
+    {
+      "id": "eggo1239",
+      "name": "Eggon",
+      "iso": "ego"
+    },
+    {
+      "id": "ehue1238",
+      "name": "Ehueun",
+      "iso": "ehu"
+    },
+    {
+      "id": "ejag1239",
+      "name": "Ejagham",
+      "iso": "etu"
+    },
+    {
+      "id": "doka1242",
+      "name": "Ejuele",
+      "iso": "dbi"
+    },
+    {
+      "id": "ekaj1238",
+      "name": "Ekajuk",
+      "iso": "eka"
+    },
+    {
+      "id": "ekii1241",
+      "name": "Eki",
+      "iso": "eki"
+    },
+    {
+      "id": "ekit1246",
+      "name": "Ekit",
+      "iso": "eke"
+    },
+    {
+      "id": "ekpe1253",
+      "name": "Ekpeye",
+      "iso": "ekp"
+    },
+    {
+      "id": "elem1253",
+      "name": "Eleme",
+      "iso": "elm"
+    },
+    {
+      "id": "emai1241",
+      "name": "Emai-Iuleha-Ora",
+      "iso": "ema"
+    },
+    {
+      "id": "stan1293",
+      "name": "English",
+      "iso": "eng"
+    },
+    {
+      "id": "enwa1245",
+      "name": "Enwan (Akwa Ibom State)",
+      "iso": "enw"
+    },
+    {
+      "id": "enwa1246",
+      "name": "Enwan (Edo State)",
+      "iso": "env"
+    },
+    {
+      "id": "epie1238",
+      "name": "Epie",
+      "iso": "epi"
+    },
+    {
+      "id": "eruw1238",
+      "name": "Eruwa",
+      "iso": "erh"
+    },
+    {
+      "id": "esan1238",
+      "name": "Esan",
+      "iso": "ish"
+    },
+    {
+      "id": "esim1238",
+      "name": "Esimbi",
+      "iso": "ags"
+    },
+    {
+      "id": "eteb1238",
+      "name": "Etebi",
+      "iso": "etb"
+    },
+    {
+      "id": "eten1239",
+      "name": "Eten",
+      "iso": "etx"
+    },
+    {
+      "id": "etky1238",
+      "name": "Etkywan",
+      "iso": "ich"
+    },
+    {
+      "id": "etul1245",
+      "name": "Etulo",
+      "iso": "utr"
+    },
+    {
+      "id": "evan1238",
+      "name": "Evant",
+      "iso": "bzz"
+    },
+    {
+      "id": "fali1285",
+      "name": "Fali",
+      "iso": "fli"
+    },
+    {
+      "id": "famm1241",
+      "name": "Fam",
+      "iso": "fam"
+    },
+    {
+      "id": "fira1238",
+      "name": "Firan",
+      "iso": "fir"
+    },
+    {
+      "id": "fumm1238",
+      "name": "Fum",
+      "iso": "fum"
+    },
+    {
+      "id": "fung1245",
+      "name": "Fungwa",
+      "iso": "ula"
+    },
+    {
+      "id": "fyam1238",
+      "name": "Fyam",
+      "iso": "pym"
+    },
+    {
+      "id": "fyer1241",
+      "name": "Fyer",
+      "iso": "fie"
+    },
+    {
+      "id": "gaan1243",
+      "name": "Ga'anda",
+      "iso": "gqa"
+    },
+    {
+      "id": "gaaa1245",
+      "name": "Gaa",
+      "iso": "ttb"
+    },
+    {
+      "id": "gade1242",
+      "name": "Gade",
+      "iso": "ged"
+    },
+    {
+      "id": "gala1264",
+      "name": "Galambu",
+      "iso": "glo"
+    },
+    {
+      "id": "gamo1241",
+      "name": "Gamo-Ningi",
+      "iso": "bte"
+    },
+    {
+      "id": "gana1270",
+      "name": "Ganang",
+      "iso": "gne"
+    },
+    {
+      "id": "gbag1258",
+      "name": "Gbagyi",
+      "iso": "gbr"
+    },
+    {
+      "id": "gbar1246",
+      "name": "Gbari",
+      "iso": "gby"
+    },
+    {
+      "id": "gbir1241",
+      "name": "Gbiri-Niragu",
+      "iso": "grh"
+    },
+    {
+      "id": "geng1243",
+      "name": "Gengle",
+      "iso": "geg"
+    },
+    {
+      "id": "kuga1239",
+      "name": "Gengle-Kugama",
+      "iso": "kow"
+    },
+    {
+      "id": "gera1246",
+      "name": "Gera",
+      "iso": "gew"
+    },
+    {
+      "id": "geru1240",
+      "name": "Geruma",
+      "iso": "gea"
+    },
+    {
+      "id": "ghot1243",
+      "name": "Ghotuo",
+      "iso": "aaa"
+    },
+    {
+      "id": "giba1240",
+      "name": "Gibanawa",
+      "iso": "gib"
+    },
+    {
+      "id": "giiw1236",
+      "name": "Giiwo",
+      "iso": "kks"
+    },
+    {
+      "id": "gimm1241",
+      "name": "Gimme",
+      "iso": "kmp"
+    },
+    {
+      "id": "gimn1238",
+      "name": "Gimnime",
+      "iso": "gmn"
+    },
+    {
+      "id": "glav1244",
+      "name": "Glavda",
+      "iso": "glw"
+    },
+    {
+      "id": "goem1240",
+      "name": "Goemai",
+      "iso": "ank"
+    },
+    {
+      "id": "goka1239",
+      "name": "Gokana",
+      "iso": "gkn"
+    },
+    {
+      "id": "gude1246",
+      "name": "Gude",
+      "iso": "gde"
+    },
+    {
+      "id": "gudu1250",
+      "name": "Gudu",
+      "iso": "gdu"
+    },
+    {
+      "id": "gudu1252",
+      "name": "Guduf-Gava",
+      "iso": "gdf"
+    },
+    {
+      "id": "gunn1250",
+      "name": "Gun",
+      "iso": "guw"
+    },
+    {
+      "id": "gupa1248",
+      "name": "Gupa",
+      "iso": "gpa"
+    },
+    {
+      "id": "gurm1246",
+      "name": "Gurmana",
+      "iso": "gvm"
+    },
+    {
+      "id": "guru1271",
+      "name": "Guruntum-Mbaaru",
+      "iso": "grd"
+    },
+    {
+      "id": "gvok1239",
+      "name": "Gvoko",
+      "iso": "ngs"
+    },
+    {
+      "id": "gwam1244",
+      "name": "Gwamhi-Wuri",
+      "iso": "bga"
+    },
+    {
+      "id": "gwan1268",
+      "name": "Gwandara",
+      "iso": "gwn"
+    },
+    {
+      "id": "gwar1240",
+      "name": "Gwara",
+      "iso": "NOCODE_Gwara"
+    },
+    {
+      "id": "nucl1692",
+      "name": "Gyaazi",
+      "iso": "gyz"
+    },
+    {
+      "id": "gyem1238",
+      "name": "Gyem",
+      "iso": "gye"
+    },
+    {
+      "id": "hash1238",
+      "name": "Hasha",
+      "iso": "ybj"
+    },
+    {
+      "id": "haus1257",
+      "name": "Hausa",
+      "iso": "hau"
+    },
+    {
+      "id": "haus1246",
+      "name": "Hausa Sign Language",
+      "iso": "hsl"
+    },
+    {
+      "id": "nige1253",
+      "name": "Hausa States Fulfulde",
+      "iso": "fuv"
+    },
+    {
+      "id": "hdii1240",
+      "name": "Hdi",
+      "iso": "xed"
+    },
+    {
+      "id": "holm1250",
+      "name": "Holma",
+      "iso": "hod"
+    },
+    {
+      "id": "horo1245",
+      "name": "Horom",
+      "iso": "hoe"
+    },
+    {
+      "id": "huba1236",
+      "name": "Huba",
+      "iso": "hbb"
+    },
+    {
+      "id": "huns1239",
+      "name": "Hun-Saare",
+      "iso": "dud"
+    },
+    {
+      "id": "hung1276",
+      "name": "Hungworo",
+      "iso": "nat"
+    },
+    {
+      "id": "hwan1240",
+      "name": "Hwana",
+      "iso": "hwo"
+    },
+    {
+      "id": "hyaa1239",
+      "name": "Hya",
+      "iso": "hya"
+    },
+    {
+      "id": "hyam1245",
+      "name": "Hyam",
+      "iso": "jab"
+    },
+    {
+      "id": "hone1235",
+      "name": "Hõne",
+      "iso": "juh"
+    },
+    {
+      "id": "iban1261",
+      "name": "Ibani",
+      "iso": "iby"
+    },
+    {
+      "id": "ibib1240",
+      "name": "Ibibio",
+      "iso": "ibb"
+    },
+    {
+      "id": "ibil1238",
+      "name": "Ibilo",
+      "iso": "ibi"
+    },
+    {
+      "id": "ibin1241",
+      "name": "Ibino",
+      "iso": "ibn"
+    },
+    {
+      "id": "ibok1234",
+      "name": "Ibokun Sign Language",
+      "iso": "NOCODE_Ibokun-Sign"
+    },
+    {
+      "id": "ibuo1242",
+      "name": "Ibuoro",
+      "iso": "ibr"
+    },
+    {
+      "id": "icev1238",
+      "name": "Iceve-Maci",
+      "iso": "bec"
+    },
+    {
+      "id": "ider1238",
+      "name": "Idere",
+      "iso": "ide"
+    },
+    {
+      "id": "ides1238",
+      "name": "Idesa",
+      "iso": "ids"
+    },
+    {
+      "id": "idom1241",
+      "name": "Idoma",
+      "iso": "idu"
+    },
+    {
+      "id": "idon1238",
+      "name": "Idon",
+      "iso": "idc"
+    },
+    {
+      "id": "igal1242",
+      "name": "Igala",
+      "iso": "igl"
+    },
+    {
+      "id": "nucl1417",
+      "name": "Igbo",
+      "iso": "ibo"
+    },
+    {
+      "id": "iged1239",
+      "name": "Igede",
+      "iso": "ige"
+    },
+    {
+      "id": "igut1238",
+      "name": "Iguta",
+      "iso": "nar"
+    },
+    {
+      "id": "igwe1238",
+      "name": "Igwe",
+      "iso": "igw"
+    },
+    {
+      "id": "ihie1238",
+      "name": "Ihievbe",
+      "iso": "ihi"
+    },
+    {
+      "id": "ijaz1238",
+      "name": "Ija-Zuba",
+      "iso": "vki"
+    },
+    {
+      "id": "ikaa1238",
+      "name": "Ika",
+      "iso": "ikk"
+    },
+    {
+      "id": "ikhi1234",
+      "name": "Ikhin-Arokho",
+      "iso": "ikh"
+    },
+    {
+      "id": "ikoo1245",
+      "name": "Iko",
+      "iso": "iki"
+    },
+    {
+      "id": "ikpe1243",
+      "name": "Ikpeshi",
+      "iso": "ikp"
+    },
+    {
+      "id": "ikug1238",
+      "name": "Iku-Gora-Ankwa",
+      "iso": "ikv"
+    },
+    {
+      "id": "ikul1238",
+      "name": "Ikulu",
+      "iso": "ikl"
+    },
+    {
+      "id": "ikwe1242",
+      "name": "Ikwere",
+      "iso": "ikw"
+    },
+    {
+      "id": "ilue1241",
+      "name": "Ilue",
+      "iso": "ilv"
+    },
+    {
+      "id": "irig1241",
+      "name": "Irigwe",
+      "iso": "iri"
+    },
+    {
+      "id": "isek1239",
+      "name": "Isekiri",
+      "iso": "its"
+    },
+    {
+      "id": "isok1239",
+      "name": "Isoko",
+      "iso": "iso"
+    },
+    {
+      "id": "isum1240",
+      "name": "Isu (Menchum Division)",
+      "iso": "isu"
+    },
+    {
+      "id": "itoo1242",
+      "name": "Ito",
+      "iso": "itw"
+    },
+    {
+      "id": "itum1245",
+      "name": "Itu Mbon Uzo",
+      "iso": "itm"
+    },
+    {
+      "id": "ivbi1241",
+      "name": "Ivbie North-Okpela-Arhe",
+      "iso": "atg"
+    },
+    {
+      "id": "iyay1238",
+      "name": "Iyayu",
+      "iso": "iya"
+    },
+    {
+      "id": "iyiv1238",
+      "name": "Iyive",
+      "iso": "uiv"
+    },
+    {
+      "id": "bakp1238",
+      "name": "Iyongiyong",
+      "iso": "bbs"
+    },
+    {
+      "id": "izer1241",
+      "name": "Izere",
+      "iso": "izr"
+    },
+    {
+      "id": "izie1238",
+      "name": "Izi-Ezaa-Ikwo-Mgbo",
+      "iso": "izi"
+    },
+    {
+      "id": "izon1238",
+      "name": "Izon",
+      "iso": "ijc"
+    },
+    {
+      "id": "izor1238",
+      "name": "Izora",
+      "iso": "cbo"
+    },
+    {
+      "id": "jort1240",
+      "name": "Jakattoe",
+      "iso": "jrt"
+    },
+    {
+      "id": "cent2045",
+      "name": "Jalaa",
+      "iso": "cet"
+    },
+    {
+      "id": "jana1236",
+      "name": "Jan-Awei",
+      "iso": "NOCODE_Jan-Awei"
+    },
+    {
+      "id": "janj1240",
+      "name": "Janji",
+      "iso": "jni"
+    },
+    {
+      "id": "jara1274",
+      "name": "Jara",
+      "iso": "jaf"
+    },
+    {
+      "id": "jara1263",
+      "name": "Jarawa (Nigeria)",
+      "iso": "jar"
+    },
+    {
+      "id": "jere1244",
+      "name": "Jere",
+      "iso": "jer"
+    },
+    {
+      "id": "jiba1237",
+      "name": "Jiba",
+      "iso": "juo"
+    },
+    {
+      "id": "jibu1239",
+      "name": "Jibu",
+      "iso": "jib"
+    },
+    {
+      "id": "jilb1238",
+      "name": "Jilbe",
+      "iso": "jie"
+    },
+    {
+      "id": "jimi1254",
+      "name": "Jimi (Cameroon)",
+      "iso": "jim"
+    },
+    {
+      "id": "jimi1255",
+      "name": "Jimi (Nigeria)",
+      "iso": "jmi"
+    },
+    {
+      "id": "diri1253",
+      "name": "Jirim",
+      "iso": "dir"
+    },
+    {
+      "id": "jiru1238",
+      "name": "Jiru",
+      "iso": "jrr"
+    },
+    {
+      "id": "jjuu1238",
+      "name": "Jju",
+      "iso": "kaj"
+    },
+    {
+      "id": "juuu1243",
+      "name": "Ju",
+      "iso": "juu"
+    },
+    {
+      "id": "juku1254",
+      "name": "Jukun Takum",
+      "iso": "jbu"
+    },
+    {
+      "id": "kaan1247",
+      "name": "Kaan",
+      "iso": "ldl"
+    },
+    {
+      "id": "kada1284",
+      "name": "Kadara",
+      "iso": "kad"
+    },
+    {
+      "id": "vagh1248",
+      "name": "Kadung",
+      "iso": "dkg"
+    },
+    {
+      "id": "kago1247",
+      "name": "Kagoma",
+      "iso": "kdm"
+    },
+    {
+      "id": "kaiv1238",
+      "name": "Kaivi",
+      "iso": "kce"
+    },
+    {
+      "id": "kaka1264",
+      "name": "Kakanda",
+      "iso": "kka"
+    },
+    {
+      "id": "kaki1247",
+      "name": "Kakihum",
+      "iso": "kxe"
+    },
+    {
+      "id": "kala1381",
+      "name": "Kalabari",
+      "iso": "ijn"
+    },
+    {
+      "id": "kamm1249",
+      "name": "Kam",
+      "iso": "kdx"
+    },
+    {
+      "id": "kama1358",
+      "name": "Kamantan",
+      "iso": "kci"
+    },
+    {
+      "id": "kami1258",
+      "name": "Kami (Nigeria)",
+      "iso": "kmi"
+    },
+    {
+      "id": "kamo1254",
+      "name": "Kamo",
+      "iso": "kcq"
+    },
+    {
+      "id": "kamw1239",
+      "name": "Kamwe",
+      "iso": "hig"
+    },
+    {
+      "id": "kani1277",
+      "name": "Kaningdon-Nindem",
+      "iso": "kdp"
+    },
+    {
+      "id": "kanu1277",
+      "name": "Kanufi",
+      "iso": "kni"
+    },
+    {
+      "id": "kapy1238",
+      "name": "Kapya",
+      "iso": "klo"
+    },
+    {
+      "id": "kare1348",
+      "name": "Karekare",
+      "iso": "kai"
+    },
+    {
+      "id": "kari1316",
+      "name": "Kariya",
+      "iso": "kil"
+    },
+    {
+      "id": "khan1278",
+      "name": "Khana",
+      "iso": "ogo"
+    },
+    {
+      "id": "khol1240",
+      "name": "Kholok",
+      "iso": "ktc"
+    },
+    {
+      "id": "kinu1239",
+      "name": "Kinuku",
+      "iso": "kkd"
+    },
+    {
+      "id": "kion1242",
+      "name": "Kiong",
+      "iso": "kkm"
+    },
+    {
+      "id": "kirb1236",
+      "name": "Kir-Balar",
+      "iso": "kkr"
+    },
+    {
+      "id": "kiri1254",
+      "name": "Kirike",
+      "iso": "okr"
+    },
+    {
+      "id": "kiry1234",
+      "name": "Kirya-Konzel",
+      "iso": "fkk"
+    },
+    {
+      "id": "kiza1239",
+      "name": "Kizamani",
+      "iso": "izm"
+    },
+    {
+      "id": "koen1239",
+      "name": "Koenoem",
+      "iso": "kcs"
+    },
+    {
+      "id": "kofa1236",
+      "name": "Kofa",
+      "iso": "kso"
+    },
+    {
+      "id": "kohu1244",
+      "name": "Kohumono",
+      "iso": "bcs"
+    },
+    {
+      "id": "koma1266",
+      "name": "Koma Ndera",
+      "iso": "kmy"
+    },
+    {
+      "id": "kono1264",
+      "name": "Kono (Nigeria)",
+      "iso": "klk"
+    },
+    {
+      "id": "koro1323",
+      "name": "Koro Nulu",
+      "iso": "vkn"
+    },
+    {
+      "id": "koro1324",
+      "name": "Koro Zuba",
+      "iso": "vkz"
+    },
+    {
+      "id": "koro1304",
+      "name": "Korop",
+      "iso": "krp"
+    },
+    {
+      "id": "kpan1246",
+      "name": "Kpan",
+      "iso": "kpk"
+    },
+    {
+      "id": "kpas1242",
+      "name": "Kpasam",
+      "iso": "pbn"
+    },
+    {
+      "id": "kpat1246",
+      "name": "Kpati",
+      "iso": "koc"
+    },
+    {
+      "id": "kubi1239",
+      "name": "Kubi",
+      "iso": "kof"
+    },
+    {
+      "id": "kudu1241",
+      "name": "Kudu-Camo",
+      "iso": "kov"
+    },
+    {
+      "id": "kugb1241",
+      "name": "Kugbo",
+      "iso": "kes"
+    },
+    {
+      "id": "kuke1242",
+      "name": "Kukele",
+      "iso": "kez"
+    },
+    {
+      "id": "kule1247",
+      "name": "Kulere",
+      "iso": "kul"
+    },
+    {
+      "id": "kulu1255",
+      "name": "Kulung (Nigeria)",
+      "iso": "bbu"
+    },
+    {
+      "id": "kumb1238",
+      "name": "Kumba",
+      "iso": "ksm"
+    },
+    {
+      "id": "kupa1238",
+      "name": "Kupa",
+      "iso": "kug"
+    },
+    {
+      "id": "kura1249",
+      "name": "Kurama",
+      "iso": "krh"
+    },
+    {
+      "id": "kurm1245",
+      "name": "Kurmin Dangana",
+      "iso": "NOCODE_Kurmin-Dangana"
+    },
+    {
+      "id": "kush1236",
+      "name": "Kushi",
+      "iso": "kuh"
+    },
+    {
+      "id": "kute1248",
+      "name": "Kutep",
+      "iso": "kub"
+    },
+    {
+      "id": "kutt1236",
+      "name": "Kutto",
+      "iso": "kpa"
+    },
+    {
+      "id": "kutu1262",
+      "name": "Kuturmi",
+      "iso": "khj"
+    },
+    {
+      "id": "kwaa1269",
+      "name": "Kwaami",
+      "iso": "ksq"
+    },
+    {
+      "id": "kwaj1242",
+      "name": "Kwaja-Ndaktup",
+      "iso": "kdz"
+    },
+    {
+      "id": "kwak1264",
+      "name": "Kwak",
+      "iso": "kwq"
+    },
+    {
+      "id": "kyak1243",
+      "name": "Kyak",
+      "iso": "bka"
+    },
+    {
+      "id": "kyen1242",
+      "name": "Kyenga",
+      "iso": "tye"
+    },
+    {
+      "id": "cori1240",
+      "name": "Kyoli",
+      "iso": "cry"
+    },
+    {
+      "id": "labi1245",
+      "name": "Labir",
+      "iso": "jku"
+    },
+    {
+      "id": "lagw1237",
+      "name": "Lagwan",
+      "iso": "kot"
+    },
+    {
+      "id": "lala1261",
+      "name": "Lala-Roba",
+      "iso": "lla"
+    },
+    {
+      "id": "lama1288",
+      "name": "Lamang",
+      "iso": "hia"
+    },
+    {
+      "id": "lame1257",
+      "name": "Lame",
+      "iso": "bma"
+    },
+    {
+      "id": "lamj1245",
+      "name": "Lamja-Dengsa-Tola",
+      "iso": "ldh"
+    },
+    {
+      "id": "lamn1239",
+      "name": "Lamnso'",
+      "iso": "lns"
+    },
+    {
+      "id": "laru1238",
+      "name": "Laru (Nigeria)",
+      "iso": "lan"
+    },
+    {
+      "id": "leel1242",
+      "name": "Leelau",
+      "iso": "ldk"
+    },
+    {
+      "id": "legb1242",
+      "name": "Legbo",
+      "iso": "agb"
+    },
+    {
+      "id": "lemo1242",
+      "name": "Lemoro",
+      "iso": "ldj"
+    },
+    {
+      "id": "leny1238",
+      "name": "Lenyima",
+      "iso": "ldg"
+    },
+    {
+      "id": "lere1241",
+      "name": "Lere",
+      "iso": "gnh"
+    },
+    {
+      "id": "leyi1238",
+      "name": "Leyigha",
+      "iso": "ayi"
+    },
+    {
+      "id": "liji1238",
+      "name": "Lijili",
+      "iso": "mgi"
+    },
+    {
+      "id": "limb1268",
+      "name": "Limbum",
+      "iso": "lmp"
+    },
+    {
+      "id": "loka1252",
+      "name": "Lokaa",
+      "iso": "yaz"
+    },
+    {
+      "id": "long1389",
+      "name": "Longuda",
+      "iso": "lnu"
+    },
+    {
+      "id": "looo1238",
+      "name": "Loo",
+      "iso": "ldo"
+    },
+    {
+      "id": "lopa1238",
+      "name": "Lopa",
+      "iso": "lop"
+    },
+    {
+      "id": "lubi1238",
+      "name": "Lubila",
+      "iso": "kcc"
+    },
+    {
+      "id": "lufu1237",
+      "name": "Lufu",
+      "iso": "ldq"
+    },
+    {
+      "id": "luri1256",
+      "name": "Luri",
+      "iso": "ldd"
+    },
+    {
+      "id": "maak1236",
+      "name": "Maaka",
+      "iso": "mew"
+    },
+    {
+      "id": "mada1282",
+      "name": "Mada (Nigeria)",
+      "iso": "mda"
+    },
+    {
+      "id": "mafa1239",
+      "name": "Mafa",
+      "iso": "maf"
+    },
+    {
+      "id": "maga1273",
+      "name": "Magajingari Sign Language",
+      "iso": "NOCODE_Magajingari-Sign"
+    },
+    {
+      "id": "makn1235",
+      "name": "Mak (Nigeria)",
+      "iso": "pbl"
+    },
+    {
+      "id": "mala1471",
+      "name": "Mala (Nigeria)",
+      "iso": "ruy"
+    },
+    {
+      "id": "malg1251",
+      "name": "Malgwa",
+      "iso": "NOCODE_Malgwa"
+    },
+    {
+      "id": "mama1272",
+      "name": "Mama",
+      "iso": "mma"
+    },
+    {
+      "id": "mang1399",
+      "name": "Manga-Dagera Kanuri",
+      "iso": "kby"
+    },
+    {
+      "id": "mang1417",
+      "name": "Mangar",
+      "iso": "NOCODE_Mangar"
+    },
+    {
+      "id": "mang1416",
+      "name": "Mangas",
+      "iso": "zns"
+    },
+    {
+      "id": "marg1265",
+      "name": "Marghi Central",
+      "iso": "mrt"
+    },
+    {
+      "id": "marg1266",
+      "name": "Marghi South",
+      "iso": "mfm"
+    },
+    {
+      "id": "mash1269",
+      "name": "Mashi (Nigeria)",
+      "iso": "jms"
+    },
+    {
+      "id": "mawa1236",
+      "name": "Mawa (Nigeria)",
+      "iso": "wma"
+    },
+    {
+      "id": "mbay1241",
+      "name": "Mbay",
+      "iso": "myb"
+    },
+    {
+      "id": "mbee1249",
+      "name": "Mbe",
+      "iso": "mfo"
+    },
+    {
+      "id": "mboi1246",
+      "name": "Mboi",
+      "iso": "moi"
+    },
+    {
+      "id": "mbon1253",
+      "name": "Mbongno",
+      "iso": "bgu"
+    },
+    {
+      "id": "mbul1260",
+      "name": "Mbula-Bwazza",
+      "iso": "mbu"
+    },
+    {
+      "id": "mbur1239",
+      "name": "Mburku",
+      "iso": "bbt"
+    },
+    {
+      "id": "mund1334",
+      "name": "Mindat",
+      "iso": "mmf"
+    },
+    {
+      "id": "ming1254",
+      "name": "Mingang Doso",
+      "iso": "mko"
+    },
+    {
+      "id": "mish1244",
+      "name": "Miship",
+      "iso": "mjs"
+    },
+    {
+      "id": "miya1266",
+      "name": "Miya",
+      "iso": "mkf"
+    },
+    {
+      "id": "momj1237",
+      "name": "Mom Jango",
+      "iso": "ver"
+    },
+    {
+      "id": "mont1280",
+      "name": "Montol",
+      "iso": "mtl"
+    },
+    {
+      "id": "mooo1239",
+      "name": "Moo",
+      "iso": "gwg"
+    },
+    {
+      "id": "mpad1242",
+      "name": "Mpade",
+      "iso": "mpi"
+    },
+    {
+      "id": "nucl1240",
+      "name": "Mumuye",
+      "iso": "mzm"
+    },
+    {
+      "id": "mvan1238",
+      "name": "Mvano",
+      "iso": "mcj"
+    },
+    {
+      "id": "mwag1236",
+      "name": "Mwaghavul",
+      "iso": "sur"
+    },
+    {
+      "id": "magh1238",
+      "name": "Mághdì",
+      "iso": "gmd"
+    },
+    {
+      "id": "ndeg1238",
+      "name": "Nde-Gbite",
+      "iso": "ned"
+    },
+    {
+      "id": "nden1250",
+      "name": "Nde-Nsele-Nta",
+      "iso": "ndd"
+    },
+    {
+      "id": "ndoe1238",
+      "name": "Ndoe",
+      "iso": "nbb"
+    },
+    {
+      "id": "ndoo1241",
+      "name": "Ndoola",
+      "iso": "ndr"
+    },
+    {
+      "id": "ndun1251",
+      "name": "Ndunda",
+      "iso": "nuh"
+    },
+    {
+      "id": "ahwa1235",
+      "name": "Ndunic",
+      "iso": "nfd"
+    },
+    {
+      "id": "ngal1301",
+      "name": "Ngala of Lake Chad",
+      "iso": "NOCODE_Ngala-Barth"
+    },
+    {
+      "id": "ngam1268",
+      "name": "Ngambay",
+      "iso": "sba"
+    },
+    {
+      "id": "ngam1282",
+      "name": "Ngamo",
+      "iso": "nbh"
+    },
+    {
+      "id": "ngas1240",
+      "name": "Ngas",
+      "iso": "anc"
+    },
+    {
+      "id": "nggw1242",
+      "name": "Nggwahyi",
+      "iso": "ngx"
+    },
+    {
+      "id": "ngiz1242",
+      "name": "Ngizim",
+      "iso": "ngi"
+    },
+    {
+      "id": "ngwa1251",
+      "name": "Ngwaba",
+      "iso": "ngw"
+    },
+    {
+      "id": "nige1257",
+      "name": "Nigerian Pidgin",
+      "iso": "pcm"
+    },
+    {
+      "id": "nige1240",
+      "name": "Nigerian Sign Language",
+      "iso": "nsi"
+    },
+    {
+      "id": "ninz1246",
+      "name": "Ninzo",
+      "iso": "nin"
+    },
+    {
+      "id": "njan1240",
+      "name": "Njanga",
+      "iso": "NOCODE_Njanga"
+    },
+    {
+      "id": "njer1242",
+      "name": "Njerep",
+      "iso": "njr"
+    },
+    {
+      "id": "nkar1238",
+      "name": "Nkari",
+      "iso": "nkz"
+    },
+    {
+      "id": "nkem1242",
+      "name": "Nkem-Nkum",
+      "iso": "isi"
+    },
+    {
+      "id": "nkor1239",
+      "name": "Nkoroo",
+      "iso": "nkx"
+    },
+    {
+      "id": "nkuk1238",
+      "name": "Nkukoli",
+      "iso": "nbo"
+    },
+    {
+      "id": "nnam1238",
+      "name": "Nnam",
+      "iso": "nbp"
+    },
+    {
+      "id": "nort2775",
+      "name": "Northwest Gbaya",
+      "iso": "gya"
+    },
+    {
+      "id": "nshi1235",
+      "name": "Nshi",
+      "iso": "nsc"
+    },
+    {
+      "id": "nucl1698",
+      "name": "Nteng",
+      "iso": "nqt"
+    },
+    {
+      "id": "numa1252",
+      "name": "Numana",
+      "iso": "nbr"
+    },
+    {
+      "id": "nung1292",
+      "name": "Nungu",
+      "iso": "rin"
+    },
+    {
+      "id": "nupe1254",
+      "name": "Nupe-Nupe-Tako",
+      "iso": "nup"
+    },
+    {
+      "id": "nyam1285",
+      "name": "Nyam",
+      "iso": "nmi"
+    },
+    {
+      "id": "yesk1239",
+      "name": "Nyankpa",
+      "iso": "yes"
+    },
+    {
+      "id": "nyon1241",
+      "name": "Nyong",
+      "iso": "muo"
+    },
+    {
+      "id": "nzan1240",
+      "name": "Nzanyi",
+      "iso": "nja"
+    },
+    {
+      "id": "oban1244",
+      "name": "Obanliku",
+      "iso": "bzy"
+    },
+    {
+      "id": "obol1243",
+      "name": "Obolo",
+      "iso": "ann"
+    },
+    {
+      "id": "obul1239",
+      "name": "Obulom-Ochichi",
+      "iso": "obu"
+    },
+    {
+      "id": "odua1238",
+      "name": "Odual",
+      "iso": "odu"
+    },
+    {
+      "id": "odut1238",
+      "name": "Odut",
+      "iso": "oda"
+    },
+    {
+      "id": "ogba1241",
+      "name": "Ogbah",
+      "iso": "ogc"
+    },
+    {
+      "id": "ogbi1239",
+      "name": "Ogbia",
+      "iso": "ogb"
+    },
+    {
+      "id": "ogbo1242",
+      "name": "Ogbogolo",
+      "iso": "ogg"
+    },
+    {
+      "id": "ogbr1243",
+      "name": "Ogbronuagum",
+      "iso": "ogu"
+    },
+    {
+      "id": "okoe1238",
+      "name": "Oko-Eni-Osayen",
+      "iso": "oks"
+    },
+    {
+      "id": "okob1241",
+      "name": "Okobo",
+      "iso": "okb"
+    },
+    {
+      "id": "okod1238",
+      "name": "Okodia",
+      "iso": "okd"
+    },
+    {
+      "id": "okpa1238",
+      "name": "Okpamheri",
+      "iso": "opa"
+    },
+    {
+      "id": "okpe1249",
+      "name": "Okpe (Northwestern Edo)",
+      "iso": "okx"
+    },
+    {
+      "id": "okpe1250",
+      "name": "Okpe (Southwestern Edo)",
+      "iso": "oke"
+    },
+    {
+      "id": "olom1241",
+      "name": "Oloma",
+      "iso": "olm"
+    },
+    {
+      "id": "olul1245",
+      "name": "Olulumo-Ikom",
+      "iso": "iko"
+    },
+    {
+      "id": "orin1239",
+      "name": "Oring",
+      "iso": "org"
+    },
+    {
+      "id": "oroo1241",
+      "name": "Oro",
+      "iso": "orx"
+    },
+    {
+      "id": "orum1241",
+      "name": "Oruma",
+      "iso": "orr"
+    },
+    {
+      "id": "osos1238",
+      "name": "Ososo",
+      "iso": "oso"
+    },
+    {
+      "id": "otan1238",
+      "name": "Otank",
+      "iso": "uta"
+    },
+    {
+      "id": "paaa1242",
+      "name": "Pa'a",
+      "iso": "pqa"
+    },
+    {
+      "id": "kofy1242",
+      "name": "Pan",
+      "iso": "kwl"
+    },
+    {
+      "id": "pana1293",
+      "name": "Pana (Central African Republic)",
+      "iso": "pnz"
+    },
+    {
+      "id": "pana1298",
+      "name": "Panawa",
+      "iso": "pwb"
+    },
+    {
+      "id": "pang1286",
+      "name": "Pangseng",
+      "iso": "pgs"
+    },
+    {
+      "id": "peer1241",
+      "name": "Peere",
+      "iso": "pfe"
+    },
+    {
+      "id": "pero1241",
+      "name": "Pero",
+      "iso": "pip"
+    },
+    {
+      "id": "polc1243",
+      "name": "Pesse",
+      "iso": "pze"
+    },
+    {
+      "id": "piti1243",
+      "name": "Piti",
+      "iso": "pcn"
+    },
+    {
+      "id": "piya1245",
+      "name": "Piya-Kwonci",
+      "iso": "piy"
+    },
+    {
+      "id": "pong1250",
+      "name": "Pongu",
+      "iso": "png"
+    },
+    {
+      "id": "psik1239",
+      "name": "Psikye",
+      "iso": "kvj"
+    },
+    {
+      "id": "puta1243",
+      "name": "Putai",
+      "iso": "mfl"
+    },
+    {
+      "id": "pyap1239",
+      "name": "Pyapun",
+      "iso": "pcw"
+    },
+    {
+      "id": "peee1238",
+      "name": "Pye",
+      "iso": "pai"
+    },
+    {
+      "id": "rang1269",
+      "name": "Rang",
+      "iso": "rax"
+    },
+    {
+      "id": "resh1242",
+      "name": "Reshe",
+      "iso": "res"
+    },
+    {
+      "id": "rish1234",
+      "name": "Rishiwa",
+      "iso": "rsw"
+    },
+    {
+      "id": "tanj1247",
+      "name": "Rjili",
+      "iso": "uji"
+    },
+    {
+      "id": "agoi1246",
+      "name": "Robambami",
+      "iso": "ibm"
+    },
+    {
+      "id": "rogo1238",
+      "name": "Rogo",
+      "iso": "rod"
+    },
+    {
+      "id": "ronn1241",
+      "name": "Ron",
+      "iso": "cla"
+    },
+    {
+      "id": "ruma1250",
+      "name": "Ruma",
+      "iso": "ruz"
+    },
+    {
+      "id": "tsis1238",
+      "name": "Salka-Tsishingini",
+      "iso": "tsw"
+    },
+    {
+      "id": "samb1311",
+      "name": "Sama Mum",
+      "iso": "ccg"
+    },
+    {
+      "id": "samb1305",
+      "name": "Samba Leko",
+      "iso": "ndi"
+    },
+    {
+      "id": "samb1307",
+      "name": "Sambe",
+      "iso": "xab"
+    },
+    {
+      "id": "sang1329",
+      "name": "Sanga (Nigeria)",
+      "iso": "xsn"
+    },
+    {
+      "id": "sasa1247",
+      "name": "Sasaru",
+      "iso": "sxs"
+    },
+    {
+      "id": "saya1246",
+      "name": "Saya",
+      "iso": "say"
+    },
+    {
+      "id": "shal1242",
+      "name": "Shall-Zwall",
+      "iso": "sha"
+    },
+    {
+      "id": "sham1278",
+      "name": "Shama-Sambuga",
+      "iso": "sqa"
+    },
+    {
+      "id": "sham1277",
+      "name": "Shamang",
+      "iso": "xsh"
+    },
+    {
+      "id": "shan1278",
+      "name": "Shang",
+      "iso": "NOCODE_Shang"
+    },
+    {
+      "id": "shan1282",
+      "name": "Shanga",
+      "iso": "sho"
+    },
+    {
+      "id": "shau1238",
+      "name": "Shau",
+      "iso": "sqh"
+    },
+    {
+      "id": "shen1251",
+      "name": "Sheni-Ziriya",
+      "iso": "scv"
+    },
+    {
+      "id": "shik1242",
+      "name": "Shiki",
+      "iso": "gua"
+    },
+    {
+      "id": "shoo1247",
+      "name": "Shoo-Minda-Nye",
+      "iso": "bcv"
+    },
+    {
+      "id": "shuw1238",
+      "name": "Shuwa-Zamani",
+      "iso": "ksa"
+    },
+    {
+      "id": "siri1278",
+      "name": "Siri",
+      "iso": "sir"
+    },
+    {
+      "id": "somy1238",
+      "name": "Somyev",
+      "iso": "kgt"
+    },
+    {
+      "id": "sout2774",
+      "name": "Southeast Ijo",
+      "iso": "ijs"
+    },
+    {
+      "id": "mfum1238",
+      "name": "Southern Mfumte",
+      "iso": "nfu"
+    },
+    {
+      "id": "suku1272",
+      "name": "Sukur",
+      "iso": "syk"
+    },
+    {
+      "id": "surr1238",
+      "name": "Sur",
+      "iso": "tdl"
+    },
+    {
+      "id": "shaa1247",
+      "name": "Sya",
+      "iso": "scw"
+    },
+    {
+      "id": "tagd1238",
+      "name": "Tagdal",
+      "iso": "tda"
+    },
+    {
+      "id": "taha1241",
+      "name": "Tahaggart Tamahaq",
+      "iso": "thv"
+    },
+    {
+      "id": "tall1250",
+      "name": "Tal",
+      "iso": "tal"
+    },
+    {
+      "id": "tala1295",
+      "name": "Tala",
+      "iso": "tak"
+    },
+    {
+      "id": "tamb1267",
+      "name": "Tambas",
+      "iso": "tdk"
+    },
+    {
+      "id": "nucl1696",
+      "name": "Tangale",
+      "iso": "tan"
+    },
+    {
+      "id": "tarj1235",
+      "name": "Tarjumo",
+      "iso": "txj"
+    },
+    {
+      "id": "taro1263",
+      "name": "Tarok",
+      "iso": "yer"
+    },
+    {
+      "id": "tasa1240",
+      "name": "Tasawaq",
+      "iso": "twq"
+    },
+    {
+      "id": "tawa1286",
+      "name": "Tawallammat Tamajaq",
+      "iso": "ttq"
+    },
+    {
+      "id": "teda1241",
+      "name": "Tedaga",
+      "iso": "tuq"
+    },
+    {
+      "id": "teee1242",
+      "name": "Tee",
+      "iso": "tkq"
+    },
+    {
+      "id": "teme1252",
+      "name": "Teme",
+      "iso": "tdo"
+    },
+    {
+      "id": "tepp1235",
+      "name": "Tep",
+      "iso": "NOCODE_Tep"
+    },
+    {
+      "id": "tera1251",
+      "name": "Tera",
+      "iso": "ttr"
+    },
+    {
+      "id": "tesh1239",
+      "name": "Teshenawa",
+      "iso": "twc"
+    },
+    {
+      "id": "tets1235",
+      "name": "Tetserret",
+      "iso": "tez"
+    },
+    {
+      "id": "thaa1239",
+      "name": "Tha",
+      "iso": "thy"
+    },
+    {
+      "id": "tigo1236",
+      "name": "Tigon Mbembe",
+      "iso": "nza"
+    },
+    {
+      "id": "tita1240",
+      "name": "Tita",
+      "iso": "tdq"
+    },
+    {
+      "id": "tivv1240",
+      "name": "Tiv",
+      "iso": "tiv"
+    },
+    {
+      "id": "yaaa1242",
+      "name": "Tiyaa",
+      "iso": "tyy"
+    },
+    {
+      "id": "toro1249",
+      "name": "Toro",
+      "iso": "tdv"
+    },
+    {
+      "id": "tsik1238",
+      "name": "Tsikimba",
+      "iso": "kdl"
+    },
+    {
+      "id": "tsoo1241",
+      "name": "Tso",
+      "iso": "ldp"
+    },
+    {
+      "id": "tsuv1239",
+      "name": "Tsuvadi",
+      "iso": "tvd"
+    },
+    {
+      "id": "tula1252",
+      "name": "Tula",
+      "iso": "tul"
+    },
+    {
+      "id": "nucl1693",
+      "name": "Tulai",
+      "iso": "tvi"
+    },
+    {
+      "id": "tumi1238",
+      "name": "Tumi",
+      "iso": "kku"
+    },
+    {
+      "id": "tunz1235",
+      "name": "Tunzu",
+      "iso": "dza"
+    },
+    {
+      "id": "tyap1238",
+      "name": "Tyap",
+      "iso": "kcg"
+    },
+    {
+      "id": "ubag1245",
+      "name": "Ubaghara",
+      "iso": "byc"
+    },
+    {
+      "id": "uban1243",
+      "name": "Ubang",
+      "iso": "uba"
+    },
+    {
+      "id": "udaa1238",
+      "name": "Uda",
+      "iso": "uda"
+    },
+    {
+      "id": "mesa1245",
+      "name": "Ugare",
+      "iso": "iyo"
+    },
+    {
+      "id": "uham1238",
+      "name": "Uhami",
+      "iso": "uha"
+    },
+    {
+      "id": "ukaa1243",
+      "name": "Ukaan",
+      "iso": "kcf"
+    },
+    {
+      "id": "ukpe1247",
+      "name": "Ukpe-Bayobiri",
+      "iso": "ukp"
+    },
+    {
+      "id": "ukpe1249",
+      "name": "Ukpet-Ehom",
+      "iso": "akd"
+    },
+    {
+      "id": "ukue1238",
+      "name": "Ukue",
+      "iso": "uku"
+    },
+    {
+      "id": "ukwa1238",
+      "name": "Ukwa",
+      "iso": "ukq"
+    },
+    {
+      "id": "ukwu1241",
+      "name": "Ukwuani-Aboh-Ndoni",
+      "iso": "ukw"
+    },
+    {
+      "id": "uluk1257",
+      "name": "Ulukwumi",
+      "iso": "ulb"
+    },
+    {
+      "id": "umon1238",
+      "name": "Umon",
+      "iso": "umm"
+    },
+    {
+      "id": "unem1238",
+      "name": "Uneme",
+      "iso": "une"
+    },
+    {
+      "id": "uokh1238",
+      "name": "Uokha",
+      "iso": "uok"
+    },
+    {
+      "id": "urho1239",
+      "name": "Urhobo",
+      "iso": "urh"
+    },
+    {
+      "id": "usag1244",
+      "name": "Usaghade",
+      "iso": "usk"
+    },
+    {
+      "id": "kagf1238",
+      "name": "Ut-Main",
+      "iso": "gel"
+    },
+    {
+      "id": "putu1241",
+      "name": "Utugwang-Irungene-Afrike",
+      "iso": "afe"
+    },
+    {
+      "id": "uvbi1238",
+      "name": "Uvbie",
+      "iso": "evh"
+    },
+    {
+      "id": "uzek1238",
+      "name": "Uzekwe",
+      "iso": "eze"
+    },
+    {
+      "id": "vemg1240",
+      "name": "Vemgo-Mabas",
+      "iso": "vem"
+    },
+    {
+      "id": "vere1252",
+      "name": "Vere Kaadam",
+      "iso": "NOCODE_Vere-Kaadam"
+    },
+    {
+      "id": "viti1241",
+      "name": "Viti",
+      "iso": "vit"
+    },
+    {
+      "id": "vono1238",
+      "name": "Vono",
+      "iso": "kch"
+    },
+    {
+      "id": "suru1258",
+      "name": "Vori",
+      "iso": "sde"
+    },
+    {
+      "id": "voro1240",
+      "name": "Voro",
+      "iso": "vor"
+    },
+    {
+      "id": "vute1244",
+      "name": "Vute",
+      "iso": "vut"
+    },
+    {
+      "id": "waja1259",
+      "name": "Waja",
+      "iso": "wja"
+    },
+    {
+      "id": "waka1275",
+      "name": "Waka",
+      "iso": "wav"
+    },
+    {
+      "id": "wand1278",
+      "name": "Wandala",
+      "iso": "mfi"
+    },
+    {
+      "id": "wann1241",
+      "name": "Wannu",
+      "iso": "jub"
+    },
+    {
+      "id": "wapa1235",
+      "name": "Wapan",
+      "iso": "juk"
+    },
+    {
+      "id": "warj1253",
+      "name": "Warji-Gala",
+      "iso": "wji"
+    },
+    {
+      "id": "wawa1246",
+      "name": "Wawa",
+      "iso": "www"
+    },
+    {
+      "id": "nige1255",
+      "name": "Western Mambila",
+      "iso": "mzk"
+    },
+    {
+      "id": "west2454",
+      "name": "Western Niger Fulfulde",
+      "iso": "fuh"
+    },
+    {
+      "id": "cish1238",
+      "name": "Western-Kambari-Cishingini",
+      "iso": "asg"
+    },
+    {
+      "id": "womn1235",
+      "name": "Wom (Nigeria)",
+      "iso": "wom"
+    },
+    {
+      "id": "waph1238",
+      "name": "Wãpha",
+      "iso": "juw"
+    },
+    {
+      "id": "yace1238",
+      "name": "Yace",
+      "iso": "ekr"
+    },
+    {
+      "id": "yala1263",
+      "name": "Yala",
+      "iso": "yba"
+    },
+    {
+      "id": "yamb1251",
+      "name": "Yamba",
+      "iso": "yam"
+    },
+    {
+      "id": "yang1290",
+      "name": "Yangkam",
+      "iso": "bsx"
+    },
+    {
+      "id": "cind1241",
+      "name": "Yara",
+      "iso": "cdr"
+    },
+    {
+      "id": "yekh1238",
+      "name": "Yekhee",
+      "iso": "ets"
+    },
+    {
+      "id": "yend1241",
+      "name": "Yendang",
+      "iso": "ynq"
+    },
+    {
+      "id": "yend1240",
+      "name": "Yendang (Retired)",
+      "iso": "yen"
+    },
+    {
+      "id": "yiwo1237",
+      "name": "Yiwom",
+      "iso": "gek"
+    },
+    {
+      "id": "yoru1245",
+      "name": "Yoruba",
+      "iso": "yor"
+    },
+    {
+      "id": "yoru1246",
+      "name": "Yoruba Sign Language",
+      "iso": "NOCODE_Yoruba-Sign"
+    },
+    {
+      "id": "yott1234",
+      "name": "Yotti",
+      "iso": "yot"
+    },
+    {
+      "id": "yuku1243",
+      "name": "Yukuben",
+      "iso": "ybl"
+    },
+    {
+      "id": "zang1255",
+      "name": "Zangwal",
+      "iso": "zah"
+    },
+    {
+      "id": "zari1242",
+      "name": "Zari",
+      "iso": "zaz"
+    },
+    {
+      "id": "zarm1239",
+      "name": "Zarma-Kaado",
+      "iso": "dje"
+    },
+    {
+      "id": "zeem1242",
+      "name": "Zeem",
+      "iso": "zem"
+    },
+    {
+      "id": "zhir1238",
+      "name": "Zhire",
+      "iso": "zhi"
+    },
+    {
+      "id": "zizi1238",
+      "name": "Zizilivakan",
+      "iso": "ziz"
+    },
+    {
+      "id": "zull1239",
+      "name": "Zul",
+      "iso": "zlu"
+    },
+    {
+      "id": "zumb1240",
+      "name": "Zumbun",
+      "iso": "jmb"
+    },
+    {
+      "id": "ahan1244",
+      "name": "Àhàn",
+      "iso": "ahn"
+    },
+    {
+      "id": "anca1236",
+      "name": "Áncá",
+      "iso": "acb"
+    }
+  ]
+}

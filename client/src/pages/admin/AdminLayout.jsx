@@ -1,3 +1,4 @@
+import SupportLanguageDesk from '../../components/admin/SupportLanguageDesk';
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { NavLink, Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -1664,6 +1665,9 @@ const AdminLayout = () => {
               You are viewing scoped admin data for <span className="font-semibold">{assignedStateLabel}{assignedLgaLabel ? `, ${assignedLgaLabel}` : ''}</span>.
             </div>
           )}
+          <Link className="my-3 inline-block rounded border p-3" to="/admin/code-of-conduct">Code of Conduct: download, sign and submit</Link>
+          {isSuperAdmin&&<Link to="/admin/background-jobs" className="mx-3 inline-block rounded border p-3">Background jobs</Link>}
+          <SupportLanguageDesk user={user}/>
           <Outlet />
         </main>
       </div>

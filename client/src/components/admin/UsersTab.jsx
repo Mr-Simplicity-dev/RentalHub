@@ -178,8 +178,8 @@ const UsersTab = ({
     const { user, action, reason } = accountAction;
     const normalizedReason = reason.trim();
 
-    if ((action === "ban" || action === "delete" || action === "bulk_ban") && !normalizedReason) {
-      setAccountActionError(action === "delete" ? "Deletion reason is required." : "Ban reason is required.");
+    if ((action === "ban" || action === "delete" || action === "bulk_ban" || action === "bulk_verify") && !normalizedReason) {
+      setAccountActionError(action === "delete" ? "Deletion reason is required." : "A decision reason is required.");
       return;
     }
 
@@ -190,6 +190,10 @@ const UsersTab = ({
         await unbanUser(user.id, normalizedReason);
       } else if (action === "delete") {
         await deleteUser(user.id, normalizedReason);
+      } else if(action==='bulk_verify'){
+        const completed=await bulkUsers('verify',normalizedReason);
+        if(completed===false){setAccountActionError('Verification was not completed. Check the identity review message and try again.');return;}
+        setSelectedUsers([]);
       } else if (action === "bulk_ban") {
         await bulkUsers("ban", normalizedReason);
         setSelectedUsers([]);
@@ -222,7 +226,7 @@ const UsersTab = ({
           </button>
 
           <button
-            onClick={() => bulkUsers("verify")}
+            onClick={() => openAccountAction(null,"bulk_verify")}
             className="rounded-lg bg-green-600 px-3 py-1 text-sm text-white transition-colors hover:bg-green-700"
           >
             Verify
@@ -865,7 +869,7 @@ const UsersTab = ({
           <div className="w-full max-w-md rounded-xl2 bg-white shadow-card">
             <div className="border-b border-soft px-6 py-4">
               <h3 className="text-lg font-semibold text-gray-900">
-                {accountAction.action === "bulk_ban"
+                {accountAction.action === "bulk_verify" ? "Verify selected users" : accountAction.action === "bulk_ban"
                   ? "Ban selected users"
                   : accountAction.action === "ban"
                   ? "Ban user"
@@ -874,7 +878,7 @@ const UsersTab = ({
                   : "Unban user"}
               </h3>
               <p className="mt-1 text-sm text-gray-500">
-                {accountAction.action === "bulk_ban"
+                {accountAction.action === "bulk_verify" ? `${selectedUsers.length} selected users will be checked and verified. Explain your review decision below.` : accountAction.action === "bulk_ban"
                   ? `${selectedUsers.length} selected user${selectedUsers.length === 1 ? "" : "s"} will be banned.`
                   : `${accountAction.user?.full_name || "This user"} (${accountAction.user?.email || "no email"})`}
               </p>

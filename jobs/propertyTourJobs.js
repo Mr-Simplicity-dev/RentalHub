@@ -1,3 +1,5 @@
+const {timeout:setTimeout}=require('../services/backgroundJobRuntime');
+const {interval:setInterval}=require('../services/backgroundJobRuntime');
 const db = require('../config/middleware/database');
 const logger = require('../config/utils/logger');
 const { generatePropertyTour } = require('../config/utils/propertyTourService');
@@ -142,18 +144,18 @@ const startPropertyTourJobs = () => {
   started = true;
 
   // Only one worker should own the timer in a pm2 cluster.
-  if (process.env.pm_id && process.env.pm_id !== '0') return;
+
 
   const intervalMs =
     Math.max(30, Number(process.env.PROPERTY_TOUR_TICK_SECONDS) || 120) * 1000;
 
   const timer = setInterval(() => {
-    void runPropertyTourJobs();
+    return runPropertyTourJobs();
   }, intervalMs);
   if (typeof timer.unref === 'function') timer.unref();
 
   setTimeout(() => {
-    void runPropertyTourJobs();
+    return runPropertyTourJobs();
   }, 45000).unref?.();
 };
 

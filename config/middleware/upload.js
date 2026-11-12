@@ -240,7 +240,7 @@ const reprocessPassportImage = async (req, res, next) => {
 
   try {
     const sharp = require('sharp');
-    const jpgPath = req.file.path.replace(/\.[^.]+$/, '') + '.jpg';
+    const jpgPath = req.file.path.replace(/\.[^.]+$/, '') + '.processed.jpg';
 
     await sharp(req.file.path, { failOn: 'error' })
       .rotate()

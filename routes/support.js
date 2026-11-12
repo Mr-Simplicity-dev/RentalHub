@@ -10,6 +10,9 @@ const validateRequest = require('../config/middleware/validateRequest');
 const { ZONE_STATES, canonicalZone, zoneContainsState, zoneForState } = require('../config/utils/territorialZones');
 
 const router = express.Router();
+router.use('/tickets/:ticketId/dispute-handover',require('./supportDisputes'));
+router.get('/tickets/:id/customer',authenticate,require('../config/utils/twoFactor').requirePrivilegedMfa,require('../config/middleware/securityRateLimiters').supportCustomerLookupLimiter,async(req,res,next)=>{try{res.set('Cache-Control','no-store');res.json({success:true,data:await require('../services/supportCustomerService').getCustomer(req.user,req.params.id)});}catch(error){if(error.statusCode)return res.status(error.statusCode).json({success:false,message:error.message});next(error);}});
+router.get('/dispute-handovers',authenticate,async(req,res,next)=>{try{res.json({success:true,data:await require('../services/supportDisputeHandoverService').listOwn(req)});}catch(error){next(error);}});
 const logger = require('../config/utils/logger');
 const activityLogger = require('../services/activityLogger');
 
@@ -1057,7 +1060,7 @@ const sendSupportAlertEmails = async (recipientIds, subject, message, path = '/a
       });
     }
   } catch (err) {
-    req.logger.error('Support alert email error (non-fatal):', err.message || err);
+    logger.error('Support alert email error (non-fatal):', err.message || err);
   }
 };
 
@@ -1166,7 +1169,7 @@ const addReplyNotification = async (reply, ticket, senderId, recipientId) => {
       preview: (reply.message || '').substring(0, 100),
     });
   } catch (err) {
-    req.logger.error('Add reply notification error:', err);
+    logger.error('Add reply notification error:', err);
   }
 };
 
@@ -1198,7 +1201,7 @@ const notifySlaRisk = async (ticket, severity, policies = {}) => {
       await sendSupportAlertEmails(recipientIds, title, message, link);
     }
   } catch (err) {
-    req.logger.error('Support SLA notification error:', err);
+    logger.error('Support SLA notification error:', err);
   }
 };
 
@@ -1233,7 +1236,7 @@ const notifyPolicyRisk = async (ticket, severity, policies = {}) => {
 
     await notifyDepartmentEscalation(ticket, ticket.escalation_department, message);
   } catch (err) {
-    req.logger.error('Support policy notification error:', err);
+    logger.error('Support policy notification error:', err);
   }
 };
 
@@ -1347,9 +1350,9 @@ const runSupportSlaMonitor = async () => {
 };
 
 if (process.env.NODE_ENV !== 'test') {
-  const supportSlaMonitor = setInterval(runSupportSlaMonitor, 5 * 60 * 1000);
+  const supportSlaMonitor = require('../services/backgroundJobRuntime').interval(runSupportSlaMonitor, 5 * 60 * 1000);
   if (typeof supportSlaMonitor.unref === 'function') supportSlaMonitor.unref();
-  setTimeout(runSupportSlaMonitor, 30000).unref?.();
+  require('../services/backgroundJobRuntime').timeout(runSupportSlaMonitor, 30000).unref?.();
 }
 
 const sendReplyEmail = async (reply, ticket, sender) => {
@@ -1385,7 +1388,7 @@ const sendReplyEmail = async (reply, ticket, sender) => {
       }
     }
   } catch (err) {
-    req.logger.error('Reply email error:', err);
+    logger.error('Reply email error:', err);
   }
 };
 
@@ -1410,20 +1413,22 @@ router.post('/contact', contactFormLimiter, [
     await ensureSupportSchema();
 
     const { name, email, state, lga, subject, message, priority, related_id } = req.body;
+    const guestContact=require('../services/supportCustomerService').captureGuestContact(req.body);
     const relatedType = normalizeRelatedType(req.body.related_type);
     const category = normalizeSupportCategory(req.body.category, relatedType);
     const relatedId = relatedType && Number.isInteger(Number(related_id)) ? Number(related_id) : null;
     const normalizedPriority = priority || 'medium';
     const escalationDepartment = normalizeDepartment(req.body.escalation_department, category, relatedType);
     const slaDueAt = resolveSlaDueAt(category, normalizedPriority);
+    try{require('../config/utils/languagePolicy').languagePreference(req.body.preferred_language);}catch(error){return res.status(400).json({message:error.message});}
     const guestAccessToken = generateGuestAccessToken();
     const guestAccessTokenHash = hashGuestAccessToken(guestAccessToken);
     const result = await db.query(
       `INSERT INTO support_tickets
          (subject, description, state, lga, contact_email, priority, status, user_id,
           category, related_type, related_id, escalation_department, sla_due_at,
-          guest_access_token_hash, guest_access_token_created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, 'open', NULL, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP)
+          guest_access_token_hash, guest_access_token_created_at, contact_name, contact_phone)
+       VALUES ($1, $2, $3, $4, $5, $6, 'open', NULL, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP, $13, $14)
        RETURNING id`,
       [
         subject?.trim() ? `[Contact] ${subject.trim()}` : `[Contact] ${name.trim()}`,
@@ -1440,6 +1445,8 @@ router.post('/contact', contactFormLimiter, [
         escalationDepartment,
         slaDueAt,
         guestAccessTokenHash,
+        guestContact.name,
+        guestContact.phone,
       ]
     );
 
@@ -1467,73 +1474,9 @@ router.post('/contact', contactFormLimiter, [
       { category, related_type: relatedType, related_id: relatedId, escalation_department: escalationDepartment }
     );
 
-    // Auto-assign: LGA support → State support → Super support (least-loaded)
+    let languageAssigned=null;
     try {
-      let assignedTo = null;
-
-      if (lga) {
-        const lgaResult = await db.query(
-          `SELECT u.id, COUNT(st.id) AS open_tickets
-           FROM users u
-           LEFT JOIN support_tickets st ON st.assigned_to = u.id
-             AND st.status NOT IN ('resolved', 'closed')
-           WHERE u.user_type = 'lga_support_admin'
-             AND u.assigned_state = $1
-             AND u.assigned_city = $2
-             AND u.deleted_at IS NULL AND u.account_suspended_at IS NULL
-           GROUP BY u.id
-           ORDER BY open_tickets ASC, u.id ASC
-           LIMIT 1`,
-          [state, lga]
-        );
-        if (lgaResult.rows.length > 0) assignedTo = lgaResult.rows[0].id;
-      }
-
-      if (!assignedTo) {
-        const stateResult = await db.query(
-          `SELECT u.id, COUNT(st.id) AS open_tickets
-           FROM users u
-           LEFT JOIN support_tickets st ON st.assigned_to = u.id
-             AND st.status NOT IN ('resolved', 'closed')
-           WHERE u.user_type = 'state_support_admin'
-             AND u.assigned_state = $1
-             AND u.deleted_at IS NULL AND u.account_suspended_at IS NULL
-           GROUP BY u.id
-           ORDER BY open_tickets ASC, u.id ASC
-           LIMIT 1`,
-          [state]
-        );
-        if (stateResult.rows.length > 0) assignedTo = stateResult.rows[0].id;
-      }
-
-      if (!assignedTo) {
-        const superResult = await db.query(
-          `SELECT u.id, COUNT(st.id) AS open_tickets
-           FROM users u
-           LEFT JOIN support_tickets st ON st.assigned_to = u.id
-             AND st.status NOT IN ('resolved', 'closed')
-           WHERE u.user_type = 'super_support_admin'
-             AND u.deleted_at IS NULL AND u.account_suspended_at IS NULL
-           GROUP BY u.id
-           ORDER BY open_tickets ASC, u.id ASC
-           LIMIT 1`
-        );
-        if (superResult.rows.length > 0) assignedTo = superResult.rows[0].id;
-      }
-
-      if (assignedTo) {
-        await db.query('UPDATE support_tickets SET assigned_to = $1 WHERE id = $2', [assignedTo, ticketId]);
-
-        await activityLogger.log({
-          userId: assignedTo,
-          action: 'ticket_auto_assigned',
-          entityType: 'ticket',
-          entityId: ticketId,
-          metadata: { source: 'contact_form', state, lga },
-          state,
-          lga,
-        });
-      }
+      languageAssigned=await require('../services/supportLanguageService').assignLanguageTicket(ticketId,req.body.preferred_language);
     } catch (assignErr) {
       logger.error('Ticket auto-assignment error (non-fatal):', assignErr);
     }
@@ -1564,10 +1507,11 @@ router.post('/contact', contactFormLimiter, [
     setGuestResponseNoStore(res);
     res.status(201).json({
       success: true,
-      message: 'Message sent successfully',
-      data: { ticketId, guestAccessToken },
+      message: languageAssigned?'Message sent successfully':'Your request is saved. Senior support is arranging an available agent for your language.',
+      data: { ticketId, guestAccessToken, language_match_pending:!languageAssigned },
     });
   } catch (error) {
+    if(error.statusCode)return res.status(error.statusCode).json({success:false,message:error.message});
     req.logger.error('Contact form error:', error);
     res.status(500).json({ success: false, message: 'Failed to send message' });
   }
@@ -1616,6 +1560,7 @@ router.post('/tickets', authenticate, [
   try {
     await ensureSupportSchema();
 
+    try{require('../config/utils/languagePolicy').languagePreference(req.body.preferred_language);}catch(error){return res.status(400).json({message:error.message});}
     const { subject, description, priority, state, lga, related_id } = req.body;
     const relatedType = normalizeRelatedType(req.body.related_type);
     const category = normalizeSupportCategory(req.body.category, relatedType);
@@ -1662,93 +1607,8 @@ router.post('/tickets', authenticate, [
       logger.warn(`Handover schema check skipped: ${schemaError.message}`);
     }
 
-    // Auto-assign: LGA support → State support → Super support (least-loaded).
-    // State names are compared loosely because rows mix "FCT" and
-    // "Federal Capital Territory"; a strict text match left tickets unassigned.
     try {
-      const { normalizeStateName } = require('../config/utils/stateName');
-      const { notifyTicketCreated } = require('../config/utils/ticketNotificationService');
-
-      const stateKey = normalizeStateName(state);
-      let assignedTo = null;
-
-      if (stateKey) {
-        const findSupportAdmin = async ({ userType, lgaName = null }) => {
-          const params = [stateKey, userType];
-          let lgaClause = '';
-          if (lgaName) {
-            params.push(String(lgaName).trim().toLowerCase());
-            lgaClause = ` AND LOWER(TRIM(COALESCE(u.assigned_city, ''))) = $${params.length}`;
-          }
-
-          const result = await db.query(
-            `SELECT u.id, COUNT(st.id) AS open_tickets
-             FROM users u
-             LEFT JOIN support_tickets st ON st.assigned_to = u.id
-               AND st.status NOT IN ('resolved', 'closed')
-             WHERE u.user_type = $2
-               AND LOWER(TRIM(COALESCE(u.assigned_state, ''))) <> ''
-               AND regexp_replace(LOWER(TRIM(u.assigned_state)), '\\s+state$', '') IN ($1, 'federal capital territory')
-               ${lgaClause}
-               AND u.deleted_at IS NULL AND u.account_suspended_at IS NULL
-             GROUP BY u.id
-             ORDER BY open_tickets ASC, u.id ASC
-             LIMIT 1`,
-            params
-          );
-          return result.rows[0]?.id || null;
-        };
-
-        if (lga) {
-          assignedTo = await findSupportAdmin({ userType: 'lga_support_admin', lgaName: lga });
-        }
-        if (!assignedTo && stateKey) {
-          assignedTo = await findSupportAdmin({ userType: 'state_support_admin' });
-        }
-        if (!assignedTo) {
-          const superResult = await db.query(
-            `SELECT u.id, COUNT(st.id) AS open_tickets
-             FROM users u
-             LEFT JOIN support_tickets st ON st.assigned_to = u.id
-               AND st.status NOT IN ('resolved', 'closed')
-             WHERE u.user_type = 'super_support_admin'
-               AND u.deleted_at IS NULL AND u.account_suspended_at IS NULL
-             GROUP BY u.id
-             ORDER BY open_tickets ASC, u.id ASC
-             LIMIT 1`
-          );
-          if (superResult.rows.length > 0) assignedTo = superResult.rows[0].id;
-        }
-      }
-
-      if (assignedTo) {
-        await db.query('UPDATE support_tickets SET assigned_to = $1 WHERE id = $2', [assignedTo, ticket.id]);
-        ticket.assigned_to = assignedTo;
-
-        // Start the 90-second first-response clock from this moment.
-        try {
-          const { markTicketAssigned } = require('../services/supportReassignService');
-          await markTicketAssigned(ticket.id, assignedTo);
-        } catch (assignClockError) {
-          logger.warn(`Assign clock start skipped: ${assignClockError.message}`);
-        }
-
-        await activityLogger.log({
-          userId: assignedTo,
-          action: 'ticket_auto_assigned',
-          entityType: 'ticket',
-          entityId: ticket.id,
-          metadata: { source: 'authenticated', state, lga, userId: req.user.id },
-          state,
-          lga,
-          ip: req.ip,
-        });
-      }
-
-      // Write a real notification so a new ticket is never silent. This works
-      // whether or not the admin has the dashboard open, and it feeds the
-      // unread badge that every surface reads.
-      await notifyTicketCreated({ ticket, assignedTo });
+      ticket.assigned_to=await require('../services/supportLanguageService').assignLanguageTicket(ticket.id,req.body.preferred_language);
     } catch (assignErr) {
       logger.error('Ticket auto-assignment error (non-fatal):', assignErr);
     }
@@ -1758,7 +1618,7 @@ router.post('/tickets', authenticate, [
       ticket,
     });
 
-    res.status(201).json({ success: true, data: ticket });
+    res.status(201).json({ success: true, data: ticket, message:ticket.assigned_to?'Support request saved.':'Your request is saved. Senior support is arranging an available agent for your language.' });
   } catch (error) {
     req.logger.error('Create support ticket error:', error);
     res.status(500).json({ success: false, message: 'Failed to create support ticket' });
@@ -1771,7 +1631,7 @@ router.get('/tickets/my', authenticate, async (req, res) => {
 
     const result = await db.query(
       `SELECT st.id, st.subject, st.description, st.state, st.lga, st.priority, st.status,
-              st.category, st.related_type, st.related_id, st.escalation_department,
+              st.preferred_language, st.category, st.related_type, st.related_id, st.escalation_department,
               st.escalation_status, st.sla_due_at, st.last_escalated_at,
               st.escalated_at, st.resolved_at, st.created_at, st.updated_at,
               (SELECT COUNT(*) FROM support_ticket_replies str WHERE str.ticket_id = st.id AND str.is_admin = TRUE AND (str.read_at IS NULL OR str.read_at < st.updated_at))::int AS unread_admin_replies
@@ -1790,28 +1650,31 @@ router.get('/tickets/my', authenticate, async (req, res) => {
 
 // Admin ticket listing
 
-router.get('/tickets', authenticate, requireSupportAdmin, async (req, res) => {
+const listSupportTickets = async (req, res) => {
+  res.set('Cache-Control','no-store');
+  const criteria=req.method==='POST'?(req.body||{}):req.query;
   try {
     await ensureSupportSchema();
 
     const where = [];
     const params = [];
 
-    if (req.query.status && req.query.status !== 'all') {
-      params.push(String(req.query.status));
+    if (criteria.status && criteria.status !== 'all') {
+      params.push(String(criteria.status));
       where.push(`st.status = $${params.length}`);
     }
 
-    if (req.query.priority && req.query.priority !== 'all') {
-      params.push(String(req.query.priority));
+    if (criteria.priority && criteria.priority !== 'all') {
+      params.push(String(criteria.priority));
       where.push(`st.priority = $${params.length}`);
     }
 
     addSupportTicketScope(where, params, req.user);
+    require('../services/supportCustomerService').addTicketSearch(where,params,criteria.search);
 
     const result = await db.query(
       `SELECT st.id, st.subject, st.description, st.state, st.lga, st.priority, st.status,
-              st.category, st.related_type, st.related_id, st.escalation_department,
+              st.preferred_language, st.category, st.related_type, st.related_id, st.escalation_department,
               st.escalation_status, st.escalation_note, st.sla_due_at, st.last_escalated_at,
               CASE
                 WHEN st.status = 'resolved' THEN 'met'
@@ -1822,7 +1685,7 @@ router.get('/tickets', authenticate, requireSupportAdmin, async (req, res) => {
               END AS sla_status,
               st.created_at, st.updated_at, st.escalated_at, st.resolved_at,
               st.assigned_to,
-              u.email AS user_email, u.full_name AS user_name,
+              u.email AS user_email, u.phone AS user_phone, st.contact_email, st.contact_phone, st.contact_name, u.full_name AS user_name,
               a.email AS assigned_email, a.full_name AS assigned_name,
               (SELECT COUNT(*) FROM support_ticket_replies str WHERE str.ticket_id = st.id AND str.is_admin = FALSE AND (str.read_at IS NULL))::int AS unread_user_replies
        FROM support_tickets st
@@ -1841,7 +1704,9 @@ router.get('/tickets', authenticate, requireSupportAdmin, async (req, res) => {
     req.logger.error('Support tickets error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch support tickets' });
   }
-});
+};
+router.get('/tickets', authenticate, requireSupportAdmin, listSupportTickets);
+router.post('/tickets/search', authenticate, requireSupportAdmin, require('../config/utils/twoFactor').requirePrivilegedMfa, require('../config/middleware/securityRateLimiters').supportCustomerLookupLimiter, listSupportTickets);
 
 // ─── Escalate ──────────────────────────────────────────────────────────────
 
@@ -1860,7 +1725,7 @@ router.post('/tickets/escalate', authenticate, requireSupportAdmin, async (req, 
     const { status, ticket } = await getScopedTicket(
       ticketId,
       req.user,
-      'st.*, u.email AS user_email, u.full_name AS user_name'
+      'st.*, u.email AS user_email, u.phone AS user_phone, st.contact_email, st.contact_phone, st.contact_name, u.full_name AS user_name'
     );
 
     if (status === 404) {
@@ -1993,6 +1858,7 @@ router.patch('/tickets/:id/assign', authenticate, requireSupportAdmin, async (re
       }
     }
 
+    if(!(await require('../services/supportLanguageService').canTakeLanguageTicket(assignedTo,ticket)))return res.status(409).json({message:'Choose an available agent with approved skills in the customer language.'});
     const result = await db.query(
       `UPDATE support_tickets SET assigned_to = $1,
           status = CASE WHEN status = 'open' THEN 'in_progress' ELSE status END,
@@ -2005,6 +1871,7 @@ router.patch('/tickets/:id/assign', authenticate, requireSupportAdmin, async (re
       return res.status(404).json({ success: false, message: 'Ticket not found' });
     }
 
+    await require('../services/supportReassignService').markTicketAssigned(ticketId,assignedTo);
     emitTicketUpdated(result.rows[0]);
 
     await activityLogger.log({
@@ -2146,13 +2013,13 @@ router.get('/tickets/:id/context', authenticate, async (req, res) => {
     let ticket;
 
     if (isSupportAdmin) {
-      const scoped = await getScopedTicket(ticketId, req.user, 'st.*, u.email AS user_email, u.full_name AS user_name');
+      const scoped = await getScopedTicket(ticketId, req.user, 'st.*, u.email AS user_email, u.phone AS user_phone, st.contact_email, st.contact_phone, st.contact_name, u.full_name AS user_name');
       if (scoped.status === 404) return res.status(404).json({ success: false, message: 'Ticket not found' });
       if (scoped.status === 403) return res.status(403).json({ success: false, message: 'Access denied' });
       ticket = scoped.ticket;
     } else {
       const ownerResult = await db.query(
-        `SELECT st.*, u.email AS user_email, u.full_name AS user_name
+        `SELECT st.*, u.email AS user_email, u.phone AS user_phone, st.contact_email, st.contact_phone, st.contact_name, u.full_name AS user_name
          FROM support_tickets st
          LEFT JOIN users u ON u.id = st.user_id
          WHERE st.id = $1 AND st.user_id = $2`,
@@ -2304,7 +2171,7 @@ router.get('/department-escalations', authenticate, async (req, res) => {
 
     const result = await db.query(
       `SELECT st.id, st.subject, st.description, st.state, st.lga, st.priority, st.status,
-              st.category, st.related_type, st.related_id, st.escalation_department,
+              st.preferred_language, st.category, st.related_type, st.related_id, st.escalation_department,
               st.escalation_status, st.escalation_note, st.sla_due_at, st.last_escalated_at,
               CASE
                 WHEN st.status = 'resolved' THEN 'met'
@@ -2315,7 +2182,7 @@ router.get('/department-escalations', authenticate, async (req, res) => {
               END AS sla_status,
               st.created_at, st.updated_at, st.escalated_at, st.resolved_at,
               st.assigned_to,
-              u.email AS user_email, u.full_name AS user_name,
+              u.email AS user_email, u.phone AS user_phone, st.contact_email, st.contact_phone, st.contact_name, u.full_name AS user_name,
               a.email AS assigned_email, a.full_name AS assigned_name,
               (SELECT COUNT(*) FROM support_ticket_replies str WHERE str.ticket_id = st.id AND str.is_admin = FALSE AND str.read_at IS NULL)::int AS unread_user_replies
        FROM support_tickets st
@@ -2515,7 +2382,7 @@ router.get('/governance/export', authenticate, requireSupportAdmin, async (req, 
                 WHEN st.sla_due_at < CURRENT_TIMESTAMP + INTERVAL '2 hours' THEN 'due_soon'
                 ELSE 'on_track'
               END AS sla_status,
-              u.email AS user_email, u.full_name AS user_name,
+              u.email AS user_email, u.phone AS user_phone, st.contact_email, st.contact_phone, st.contact_name, u.full_name AS user_name,
               a.email AS assigned_email, a.full_name AS assigned_name
        FROM support_tickets st
        LEFT JOIN users u ON u.id = st.user_id
@@ -2739,18 +2606,11 @@ router.post('/tickets/:id/reply', authenticate, uploadAttachment.single('attachm
       return res.status(403).json({ success: false, message: 'You cannot reply to this ticket' });
     }
 
+    try{
+      const history=(await db.query("SELECT message FROM support_ticket_replies WHERE ticket_id=$1 AND user_id=$2 AND created_at>NOW()-INTERVAL '15 minutes' ORDER BY created_at DESC LIMIT 5",[ticketId,req.user.id])).rows.reverse().map(row=>row.message);
+      await require('../services/contactPolicyService').enforce({userId:req.user.id,channel:'support_ticket',contextKey:ticketId,texts:[message],history});
+    }catch(error){if(error.code==='CONTACT_SHARING_BLOCKED'){if(req.file?.path){try{require('fs').unlinkSync(req.file.path);}catch{}}return res.status(400).json({success:false,code:error.code,message:error.message});}throw error;}
     const isAdminReply = isSupportAdmin || isDeptAdmin;
-
-    // The auto-handover rule: an admin reply ends the 90-second clock for good.
-    // Once an agent has answered, the ticket stays with him.
-    if (isAdminReply) {
-      try {
-        const { markTicketAnswered } = require('../services/supportReassignService');
-        await markTicketAnswered(ticketId);
-      } catch (reassignError) {
-        logger.warn(`markTicketAnswered skipped: ${reassignError.message}`);
-      }
-    }
 
     // Insert reply
     const result = await db.query(
@@ -2770,6 +2630,8 @@ router.post('/tickets/:id/reply', authenticate, uploadAttachment.single('attachm
     );
 
     const reply = result.rows[0];
+    await db.query('UPDATE support_tickets SET waiting_customer_since=CASE WHEN $1::boolean THEN NULL ELSE COALESCE(waiting_customer_since,NOW()) END WHERE id=$2',[isAdminReply,ticketId]);
+    if(isAdminReply) await require('../services/supportReassignService').markTicketAnswered(ticketId);
 
     // Re-open if resolved
     if (ticket.status === 'resolved') {
@@ -2923,6 +2785,7 @@ router.patch('/tickets/:ticketId/reply/:replyId', authenticate, async (req, res)
       }
     }
 
+    try{const history=(await db.query("SELECT message FROM support_ticket_replies WHERE ticket_id=$1 AND user_id=$2 AND id<>$3 AND created_at>NOW()-INTERVAL '15 minutes' ORDER BY created_at DESC LIMIT 5",[ticketId,req.user.id,replyId])).rows.reverse().map(row=>row.message);await require('../services/contactPolicyService').enforce({userId:req.user.id,channel:'support_ticket',contextKey:ticketId,texts:[message],history});}catch(error){if(error.code==='CONTACT_SHARING_BLOCKED')return res.status(400).json({success:false,code:error.code,message:error.message});throw error;}
     const result = await db.query(
       `UPDATE support_ticket_replies SET message = $1, edited_at = CURRENT_TIMESTAMP
        WHERE id = $2 RETURNING *`,
@@ -3498,6 +3361,7 @@ router.post('/tickets/contact-reply', guestSupportWriteLimiter, uploadAttachment
     attachmentPersisted = Boolean(req.file);
 
     const reply = result.rows[0];
+    await db.query('UPDATE support_tickets SET waiting_customer_since=COALESCE(waiting_customer_since,NOW()) WHERE id=$1',[ticketId]);
 
     // Re-open resolved ticket
     if (ticket.status === 'resolved') {
@@ -3840,6 +3704,7 @@ router.get('/admin/dashboard', authenticate, requireSupportAdmin, async (req, re
 router.createVoiceEscalatedTicket = createVoiceEscalatedTicket;
 router.getVoiceTicketDepartment = getVoiceTicketDepartment;
 
+router.canSupportAdminAccessTicket = canSupportAdminAccessTicket;
 router._supportScopeForTest = {
   canSupportAdminAccessTicket,
   normalizeSupportCategory,

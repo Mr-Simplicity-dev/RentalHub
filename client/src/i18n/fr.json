@@ -331,7 +331,9 @@
     "open_live_camera": "Ouvrir la caméra en direct",
     "captured_preview": "Aperçu du passeport capturé",
     "preview_hint": "Assurez-vous que votre visage est net et entièrement visible avant le téléversement.",
-    "camera_guide": "Gardez votre visage dans le guide et terminez tous les contrôles."
+    "camera_guide": "Gardez votre visage dans le guide et terminez tous les contrôles.",
+    "face_gallery_consent": "J’accepte la comparaison de mon visage et son stockage sécurisé sur le serveur privé de RentalHub pour vérifier mon identité et éviter les comptes en double. Sans mon accord, le personnel examinera ma photo manuellement.",
+    "photo_review_pending": "Photo enregistrée. La vérification de votre identité est en cours d’examen."
   },
   "property_types": {
     "apartment": "Appartement",
@@ -400,7 +402,7 @@
     "not_found": "Bien introuvable",
     "no_photos": "Aucune photo disponible",
     "unlock_title": "Payez pour débloquer tous les détails du bien",
-    "unlock_text": "Les détails complets, l'adresse, le contact du propriétaire et les médias premium sont disponibles après un paiement unique.",
+    "unlock_text": "Payez une seule fois pour ouvrir les détails complets du bien et les médias supplémentaires. Les numéros de téléphone et les e-mails ne sont pas inclus.",
     "pay_unlock_details": "Payer pour débloquer les détails",
     "login_continue": "Connectez-vous pour continuer",
     "per_period": "par {{period}}",
@@ -414,7 +416,7 @@
     "amenities": "Équipements",
     "video_tour": "Visite vidéo",
     "full_address": "Adresse complète",
-    "contact_landlord": "Contacter le propriétaire",
+    "contact_landlord": "Demandes sur le bien",
     "name": "Nom",
     "phone": "Téléphone",
     "whatsapp": "WhatsApp",
@@ -423,8 +425,8 @@
     "audio_call": "Appel audio",
     "video_call": "Appel vidéo",
     "start_virtual_tour": "Démarrer une visite virtuelle",
-    "subscribe_contact_title": "Abonnez-vous pour voir le contact",
-    "subscribe_contact_text": "Effectuez un paiement unique pour accéder au contact du propriétaire et aux détails complets du bien.",
+    "subscribe_contact_title": "Demandes sur le bien",
+    "subscribe_contact_text": "Payez une seule fois pour ouvrir les détails complets du bien et les médias supplémentaires. Les numéros de téléphone et les e-mails ne sont pas inclus.",
     "pay_to_unlock": "Payer pour débloquer",
     "apply_property": "Postuler pour ce bien",
     "report_dispute": "Signaler un litige",
@@ -625,7 +627,8 @@
       "send_message": "Envoyer le message",
       "start_conversation_btn": "Démarrer la conversation",
       "lookup": "Vérifier le statut des tickets"
-    }
+    },
+    "private_documents": "Envoyez les documents dans un ticket privé d’assistance."
   },
   "about_us": {
     "hero": {
@@ -1071,7 +1074,7 @@
     "tenants_step_2_hl_2": "Virtual property tours",
     "tenants_step_2_hl_3": "Save favorites",
     "tenants_step_3_title": "Unlock Full Details",
-    "tenants_step_3_desc": "Make a one-time payment to unlock full property details, including the landlord contact information and premium media.",
+    "tenants_step_3_desc": "Payez une seule fois pour ouvrir les détails complets du bien et les médias supplémentaires. Les numéros de téléphone et les e-mails ne sont pas inclus.",
     "tenants_step_3_hl_1": "Full address revealed",
     "tenants_step_3_hl_2": "Landlord contact info",
     "tenants_step_3_hl_3": "HD photos & video",
@@ -3180,7 +3183,20 @@
     "adjustment_body": "Votre carte bancaire a été émise hors du Nigeria. Pour finaliser votre inscription au tarif local, un complément",
     "adjustment_body_2": "(conversion au taux du marché + 5 $ de frais de traitement) est requis avant l'activation de votre compte.",
     "adjustment_pay": "Payer la différence maintenant",
-    "adjustment_failed": "Impossible d'initier le paiement de la différence. Veuillez réessayer."
+    "adjustment_failed": "Impossible d'initier le paiement de la différence. Veuillez réessayer.",
+    "otp_pre_payment_body": "Nous avons envoyé un code à votre téléphone. Il est valable 10 minutes. Vérifiez votre numéro avant de passer au paiement.",
+    "otp_verify_payment": "Vérifier et passer au paiement",
+    "phone_verified_continue": "Téléphone vérifié. Continuez sans saisir à nouveau le code.",
+    "phone_checking_identity": "Téléphone vérifié. Vérification de votre identité en cours.",
+    "otp_resend_wait": "Nouvel envoi possible dans {{count}} s",
+    "email_send": "Envoyer le courriel de vérification",
+    "email_sent": "Consultez votre boîte de réception et vos indésirables. Ouvrez le lien pour confirmer votre adresse.",
+    "email_send_failed": "Impossible d’envoyer le courriel. Réessayez.",
+    "passport_image_label": "Page d’identité du passeport",
+    "passport_image_choose": "Choisir la page du passeport",
+    "passport_image_required": "Joignez une image nette de la page d’identité de votre passeport.",
+    "passport_image_help": "Incluez toute la page avec votre photo et les informations du passeport. Utilisez une image JPEG ou PNG nette. Elle ne sera pas conservée dans le brouillon.",
+    "passport_country_label": "Pays de délivrance du passeport"
   },
   "careers": {
     "recruitment_closed_title": "Recrutement clos",

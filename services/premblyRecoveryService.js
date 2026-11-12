@@ -13,6 +13,15 @@ const {
 
 const ACTIVE_ATTEMPT_STATUSES = ['initiating', 'pending', 'attention_required'];
 
+const canRetryRegistrationAuthFailure = (attempt, now = Date.now()) =>
+  attempt?.context_type === 'registration' &&
+  attempt.status === 'not_verified' &&
+  /token_not_valid/i.test(attempt.provider_message || '') &&
+  !attempt.provider_reference &&
+  attempt.billing_status !== true &&
+  Number.isFinite(new Date(attempt.updated_at).getTime()) &&
+  now - new Date(attempt.updated_at).getTime() >= 5 * 60 * 1000;
+
 const rollbackQuietly = async (client) => {
   if (!client) return;
   try {
@@ -62,7 +71,9 @@ const attemptToResult = (attempt) => {
     };
   }
 
-  const status =
+  const untrackable = !attempt.provider_reference && !['verified', 'not_verified'].includes(attempt.status);
+  const authFailure = /token_not_valid|invalid.?api.?key|unauthori[sz]ed/i.test(attempt.provider_message || '');
+  const status = untrackable ? 'reconciliation_required' : authFailure ? 'service_error' :
     attempt.status === 'verified'
       ? 'verified'
       : attempt.status === 'not_verified'
@@ -86,6 +97,11 @@ const attemptToResult = (attempt) => {
     billing_status: attempt.billing_status,
     attempt_id: attempt.id,
     document_country: attempt.document_country || null,
+    verified_name: attempt.verified_identity_name || null,
+    document_number_hash: attempt.verified_document_number_hash || null,
+    document_type: attempt.verified_document_type || null,
+    document_expiry: attempt.verified_document_expiry || null,
+    can_auto_check: Boolean(attempt.provider_reference) && status === 'provider_pending',
   };
 };
 
@@ -95,6 +111,7 @@ const beginAttemptWithClient = async (client, {
   identityType,
   subjectHash,
   requestKeyHash,
+  verificationInputHash = null,
 }) => {
   await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [requestKeyHash]);
   await client.query(
@@ -130,6 +147,17 @@ const beginAttemptWithClient = async (client, {
       : [contextId, ACTIVE_ATTEMPT_STATUSES]
   );
 
+  if (canRetryRegistrationAuthFailure(existing.rows[0])) {
+    await client.query("UPDATE prembly_verification_attempts SET status = 'expired', updated_at = NOW() WHERE id = $1", [existing.rows[0].id]);
+    existing.rows = [];
+  }
+
+  if (existing.rows[0]?.context_type === 'registration' && existing.rows[0].identity_type === 'passport' && existing.rows[0].status === 'not_verified' && verificationInputHash && existing.rows[0].verification_input_hash && existing.rows[0].verification_input_hash !== verificationInputHash) {
+    await client.query("UPDATE prembly_verification_attempts SET status = 'expired', updated_at = NOW() WHERE id = $1", [existing.rows[0].id]);
+    existing.rows = [];
+  }
+
+
   if (existing.rows.length) {
     return {
       attempt: existing.rows[0],
@@ -143,9 +171,9 @@ const beginAttemptWithClient = async (client, {
   const inserted = await client.query(
     `INSERT INTO prembly_verification_attempts (
        id, callback_token, context_type, context_id, request_key_hash,
-       subject_hash, identity_type
+       subject_hash, identity_type, verification_input_hash
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING *`,
     [
       attemptId,
@@ -155,6 +183,7 @@ const beginAttemptWithClient = async (client, {
       requestKeyHash,
       subjectHash,
       identityType,
+      verificationInputHash,
     ]
   );
 
@@ -205,7 +234,7 @@ const applyResultWithClient = async (client, attempt, result, source) => {
         ? 'not_verified'
         : result.status === 'wallet_error'
           ? 'attention_required'
-          : 'pending';
+          : result.status === 'service_error' && !referenceId ? 'attention_required' : 'pending';
   const isFinal = ['verified', 'not_verified'].includes(nextStatus);
   const nextCheckMinutes = referenceId
     ? getPremblyBackoffMinutes(Number(attempt.poll_attempts || 0) + 1)
@@ -221,6 +250,10 @@ const applyResultWithClient = async (client, attempt, result, source) => {
          billing_status = COALESCE($6, billing_status),
          provider_message = $7,
          document_country = COALESCE($10, document_country),
+         verified_identity_name = COALESCE($11, verified_identity_name),
+         verified_document_number_hash = COALESCE($12, verified_document_number_hash),
+         verified_document_type = COALESCE($13, verified_document_type),
+         verified_document_expiry = COALESCE($14, verified_document_expiry),
          next_check_at = CASE
            WHEN $8::boolean OR $9::integer IS NULL THEN NULL
            ELSE NOW() + ($9::text || ' minutes')::interval
@@ -240,9 +273,17 @@ const applyResultWithClient = async (client, attempt, result, source) => {
       isFinal,
       nextCheckMinutes,
       typeof result.document_country === 'string' ? result.document_country.slice(0, 80) : null,
+      typeof result.verified_name === 'string' ? result.verified_name.slice(0, 200) : null,
+      attempt.identity_type === 'passport' && typeof result.document_number === 'string' && result.document_number ? require('../config/utils/passportVerification').numberHash(result.document_number) : null,
+      typeof result.document_type === 'string' ? result.document_type.slice(0, 80) : null,
+      typeof result.document_expiry === 'string' ? result.document_expiry.slice(0, 40) : null,
     ]
   );
   const updated = updatedAttempt.rows[0];
+  if (result.verified && result.reference_photo) {
+    const encrypted = require('../config/utils/ninEncryption').encryptNIN(result.reference_photo);
+    if (encrypted) await client.query('UPDATE prembly_verification_attempts SET reference_photo_encrypted=$2 WHERE id=$1',[attempt.id,encrypted]);
+  }
   const notifications = [];
 
   if (attempt.context_type === 'credential_revalidation') {
@@ -460,6 +501,8 @@ const processPremblyWebhook = async ({
 
 const executeRegistrationVerificationWithRecovery = async ({
   identityType,
+  documentCountry,
+  verificationInputHash,
   identityValue,
   email,
   phone,
@@ -481,7 +524,7 @@ const executeRegistrationVerificationWithRecovery = async ({
   const requestKeyHash = buildPremblyRequestKey({
     contextType: 'registration',
     identityType,
-    subjectHash,
+    subjectHash: identityType === 'passport' ? crypto.createHash('sha256').update(subjectHash + ':' + String(documentCountry || '').toUpperCase()).digest('hex') : subjectHash,
     email,
     phone,
   });
@@ -490,10 +533,17 @@ const executeRegistrationVerificationWithRecovery = async ({
     identityType,
     subjectHash,
     requestKeyHash,
+    verificationInputHash,
   });
 
   if (!started.isNew) {
-    return attemptToResult(started.attempt);
+    const attempt = started.attempt;
+    if (attempt.provider_reference && attempt.status !== 'verified' && Date.now() - new Date(attempt.updated_at).getTime() >= 30000) {
+      const checked = await getVerificationStatusWithPrembly(attempt.provider_reference);
+      const updated = await processPremblyAttemptResult({ attemptId: attempt.id, result: checked, source: 'registration_resume' });
+      return attemptToResult(updated);
+    }
+    return attemptToResult(attempt);
   }
 
   const result = await verify(started.callbackUrl);

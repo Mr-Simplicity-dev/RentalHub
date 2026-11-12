@@ -1,8 +1,14 @@
+import { useAuth } from '../../hooks/useAuth';
 import React, { useState } from "react";
 import api from "../../services/api";
 import { toast } from "react-toastify";
 import PaginationControls from "./PaginationControls";
 
+const IdentityFlags = ({userId,flags=[]}) => {
+ const {user}=useAuth();const [reviewing,setReviewing]=useState(null),[note,setNote]=useState(''),[done,setDone]=useState([]),[busy,setBusy]=useState(false);
+ const save=async()=>{if(note.trim().length<10)return toast.error('Write a review note of at least 10 characters.');setBusy(true);try{await api.patch('/admin/users/'+userId+'/identity-flags/'+reviewing+'/review',{note});setDone(previous=>[...previous,reviewing]);setReviewing(null);setNote('');toast.success('Review recorded. Account approval is a separate action.');}catch(error){toast.error(error?.response?.data?.message || 'Review failed');}finally{setBusy(false);}};
+ return <div className="mt-2 space-y-2">{flags.filter(flag=>!done.includes(flag.id)).map(flag=><div key={flag.id} className="rounded-lg bg-amber-50 p-2 text-xs text-amber-900"><p>{flag.reason.replace(/_/g,' ')}</p>{user?.user_type==='super_admin' && <button type="button" className="mt-1 font-semibold underline" onClick={()=>setReviewing(flag.id)}>Record investigation</button>}</div>)}{reviewing && <div className="space-y-2"><textarea aria-label="Identity investigation note" value={note} onChange={event=>setNote(event.target.value)} maxLength={2000} className="w-full rounded border p-2" /><button type="button" disabled={busy} onClick={save} className="rounded bg-blue-900 p-2 text-white">Save review</button><button type="button" onClick={()=>setReviewing(null)} className="p-2">Cancel</button></div>}</div>;
+};
 const viewPassport = async (rawUrl) => {
   const filename = String(rawUrl || "").replace(/\\/g, "/").split("/").pop();
   if (!filename) return;
@@ -79,8 +85,8 @@ const VerificationsTab = ({
 
     if (!verification || !action) return;
 
-    if ((action === "reject" || action === "delete") && !note.trim()) {
-      setReviewError(action === "delete" ? "Delete reason is required." : "Rejection reason is required.");
+    if (!note.trim()) {
+      setReviewError(action === "delete" ? "Delete reason is required." : "A decision note is required.");
       return;
     }
 
@@ -271,6 +277,7 @@ const VerificationsTab = ({
 
                     <td className="p-3">
 
+                      <IdentityFlags userId={v.id} flags={v.identity_review_flags || []} />
                       {v.passport_photo_url ? (
                         <button
                           type="button"
@@ -398,7 +405,7 @@ const VerificationsTab = ({
               className="mt-2 h-32 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               placeholder={
                 reviewDialog.action === "approve"
-                  ? "Optional note for the verification record"
+                  ? "Required note explaining the verification decision"
                   : reviewDialog.action === "reject"
                     ? "Explain why this identity document is being rejected"
                     : "Explain why this rejected verification record is being cleared"

@@ -10,6 +10,8 @@ const { canAccessDispute } = require('../config/middleware/disputeAccessMiddlewa
 const upload = require('../config/middleware/uploadEvidence');
 const { param } = require('express-validator');
 const validateRequest = require('../config/middleware/validateRequest');
+const sharedContactGuard=async(req,res,next)=>{try{const history=req.params.disputeId?(await require('../config/middleware/database').query("SELECT message FROM dispute_messages WHERE dispute_id=$1 AND sender_id=$2 AND created_at>NOW()-INTERVAL '15 minutes' ORDER BY created_at DESC LIMIT 5",[req.params.disputeId,req.user.id])).rows.reverse().map(row=>row.message):[];await require('../services/contactPolicyService').enforce({userId:req.user.id,channel:'dispute',contextKey:req.params.disputeId||req.body.property_id||'new',texts:[req.body.message,req.body.title,req.body.description],history});next();}catch(error){if(error.code==='CONTACT_SHARING_BLOCKED')return res.status(400).json({success:false,code:error.code,message:error.message});next(error);}};
+router.use((req,res,next)=>{const json=res.json;res.json=function(body){const allowed=['admin','lga_admin','super_admin','super_support_admin','zonal_admin','state_support_admin','lga_support_admin'].includes(req.user?.user_type);return json.call(this,allowed?body:require('../config/utils/propertyContactPrivacy').removePropertyContacts(body));};next();});
 
 /**
  * Create dispute
@@ -19,6 +21,7 @@ router.post(
   '/',
   authenticate,
   allowRoles('tenant', 'landlord', 'admin', 'super_admin'),
+  sharedContactGuard,
   disputeController.createDispute
 );
 
@@ -60,6 +63,7 @@ router.post(
   authenticate,
   canAccessDispute,
   [param('disputeId').isInt({ min: 1 }).withMessage('disputeId must be a positive integer'), validateRequest],
+  sharedContactGuard,
   disputeController.addDisputeMessage
 );
 
@@ -71,6 +75,7 @@ router.patch(
   authenticate,
   canAccessDispute,
   [param('disputeId').isInt({ min: 1 }).withMessage('disputeId must be a positive integer'), validateRequest],
+  sharedContactGuard,
   disputeController.editDisputeMessage
 );
 
@@ -82,6 +87,7 @@ router.patch(
   '/:disputeId/resolve',
   authenticate,
   allowRoles('admin', 'super_admin'),
+  canAccessDispute,
   [param('disputeId').isInt({ min: 1 }).withMessage('disputeId must be a positive integer'), validateRequest],
   disputeController.resolveDispute
 );

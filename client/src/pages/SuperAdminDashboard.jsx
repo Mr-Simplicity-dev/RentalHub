@@ -827,6 +827,7 @@ export default function SuperAdminDashboard() {
     // tour analytics, department oversights, support/voice boards...). The
     // search must reach everything a super admin can open.
     const routeDestinations = [
+      { name: "route:background-jobs", label: "Background jobs", detail: "Scheduler health and recent results", keywords: ["jobs", "scheduler", "monitor"], path: "/admin/background-jobs" },
       { name: "route:seo", label: "SEO Dashboard", detail: "SEO settings and Google indexing", keywords: ["seo", "google", "sitemap", "indexing"], path: "/super-admin/seo" },
       { name: "route:tour-analytics", label: "Tour Analytics", detail: "Guided-tour adoption analytics", keywords: ["tour", "onboarding", "walkthrough"], path: "/super-admin/tour-analytics" },
       { name: "route:tour-music", label: "Tour Music", detail: "Approved music library for property tours", keywords: ["tour", "music", "audio", "licence", "soundtrack"], path: "/super-admin/tour-music" },
@@ -1038,8 +1039,10 @@ export default function SuperAdminDashboard() {
         loadVerifications(verificationPage);
         loadAdminPerformance();
       }
+      return true;
     } catch (err) {
       toast.error(err.response?.data?.message || "Bulk action failed");
+      return false;
     }
   };
 

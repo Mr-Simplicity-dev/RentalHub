@@ -1,3 +1,5 @@
+import BackgroundJobs from './admin/BackgroundJobs';
+import AdminConduct from './admin/AdminConduct';
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, Link } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from 'react-query';
@@ -105,6 +107,7 @@ const TenancyAgreements = React.lazy(() => import('./TenancyAgreements'));
 const TenancyAgreementDetail = React.lazy(() => import('./TenancyAgreementDetail'));
 const SubscribedProperties = React.lazy(() => import('./SubscribedProperties'));
 const Support = React.lazy(() => import('./Support'));
+const SupportTicketEntry = React.lazy(() => import('./SupportTicketEntry'));
 const AcceptLawyerInvite = React.lazy(() => import('./AcceptLawyerInvite'));
 const AcceptAgentInvite = React.lazy(() => import('./AcceptAgentInvite'));
 const LocationPage = React.lazy(() => import('./LocationPage'));
@@ -833,6 +836,8 @@ function App() {
               <Suspense fallback={<Loader />}>
               <AssistedSessionGate><Routes>
               <Route path="/registration-payment" element={<ProtectedRoute><RegistrationPayment /></ProtectedRoute>} />
+              <Route path="/admin/background-jobs" element={<ProtectedRoute><BackgroundJobs /></ProtectedRoute>} />
+              <Route path="/admin/code-of-conduct" element={<ProtectedRoute><AdminConduct /></ProtectedRoute>} />
               <Route path="/admin/assisted-registration" element={<ProtectedRoute><AssistedRegistration /></ProtectedRoute>} />
               {/* Public Routes */}
               <Route path="/" element={<Home />} />
@@ -964,6 +969,7 @@ function App() {
               <Route path="/tenancy-agreements/:id" element={<TenancyAgreementDetail />} />
               <Route path="/subscribed-properties" element={<SubscribedProperties />} />
               <Route path="/support" element={<Support />} />
+              <Route path="/support/tickets/:ticketId" element={<ProtectedRoute><SupportTicketEntry /></ProtectedRoute>} />
               <Route path="/dispute/:disputeId" element={<DisputeDetails />} />
               <Route path="/nigeria" element={<NigeriaPage />} />
               <Route path="/nigeria/:stateSlug" element={<LocationPage />} />

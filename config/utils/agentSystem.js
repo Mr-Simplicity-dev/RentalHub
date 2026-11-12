@@ -152,9 +152,7 @@ const getActiveAgentAssignmentByAgentId = async (agentUserId) => {
   const result = await db.query(
     `SELECT
        la.*,
-       landlord.full_name AS landlord_name,
-       landlord.email AS landlord_email,
-       landlord.phone AS landlord_phone
+       landlord.full_name AS landlord_name
      FROM landlord_agents la
      JOIN users landlord ON landlord.id = la.landlord_user_id
      WHERE la.agent_user_id = $1

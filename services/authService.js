@@ -85,6 +85,54 @@ const {
 } = require('../config/utils/sessionToken');
 const redis = require('../config/utils/redis');
 
+const registrationPhoneGate = require('./registrationPhoneGate')({ db, sendVerificationCode, secret: () => process.env.JWT_SECRET });
+const { hashGrant } = require('./registrationPhoneGate');
+const phoneGateResponse = async (req, res, flow) => {
+  if (req.registrationPhoneGrant) return false;
+  const flags = await getFeatureFlagsMap();
+  await assertRegistrationAllowed({ userType: req.body.user_type, flags, stateId: req.body.state_id, lgaName: req.body.lga_name });
+  if ((req.body.is_foreigner === true || req.body.is_foreigner === 'true') && flags.passport_number !== false) {
+    const passport = require('../config/utils/passportVerification');
+    const route = passport.channel(req.body.nationality, Boolean(req.body.passport_document_image));
+    if (route.method === 'document') await passport.documentImage(req.body.passport_document_image);
+  }
+  const data = await registrationPhoneGate.send({ ...req.body, registration_flow: flow });
+  await logOtpEvent({ contact: req.body.phone, channel: 'sms', purpose: 'registration_phone', status: 'sent', expiresAt: Date.now() + 600000, req });
+  res.json({ success: false, code: 'PHONE_VERIFICATION_REQUIRED', message: 'A verification code has been sent to your phone.', data });
+  return true;
+};
+const verifyRegistrationPhone = flow => async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
+    const details = { ...req.body, registration_flow: flow };
+    req.registrationPhoneGrant = req.body.phone_verification_token
+      ? await registrationPhoneGate.resume(details, req.body.phone_verification_token)
+      : await registrationPhoneGate.verify(details);
+    await logOtpEvent({ contact: req.body.phone, channel: 'sms', purpose: 'registration_phone', status: 'verified', req });
+    if (!req.body.phone_verification_token && req.body.phone_verification_protocol === 2) return res.json({ success: true, code: 'PHONE_VERIFIED', phone_verification_token: req.registrationPhoneGrant, data: { phone_verified: true } });
+    const json = res.json.bind(res);
+    res.json = payload => json({ ...payload, phone_verification_token: req.registrationPhoneGrant, ...(payload.success && payload.data ? { data: { ...payload.data, completion_token: req.registrationPhoneGrant } } : {}) });
+    return flow === 'paid' ? exports.initializeRegistrationPayment(req, res) : exports.register(req, res);
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ success: false, code: error.code, message: error.statusCode ? error.message : 'Phone verification failed. Please try again.' });
+  }
+};
+exports.verifyRegistrationPaymentPhone = verifyRegistrationPhone('paid');
+exports.verifyRegistrationFreePhone = verifyRegistrationPhone('free');
+exports.resendRegistrationPhone = async (req, res) => {
+  try {
+    const flow = req.body.registration_flow === 'free' ? 'free' : 'paid';
+    const details = { ...req.body, registration_flow: flow };
+    const challenge = await db.query(`SELECT payload_digest FROM registration_phone_challenges WHERE id::text = $1 AND consumed_at IS NULL AND created_at > NOW() - INTERVAL '24 hours'`, [String(req.body.phone_challenge || '')]);
+    if (!challenge.rows.length || challenge.rows[0].payload_digest !== registrationPhoneGate.fingerprint(details)) return res.status(400).json({ success: false, message: 'This verification has expired. Please submit your details again.' });
+    const data = await registrationPhoneGate.send(details);
+    await logOtpEvent({ contact: req.body.phone, channel: 'sms', purpose: 'registration_phone', status: 'sent', expiresAt: Date.now() + 600000, req });
+    return res.json({ success: true, data });
+  } catch (error) { return res.status(error.statusCode || 500).json({ success: false, code: error.code, message: error.statusCode ? error.message : 'Could not send the verification code.' }); }
+};
+
+
 // OTP storage with Redis fallback to in-memory Map
 const otpStore = new Map();
 const lawyerOtpStore = new Map();
@@ -801,7 +849,8 @@ const validateAndPrepareRegistration = async (payload, options = {}) => {
       : null;
 
   if (cleanLawyerEmail && cleanLawyerEmail === cleanEmail) {
-    const error = new Error('Lawyer email must be different from your account email');
+    const error = new Error("Your legal representative's email must be different from your account email");
+
     error.statusCode = 400;
     throw error;
   }
@@ -824,7 +873,7 @@ const validateAndPrepareRegistration = async (payload, options = {}) => {
 
   // Diaspora registrations must pay when the diaspora payment flag is on —
   // this free-register path is not an alternative to the payment flow.
-  if (registrationTier === 'diaspora' && flags.diaspora_registration_payment === true) {
+  if (registrationTier === 'diaspora' && flags.diaspora_registration_payment === true && options.registrationPayment !== true) {
     const error = new Error('Diaspora registration requires a registration payment');
     error.statusCode = 402;
     throw error;
@@ -844,6 +893,7 @@ const validateAndPrepareRegistration = async (payload, options = {}) => {
   let identityType = null;
   let cleanNIN = null;
   let cleanPassportNumber = null;
+  let passportResult = null;
   const submittedNationality = nationality ? String(nationality).trim() : '';
   const isNigerianNationality = /^nigeria(n)?$/i.test(submittedNationality);
 
@@ -853,7 +903,7 @@ const validateAndPrepareRegistration = async (payload, options = {}) => {
     throw error;
   }
 
-  if (isForeigner && !isCountryNameValid(submittedNationality)) {
+  if (isForeigner && !isCountryNameValid(submittedNationality) && !require('../config/utils/passportVerification').countryCode(submittedNationality)) {
     const error = new Error('Nationality must be a recognised country name');
     error.statusCode = 400;
     throw error;
@@ -933,15 +983,23 @@ const validateAndPrepareRegistration = async (payload, options = {}) => {
         throw error;
       }
 
+      if (nimcResult.status === 'reconciliation_required') {
+        const error = new Error('Your phone verification is saved, but the identity provider did not return a trackable result. No additional identity check has been submitted. Support must reconcile the existing request before registration can continue.');
+        error.statusCode = 503;
+        error.code = 'PREMBLY_RECONCILIATION_REQUIRED';
+        error.data = { attempt_id: nimcResult.attempt_id, can_auto_check: false };
+        throw error;
+      }
       if (nimcResult.status === 'provider_pending') {
         const error = new Error(
-          'Prembly is temporarily unavailable or still processing this NIN. RentalHub saved the transaction and will check it automatically without submitting another paid verification.'
+          'Your NIN check is pending. Your phone verification is saved. We are checking the existing identity request before continuing to payment.'
         );
         error.statusCode = 202;
         error.code = 'PREMBLY_VERIFICATION_PENDING';
         error.data = {
           attempt_id: nimcResult.attempt_id,
           identity_type: 'nin',
+          can_auto_check: nimcResult.can_auto_check === true,
         };
         throw error;
       }
@@ -993,8 +1051,12 @@ const validateAndPrepareRegistration = async (payload, options = {}) => {
       identityType = 'passport';
       cleanPassportNumber = passportValidation.value;
 
-      const passportResult = await executeRegistrationVerificationWithRecovery({
+      const passport = require('../config/utils/passportVerification');
+      const passportRoute = passport.channel(cleanNationality, Boolean(payload.passport_document_image));
+      passportResult = await executeRegistrationVerificationWithRecovery({
         identityType: 'passport',
+        documentCountry: passportRoute.code + ':' + passportRoute.method,
+        verificationInputHash: payload.passport_document_image ? require('crypto').createHash('sha256').update(payload.passport_document_image).digest('hex') : null,
         identityValue: cleanPassportNumber,
         email: cleanEmail,
         phone: cleanPhone,
@@ -1003,9 +1065,19 @@ const validateAndPrepareRegistration = async (payload, options = {}) => {
           cleanFullName,
           cleanNationality,
           date_of_birth,
-          { callbackUrl }
+          { callbackUrl, documentImage: payload.passport_document_image }
         ),
       });
+
+      passportResult = passport.checkIdentity(passportResult, { number: cleanPassportNumber, country: cleanNationality, method: passportRoute.method });
+      verificationMeta = {
+        status: passportResult.status,
+        message: passportResult.message,
+        reference: passportResult.reference_id || null,
+        response_code: passportResult.response_code || null,
+        billing_status: passportResult.billing_status,
+        verified_name: passportResult.verified_name || null,
+      };
 
       if (passportResult.status === 'not_configured') {
         const error = new Error('Passport verification API is required but not configured on the server');
@@ -1019,15 +1091,23 @@ const validateAndPrepareRegistration = async (payload, options = {}) => {
         throw error;
       }
 
+      if (passportResult.status === 'reconciliation_required') {
+        const error = new Error('Your phone verification is saved, but the identity provider did not return a trackable result. No additional identity check has been submitted. Support must reconcile the existing request before registration can continue.');
+        error.statusCode = 503;
+        error.code = 'PREMBLY_RECONCILIATION_REQUIRED';
+        error.data = { attempt_id: passportResult.attempt_id, can_auto_check: false };
+        throw error;
+      }
       if (passportResult.status === 'provider_pending') {
         const error = new Error(
-          'Prembly is temporarily unavailable or still processing this passport. RentalHub saved the transaction and will check it automatically without submitting another paid verification.'
+          'Your passport check is pending. Your phone verification is saved. We are checking the existing identity request before continuing to payment.'
         );
         error.statusCode = 202;
         error.code = 'PREMBLY_VERIFICATION_PENDING';
         error.data = {
           attempt_id: passportResult.attempt_id,
           identity_type: 'passport',
+          can_auto_check: passportResult.can_auto_check === true,
         };
         throw error;
       }
@@ -1037,6 +1117,7 @@ const validateAndPrepareRegistration = async (payload, options = {}) => {
         error.statusCode = 400;
         throw error;
       }
+      if (passportResult.verified !== true) { const error = new Error('Passport verification has not been confirmed.'); error.statusCode = 503; throw error; }
     }
   }
 
@@ -1046,7 +1127,7 @@ const validateAndPrepareRegistration = async (payload, options = {}) => {
     // A passport issued by Nigeria must use the local NIN path — a Nigerian
     // cannot claim diaspora status with a Nigerian document.
     passportIssuingCountry = passportResult?.document_country || null;
-    if (passportIssuingCountry && /^nigeria(n)?$/i.test(String(passportIssuingCountry))) {
+    if (passportIssuingCountry && /^(nigeria(n)?|ng|nga)$/i.test(String(passportIssuingCountry).trim())) {
       const error = new Error(
         'Nigerian-issued passports must register with NIN using the local path'
       );
@@ -1357,6 +1438,7 @@ const createUserFromPreparedRegistration = async ({
   beforeCommit,
   deferPaidBenefits = false,
   assistedRegistration = false,
+  phoneVerified = false,
   logger = console
 }) => {
   await ensureTenantRegistrationPaymentSchema();
@@ -1511,6 +1593,10 @@ const createUserFromPreparedRegistration = async ({
     }
 
     if (beforeCommit) await beforeCommit(client, newUser);
+    if (phoneVerified || tenantRegistrationPayment?.registration_payload?.registration_phone_grant_hash || tenantRegistrationPayment?.registration_payload?.registration_phone_verified === true) {
+      await client.query('UPDATE users SET phone_verified = TRUE WHERE id = $1', [newUser.id]);
+      newUser.phone_verified = true;
+    }
     await client.query('COMMIT');
 
     let referralReward = null;
@@ -1744,7 +1830,7 @@ const createUserFromPreparedRegistration = async ({
       { expiresIn: '24h' }
     );
 
-    if (newUser.email) await sendVerificationEmail(newUser.email, verificationToken);
+    const verificationEmailResult = newUser.email ? await sendVerificationEmail(newUser.email, verificationToken) : null;
     if (newUser.email) await sendWelcomeEmail(
       newUser.email,
       newUser.full_name,
@@ -1762,12 +1848,14 @@ const createUserFromPreparedRegistration = async ({
         created_at: newUser.created_at,
         identity_document_type: newUser.identity_document_type,
         nin_verified: newUser.nin_verified,
+        phone_verified: newUser.phone_verified === true,
         nationality: newUser.nationality,
         preferred_state_id: newUser.preferred_state_id,
         preferred_state_name: preparedRegistration.preferredStateName || null,
         preferred_lga_name: newUser.preferred_lga_name
       },
       token,
+      email_verification: { required: Boolean(newUser.email), sent: verificationEmailResult?.success === true, expires_in: 86400 },
       verification: verificationMeta,
       referral_reward: referralReward,
       lawyer_invite: lawyerInvite,
@@ -1795,6 +1883,8 @@ exports.register = async (req, res) => {
         errors: errors.array()
       });
     }
+
+    if (await phoneGateResponse(req, res, 'free')) return;
 
     const {
       preparedRegistration,
@@ -1849,6 +1939,7 @@ exports.register = async (req, res) => {
 
     const data = await createUserFromPreparedRegistration({
       preparedRegistration: preparedRegistrationWithLocation,
+      phoneVerified: Boolean(req.registrationPhoneGrant),
       passwordHash,
       verificationMeta,
       kycResult,
@@ -1910,12 +2001,14 @@ exports.initializeRegistrationPayment = async (req, res) => {
       });
     }
 
+    if (await phoneGateResponse(req, res, 'paid')) return;
+
     const {
       preparedRegistration,
       plainPassword,
       verificationMeta,
       kycResult
-    } = await validateAndPrepareRegistration(req.body);
+    } = await validateAndPrepareRegistration(req.body, { registrationPayment: true, logger: req.logger });
 
     await assertRegistrationAllowed({
       userType: preparedRegistration.user_type,
@@ -2054,6 +2147,7 @@ exports.initializeRegistrationPayment = async (req, res) => {
     };
 
     const registrationPayload = {
+      registration_phone_grant_hash: hashGrant(req.registrationPhoneGrant),
       ...preparedRegistrationWithLocation,
       cleanNIN: storeIdentityAtRest(preparedRegistrationWithLocation.cleanNIN),
       cleanPassportNumber: storeIdentityAtRest(preparedRegistrationWithLocation.cleanPassportNumber),
@@ -2301,25 +2395,16 @@ exports.sendRegistrationPaymentOTP = async (req, res) => {
       });
     }
 
-    const otpResult = await sendVerificationCode(phone);
-    if (!otpResult.success) {
-      return res.status(400).json({
-        success: false,
-        message: otpResult.message || 'Could not send the verification code. Please try again shortly.'
-      });
-    }
-
-    await otpSet(`reg_otp:${reference}`, { code: otpResult.code }, 300);
-
-    return res.json({
-      success: true,
-      message: 'A verification code has been sent to your phone.'
-    });
+    const data = await registrationPhoneGate.send({ registration_flow: 'resume', reference, phone });
+    await db.query(`UPDATE tenant_registration_payments SET registration_payload = COALESCE(registration_payload, '{}'::jsonb) || jsonb_build_object('resume_phone_challenge', $1::text) WHERE transaction_reference = $2 AND registered_user_id IS NULL`, [data.phone_challenge, reference]);
+    await logOtpEvent({ contact: phone, channel: 'sms', purpose: 'registration_phone', status: 'sent', expiresAt: Date.now() + 600000, req });
+    return res.json({ success: true, message: 'A verification code has been sent to your phone.', data });
   } catch (error) {
     req.logger.error('Registration payment OTP error:', error);
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
-      message: 'Failed to send the verification code'
+      code: error.code,
+      message: error.statusCode ? error.message : 'Failed to send the verification code'
     });
   }
 };
@@ -2840,43 +2925,18 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
       });
     }
 
-    // Phone-OTP gate: the reference is a bearer secret (it travels in the URL
-    // and email). Requiring the code sent to the registration phone means a
-    // leaked or intercepted link alone can never complete the registration —
-    // the account session is only handed to the person who controls that phone.
-    const otpCode = String(req.body.otp || '').trim();
-    const otpKey = `reg_otp:${reference}`;
-    const storedOTP = await otpGet(otpKey);
-
-    if (!otpCode) {
-      return res.status(428).json({
-        success: false,
-        code: 'OTP_REQUIRED',
-        message: 'Enter the verification code sent to your phone to complete your registration.'
-      });
+    const grantHash = tenantRegistrationPayment.registration_payload?.registration_phone_grant_hash;
+    const suppliedGrant = String(req.body.completion_token || '');
+    if (grantHash && suppliedGrant && hashGrant(suppliedGrant) === grantHash) {
+      // The verified browser/app retains this secret; the payment URL carries no session authority.
+    } else {
+      const otp = String(req.body.otp || '').trim();
+      const phoneChallenge = tenantRegistrationPayment.registration_payload?.resume_phone_challenge;
+      if (!otp) return res.status(428).json({ success: false, code: 'OTP_REQUIRED', message: 'Verify your phone to complete this registration.' });
+      if (!phoneChallenge) return res.status(400).json({ success: false, code: 'OTP_EXPIRED', message: 'Request a new verification code.' });
+      await registrationPhoneGate.verify({ registration_flow: 'resume', reference, phone: String(tenantRegistrationPayment.phone || '').trim(), phone_challenge: phoneChallenge, otp });
+      tenantRegistrationPayment.registration_payload.registration_phone_verified = true;
     }
-
-    if (!storedOTP || !storedOTP.code) {
-      return res.status(400).json({
-        success: false,
-        code: 'OTP_EXPIRED',
-        message: 'The verification code has expired. Request a new code and try again.'
-      });
-    }
-
-    const storedOTPString = String(storedOTP.code);
-    if (
-      storedOTPString.length !== otpCode.length ||
-      !crypto.timingSafeEqual(Buffer.from(otpCode), Buffer.from(storedOTPString))
-    ) {
-      return res.status(400).json({
-        success: false,
-        code: 'OTP_INVALID',
-        message: 'Invalid verification code.'
-      });
-    }
-
-    await otpDelete(otpKey);
 
     if (tenantRegistrationPayment.payment_status !== 'completed') {
       if (!PAYSTACK_SECRET_KEY) {
@@ -3480,6 +3540,7 @@ exports.getRegistrationFlags = async (req, res) => {
         registration_access_message: registrationAccess?.message || null,
         nin_number: flags.nin_number !== false,
         passport_number: flags.passport_number !== false,
+        passport_country_choices: require('../config/utils/passportVerification').countryChoices(),
         diaspora_registration: flags.diaspora_registration === true,
         diaspora_registration_payment: flags.diaspora_registration_payment === true,
         diaspora_require_foreign_card: flags.diaspora_require_foreign_card === true,
@@ -4552,222 +4613,11 @@ const ensureFraudAlertsSchema = async () => {
 };
 
 // Check lawyer passport for fraud (compare with tenant/landlord passports)
-exports.checkLawyerPassportForFraud = async (req, res) => {
-  try {
-    await ensureIdentitySchema();
-    await ensureFraudAlertsSchema();
-
-    const lawyerId = req.user?.id;
-    
-    if (!lawyerId) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication required'
-      });
-    }
-
-    // Check user is lawyer
-    const lawyerCheck = await db.query(
-      `SELECT id, user_type, email, full_name FROM users WHERE id = $1`,
-      [lawyerId]
-    );
-
-    if (!lawyerCheck.rows.length || lawyerCheck.rows[0].user_type !== 'lawyer') {
-      return res.status(403).json({
-        success: false,
-        message: 'This endpoint is for lawyers only'
-      });
-    }
-
-    const lawyer = lawyerCheck.rows[0];
-
-    // Get the uploaded passport from request - expecting multipart form data
-    if (!req.file && !req.files?.passport) {
-      return res.status(400).json({
-        success: false,
-        message: 'No passport file provided for fraud check'
-      });
-    }
-
-    const passportFile = req.file || req.files?.passport?.[0];
-    if (!passportFile) {
-      return res.status(400).json({
-        success: false,
-        message: 'Passport file is required'
-      });
-    }
-
-    // Check if this lawyer's identity (NIN/passport number) is already used by another user
-    const lawyerIdentity = await db.query(
-      `SELECT nin_hash, international_passport_number, identity_document_type
-       FROM users WHERE id = $1`,
-      [lawyerId]
-    );
-
-    let fraudDetected = false;
-    let matchedUser = null;
-    let fraudReason = null;
-    const checksPerformed = [];
-
-    if (lawyerIdentity.rows.length) {
-      const { nin_hash, international_passport_number, identity_document_type } = lawyerIdentity.rows[0];
-
-      // Check 1: Duplicate NIN hash across other users
-      if (nin_hash) {
-        checksPerformed.push('nin_hash_cross_check');
-        const ninMatch = await db.query(
-          `SELECT id, full_name, email, user_type
-           FROM users
-           WHERE nin_hash = $1
-             AND id != $2
-             AND deleted_at IS NULL
-           LIMIT 1`,
-          [nin_hash, lawyerId]
-        );
-        if (ninMatch.rows.length) {
-          fraudDetected = true;
-          matchedUser = ninMatch.rows[0];
-          fraudReason = 'Duplicate NIN detected: same NIN is registered to another user';
-        }
-      }
-
-      // Check 2: Duplicate international passport number across other users
-      if (!fraudDetected && international_passport_number) {
-        checksPerformed.push('passport_number_cross_check');
-        const passportMatch = await db.query(
-          `SELECT id, full_name, email, user_type
-           FROM users
-           WHERE international_passport_number = $1
-             AND id != $2
-             AND deleted_at IS NULL
-           LIMIT 1`,
-          [international_passport_number, lawyerId]
-        );
-        if (passportMatch.rows.length) {
-          fraudDetected = true;
-          matchedUser = passportMatch.rows[0];
-          fraudReason = 'Duplicate passport number detected: same passport number is registered to another user';
-        }
-      }
-
-      // Check 3: File-level hash of the uploaded passport against other passport files
-      if (!fraudDetected && passportFile.buffer) {
-        checksPerformed.push('passport_file_integrity_check');
-        try {
-          const fileHash = crypto.createHash('sha256').update(passportFile.buffer).digest('hex');
-          const existingPassports = await db.query(
-            `SELECT id, full_name, email, user_type
-             FROM users
-             WHERE user_type IN ('tenant', 'landlord', 'lawyer')
-               AND passport_photo_url IS NOT NULL
-               AND id != $1
-               AND deleted_at IS NULL
-             LIMIT 1000`,
-            [lawyerId]
-          );
-
-          const samePassport = existingPassports.rows.find(row =>
-            row.passport_photo_url && row.passport_photo_url.includes(fileHash)
-          );
-          // Note: Full file hash comparison requires storing passport_file_hash on upload.
-          // This is a placeholder for when that column is added in the passport upload flow.
-        } catch (hashError) {
-          req.logger.warn('Passport file hash check error (non-fatal):', hashError.message);
-        }
-      }
-
-      // Check 4: Identity document type mismatch
-      if (!fraudDetected && identity_document_type === 'nin') {
-        checksPerformed.push('identity_type_consistency_check');
-        const sameIdentityType = await db.query(
-          `SELECT COUNT(*) as cnt FROM users
-           WHERE identity_document_type = $1
-             AND id != $2
-             AND deleted_at IS NULL`,
-          ['nin', lawyerId]
-        );
-        // No direct fraud indicator here — just logging for audit
-      }
-    }
-
-    if (!fraudDetected && !checksPerformed.length) {
-      checksPerformed.push('identity_lookup_unavailable');
-    }
-
-    const fraudAlert = {
-      isFraudulent: fraudDetected,
-      message: fraudDetected
-        ? `Passport verification failed: ${fraudReason}`
-        : 'Passport appears valid - no fraud indicators detected',
-      matchedUser: matchedUser,
-      checksPerformed
-    };
-
-    // If fraud detected, create alert record
-    if (fraudDetected && matchedUser) {
-      await db.query(
-        `INSERT INTO lawyer_fraud_alerts 
-         (lawyer_user_id, duplicate_passport_user_id, original_user_type, original_user_email, original_user_name, lawyer_email, lawyer_name, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')`,
-        [lawyerId, matchedUser.id, matchedUser.user_type, matchedUser.email, matchedUser.full_name, lawyer.email, lawyer.full_name]
-      );
-
-      // Notify super admin
-      const superAdmins = await db.query(
-        `SELECT id, email FROM users WHERE user_type = 'super_admin' AND email_verified = TRUE LIMIT 10`
-      );
-
-      if (superAdmins.rows.length > 0) {
-        try {
-          for (const admin of superAdmins.rows) {
-            await sendFraudAlertEmail({
-              adminEmail: admin.email,
-              adminName: admin.email.split('@')[0],
-              lawyerName: lawyer.full_name,
-              lawyerEmail: lawyer.email,
-              matchedUserName: matchedUser.full_name,
-              matchedUserType: matchedUser.user_type,
-              matchedUserEmail: matchedUser.email,
-              alertTime: new Date().toISOString(),
-            }).catch(err => req.logger.error('Fraud alert email failed:', err));
-          }
-
-          await db.query(
-            `UPDATE lawyer_fraud_alerts 
-             SET super_admin_notified_at = NOW()
-             WHERE lawyer_user_id = $1 AND status = 'pending'
-             ORDER BY created_at DESC
-             LIMIT 1`,
-            [lawyerId]
-          );
-        } catch (notifyError) {
-          req.logger.error('Super admin notification failed:', notifyError);
-        }
-      }
-    }
-
-    return res.json({
-      success: !fraudDetected,
-      message: fraudAlert.message,
-      data: {
-        fraud_detected: fraudDetected,
-        matched_user: matchedUser,
-        checks_performed: fraudAlert.checksPerformed,
-        recommendation: fraudDetected 
-          ? 'Lawyer account flagged for fraud investigation. Super admin has been notified.'
-          : 'Passport verification passed. Lawyer may proceed with dashboard access.'
-      }
-    });
-  } catch (error) {
-    req.logger.error('Passport fraud check error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Passport fraud check failed'
-    });
-  }
+exports.checkLawyerPassportForFraud = (req,res) => {
+  if(req.file?.path){try{require('fs').unlinkSync(req.file.path);}catch{}}
+  return res.status(410).json({success:false,code:'USE_PROTECTED_PHOTO_UPLOAD',message:'Use Profile identity verification to submit your live photo. Identity and fraud checks run together there.'});
 };
 
-// VERIFY EMAIL
 exports.verifyEmail = async (req, res) => {
   try {
     const { token } = req.params;
@@ -4782,9 +4632,9 @@ exports.verifyEmail = async (req, res) => {
     const result = await db.query(
       `UPDATE users
        SET email_verified = TRUE, updated_at = NOW()
-       WHERE id = $1
-       RETURNING id, email, user_type, email_verified, token_version`,
-      [decoded.userId]
+       WHERE id = $1 AND LOWER(email) = LOWER($2)
+       RETURNING id, email, full_name, user_type, email_verified, phone_verified, token_version, is_active, approval_status, deleted_at, totp_enabled, is_recruitment_admin`,
+      [decoded.userId, decoded.email]
     );
 
     if (result.rowCount === 0) {
@@ -4805,29 +4655,10 @@ exports.verifyEmail = async (req, res) => {
       req,
     });
 
-    // 🔐 Auto-login token with current token_version
-    const authToken = jwt.sign(
-      {
-        id: user.id,
-        user_type: user.user_type,
-        tv: user.token_version || 1,
-        purpose: 'session',
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
-    const csrfToken = setAuthCookies(res, authToken);
-    const responseData = {
-      success: true,
-      message: 'Email verified successfully!',
-      user,
-      csrf_token: csrfToken,
-    };
-    if (shouldReturnTokenInBody()) {
-      responseData.token = authToken;
-    }
-    res.json(responseData);
+    const eligibleForSession = ['tenant', 'landlord'].includes(user.user_type) && !user.is_recruitment_admin && user.is_active === true && !user.deleted_at && (!user.approval_status || user.approval_status === 'approved') && !user.totp_enabled;
+    if (!eligibleForSession) return res.json({ success: true, message: 'Email verified successfully. Please sign in to continue.', requires_sign_in: true, user: { id: user.id, user_type: user.user_type, email_verified: true, phone_verified: user.phone_verified } });
+    const session = attachAuthSession(res, { user, token: generateToken(user.id, user.user_type, { tokenVersion: user.token_version || 1 }) }, { exposeSessionToken: isNativeAuthClient(req) });
+    return res.json({ success: true, message: 'Email verified successfully!', ...session, data: session });
 
   } catch (error) {
     req.logger.error('Verify email error:', error.message);
@@ -4845,7 +4676,7 @@ exports.resendVerification = async (req, res) => {
     const { email } = req.body;
 
     const result = await db.query(
-      'SELECT id, email, email_verified FROM users WHERE email = $1',
+      'SELECT id, email, email_verified FROM users WHERE LOWER(email) = LOWER($1)',
       [email]
     );
 
@@ -4876,7 +4707,8 @@ exports.resendVerification = async (req, res) => {
       { expiresIn: '24h' }
     );
 
-    await sendVerificationEmail(email, verificationToken);
+    const delivery = await sendVerificationEmail(user.email, verificationToken);
+    if (!delivery.success) return res.status(503).json({ success: false, message: 'Could not send the verification email. Please try again shortly.' });
 
     res.json({
       success: true,
@@ -5023,75 +4855,7 @@ exports.verifyPhone = async (req, res) => {
 };
 
 // UPLOAD PASSPORT PHOTO
-exports.uploadPassport = async (req, res) => {
-  try {
-    await ensureIdentitySchema();
-
-    const userId = req.user.id;
-
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please upload a passport photo'
-      });
-    }
-
-    const relativePath = `/uploads/passports/${req.file.filename}`;
-
-    // Check if identity is already verified via Prembly
-    const currentUser = await db.query(
-      `SELECT nin_verified, identity_document_type, international_passport_number,
-              identity_verification_status
-       FROM users WHERE id = $1`,
-      [userId]
-    );
-
-    const hasVerifiedIdentity = currentUser.rows.length > 0 &&
-      currentUser.rows[0].nin_verified === true;
-
-    const hasIdentityNumber = currentUser.rows.length > 0 &&
-      (
-        currentUser.rows[0].identity_document_type === 'passport'
-          ? !!currentUser.rows[0].international_passport_number
-          : true
-      );
-
-    const autoVerified = hasVerifiedIdentity && hasIdentityNumber;
-
-    await db.query(
-      `UPDATE users
-       SET passport_photo_url = $1,
-           identity_verified = $2,
-           identity_verified_by = NULL,
-           identity_verified_at = CASE WHEN $2 THEN CURRENT_TIMESTAMP ELSE NULL END,
-           identity_verification_status = CASE
-             WHEN $2 THEN 'verified'
-             WHEN $3 THEN 'pending'
-             ELSE NULL
-           END,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $4`,
-      [
-        relativePath,
-        autoVerified,              // $2: identity_verified (auto by system)
-        hasIdentityNumber,         // $3: set pending if identity number exists
-        userId                     // $4: WHERE clause
-      ]
-    );
-
-    res.json({
-      success: true,
-      message: 'Passport uploaded successfully!',
-      data: { passport_photo_url: relativePath },
-    });
-  } catch (error) {
-    req.logger.error('Passport upload error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Passport upload failed',
-    });
-  }
-};
+exports.uploadPassport = (req,res) => require('../routes/users').handlePassportUpload(req,res);
 
 // GET CURRENT USER
 const { decryptNIN } = require('../config/utils/ninEncryption');

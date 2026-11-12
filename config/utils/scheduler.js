@@ -1,3 +1,4 @@
+const {interval:setInterval,once}=require('../../services/backgroundJobRuntime');
 const logger = require('./logger');
 const { checkAndEscalateDisputes } = require('../../services/disputeEscalationService');
 
@@ -14,7 +15,7 @@ function startScheduler() {
   };
 
   // Run immediately once on server start
-  runEscalation();
+  void once('dispute-escalation:startup',runEscalation);
 
   // Then run every 24 hours
   setInterval(runEscalation, 24 * 60 * 60 * 1000);

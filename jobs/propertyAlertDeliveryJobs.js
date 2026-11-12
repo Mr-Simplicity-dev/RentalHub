@@ -1,4 +1,4 @@
-const cron=require('node-cron');
+const cron=require('../services/backgroundJobRuntime').cron;
 const logger=require('../config/utils/logger');
 const {processQueue}=require('../services/propertyAlertDeliveryService');
 let running=false;

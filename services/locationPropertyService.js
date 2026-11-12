@@ -1,3 +1,4 @@
+const {removePropertyContacts}=require('../config/utils/propertyContactPrivacy');
 // ====================== IMPORTS ======================
 const db = require('../config/middleware/database');
 
@@ -91,8 +92,6 @@ exports.getPropertiesByState = async (req, res) => {
         p.rent_amount, p.payment_frequency, p.city, p.area,
         s.state_name AS state, p.featured, p.created_at,
         u.full_name as landlord_name,
-        u.email as landlord_email,
-        u.phone as landlord_phone,
         (SELECT photo_url FROM property_photos 
          WHERE property_id = p.id AND is_primary = TRUE LIMIT 1) AS primary_photo,
         (SELECT COUNT(*) FROM property_photos WHERE property_id = p.id) AS photo_count,
@@ -137,7 +136,7 @@ exports.getPropertiesByState = async (req, res) => {
     
     res.json({
       success: true,
-      data: result.rows,
+      data: removePropertyContacts(result.rows),
       statistics: statsResult.rows[0],
       pagination: {
         page: parseInt(page),

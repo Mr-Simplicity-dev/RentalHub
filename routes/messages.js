@@ -5,6 +5,14 @@ const validateRequest = require('../config/middleware/validateRequest');
 const messageController = require('../controllers/messageController');
 const { authenticate } = require('../config/middleware/auth');
 
+const contactForms=require('../services/supportContactService');
+const {sensitiveActionLimiter}=require('../config/middleware/securityRateLimiters');
+router.get('/private-contact-forms',authenticate,contactForms.list);
+router.post('/private-contact-forms',authenticate,sensitiveActionLimiter,require('../config/utils/twoFactor').requirePrivilegedMfa,contactForms.create);
+router.post('/private-contact-forms/:id',authenticate,sensitiveActionLimiter,param('id').isUUID(),validateRequest,contactForms.submit);
+router.get('/private-contact-forms/:id/details',authenticate,param('id').isUUID(),validateRequest,require('../config/utils/twoFactor').requirePrivilegedMfa,contactForms.view);
+router.delete('/private-contact-forms/:id',authenticate,sensitiveActionLimiter,param('id').isUUID(),validateRequest,contactForms.withdraw);
+
 // Send message
 router.post('/',
   authenticate,

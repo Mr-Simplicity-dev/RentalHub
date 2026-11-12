@@ -32,13 +32,19 @@ const sanitizeForNegotiation = (application) => {
   delete sanitized.landlord_phone;
   delete sanitized.tenant_phone;
   delete sanitized.phone;
+  delete sanitized.tenant_email;
+  delete sanitized.landlord_email;
+  delete sanitized.email;
+  delete sanitized.actor_email;
   // Identity numbers are never required to review or negotiate an application.
   // Keep this denylist as defence in depth in case a future query accidentally
   // selects one of the underlying user identity columns.
   APPLICATION_IDENTITY_FIELDS.forEach((field) => {
     delete sanitized[field];
   });
-  // Keep only name and email for contact, not phone
+  for(const key of ['message','note','message_text'])if(typeof sanitized[key]==='string'&&require('../config/utils/contactPolicy').inspect(sanitized[key]).blocked)sanitized[key]='Contact details hidden. Continue the discussion in RentalHub.';
+  if(Array.isArray(sanitized.negotiation_history))sanitized.negotiation_history=sanitized.negotiation_history.map(sanitizeForNegotiation);
+  // Contact details are shared only through authorised private support forms.
   return sanitized;
 };
 
@@ -177,8 +183,7 @@ const getNegotiationHistory = async (applicationId) => {
   const result = await db.query(
     `SELECT
        an.*,
-       u.full_name AS actor_name,
-       u.email AS actor_email
+       u.full_name AS actor_name
      FROM application_negotiations an
      JOIN users u ON u.id = an.actor_user_id
      WHERE an.application_id = $1

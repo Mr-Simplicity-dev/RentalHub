@@ -1,3 +1,4 @@
+const {notifyDispute}=require('./disputeNotificationService');
 const logger = require('../config/utils/logger');
 const db = require('../config/middleware/database');
 
@@ -26,6 +27,7 @@ exports.checkAndEscalateDisputes = async () => {
            VALUES ($1,$2,$3,$4)`,
           [null, 'Auto escalated dispute', 'dispute', dispute.id]
         );
+        await notifyDispute(dispute.id,'escalated',null,{includeActor:true});
       }
     }
 

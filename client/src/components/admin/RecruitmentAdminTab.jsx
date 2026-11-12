@@ -1,3 +1,5 @@
+import languageCatalog from '../../data/nigerianLanguages.json';
+const languageNames=languageCatalog.languages;
 import VolunteerRecruitmentControls, {OpportunityTypeField, OpportunityBadge} from './VolunteerRecruitmentControls';
 import VolunteerOpportunityTemplates from './VolunteerOpportunityTemplates';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -423,6 +425,7 @@ export default function RecruitmentAdminTab() {
 
   return (
     <div className="space-y-6">
+<a href="/admin/code-of-conduct" className="inline-block rounded border px-4 py-3">Admin Code of Conduct: documents and submissions</a>
 <VolunteerRecruitmentControls status={status} analytics={analytics} onUpdated={loadCore} disabled={loading} />
 
       {/* ─── Header ─────────────────────────────────────── */}
@@ -885,7 +888,7 @@ export default function RecruitmentAdminTab() {
                     />
                   </td>
                   <td className="px-4 py-3">
-                    <p className="font-semibold text-slate-900">{applicant.full_name}</p>
+                    <p className="font-semibold text-slate-900">{applicant.full_name}</p><ul className="mt-2 text-xs text-slate-600">{(applicant.language_skills||[]).map(row=><li key={row.language_id}>{languageNames.find(x=>x.id===row.language_id)?.name}: speaking {row.oral}; writing {row.written} (self-reported)</li>)}</ul>
                     <p className="text-[11px] text-slate-400 font-mono">{applicant.reference_number}</p>
                     <p className="text-xs text-slate-500 truncate max-w-[180px]">{applicant.email_address}</p>
                   </td>

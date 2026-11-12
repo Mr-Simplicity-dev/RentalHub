@@ -1,3 +1,5 @@
+const {notifyDispute}=require('./disputeNotificationService');
+const identityPhotos = require('./identityPhotoService');
 const db = require('../config/middleware/database');
 const {
   LAWYER_DIRECTORY_UNLOCK_PRICE_NGN,
@@ -94,6 +96,7 @@ const getLawyerDisputeAccess = async (lawyerId, disputeId) => {
      LEFT JOIN states s ON s.id = p.state_id
      WHERE la.lawyer_user_id = $1
        AND la.status = 'active'
+       AND u.identity_verified = TRUE
        AND (
          la.property_id = d.property_id
          OR (
@@ -111,6 +114,9 @@ const getLawyerDisputeAccess = async (lawyerId, disputeId) => {
     return null;
   }
 
+  const parties=await db.query('SELECT d.opened_by,d.against_user,p.owner_id FROM disputes d JOIN properties p ON p.id=d.property_id WHERE d.id=$1',[disputeId]);
+  const party=parties.rows[0];
+  if(!party || await identityPhotos.legalConflict(lawyerId,[party.opened_by,party.against_user,party.owner_id]))return null;
   return row;
 };
 
@@ -118,7 +124,7 @@ const getLawyerDisputeAccess = async (lawyerId, disputeId) => {
    Public Lawyers Directory
 --------------------------------------------------- */
 
-exports.getPublicLawyerDirectory = async (_req, res) => {
+exports.getPublicLawyerDirectory = async (req, res) => {
   try {
     const lawyers = await fetchPublicPlatformLawyers();
 
@@ -504,7 +510,7 @@ exports.grantLawyerAccess = async (req, res) => {
     const lawyerCheck = await db.query(
       `SELECT id, assigned_state, assigned_zone, lawyer_client_scope
        FROM users
-       WHERE id = $1 AND user_type IN ('lawyer', 'state_lawyer', 'zonal_lawyer', 'super_lawyer')
+       WHERE id = $1 AND identity_verified=TRUE AND user_type IN ('lawyer', 'state_lawyer', 'zonal_lawyer', 'super_lawyer')
        LIMIT 1`,
       [lawyer_id]
     );
@@ -573,6 +579,9 @@ exports.grantLawyerAccess = async (req, res) => {
         message: "The client is not connected to this property"
       });
     }
+
+    const propertyParties=await db.query("SELECT owner_id AS id FROM properties WHERE id=$1 UNION SELECT tenant_id AS id FROM rental_applications WHERE property_id=$1 AND status='approved'",[property_id]);
+    if(await identityPhotos.legalConflict(lawyer_id,[client_user_id,...propertyParties.rows.map(r=>r.id)]))return res.status(409).json({success:false,message:'This legal assignment requires identity conflict review. Contact support.'});
 
     // Prevent duplicate active authorizations
     const dupCheck = await db.query(
@@ -762,6 +771,7 @@ exports.resolveDispute = async (req, res) => {
       ]
     );
 
+    await notifyDispute(disputeId,'resolved',lawyerId);
     return res.json({
       success: true,
       message: "Dispute resolved successfully",
@@ -900,6 +910,8 @@ exports.verifyEvidence = async (req, res) => {
       });
     }
 
+    const uploader=await db.query('SELECT uploaded_by FROM dispute_evidence WHERE id=$1 AND dispute_id=$2',[evidenceId,disputeId]);
+    if(uploader.rows[0]?.uploaded_by && await identityPhotos.legalConflict(lawyerId,[uploader.rows[0].uploaded_by]))return res.status(409).json({success:false,message:'You cannot independently verify this evidence. Identity conflict review is required.'});
     const result = await db.query(
       `UPDATE dispute_evidence
        SET verification_status = $1,
@@ -941,6 +953,7 @@ exports.verifyEvidence = async (req, res) => {
       ]
     );
 
+    await notifyDispute(disputeId,'evidence_review',lawyerId);
     return res.json({
       success: true,
       message: `Evidence marked as ${verificationStatus}`,
@@ -1313,6 +1326,7 @@ exports.updateDisputeSummary = async (req, res) => {
       ]
     );
 
+    await notifyDispute(disputeId,'summary',lawyerId);
     return res.json({
       success: true,
       message: 'Dispute summary updated successfully',

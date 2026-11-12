@@ -144,7 +144,7 @@ const startScheduler = require('./config/utils/scheduler');
 const locationRoutes = require('./routes/locationRoutes');
 const { generateSitemap } = require('./config/utils/sitemapGenerator');
 const blogRoutes = require('./routes/blogRoutes');
-const cron = require('node-cron');
+const cron = require('./services/backgroundJobRuntime').cron;
 const mongoose = require('mongoose');
 
 // Enable strict query mode to suppress Mongoose deprecation warning
@@ -174,7 +174,6 @@ connectMongoWithRetry();
 const Blog = require('./models/Blog');
 const locations = require('./data/nigeriaLocations');
 const slugify = require('./config/utils/slugify');
-const { submitUrl } = require('./config/utils/googleIndexing');
 const { generateAIContent } = require('./config/utils/aiContentGenerator');
 const configureRealtimeSocket = require('./config/utils/realtimeSocket');
 const { setRealtimeIo } = require('./config/utils/realtimeEmitter');
@@ -267,13 +266,14 @@ mongoose.connection.on('disconnected', () => {
 });
 
 const startMongoCronJobs = () => {
-  if (mongoCronJobsStarted) {
+  if (!require('./services/backgroundJobRuntime').isLeader() || mongoCronJobsStarted) {
     return;
   }
   mongoCronJobsStarted = true;
 
   // AI blog generation (reduced from 20 to 3 per day for quality and cost)
   cron.schedule('0 1 * * *', async () => {
+    if(mongoose.connection.readyState!==1)return {skipped:true,reason:'MONGODB_NOT_CONNECTED'};
     const DAILY_BUDGET_CENTS = Number(process.env.AI_BLOG_DAILY_BUDGET_CENTS) || 30;
     const MAX_POSTS_PER_DAY = Number(process.env.AI_BLOG_MAX_POSTS_PER_DAY) || 3;
     const postsPerDay = Math.min(MAX_POSTS_PER_DAY, Math.floor(DAILY_BUDGET_CENTS / 10));
@@ -375,21 +375,11 @@ Start your search today and find the best home in ${location}.
     }
   });
 
-  // Daily sitemap submission via Google Indexing API
+  // Homepage discovery uses the sitemap; the Indexing API is for eligible job/live-stream pages.
   cron.schedule('0 2 * * *', async () => {
-    try {
-      logger.info('Submitting homepage to Google Indexing API...');
-      const result = await submitUrl('https://rentalhub.com.ng', 'URL_UPDATED');
-      if (result.success) {
-        logger.info('Homepage submitted to Google Indexing API');
-      } else if (result.skipped && result.reason === 'missing_service_account') {
-        logger.warn('Google Indexing API skipped — no service-account.json found');
-      } else {
-        logger.error('Google Indexing API submission failed:', result.reason || result.error);
-      }
-    } catch (err) {
-      logger.error('Google Indexing API submission error:', err.message);
-    }
+    const response=await require('axios').get(`${getFrontendUrl()}/sitemap.xml`,{timeout:15000,responseType:'text',maxContentLength:5*1024*1024});
+    if(!/<(?:sitemapindex|urlset)(?:\s|>)/i.test(String(response.data)))throw Object.assign(new Error('Sitemap XML is unavailable'),{code:'SITEMAP_XML_INVALID'});
+    logger.info('Daily sitemap availability check completed');
   });
 };
 
@@ -848,6 +838,8 @@ app.use('/api/commissions', financeOpsLimiter, agentCommissionRoutes);
 app.use('/api/admin/agents', adminLimiter, adminAgentRoutes);
 app.use('/api/withdrawals', financeOpsLimiter, agentWithdrawalRoutes);
 app.use('/api/state-migrations', generalOpsLimiter, stateMigrationRoutes);
+app.use('/api/admin-conduct', adminLimiter, require('./routes/adminConduct'));
+app.use('/api/support-languages', adminLimiter, require('./routes/supportLanguages'));
 app.use('/api/support', adminLimiter, supportRoutes);
 app.use('/api/system', adminLimiter, systemRoutes);
 app.use('/api/mobile', generalOpsLimiter, mobileDiagnosticsRoutes);
@@ -962,6 +954,7 @@ const startBackgroundServices = () => {
   }
 
   backgroundServicesStarted = true;
+  startMongoCronJobs();
   ensureSurveyBoundaryData();
 startPaymentJobs();
 startPropertyJobs();
@@ -975,6 +968,7 @@ startMarketingCommissionJobs();
   startPremblyRecoveryJobs();
   startRegistrationReminderJobs();
   startSupportReassignJobs();
+  require('./services/conductPaymentService').startConductReconciliation();
   startPropertyTourJobs();
   startScheduler();
   scheduleEvidenceIntegrityMonitoring();
@@ -1006,11 +1000,11 @@ const startServer = () => {
 
 ensureStartupSchema().then(() => {
   startServer();
-  startBackgroundServices();
+  require('./services/backgroundJobRuntime').start(startBackgroundServices);
 }).catch((err) => {
   logger.error('Startup schema migration failed:', err.message);
   startServer();
-  startBackgroundServices();
+  require('./services/backgroundJobRuntime').start(startBackgroundServices);
 });
 
 // Graceful shutdown — drain connections, stop jobs, close DB
@@ -1028,6 +1022,8 @@ const gracefulShutdown = async (signal) => {
   }, 10000);
 
   try {
+    const jobsDrained=await require('./services/backgroundJobRuntime').stop();
+    if(!jobsDrained)process.exit(0);
     // Close DB pool
     await db.end().catch((err) => logger.error('DB pool close error:', err.message));
     logger.info('Database pool closed.');

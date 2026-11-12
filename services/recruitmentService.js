@@ -1438,6 +1438,7 @@ exports.updateRole = async (req, res) => {
     if (!role) return res.status(404).json({success:false,message:'Role not found'});
     if (req.body.opportunity_type !== undefined && req.body.opportunity_type !== role.opportunity_type) return res.status(409).json({success:false,message:'Create a new opportunity to change its type and preserve application history'});
     const volunteer = isVolunteer(role);
+
     const applicationFee = volunteer ? 0 : req.body.application_fee;
     const premiumFee = volunteer ? 0 : req.body.premium_fee;
     if ([applicationFee,premiumFee].some(n => n != null && (!Number.isFinite(Number(n)) || Number(n) < 0))) return res.status(400).json({success:false,message:'Invalid fees'});
@@ -2396,6 +2397,7 @@ const PUBLIC_APPLICATION_FIELDS = new Set([
   'opportunity_type',
   'volunteer_motivation',
   'availability',
+  'language_skills',
   'application_fee',
   'payment_status',
   'payment_date',
@@ -3276,6 +3278,11 @@ exports.createApplication = async (req, res) => {
     }
     const role = roleResult.rows[0];
     const volunteer = isVolunteer(role);
+    let languageSkills=[];
+    if(require('../config/utils/languagePolicy').requiresLanguages(role)){
+      try{languageSkills=require('../config/utils/languagePolicy').validateSkills(req.body.language_skills);}
+      catch(error){return res.status(400).json({success:false,message:error.message});}
+    }
     if (!volunteer && !normalizeText(highest_education)) {
       return res.status(400).json({ success: false, message: 'Missing required fields: highest education' });
     }
@@ -3310,8 +3317,8 @@ exports.createApplication = async (req, res) => {
         state_name, lga_name, area_locality, residential_address, date_of_birth,
         highest_education, years_of_experience, current_employment_status,
         skills_qualifications, suitability_reason, application_fee,
-        application_track, reference_number, status, payment_status, volunteer_motivation, availability
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+        application_track, reference_number, status, payment_status, volunteer_motivation, availability, language_skills
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
       RETURNING *`,
       [
         role.cycle_id,
@@ -3336,6 +3343,7 @@ exports.createApplication = async (req, res) => {
         volunteer ? 'not_applicable' : 'pending',
         volunteer ? normalizeText(volunteer_motivation) : null,
         volunteer ? normalizeText(availability) : null,
+        JSON.stringify(languageSkills),
       ]
     );
     if (volunteer) {

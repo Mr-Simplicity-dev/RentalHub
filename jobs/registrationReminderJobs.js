@@ -1,3 +1,4 @@
+const {interval:setInterval}=require('../services/backgroundJobRuntime');
 /**
  * Reminds registrants who started but did not complete their registration
  * payment. Emails a secure resume link (/register?registration_ref=...) so
@@ -224,7 +225,7 @@ const getAbandonedRegistrationsSummary = async () => {
 const startRegistrationReminderJobs = () => {
   // Run hourly
   setInterval(runRegistrationReminders, 60 * 60 * 1000);
-  runRegistrationReminders();
+  void require('../services/backgroundJobRuntime').once('registration-reminders:startup',runRegistrationReminders);
   logger.info('Registration reminder job started (hourly)');
 };
 

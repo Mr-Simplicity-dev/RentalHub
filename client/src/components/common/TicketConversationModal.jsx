@@ -1,3 +1,6 @@
+import SupportCustomerCard from '../admin/SupportCustomerCard';
+import DisputeHandoverPanel from './DisputeHandoverPanel';
+import SupportContactForms from './SupportContactForms';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FaArrowUp, FaCheckCircle, FaTimesCircle, FaPaperPlane, FaUser, FaShieldAlt, FaPaperclip, FaFile, FaEdit, FaTrash, FaCheck, FaTimes, FaCommentDots, FaUserCheck } from 'react-icons/fa';
 import { toast } from 'react-toastify';
@@ -178,6 +181,9 @@ const TicketConversationModal = ({
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-4">
+          <SupportCustomerCard ticketId={ticket.id}/>
+          <DisputeHandoverPanel ticketId={ticket.id} />
+          <SupportContactForms ticketId={ticket.id} peerId={ticket.user_id} />
           {chatTab === 'user' ? (
             <div className="space-y-3">
               <div className="rounded-lg bg-gray-50 dark:bg-gray-700/50 p-4">

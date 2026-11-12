@@ -1,5 +1,5 @@
 const logger = require('../config/utils/logger');
-const cron = require('node-cron');
+const cron = require('../services/backgroundJobRuntime').cron;
 const db = require('../config/middleware/database');
 const { sendWhatsAppText, sendWhatsAppTemplate, sendWhatsAppMedia } = require('../config/utils/whatsappService');
 const { ensureSchema, getDailySendLimit } = require('../services/whatsappMarketingService');
@@ -173,7 +173,7 @@ const processWhatsappQueue = async () => {
 
 exports.startWhatsappMarketingJobs = () => {
   cron.schedule('* * * * *', () => {
-    processWhatsappQueue();
+    return processWhatsappQueue();
   });
   logger.info('WhatsApp marketing queue processor started');
 };

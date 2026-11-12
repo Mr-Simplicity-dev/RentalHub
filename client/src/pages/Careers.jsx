@@ -1,3 +1,5 @@
+import LanguageSkillsField from '../components/common/LanguageSkillsField';
+import {requiresLanguages,validateSkills} from '../data/languagePolicy';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n from '../i18n';
@@ -236,6 +238,7 @@ const EMPTY_FORM = {
   suitability_reason: '',
   volunteer_motivation: '',
   availability: '',
+  language_skills: [],
   application_track: 'standard',
 };
 
@@ -672,6 +675,7 @@ export default function Careers() {
   const startApplication = async (event) => {
     event.preventDefault();
     if (!selectedRole) { toast.error(t('careers.select_role')); return; }
+    if(requiresLanguages(selectedRole)){try{validateSkills(form.language_skills);}catch(error){toast.error(error.message);return;}}
     const validationError = validateApplicationForm(form);
     if (validationError) {
       toast.error(validationError);
@@ -1593,6 +1597,7 @@ export default function Careers() {
 
       <TextAreaField label={t('careers.residential_address')} name="residential_address" value={form.residential_address} onChange={handleFormChange} required />
       <TextAreaField label={t(volunteerForm?'careers.skills_volunteer':'careers.skills_qualifications')} name="skills_qualifications" value={form.skills_qualifications} onChange={handleFormChange} placeholder={volunteerForm?t('careers.skills_volunteer_placeholder'):undefined} />
+      {requiresLanguages(selectedRole)&&<LanguageSkillsField value={form.language_skills||[]} onChange={language_skills=>setForm(old=>({...old,language_skills}))}/>}
       {selectedVolunteer && <><TextAreaField label={t('careers.volunteer_motivation')} name="volunteer_motivation" value={form.volunteer_motivation} onChange={handleFormChange} required className="lg:col-span-2" /><TextAreaField label={t('careers.volunteer_availability')} name="availability" value={form.availability} onChange={handleFormChange} required className="lg:col-span-2" /></>}
       <TextAreaField label={t(volunteerForm?'careers.suitability_volunteer':'careers.suitability')} name="suitability_reason" value={form.suitability_reason} onChange={handleFormChange} required className="lg:col-span-2" />
 
@@ -1633,7 +1638,7 @@ export default function Careers() {
 
       <button
         type="submit"
-        disabled={submitting || roles.length === 0 || (process.env.REACT_APP_TURNSTILE_SITE_KEY && !turnstileToken)}
+        disabled={submitting || (requiresLanguages(selectedRole)&&(()=>{try{validateSkills(form.language_skills);return false;}catch{return true;}})()) || roles.length === 0 || (process.env.REACT_APP_TURNSTILE_SITE_KEY && !turnstileToken)}
         className="btn btn-primary w-full py-3.5 text-base lg:col-span-2"
       >
         {submitting ? (

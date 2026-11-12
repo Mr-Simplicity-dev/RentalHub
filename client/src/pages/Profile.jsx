@@ -1,3 +1,4 @@
+import UserAvatar from '../components/common/UserAvatar';
 import AssistedPasswordForm from '../components/common/AssistedPasswordForm';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
@@ -79,6 +80,7 @@ const Profile = () => {
   const [searchParams] = useSearchParams();
   const { t } = useTranslation();
 
+  const [photoConsent,setPhotoConsent] = useState(false);
   const [passport, setPassport] = useState(null);
   const [passportPreview, setPassportPreview] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -630,6 +632,8 @@ const Profile = () => {
         const formData = new FormData();
         formData.append('passport', passport);
         formData.append('capture_source', 'live_camera');
+        formData.append('biometric_consent',photoConsent ? 'true' : 'false');
+        formData.append('biometric_consent_version','local-face-2026-11');
         if (token) {
           formData.append('live_capture_token', token);
         }
@@ -656,7 +660,7 @@ const Profile = () => {
       }
 
       if (res.data?.success) {
-        toast.success(t('profile.upload_success'));
+        toast.success(t(res.data.verification_pending ? 'profile.photo_review_pending' : 'profile.upload_success'));
         if (res.data.user) {
           updateUser(res.data.user);
         }
@@ -754,7 +758,7 @@ const Profile = () => {
     <div className="container mx-auto px-4 py-8 max-w-3xl">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="rounded-xl border border-teal-200 bg-teal-50 px-6 py-2">
-          <h1 className="text-2xl font-bold text-teal-700">{t('profile.title')}</h1>
+          <div className="flex items-center gap-3"><UserAvatar photo={user?.passport_photo_url} name={user?.full_name} className="h-14 w-14 shrink-0 rounded-full object-cover" /><h1 className="text-2xl font-bold text-teal-700">{t('profile.title')}</h1></div>
         </div>
         <BackToDashboard />
       </div>
@@ -1167,6 +1171,7 @@ const Profile = () => {
               <p className="text-sm text-red-600 mb-4">{cameraError}</p>
             )}
 
+            <label className="my-4 flex items-start gap-3 text-sm text-gray-700"><input type="checkbox" checked={photoConsent} onChange={event=>setPhotoConsent(event.target.checked)} className="mt-1 h-5 w-5 shrink-0" /><span>{t('profile.face_gallery_consent')}</span></label>
             {passportPreview && (
               <div className="mb-5 rounded-xl border border-gray-200 p-4 bg-white">
                 <p className="text-sm font-medium text-gray-700 mb-3">{t('profile.captured_preview')}</p>

@@ -1,5 +1,5 @@
 const logger = require('../config/utils/logger');
-const cron = require('node-cron');
+const cron = require('../services/backgroundJobRuntime').cron;
 const fs = require('fs');
 const db = require('../config/middleware/database');
 const { sendEmail } = require('../config/utils/mailer');

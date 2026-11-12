@@ -141,6 +141,7 @@ export default function RecruitmentAdminDashboard() {
 
       <div className="mx-auto max-w-7xl">
         <div className="space-y-6">
+          <a href="/admin/code-of-conduct" className="inline-block rounded border p-3">Review admin Code of Conduct submissions</a>
           <VolunteerRecruitmentControls status={status} analytics={analytics} onUpdated={loadCore} disabled={loading} />
           {/* ── Page Header ────────────────────────────── */}
           <PageHeader

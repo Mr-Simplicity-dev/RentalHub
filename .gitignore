@@ -101,3 +101,16 @@ geo/*.json
 
 # Rendered output of scripts/render-tour-preview.js (the sample video is local only)
 scripts/tour-preview/
+# Keep audio and private release staging out of source commits
+*.wav
+*.mp3
+*.m4a
+*.aac
+*.ogg
+*.flac
+*.opus
+*.wma
+*.aif
+*.aiff
+/.release*/
+Video-Presets_290_Royalty_Free_Background_Music_Tracks/

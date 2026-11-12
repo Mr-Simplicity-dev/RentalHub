@@ -336,7 +336,9 @@
     "open_live_camera": "Buɗe Kyamara Kai Tsaye",
     "captured_preview": "Samfuran fasfon da aka ɗauka",
     "preview_hint": "Tabbatar cewa fuskarka tana da haske kuma a bayyane take kafin ɗauka.",
-    "camera_guide": "Ki riƙe fuskarki a cikin jagora kuma ki kammala duk dubawa."
+    "camera_guide": "Ki riƙe fuskarki a cikin jagora kuma ki kammala duk dubawa.",
+    "face_gallery_consent": "Na yarda a kwatanta fuskata kuma a adana bayananta a uwar garken sirri ta RentalHub domin tabbatar da shaidata da hana maimaita asusu. Idan ban yarda ba, ma’aikaci zai duba hotona.",
+    "photo_review_pending": "An ajiye hoton. Tabbatar da shaida na jiran dubawa."
   },
   "property_types": {
     "apartment": "Apartment",
@@ -405,7 +407,7 @@
     "not_found": "Ba a sami gida ba",
     "no_photos": "Babu hotuna",
     "unlock_title": "Biya don buɗe cikakken bayanin gida",
-    "unlock_text": "Cikakken bayani (cikakken adireshi, lambar mai gida, da kafofin watsa labarai na musamman) yana samuwa bayan biyan kuɗi na lokaci ɗaya na wannan gida.",
+    "unlock_text": "Biya sau ɗaya don buɗe cikakkun bayanan gida da hotuna na musamman. Ba a haɗa lambobin waya ko imel ba.",
     "pay_unlock_details": "Biya don Buɗe Bayani",
     "login_continue": "Shiga don Ci Gaba",
     "per_period": "kowace {{period}}",
@@ -419,7 +421,7 @@
     "amenities": "Abubuwan More Rayuwa",
     "video_tour": "Yawon Gida na Bidiyo",
     "full_address": "Cikakken Adireshi",
-    "contact_landlord": "Tuntuɓi Mai Gida",
+    "contact_landlord": "Tambayoyin gida",
     "name": "Suna",
     "phone": "Wayar",
     "whatsapp": "WhatsApp",
@@ -428,8 +430,8 @@
     "audio_call": "Kiran Sauti",
     "video_call": "Kiran Bidiyo",
     "start_virtual_tour": "Fara Yawon Gida na Kama-da-Wane",
-    "subscribe_contact_title": "Biya kuɗi don Ganin Lambar Sadarwa",
-    "subscribe_contact_text": "Yi biyan kuɗi na lokaci ɗaya don samun bayanin lambar mai gida da cikakken bayanin gidan nan.",
+    "subscribe_contact_title": "Tambayoyin gida",
+    "subscribe_contact_text": "Biya sau ɗaya don buɗe cikakkun bayanan gida da hotuna na musamman. Ba a haɗa lambobin waya ko imel ba.",
     "pay_to_unlock": "Biya don Buɗewa",
     "apply_property": "Nema Wannan Gida",
     "report_dispute": "Ba da Rahoton Rigima",
@@ -630,7 +632,8 @@
       "send_message": "Aika saƙo",
       "start_conversation_btn": "Fara tattaunawa",
       "lookup": "Duba matsayin tikiti"
-    }
+    },
+    "private_documents": "Aika takardu ta tikitin tallafi na sirri."
   },
   "about_us": {
     "hero": {
@@ -1076,7 +1079,7 @@
     "tenants_step_2_hl_2": "Yawon gida na kama-da-wane",
     "tenants_step_2_hl_3": "Ajiye waɗanda kuka fi so",
     "tenants_step_3_title": "Buɗe Cikakken Bayani",
-    "tenants_step_3_desc": "Yi biyan kuɗi na lokaci ɗaya don buɗe cikakken bayanin gida, ciki har da bayanin tuntuɓar mai gida da kafofin watsa labarai na musamman.",
+    "tenants_step_3_desc": "Biya sau ɗaya don buɗe cikakkun bayanan gida da hotuna na musamman. Ba a haɗa lambobin waya ko imel ba.",
     "tenants_step_3_hl_1": "An bayyana cikakken adireshi",
     "tenants_step_3_hl_2": "Bayanin tuntuɓar mai gida",
     "tenants_step_3_hl_3": "Hotuna da bidiyo HD",
@@ -3569,7 +3572,20 @@
     "adjustment_body": "Katin biyan kuɗin ku an ba da shi a wajen Najeriya. Don kammala rajistar farashin cikin gida, ana buƙatar ƙarin",
     "adjustment_body_2": "(canjin kasuwa + $5 kuɗin aiki) kafin a kunna asusunku.",
     "adjustment_pay": "Biya bambancin yanzu",
-    "adjustment_failed": "Ba a iya fara biyan bambancin ba. Da fatan za a sake gwadawa."
+    "adjustment_failed": "Ba a iya fara biyan bambancin ba. Da fatan za a sake gwadawa.",
+    "otp_pre_payment_body": "Mun aika lambar tabbatarwa zuwa wayarka. Tana aiki na minti 10. Tabbatar da lambar wayarka kafin ka ci gaba zuwa biyan kuɗi.",
+    "otp_verify_payment": "Tabbatar sannan a ci gaba zuwa biyan kuɗi",
+    "phone_verified_continue": "An tabbatar da wayarka. Ci gaba da rajista ba tare da sake shigar da lambar ba.",
+    "phone_checking_identity": "An tabbatar da wayarka. Ana duba shaidar ka kafin a ci gaba.",
+    "otp_resend_wait": "Za a iya sake aikawa bayan daƙiƙa {{count}}",
+    "email_send": "Aika imel na tabbatarwa",
+    "email_sent": "Duba akwatin saƙonka da saƙonnin banza. Buɗe hanyar tabbatarwa don tabbatar da imel ɗinka.",
+    "email_send_failed": "Ba a iya aika imel na tabbatarwa ba. Sake gwadawa.",
+    "passport_image_label": "Shafin bayanan fasfo",
+    "passport_image_choose": "Zaɓi shafin fasfo",
+    "passport_image_required": "Haɗa hoto mai kyau na shafin bayanan fasfonka kafin ci gaba.",
+    "passport_image_help": "A nuna duk shafin da hotonka da bayanan fasfo. Yi amfani da JPEG ko PNG mai kyau. Ba a ajiye hoton a daftarin rajista.",
+    "passport_country_label": "Ƙasar da ta bayar da fasfo"
   },
   "widget": {
     "support_title": "Tallafin RentalHub",
