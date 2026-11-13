@@ -18,7 +18,8 @@
     "failed": "登录失败",
     "welcome_back": "欢迎回来",
     "left_panel_desc": "登录以安全管理房产记录、租赁和案件。",
-    "trusted": "面向租客、房东和获准的平台工作人员。"
+    "trusted": "面向租客、房东和获准的平台工作人员。",
+    "google_start": "使用 Google 继续"
   },
   "language": {
     "label": "语言",
@@ -4499,5 +4500,10 @@
     "workspace_assignedReviewer": "指派的审核人员",
     "workspace_waiting": "等待分配",
     "workspace_recordHistory": "记录历史"
+  },
+  "securityCheck": {
+    "loading": "正在加载安全验证…",
+    "unavailable": "安全验证耗时过长。请检查网络连接后重试。",
+    "retry": "重试安全验证"
   }
 }

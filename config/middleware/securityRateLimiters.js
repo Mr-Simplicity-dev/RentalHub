@@ -2,15 +2,8 @@ const rateLimit = require('express-rate-limit');
 const crypto = require('crypto');
 const redis = require('../utils/redis');
 
-// Redis-backed store so rate limits are shared across all PM2 instances and
-// survive deploys/reloads. Falls back to express-rate-limit's in-memory store
-// when Redis is unavailable. Keys are hashed so raw client identifiers (IP +
-// route) never land in Redis.
-//
-// The bucket name is what keeps limiters apart: the default key is only the
-// client IP, so without a per-limiter name every limiter hashed to the same
-// Redis key and shared ONE counter — 12 ordinary "sensitive" requests in the
-// window then blocked unrelated routes for that IP.
+// The existing Redis-compatible adapter is currently process-local. Named
+// buckets isolate limits; persistent account lockouts remain database-backed.
 const { MemoryStore } = rateLimit;
 
 class RedisRateLimitStore {
@@ -23,7 +16,7 @@ class RedisRateLimitStore {
   init(options) {
     this.memory.init(options);
     this.windowMs = options.windowMs;
-    this.prefix = options.prefix || '';
+    this.prefix = options.prefix || this.bucket + ':';
   }
 
   _hash(key) {
@@ -39,7 +32,9 @@ class RedisRateLimitStore {
       const hashed = this._hash(key);
       const count = await redis.incr(hashed);
       if (count === 1) await redis.pexpire(hashed, this.windowMs);
-      return { totalHits: count, resetTime: new Date(Date.now() + this.windowMs) };
+      let ttl=typeof redis.pttl === 'function' ? await redis.pttl(hashed) : this.windowMs;
+      if(ttl<0){await redis.pexpire(hashed,this.windowMs);ttl=this.windowMs;}
+      return { totalHits: count, resetTime: new Date(Date.now() + ttl) };
     } catch (error) {
       return this.memory.increment(key);
     }
@@ -64,11 +59,13 @@ class RedisRateLimitStore {
   }
 }
 
-const buildLimiter = ({ name, windowMs, max, message, keyGenerator }) =>
-  rateLimit({
+const buildLimiter = ({ name, windowMs, max, message, keyGenerator, skip }) => {
+  const counted=Symbol(name || message);
+  const middleware=rateLimit({
     windowMs,
     max,
     ...(keyGenerator ? { keyGenerator } : {}),
+    ...(skip ? {skip} : {}),
     store: new RedisRateLimitStore(name || message),
     standardHeaders: true,
     legacyHeaders: false,
@@ -77,8 +74,11 @@ const buildLimiter = ({ name, windowMs, max, message, keyGenerator }) =>
       message,
     },
   });
+  return Object.assign((req,res,next)=>{if(req[counted])return next();req[counted]=true;return middleware(req,res,next);},middleware);
+};
 
 const authSensitiveLimiter = buildLimiter({
+  skip: req => req.method === 'GET' && ['/me','/2fa/status'].includes(req.path),
   windowMs: Number(process.env.AUTH_SENSITIVE_WINDOW_MS) || 10 * 60 * 1000,
   max: Number(process.env.AUTH_SENSITIVE_MAX) || 25,
   message: 'Too many authentication/security requests. Try again shortly.',

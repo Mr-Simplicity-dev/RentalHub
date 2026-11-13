@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 
@@ -18,6 +19,8 @@ function loadGoogle() {
 }
 
 export default function CustomerGoogleSignIn({ mobile = false, onSignedIn }) {
+  const {t}=useTranslation();
+  const [started,setStarted]=useState(mobile);
   const [params] = useSearchParams();
   const id = mobile ? params.get('request') : null;
   const button = useRef(null), challenge = useRef(null), pending = useRef(''), latest = useRef(null);
@@ -41,6 +44,7 @@ export default function CustomerGoogleSignIn({ mobile = false, onSignedIn }) {
     } finally { setBusy(false); }
   };
   useEffect(() => {
+    if(!started)return;
     let active = true;
     challenge.current = null; pending.current = ''; setFactorType(''); setMessage(''); setRegister(false);
     (async () => {
@@ -55,8 +59,8 @@ export default function CustomerGoogleSignIn({ mobile = false, onSignedIn }) {
       window.google.accounts.id.renderButton(button.current,{theme:'outline',size:'large',text:'signin_with',shape:'rectangular'});
     })().catch(e => {if (active) setMessage(e.response?.data?.message || e.message);});
     return () => {active = false; pending.current = '';};
-  }, [mobile,id,attempt]);
-  const contents = <div className="flex flex-col items-center gap-3 text-center">
+  }, [mobile,id,attempt,started]);
+  const contents = !started ? <button type="button" onClick={()=>setStarted(true)} className="min-h-11 rounded-xl border border-slate-300 px-5 py-3 font-semibold">{t('login.google_start','Continue with Google')}</button> : <div className="flex flex-col items-center gap-3 text-center">
     {returnUrl ? <a className="rounded-xl bg-blue-900 px-5 py-3 font-semibold text-white" href={returnUrl}>Return to RentalHub app</a> : <>
       <div ref={button} hidden={Boolean(factorType)} />
       {factorType && <form onSubmit={e => {e.preventDefault();latest.current(pending.current,factor,factorType);}} className="grid gap-2"><label>{factorType === 'email' ? 'Code sent to your registered email' : 'Authenticator or recovery code'}<input className="block w-full rounded border p-2" autoComplete="one-time-code" value={factor} onChange={e => setFactor(e.target.value.trim())} required maxLength={16} /></label><button disabled={busy} className="rounded bg-blue-900 p-2 text-white">Verify and continue</button></form>}

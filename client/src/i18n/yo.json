@@ -18,7 +18,8 @@
     "failed": "Wíwọlé kùnà",
     "welcome_back": "Káàbọ̀ Padà",
     "left_panel_desc": "Wọlé láti bójú tó àkọsílẹ̀ ohun-ìní, yíyálò àti ọ̀ràn rẹ ní ààbò.",
-    "trusted": "Fún ayálégbé, onílé àti òṣìṣẹ́ pẹpẹ tí a fọwọ́ sí."
+    "trusted": "Fún ayálégbé, onílé àti òṣìṣẹ́ pẹpẹ tí a fọwọ́ sí.",
+    "google_start": "Tẹ̀síwájú pẹ̀lú Google"
   },
   "language": {
     "label": "Èdè",
@@ -4747,5 +4748,10 @@
     "workspace_assignedReviewer": "Olùyẹ̀wò tí a yàn",
     "workspace_waiting": "Ń dúró de ẹni tí a ó yàn",
     "workspace_recordHistory": "Ìtàn àkọsílẹ̀"
+  },
+  "securityCheck": {
+    "loading": "Àyẹ̀wò ààbò ń ṣí…",
+    "unavailable": "Àyẹ̀wò ààbò ń gba àkókò pípẹ́. Ṣàyẹ̀wò ìsopọ̀ rẹ kí o sì tún gbìyànjú.",
+    "retry": "Tún àyẹ̀wò ààbò gbìyànjú"
   }
 }

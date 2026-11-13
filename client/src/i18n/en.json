@@ -18,7 +18,8 @@
     "failed": "Login failed",
     "welcome_back": "Welcome Back",
     "left_panel_desc": "Sign in to manage your property records, tenancies and cases securely.",
-    "trusted": "Built for tenants, landlords and approved platform staff."
+    "trusted": "Built for tenants, landlords and approved platform staff.",
+    "google_start": "Continue with Google"
   },
   "language": {
     "label": "Language",
@@ -4746,5 +4747,10 @@
     "workspace_assignedReviewer": "Assigned reviewer",
     "workspace_waiting": "Awaiting assignment",
     "workspace_recordHistory": "Record history"
+  },
+  "securityCheck": {
+    "loading": "Loading security check…",
+    "unavailable": "The security check is taking too long. Check your connection and try again.",
+    "retry": "Retry security check"
   }
 }

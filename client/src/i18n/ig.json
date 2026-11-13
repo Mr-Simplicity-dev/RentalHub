@@ -18,7 +18,8 @@
     "failed": "Ịbanye dara",
     "welcome_back": "Nnọọ na nlọghachi",
     "left_panel_desc": "Banye ka ị lekọta ndekọ ihe onwunwe, mgbazinye na okwu n’enweghị nsogbu.",
-    "trusted": "Maka ndị bi n’ụlọ mgbazinye, ndị nwe ụlọ na ndị ọrụ a kwadoro."
+    "trusted": "Maka ndị bi n’ụlọ mgbazinye, ndị nwe ụlọ na ndị ọrụ a kwadoro.",
+    "google_start": "Gaa n'ihu na Google"
   },
   "language": {
     "label": "Asụsụ",
@@ -4747,5 +4748,10 @@
     "workspace_assignedReviewer": "Onye nyocha e kenyere",
     "workspace_waiting": "Na-eche onye a ga-ekenye",
     "workspace_recordHistory": "Akụkọ ndekọ"
+  },
+  "securityCheck": {
+    "loading": "A na-ebunye nyocha nchekwa…",
+    "unavailable": "Nyocha nchekwa na-ewe ogologo oge. Lelee njikọ ịntanetị gị wee nwaa ọzọ.",
+    "retry": "Nwaa nyocha nchekwa ọzọ"
   }
 }

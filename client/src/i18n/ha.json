@@ -18,7 +18,8 @@
     "failed": "Shiga ya gaza",
     "welcome_back": "Marhabin da Komawa",
     "left_panel_desc": "Shiga don kula da bayanan kadara, haya da lamura cikin tsaro.",
-    "trusted": "An tsara wa masu haya, masu gida da ma’aikatan da aka amince da su."
+    "trusted": "An tsara wa masu haya, masu gida da ma’aikatan da aka amince da su.",
+    "google_start": "Ci gaba da Google"
   },
   "language": {
     "label": "Harshe",
@@ -4747,5 +4748,10 @@
     "workspace_assignedReviewer": "Mai nazari da aka ware",
     "workspace_waiting": "Ana jiran ware ma’aikaci",
     "workspace_recordHistory": "Tarihin bayanai"
+  },
+  "securityCheck": {
+    "loading": "Ana loda binciken tsaro…",
+    "unavailable": "Binciken tsaro yana ɗaukar lokaci. Duba haɗin intanet ɗinka ka sake gwadawa.",
+    "retry": "Sake gwada binciken tsaro"
   }
 }

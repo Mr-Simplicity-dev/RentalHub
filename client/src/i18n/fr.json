@@ -18,7 +18,8 @@
     "failed": "Échec de la connexion",
     "welcome_back": "Bon retour",
     "left_panel_desc": "Connectez-vous pour gérer vos biens, locations et dossiers en sécurité.",
-    "trusted": "Conçu pour les locataires, propriétaires et équipes autorisées."
+    "trusted": "Conçu pour les locataires, propriétaires et équipes autorisées.",
+    "google_start": "Continuer avec Google"
   },
   "language": {
     "label": "Langue",
@@ -4499,5 +4500,10 @@
     "workspace_assignedReviewer": "Personne chargée de l’examen",
     "workspace_waiting": "En attente d’affectation",
     "workspace_recordHistory": "Historique du dossier"
+  },
+  "securityCheck": {
+    "loading": "Chargement du contrôle de sécurité…",
+    "unavailable": "Le contrôle de sécurité prend trop de temps. Vérifiez votre connexion et réessayez.",
+    "retry": "Réessayer le contrôle de sécurité"
   }
 }

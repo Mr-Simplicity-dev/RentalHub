@@ -1,109 +1,22 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
-
-const SITE_KEY = process.env.REACT_APP_TURNSTILE_SITE_KEY;
-
-const TurnstileWidget = forwardRef(({ action, onToken, onExpire, onError }, ref) => {
-  const containerRef = useRef(null);
-  const widgetIdRef = useRef(null);
-  const callbacksRef = useRef({ onToken, onExpire, onError });
-  callbacksRef.current = { onToken, onExpire, onError };
-
-  useImperativeHandle(ref, () => ({
-    reset() {
-      if (window.turnstile && widgetIdRef.current !== null) {
-        window.turnstile.reset(widgetIdRef.current);
-      }
-    },
-  }), []);
-
-  useEffect(() => {
-    if (!SITE_KEY || !containerRef.current) return;
-    // The server rejects tokens whose action does not match the protected
-    // route, so every form must declare its own action.
-    if (!action) {
-      console.error('TurnstileWidget requires an "action" prop (e.g. action="rentalhub_login"). Tokens without a matching action will be rejected by the server.');
-      return;
-    }
-
-    const id = 'cf-turnstile-script';
-    if (!document.getElementById(id)) {
-      const script = document.createElement('script');
-      script.id = id;
-      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-      script.async = true;
-      script.defer = true;
-      document.body.appendChild(script);
-    }
-
-    const renderWidget = () => {
-      if (!window.turnstile || !containerRef.current) return;
-      if (widgetIdRef.current !== null) {
-        try { window.turnstile.remove(widgetIdRef.current); } catch {}
-        widgetIdRef.current = null;
-      }
-      try {
-        widgetIdRef.current = window.turnstile.render(containerRef.current, {
-          sitekey: SITE_KEY,
-          action,
-          // Render the widget immediately so users always see the checkbox
-          // before submitting. "interaction-only" hides it until Cloudflare
-          // detects an interaction, which left many users unable to log in.
-          appearance: 'always',
-          execution: 'render',
-          theme: 'auto',
-          retry: 'auto',
-          refreshExpired: 'auto',
-          callback: (token) => callbacksRef.current.onToken?.(token),
-          'expired-callback': () => {
-            callbacksRef.current.onExpire?.();
-          },
-          'error-callback': (errorCode) => {
-            callbacksRef.current.onError?.(errorCode);
-            return true;
-          },
-        });
-      } catch {}
-    };
-
-    if (window.turnstile) {
-      renderWidget();
-      return;
-    }
-
-    const checkLoaded = setInterval(() => {
-      if (window.turnstile) {
-        clearInterval(checkLoaded);
-        renderWidget();
-      }
-    }, 100);
-
-    return () => {
-      clearInterval(checkLoaded);
-      if (widgetIdRef.current !== null && window.turnstile) {
-        try { window.turnstile.remove(widgetIdRef.current); } catch {}
-        widgetIdRef.current = null;
-      }
-    };
-  }, [action]);
-
-  if (!SITE_KEY) return null;
-
-  // Turnstile renders a fixed ~300px iframe. On narrow/mobile modals it would
-  // overflow the card, so the widget is centered when there is room and
-  // horizontally scrollable when the viewport is tighter than the widget.
-  return (
-    <div
-      className="cf-turnstile-scroll"
-      style={{ width: '100%', overflowX: 'auto', overflowY: 'visible', minHeight: 65 }}
-    >
-      <div
-        ref={containerRef}
-        style={{ margin: '0 auto', width: 'max-content', minWidth: 300, maxWidth: '100%' }}
-      />
-    </div>
-  );
+import React,{forwardRef,useEffect,useImperativeHandle,useRef,useState} from 'react';
+import {useTranslation} from 'react-i18next';
+import {loadTurnstileScript} from '../../services/turnstileScript';
+const SITE_KEY=process.env.REACT_APP_TURNSTILE_SITE_KEY;
+const TurnstileWidget=forwardRef(({action,onToken,onExpire,onError},ref)=>{
+ const {t}=useTranslation(),container=useRef(null),widget=useRef(null),sdk=useRef(null),callbacks=useRef({onToken,onExpire,onError});callbacks.current={onToken,onExpire,onError};
+ const [attempt,setAttempt]=useState(0),[status,setStatus]=useState('loading'),[slow,setSlow]=useState(false);
+ const retry=()=>{callbacks.current.onToken?.(null);setAttempt(n=>n+1);};
+ useImperativeHandle(ref,()=>({reset(){retry();}}),[]);
+ useEffect(()=>{
+  let active=true,slowTimer;setStatus('loading');setSlow(false);
+  const fail=code=>{if(!active)return;setStatus('error');callbacks.current.onToken?.(null);callbacks.current.onError?.(code);};
+  if(!SITE_KEY||!action){fail('security_configuration');return()=>{active=false;};}
+  loadTurnstileScript().then(api=>{
+   if(!active||!container.current)return;sdk.current=api;setStatus('checking');
+   try{widget.current=api.render(container.current,{sitekey:SITE_KEY,action,appearance:'always',execution:'render',theme:'auto',retry:'auto',refreshExpired:'auto',callback:token=>{if(!active)return;clearTimeout(slowTimer);setStatus('verified');setSlow(false);callbacks.current.onToken?.(token);},'expired-callback':()=>{if(!active)return;setStatus('checking');callbacks.current.onToken?.(null);callbacks.current.onExpire?.();},'error-callback':code=>{fail(code);return true;},'timeout-callback':()=>fail('security_timeout')});slowTimer=setTimeout(()=>{if(active)setSlow(true);},45000);}catch{fail('security_render_failed');}
+  }).catch(()=>fail('security_script_failed'));
+  return()=>{active=false;clearTimeout(slowTimer);if(widget.current!==null&&sdk.current){try{sdk.current.remove(widget.current);}catch{}widget.current=null;}};
+ },[action,attempt]);
+ return <div className="cf-turnstile-scroll" style={{width:'100%',overflowX:'auto',overflowY:'visible',minHeight:65}}><div ref={container} style={{margin:'0 auto',width:'max-content',minWidth:300,maxWidth:'100%'}}/>{status==='loading'&&<p role="status" className="mt-2 text-center text-sm text-slate-600">{t('securityCheck.loading','Loading security check…')}</p>}{(status==='error'||(slow&&status!=='verified'))&&<div className="mt-3 space-y-2 text-center"><p role="status" className="text-sm text-slate-700">{t('securityCheck.unavailable','The security check is taking too long. Check your connection and try again.')}</p><button type="button" className="min-h-11 rounded-lg border border-slate-300 px-4 py-2 font-semibold" onClick={retry}>{t('securityCheck.retry','Retry security check')}</button></div>}</div>;
 });
-
-TurnstileWidget.displayName = 'TurnstileWidget';
-
-export default TurnstileWidget;
+TurnstileWidget.displayName='TurnstileWidget';export default TurnstileWidget;
