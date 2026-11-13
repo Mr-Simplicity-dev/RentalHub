@@ -28,6 +28,11 @@ const api = axios.create({
 // Track if a refresh is already in-flight to avoid multiple simultaneous calls
 let isRefreshing = false;
 let pendingRequests = [];
+const invalidateSession = () => {
+  clearAuthSession();
+  delete api.defaults.headers.common.Authorization;
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('rentalhub:session-expired'));
+};
 
 // Request interceptor to add auth token
 const mfaVerification = createMfaVerification({
@@ -110,18 +115,15 @@ api.interceptors.response.use(
 
     // Don't try to refresh if the failing request was itself the refresh endpoint
     if (originalRequest?.url?.includes('/auth/refresh-token')) {
-      clearAuthSession();
-      delete api.defaults.headers.common.Authorization;
+      invalidateSession();
       return Promise.reject(error);
     }
 
     if (isRefreshing) {
       // Queue this request until the refresh completes
-      return new Promise((resolve) => {
-        pendingRequests.push((newToken) => {
-          originalRequest.headers.Authorization = `Bearer ${newToken}`;
-          resolve(api(originalRequest));
-        });
+      originalRequest._retry = true;
+      return new Promise((resolve, reject) => {
+        pendingRequests.push({ resolve, reject, request: originalRequest });
       });
     }
 
@@ -156,8 +158,10 @@ api.interceptors.response.use(
       const queuedRequests = [...pendingRequests];
       pendingRequests = [];
 
-      queuedRequests.forEach((callback) => {
-        callback(newToken);
+      queuedRequests.forEach(({ resolve, request }) => {
+        request.headers = request.headers || {};
+        request.headers.Authorization = `Bearer ${newToken}`;
+        resolve(api(request));
       });
 
       // Retry the original request with the refreshed token.
@@ -171,11 +175,11 @@ api.interceptors.response.use(
     } catch (refreshError) {
       // Release the refresh lock and clear the failed session.
       isRefreshing = false;
+      const queuedRequests = pendingRequests;
       pendingRequests = [];
-
-      clearAuthSession();
-
-      delete api.defaults.headers.common.Authorization;
+      queuedRequests.forEach(({ reject }) => reject(refreshError));
+      // A temporary outage must not destroy a valid browser session.
+      if (refreshError.response?.status === 401) invalidateSession();
 
       return Promise.reject(refreshError);
     }

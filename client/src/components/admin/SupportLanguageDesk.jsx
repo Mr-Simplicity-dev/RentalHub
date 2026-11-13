@@ -13,8 +13,10 @@ export default function SupportLanguageDesk({
   const senior = ['super_support_admin', 'super_admin'].includes(user?.user_type);
   const allowed = ['lga_support_admin', 'state_support_admin', 'super_support_admin', 'super_admin'].includes(user?.user_type);
   const load = async () => {
-    const r = await api.get('/support-languages/profile');
-    setSkills(r.data.data.skills);
+    if (user?.user_type !== 'super_admin') {
+      const r = await api.get('/support-languages/profile');
+      setSkills(r.data.data.skills);
+    }
     if (senior) {
       const [a, b] = await Promise.all([api.get('/support-languages/review'), api.get('/support-languages/monitor')]);
       setRows(a.data.data);
@@ -23,7 +25,7 @@ export default function SupportLanguageDesk({
   };
   useEffect(() => {
     if (allowed) load().catch(() => setMessage('Could not load language desk.'));
-  }, [allowed]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [allowed, user?.id, user?.user_type]); // eslint-disable-line react-hooks/exhaustive-deps
   const action = async fn => {
     setBusy(true);
     try {
@@ -37,14 +39,14 @@ export default function SupportLanguageDesk({
     }
   };
   if (!allowed) return null;
-  return <details className="my-4 rounded-xl border bg-white p-4 text-slate-900"><summary className="cursor-pointer font-semibold">Support languages, availability and response review</summary><p role="status">{message}</p><LanguageSkillsField english value={skills} onChange={setSkills} /><button disabled={busy} className="m-2 rounded bg-blue-900 p-3 text-white" onClick={() => action(() => api.put('/support-languages/profile', {
+  return <details open className="my-4 rounded-xl border bg-white p-4 text-slate-900"><summary className="cursor-pointer font-semibold">{user?.user_type === 'super_admin' ? 'Language assessments and response review' : 'Support languages, availability and response review'}</summary><p role="status">{message}</p>{user?.user_type !== 'super_admin' && <><LanguageSkillsField english value={skills} onChange={setSkills} /><button disabled={busy} className="m-2 rounded bg-blue-900 p-3 text-white" onClick={() => action(() => api.put('/support-languages/profile', {
       skills
     }))}>Send skills for assessment</button><button disabled={busy} className="m-2 rounded border p-3" onClick={() => action(() => api.put('/support-languages/availability', {
       available: true,
       minutes: 60
     }))}>Available for 1 hour</button><button disabled={busy} className="m-2 rounded border p-3" onClick={() => action(() => api.put('/support-languages/availability', {
       available: false
-    }))}>Unavailable / on break</button>
+    }))}>Unavailable / on break</button></>}
  {senior && <><h3 className="font-semibold">Language assessments</h3><p>Check the agent’s speaking and writing before approval. You cannot approve yourself.</p><div className="max-h-96 overflow-auto">{rows.map(row => <div key={row.user_id + row.language_id} className="border-b p-3">{row.full_name} — {languages.find(x => x.id === row.language_id)?.name} — speaking: {row.oral}; writing: {row.written}; {row.status}<button disabled={busy || Number(row.user_id) === Number(user.id)} className="m-2 rounded border p-2" onClick={() => {
             const note = window.prompt('Describe the language assessment (at least 10 characters):');
             if (note) action(() => api.post('/support-languages/review', {

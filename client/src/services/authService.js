@@ -108,9 +108,8 @@ export const authService = {
  
 getCurrentUser: async () => {
   const response = await api.get('/auth/me', {
-    // Do not call refresh-token when there is no logged-in session.
-    // The /auth/me endpoint already accepts the HttpOnly session cookie.
-    skipAuthRefresh: true,
+    // Recover an expired access token from the valid HttpOnly cookie.
+    skipAuthRefresh: false,
   });
 
   if (response.data.success) {

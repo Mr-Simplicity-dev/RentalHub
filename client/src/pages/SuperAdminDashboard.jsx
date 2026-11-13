@@ -1,4 +1,3 @@
-import AdminDashboardGate from '../components/admin/AdminDashboardGate';
 import PropertyProtectionEntry from '../components/common/PropertyProtectionEntry';
 import AssistedRegistrationCard from '../components/admin/AssistedRegistrationCard';
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
@@ -1366,7 +1365,15 @@ function SuperAdminDashboardContent() {
           </div>
 
           <PropertyProtectionEntry />
-          <Link className="my-3 inline-flex rounded-lg border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-800" to="/admin/code-of-conduct">Code of Conduct management</Link>
+          <section className="my-4 rounded-xl border border-slate-200 bg-slate-50 p-4" aria-label="Operations tools">
+            <h3 className="mb-3 text-sm font-semibold text-slate-700">Operations tools</h3>
+            <div className="flex flex-wrap gap-2">{[
+              ['/admin/code-of-conduct', 'Code of Conduct management'],
+              ['/admin/background-jobs', 'Background jobs'],
+              ['/admin/whatsapp-support', 'WhatsApp support oversight'],
+              ['/admin/support-languages', 'Support language and response review'],
+            ].map(([path, label]) => <Link key={path} className="rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800" to={path}>{label}</Link>)}</div>
+          </section>
           <div className="space-y-5">
             {shortcutCategories.map((cat) => {
               const colorMap = {
@@ -1899,4 +1906,4 @@ function SuperAdminDashboardContent() {
   );
 }
 
-export default function SuperAdminDashboard(){return <AdminDashboardGate endpoint="/auth/2fa/check">{()=> <SuperAdminDashboardContent/>}</AdminDashboardGate>;}
+export default SuperAdminDashboardContent;

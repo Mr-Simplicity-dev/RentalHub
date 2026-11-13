@@ -1,4 +1,4 @@
-import SupportLanguageDesk from '../../components/admin/SupportLanguageDesk';
+import AdminDashboardGate from '../../components/admin/AdminDashboardGate';
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { NavLink, Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -79,7 +79,7 @@ const getNotificationAction = (link) => {
   return { icon: FaIdCard, labelKey: 'take_action' };
 };
 
-const AdminLayout = () => {
+const AdminLayoutContent = () => {
   const { user, logout } = useAuth();
   const { t } = useTranslation();
   const location = useLocation();
@@ -1370,6 +1370,11 @@ const AdminLayout = () => {
             </div>
           )}
 
+          {!isSuperAdmin && <NavLink to="/admin/code-of-conduct" className={navItem}><FaFileAlt className="mr-3" />My Code of Conduct</NavLink>}
+          {['super_support_admin', 'state_support_admin', 'lga_support_admin'].includes(role) && <>
+            <NavLink to="/admin/whatsapp-support" className={navItem}><FaWhatsapp className="mr-3" />WhatsApp support inbox</NavLink>
+            <NavLink to="/admin/support-languages" className={navItem}><FaHeadset className="mr-3" />Support languages and availability</NavLink>
+          </>}
         </nav>
 
 
@@ -1665,10 +1670,6 @@ const AdminLayout = () => {
               You are viewing scoped admin data for <span className="font-semibold">{assignedStateLabel}{assignedLgaLabel ? `, ${assignedLgaLabel}` : ''}</span>.
             </div>
           )}
-          <Link className="my-3 inline-block rounded border p-3" to="/admin/code-of-conduct">Code of Conduct: download, sign and submit</Link>
-          {isSuperAdmin&&<Link to="/admin/background-jobs" className="mx-3 inline-block rounded border p-3">Background jobs</Link>}
-          {["super_admin","super_support_admin","state_support_admin","lga_support_admin"].includes(user?.user_type)&&<Link to="/admin/whatsapp-support" className="mx-3 inline-block rounded border p-3">WhatsApp human support inbox</Link>}
-          <SupportLanguageDesk user={user}/>
           <Outlet />
         </main>
       </div>
@@ -1677,5 +1678,8 @@ const AdminLayout = () => {
   );
 };
 
-export default AdminLayout;
+export default function AdminLayout() {
+  const { user } = useAuth();
+  return user?.user_type === 'super_admin' ? <AdminDashboardGate endpoint="/auth/2fa/check">{() => <AdminLayoutContent />}</AdminDashboardGate> : <AdminLayoutContent />;
+}
 

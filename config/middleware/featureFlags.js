@@ -225,6 +225,7 @@ const isMaintenanceBypassRoute = (req) => {
     '/auth/login',
     '/auth/me',
     '/auth/refresh',
+    '/auth/refresh-token',
   ];
 
   if (allowedExactRoutes.includes(path)) {

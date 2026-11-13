@@ -1,6 +1,7 @@
 const PropertyProtection = React.lazy(() => import('./PropertyProtection'));
 import WhatsAppSupport from './admin/WhatsAppSupport';
 import BackgroundJobs from './admin/BackgroundJobs';
+const SupportLanguages = React.lazy(() => import('./admin/SupportLanguages'));
 import AdminConduct from './admin/AdminConduct';
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, Link } from 'react-router-dom';
@@ -838,6 +839,7 @@ function App() {
               <Suspense fallback={<Loader />}>
               <AssistedSessionGate><Routes>
               <Route path="/registration-payment" element={<ProtectedRoute><RegistrationPayment /></ProtectedRoute>} />
+              <Route path="/admin/support-languages" element={<ProtectedRoute><SupportLanguages /></ProtectedRoute>} />
               <Route path="/admin/background-jobs" element={<ProtectedRoute><BackgroundJobs /></ProtectedRoute>} />
               <Route path="/admin/whatsapp-support" element={<ProtectedRoute><WhatsAppSupport /></ProtectedRoute>} />
               <Route path="/admin/code-of-conduct" element={<ProtectedRoute><AdminConduct /></ProtectedRoute>} />
