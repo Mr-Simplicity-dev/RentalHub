@@ -34,7 +34,7 @@ const getIdentityVerifications = async (req, res) => {
 
       search = '',
 
-      status = 'pending',
+      status = 'all',
 
       user_type: userType = 'all',
 
@@ -60,7 +60,6 @@ const getIdentityVerifications = async (req, res) => {
 
       `u.user_type <> 'super_admin'`,
 
-      `${USER_VERIFICATION_STATUS_EXPR} <> 'not_submitted'`,
 
     ];
 
@@ -78,6 +77,9 @@ const getIdentityVerifications = async (req, res) => {
 
       where.push(`${USER_VERIFICATION_STATUS_EXPR} = 'verified'`);
 
+    } else if (status === 'not_submitted' || status === 'revalidation_required') {
+      where.push(`${USER_VERIFICATION_STATUS_EXPR} = $${i++}`);
+      params.push(status);
     } else if (status === 'rejected') {
 
       where.push(`${USER_VERIFICATION_STATUS_EXPR} = 'rejected'`);
@@ -217,7 +219,6 @@ const getIdentityVerifications = async (req, res) => {
 
         AND u.user_type <> 'super_admin'
 
-        AND ${USER_VERIFICATION_STATUS_EXPR} <> 'not_submitted'
 
       GROUP BY u.user_type
 

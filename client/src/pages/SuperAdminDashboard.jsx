@@ -293,7 +293,7 @@ function SuperAdminDashboardContent() {
   const [verificationPage, setVerificationPage] = useState(1);
 
   const [verificationSearch, setVerificationSearch] = useState("");
-  const [verificationStatus, setVerificationStatus] = useState("pending");
+  const [verificationStatus, setVerificationStatus] = useState("all");
   const [verificationUserType, setVerificationUserType] = useState("all");
   const [verificationPagination, setVerificationPagination] = useState({
     total: 0,
@@ -917,8 +917,10 @@ function SuperAdminDashboardContent() {
         loadUsers(),
         loadAdminPerformance(),
       ]);
+      return true;
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to verify identity");
+      return false;
     }
   };
 
@@ -933,8 +935,10 @@ function SuperAdminDashboardContent() {
         loadUsers(),
         loadAdminPerformance(),
       ]);
+      return true;
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to reject identity");
+      return false;
     }
   };
 
@@ -949,8 +953,10 @@ function SuperAdminDashboardContent() {
         loadUsers(),
         loadAdminPerformance(),
       ]);
+      return true;
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to delete rejected verification");
+      return false;
     }
   };
 

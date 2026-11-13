@@ -1,9 +1,11 @@
+import InputDialog from '../../components/common/InputDialog';
+import { toast } from 'react-toastify';
 import React, { useCallback, useEffect, useState } from 'react';
 import api from '../../services/api';
 import Loader from '../../components/common/Loader';
 import { FaCheckCircle, FaTimesCircle, FaIdCard, FaSearch } from 'react-icons/fa';
 import { useAuth } from '../../hooks/useAuth';
-import { toast } from 'react-toastify';
+
 
 const PAGE_SIZE = 20;
 
@@ -30,6 +32,7 @@ const AdminVerifications = () => {
   const isZonalAdmin = user?.user_type === 'zonal_admin';
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [approvalTarget, setApprovalTarget] = useState(null);
   const [processingId, setProcessingId] = useState(null);
 
   const [search, setSearch] = useState('');
@@ -65,11 +68,12 @@ const AdminVerifications = () => {
     loadPending(page, debouncedSearch);
   }, [page, debouncedSearch, loadPending]);
 
-  const approveUser = async (userId) => {
+  const approveUser = async (userId, note) => {
     setProcessingId(userId);
     try {
-      const res = await api.post(`/admin/verifications/${userId}/approve`);
-      if (res.data?.success) loadPending(page, debouncedSearch);
+      const res = await api.post(`/admin/verifications/${userId}/approve`, {note: note.trim()});
+      if (res.data?.success) { setApprovalTarget(null); await loadPending(page, debouncedSearch); }
+    } catch (error) { toast.error(error.response?.data?.message || "Approval failed. Your note has been kept.");
     } finally {
       setProcessingId(null);
     }
@@ -92,6 +96,7 @@ const AdminVerifications = () => {
 
   return (
     <div>
+      <InputDialog isOpen={Boolean(approvalTarget)} title="Review identity approval" message={approvalTarget ? `Review the evidence for ${approvalTarget.full_name}. Your note is saved with the decision.` : ""} confirmText="Approve identity" isLoading={processingId !== null} onCancel={() => !processingId && setApprovalTarget(null)} onConfirm={({note}) => approveUser(approvalTarget.id,note)} inputs={[{name:"note",label:"Approval note",type:"textarea",required:true,placeholder:"Explain why the identity evidence is acceptable"}]} />
       <div className="mb-6 flex flex-col items-center gap-4">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900">NIN/Passport Verifications</h1>
@@ -157,7 +162,7 @@ const AdminVerifications = () => {
 
               {!isZonalAdmin && <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                 <button
-                  onClick={() => approveUser(u.id)}
+                  onClick={() => setApprovalTarget(u)}
                   disabled={processingId === u.id}
                   className="btn btn-primary flex w-full items-center justify-center sm:w-auto"
                 >

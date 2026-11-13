@@ -34,6 +34,7 @@ const UsersTab = ({
     reason: "",
   });
   const [accountActionError, setAccountActionError] = useState("");
+  const [accountActionBusy, setAccountActionBusy] = useState(false);
 
   const notifyUser = async (user) => {
     if (sendingNotification) return;
@@ -178,13 +179,18 @@ const UsersTab = ({
     const { user, action, reason } = accountAction;
     const normalizedReason = reason.trim();
 
-    if ((action === "ban" || action === "delete" || action === "bulk_ban" || action === "bulk_verify") && !normalizedReason) {
+    if ((action === "ban" || action === "delete" || action === "bulk_ban" || action === "bulk_verify" || action === "verify") && !normalizedReason) {
       setAccountActionError(action === "delete" ? "Deletion reason is required." : "A decision reason is required.");
       return;
     }
 
+    setAccountActionBusy(true);
     try {
-      if (action === "ban") {
+      if (action === "verify") {
+        if (!user.passport_photo_url || !(user.nin || user.international_passport_number)) { setAccountActionError("The user must submit their face photo and NIN or passport before approval."); return; }
+        const completed = await verifyIdentity(user.id, normalizedReason);
+        if (completed === false) { setAccountActionError("Approval was not completed. Check the review message and try again."); return; }
+      } else if (action === "ban") {
         await banUser(user.id, normalizedReason);
       } else if (action === "unban") {
         await unbanUser(user.id, normalizedReason);
@@ -201,6 +207,8 @@ const UsersTab = ({
     } catch (err) {
       setAccountActionError(err.response?.data?.message || "Account action failed");
       return;
+    } finally {
+      setAccountActionBusy(false);
     }
 
     closeAccountAction();
@@ -373,7 +381,7 @@ const UsersTab = ({
                     {!u.identity_verified &&
                       u.user_type !== "super_admin" && (
                         <button
-                          onClick={() => verifyIdentity(u.id)}
+                          onClick={() => openAccountAction(u, "verify")}
                           className="rounded-lg bg-green-600 px-2 py-1 text-xs text-white transition-colors hover:bg-green-700"
                         >
                           Verify
@@ -866,10 +874,10 @@ const UsersTab = ({
 
       {accountAction.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl2 bg-white shadow-card">
+          <div role="dialog" aria-modal="true" aria-label="Account review" className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-xl">
             <div className="border-b border-soft px-6 py-4">
               <h3 className="text-lg font-semibold text-gray-900">
-                {accountAction.action === "bulk_verify" ? "Verify selected users" : accountAction.action === "bulk_ban"
+                {accountAction.action === "verify" ? "Review identity approval" : accountAction.action === "bulk_verify" ? "Verify selected users" : accountAction.action === "bulk_ban"
                   ? "Ban selected users"
                   : accountAction.action === "ban"
                   ? "Ban user"
@@ -886,9 +894,12 @@ const UsersTab = ({
 
             <div className="space-y-3 px-6 py-4">
               <label className="block text-sm font-medium text-gray-700">
-                {accountAction.action === "unban" ? "Admin note" : "Reason"}
+                {["verify", "bulk_verify"].includes(accountAction.action) ? "Approval note (required)" : accountAction.action === "unban" ? "Admin note" : "Reason"}
               </label>
+              {accountAction.action === "verify" && (!accountAction.user?.passport_photo_url || !(accountAction.user?.nin || accountAction.user?.international_passport_number)) && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Incomplete verification: the user must submit { !accountAction.user?.passport_photo_url ? "a face photo" : "their identity document" } in their Profile before approval.</p>}
               <textarea
+                aria-label={["verify", "bulk_verify"].includes(accountAction.action) ? "Approval note" : "Decision reason"}
+                maxLength={2000}
                 value={accountAction.reason}
                 onChange={(event) => {
                   setAccountActionError("");
@@ -930,13 +941,14 @@ const UsersTab = ({
               <button
                 type="button"
                 onClick={submitAccountAction}
+                disabled={accountActionBusy || (accountAction.action === "verify" && (!accountAction.user?.passport_photo_url || !(accountAction.user?.nin || accountAction.user?.international_passport_number)))}
                 className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${
                   accountAction.action === "delete" || accountAction.action === "ban" || accountAction.action === "bulk_ban"
                     ? "bg-red-600 hover:bg-red-700"
                     : "bg-indigo-600 hover:bg-indigo-700"
                 }`}
               >
-                Confirm
+                {accountActionBusy ? "Saving…" : "Confirm"}
               </button>
             </div>
           </div>

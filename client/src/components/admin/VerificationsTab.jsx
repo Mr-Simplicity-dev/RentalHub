@@ -51,6 +51,7 @@ const VerificationsTab = ({
     note: "",
   });
   const [reviewError, setReviewError] = useState("");
+  const [reviewBusy, setReviewBusy] = useState(false);
 
   const getReviewStatus = (verification) => {
     if (verification?.identity_verification_status) {
@@ -90,15 +91,15 @@ const VerificationsTab = ({
       return;
     }
 
-    if (action === "approve") {
-      await verifyIdentity(verification.id, note);
-    } else if (action === "reject") {
-      await rejectIdentity(verification.id, note);
-    } else if (action === "delete") {
-      await deleteRejectedVerification(verification.id, note);
-    }
-
-    closeReviewDialog();
+    setReviewBusy(true);
+    try {
+      const submit = action === "approve" ? verifyIdentity : action === "reject" ? rejectIdentity : deleteRejectedVerification;
+      const completed = await submit(verification.id, note.trim());
+      if (completed === false) { setReviewError("The decision was not saved. Check the review message and try again."); return; }
+      closeReviewDialog();
+    } catch (error) {
+      setReviewError(error.response?.data?.message || "The decision was not saved. Please try again.");
+    } finally { setReviewBusy(false); }
   };
 
   return (
@@ -128,7 +129,9 @@ const VerificationsTab = ({
             value={verificationStatus}
             onChange={(e) => setVerificationStatus(e.target.value)}
           >
-            <option value="pending">Pending</option>
+            <option value="pending">Awaiting review</option>
+            <option value="not_submitted">Incomplete</option>
+            <option value="revalidation_required">Revalidation required</option>
             <option value="verified">Verified</option>
             <option value="rejected">Rejected</option>
             <option value="all">All</option>
@@ -156,6 +159,7 @@ const VerificationsTab = ({
 
         </div>
 
+        <p className="mb-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">All statuses includes newly registered accounts. Incomplete accounts need a face photo and an identity document before they can be approved.</p>
         {/* RECORD COUNT */}
 
         <div className="text-sm text-gray-500 mb-3">
@@ -256,9 +260,9 @@ const VerificationsTab = ({
                             ? "Rejected"
                             : reviewStatus === "revalidation_required"
                               ? "Revalidation Required"
-                            : "Pending"}
+                            : reviewStatus === "not_submitted" ? "Incomplete" : "Awaiting review"}
                       </span>
-
+                      {reviewStatus === "not_submitted" && <p className="mt-2 max-w-48 text-xs text-slate-600">{!v.passport_photo_url ? "Face photo needed. " : ""}{!(v.nin || v.international_passport_number) ? "NIN or passport needed. " : ""}User completes these steps in Profile.</p>}
                     </td>
 
                     <td className="p-3 text-gray-600">
@@ -371,7 +375,7 @@ const VerificationsTab = ({
 
       {reviewDialog.open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-xl">
+          <div role="dialog" aria-modal="true" aria-label="Identity review" className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-gray-200 bg-white p-6 shadow-xl">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h3 className="font-semibold text-gray-900">
@@ -402,6 +406,8 @@ const VerificationsTab = ({
                   : "Delete reason"}
             </label>
             <textarea
+              aria-label={reviewDialog.action === "approve" ? "Approval note" : "Decision reason"}
+              maxLength={2000}
               className="mt-2 h-32 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               placeholder={
                 reviewDialog.action === "approve"
@@ -435,6 +441,7 @@ const VerificationsTab = ({
               <button
                 type="button"
                 onClick={submitReview}
+                disabled={reviewBusy}
                 className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${
                   reviewDialog.action === "approve"
                     ? "bg-green-600 hover:bg-green-700"
