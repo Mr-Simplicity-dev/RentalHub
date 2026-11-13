@@ -168,15 +168,19 @@ exports.createTotpEnrollment = async ({ userId, email }) => {
   // fallback otherwise (same convention as identity data).
   const storedSecret = encryptNIN(secret) || secret;
 
-  await db.query(
+  const saved = await db.query(
     `UPDATE users
      SET totp_secret = $1,
          totp_enabled = FALSE,
          totp_failed_attempts = 0,
          totp_locked_until = NULL
-     WHERE id = $2`,
+     WHERE id = $2 AND totp_enabled IS NOT TRUE
+     RETURNING id`,
     [storedSecret, userId]
   );
+  if (saved.rowCount === 0) {
+    throw new TwoFactorError('TOTP_ALREADY_ENABLED', 'Two-factor authentication is already enabled. Disable it with your current code or recovery code before starting again.');
+  }
 
   return { secret, otpauthUrl };
 };
@@ -564,12 +568,13 @@ exports.requirePrivilegedMfa = async (req, res, next) => {
       });
     }
     console.error('Privileged MFA check failed:', error.message);
+    return res.status(503).json({ success: false, code: 'MFA_CHECK_UNAVAILABLE', message: 'Could not check two-factor security. Please try again.' });
   }
 
   return res.status(403).json({
     success: false,
-    code: 'MFA_REQUIRED',
-    message: 'Two-factor authentication is required for this account. Please enroll in TOTP first.',
+    code: 'MFA_ENROLLMENT_REQUIRED',
+    message: 'Set up two-factor authentication in your profile before using administrator tools.',
   });
 };
 

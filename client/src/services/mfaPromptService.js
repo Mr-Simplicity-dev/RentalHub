@@ -5,6 +5,9 @@
 // same way.
 
 let pending = null;
+let enrollmentMessage = null;
+export const showMfaEnrollment = (message) => { enrollmentMessage = message || 'Set up your authenticator before using administrator tools.'; emit(); };
+export const dismissMfaEnrollment = () => { enrollmentMessage = null; emit(); };
 let attempt = 0;
 const listeners = new Set();
 
@@ -20,6 +23,7 @@ const emit = () => {
 };
 
 export const getMfaState = () => {
+  if (enrollmentMessage) return { visible: true, mode: 'enrollment', message: enrollmentMessage };
   if (!pending) return { visible: false, attempt: 0, message: '' };
   return { visible: true, attempt: pending.attempt, message: pending.message };
 };

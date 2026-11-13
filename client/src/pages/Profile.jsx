@@ -843,7 +843,7 @@ const Profile = () => {
       </div>
 
       {/* Two-Factor Security */}
-      <div className="card mb-6">
+      <div id="two-factor-security" className="card mb-6 scroll-mt-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="font-semibold text-gray-900">

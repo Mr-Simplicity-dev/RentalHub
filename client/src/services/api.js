@@ -1,7 +1,7 @@
 import { createMfaVerification } from './mfaVerification.cjs';
 import axios from 'axios';
 import { clearAuthSession, getAuthToken, setAuthToken } from './authStorage';
-import { requestMfaCode, resetMfaAttempts } from './mfaPromptService';
+import { requestMfaCode, resetMfaAttempts, showMfaEnrollment } from './mfaPromptService';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
 const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
@@ -81,6 +81,11 @@ api.interceptors.response.use(
   },
   async (error) => {
     const originalRequest = error.config;
+
+    if (['MFA_ENROLLMENT_REQUIRED', 'TOTP_NOT_ENABLED', 'TOTP_NOT_SETUP'].includes(error.response?.data?.code)) {
+      showMfaEnrollment(error.response.data.message);
+      return Promise.reject(error);
+    }
 
     // Privileged dashboards answer 403 MFA_REQUIRED until a fresh TOTP code is
     // supplied. Ask for one, then replay the request with it attached.

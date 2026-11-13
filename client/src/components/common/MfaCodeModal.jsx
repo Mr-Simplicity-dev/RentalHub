@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { FaShieldAlt, FaTimes } from 'react-icons/fa';
 import {
   cancelMfaChallenge,
+  dismissMfaEnrollment,
   getMfaState,
   submitMfaCode,
   subscribeMfaChallenge,
@@ -25,6 +26,8 @@ export default function MfaCodeModal() {
   }, [challenge.visible]);
 
   if (!challenge.visible) return null;
+
+  if (challenge.mode === 'enrollment') return <div role="dialog" aria-modal="true" aria-labelledby="mfa-enrollment-title" className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4"><section className="w-full max-w-md rounded-2xl bg-white p-6 text-center shadow-2xl"><h2 id="mfa-enrollment-title" className="text-lg font-bold text-gray-900">Set up two-factor authentication</h2><p className="my-4 text-sm text-gray-600">{challenge.message}</p><a href="/profile#two-factor-security" onClick={dismissMfaEnrollment} className="block min-h-11 rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white">Set up authenticator</a><button type="button" className="mt-3 min-h-11 px-4 text-sm text-gray-600" onClick={dismissMfaEnrollment}>Not now</button></section></div>;
 
   const handleSubmit = (event) => {
     event.preventDefault();
