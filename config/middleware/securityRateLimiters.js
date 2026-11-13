@@ -78,7 +78,7 @@ const buildLimiter = ({ name, windowMs, max, message, keyGenerator, skip }) => {
 };
 
 const authSensitiveLimiter = buildLimiter({
-  skip: req => req.method === 'GET' && ['/me','/2fa/status'].includes(req.path),
+  skip: req => req.method === 'GET' && ['/me','/2fa/status','/2fa/check'].includes(req.path),
   windowMs: Number(process.env.AUTH_SENSITIVE_WINDOW_MS) || 10 * 60 * 1000,
   max: Number(process.env.AUTH_SENSITIVE_MAX) || 25,
   message: 'Too many authentication/security requests. Try again shortly.',
