@@ -39,7 +39,7 @@ const authenticate = async (req, res, next) => {
 
     const result = await db.query(
       `SELECT id, email, user_type, identity_verified, subscription_active,
-              assigned_state, assigned_city, assigned_lga, assigned_zone, assigned_state_id, assigned_lga_name, full_name, is_recruitment_admin,
+              assigned_state, assigned_city, assigned_lga, assigned_zone, full_name, is_recruitment_admin,
               preferred_state_id, preferred_lga_name, assisted_registration,
               deleted_at, is_active,
               account_suspended_reason,
@@ -88,9 +88,12 @@ const authenticate = async (req, res, next) => {
     return await require('./assistedAccessGate')(req,res,next);
   } catch (error) {
     logger.error('Auth error:', error);
-    return res.status(401).json({
+    const invalidToken = ['JsonWebTokenError', 'TokenExpiredError', 'NotBeforeError'].includes(error.name) ||
+      ['Invalid session token payload', 'Token is not a session token', 'Invalid session token claims'].includes(error.message);
+    return res.status(invalidToken ? 401 : 503).json({
       success: false,
-      message: 'Invalid or expired token.',
+      ...(invalidToken ? {} : { code: 'AUTH_CHECK_UNAVAILABLE' }),
+      message: invalidToken ? 'Invalid or expired token.' : 'We could not check your sign-in. Please try again.',
     });
   }
 };
@@ -110,7 +113,7 @@ const optionalAuthenticate = async (req, res, next) => {
 
     const result = await db.query(
       `SELECT id, email, user_type, identity_verified, subscription_active,
-              assigned_state, assigned_city, assigned_lga, assigned_zone, assigned_state_id, assigned_lga_name, full_name, is_recruitment_admin,
+              assigned_state, assigned_city, assigned_lga, assigned_zone, full_name, is_recruitment_admin,
               preferred_state_id, preferred_lga_name, assisted_registration,
               deleted_at, is_active,
               account_suspended_reason,
