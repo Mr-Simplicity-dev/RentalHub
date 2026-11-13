@@ -1,3 +1,4 @@
+import { entryFor } from '../../propertyProtection/workflow.cjs';
 import UserAvatar from './UserAvatar';
 import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -618,7 +619,7 @@ return (
                       )}
                     </Link>
 
-                    <Link to="/property-protection" className="block px-4 py-3 text-sm text-gray-700 hover:bg-primary-50" onClick={()=>handleHeaderNavigation('/property-protection')}>{t('propertyProtection.product')}</Link>
+                    {entryFor(user) && <Link to={entryFor(user).path} className="block px-4 py-3 text-sm text-gray-700 hover:bg-primary-50" onClick={()=>handleHeaderNavigation(entryFor(user).path)}>{entryFor(user).view === 'owner' ? t('propertyProtection.product') : entryFor(user).title}</Link>}
                     <Link to="/profile"
                       className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 transition-colors duration-150 hover:bg-primary-50 hover:text-primary-700"
                       onClick={() => handleHeaderNavigation('/profile')}

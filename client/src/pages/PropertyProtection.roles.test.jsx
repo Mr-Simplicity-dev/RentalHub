@@ -1,0 +1,16 @@
+import '../i18n';
+import React,{act} from 'react';
+import {createRoot} from 'react-dom/client';
+import {MemoryRouter} from 'react-router-dom';
+import {within} from '@testing-library/dom';
+import {vi,test,expect,beforeEach,afterEach} from 'vitest';
+import PropertyProtection from './PropertyProtection';
+import api from '../services/api';
+const current=vi.hoisted(()=>({role:'tenant'}));
+vi.mock('../hooks/useAuth',()=>({useAuth:()=>({user:{id:1,user_type:current.role}})}));
+vi.mock('../services/api',()=>({default:{get:vi.fn(),post:vi.fn(),request:vi.fn()}}));
+let root,container;
+beforeEach(()=>{globalThis.IS_REACT_ACT_ENVIRONMENT=true;vi.clearAllMocks();api.get.mockImplementation(async url=>({data:{data:url.endsWith('/forms')?{register:{title:'Register a property — free',fields:[]},configureService:{title:'Configure protection service',fields:[]}}:[]}}));container=document.createElement('div');document.body.appendChild(container);root=createRoot(container);});
+afterEach(async()=>{await act(async()=>root.unmount());container.remove();});
+for(const [role,view,label,back] of [['tenant','owner','My property records','/tenant/dashboard'],['agent','assigned','Assigned work','/agent/dashboard'],['lawyer','assigned','Assigned work','/lawyer'],['state_support_admin','assigned','Assigned work','/admin/state-support-dashboard'],['state_admin','operations','Area review','/admin'],['super_admin','operations','National oversight','/super-admin']])test(role+' opens the correct queue and dashboard',async()=>{current.role=role;await act(async()=>root.render(<MemoryRouter initialEntries={['/property-protection']}><PropertyProtection/></MemoryRouter>));expect(api.get).toHaveBeenCalledWith('/property-protection',{params:{view}});expect(within(container).getByRole('button',{name:label})).toHaveAttribute('aria-pressed','true');expect(within(container).getByRole('link',{name:'Back to dashboard'})).toHaveAttribute('href',back);if(view!=='owner')expect(within(container).queryByRole('button',{name:'Register a property — free'})).toBeNull();if(role==='super_admin'){expect(within(container).getByRole('button',{name:'Configure protection service'})).toBeEnabled();expect(within(container).getByRole('link',{name:'Set protection prices by location'})).toHaveAttribute('href','/super-admin?tab=pricing');}});
+test('customer links cannot open the staff queue',async()=>{current.role='tenant';await act(async()=>root.render(<MemoryRouter initialEntries={['/property-protection?view=operations']}><PropertyProtection/></MemoryRouter>));expect(api.get).toHaveBeenCalledWith('/property-protection',{params:{view:'owner'}});expect(within(container).queryByRole('button',{name:'National oversight'})).toBeNull();});

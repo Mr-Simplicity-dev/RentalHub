@@ -19,8 +19,7 @@ export default function AdminConduct() {
     [read, setRead] = useState(null);
   const reviewer = user?.user_type === 'super_admin' || user?.user_type === 'recruitment_admin' || user?.is_recruitment_admin;
   const load = async () => {
-    const r = await api.get('/admin-conduct/mine');
-    setData(r.data.data);
+    if(user?.user_type !== 'super_admin') { const r = await api.get('/admin-conduct/mine'); setData(r.data.data); }
     if (reviewer) setQueue((await api.get('/admin-conduct/queue')).data.data);
     if (user?.user_type === 'super_admin') setDocs((await api.get('/admin-conduct/documents')).data.data);
   };
@@ -64,7 +63,7 @@ export default function AdminConduct() {
       if (s?.status === 'pending_payment') action(() => api.post('/admin-conduct/' + s.id + '/verify'));
     }
   }, [data.submissions.length]); // eslint-disable-line react-hooks/exhaustive-deps
-  return <main className="mx-auto max-w-4xl space-y-5 p-5 text-slate-900"><Link className="inline-block rounded border p-3" to="/admin">Back to my admin dashboard</Link><h1 className="text-2xl font-bold">Admin Code of Conduct</h1><p>Read the approved rules for your role. Physical delivery to Recruitment is free. Optional electronic signing and submission costs ₦5,000. Signing and confirmed payment are both required.</p><p role="status" className="rounded bg-blue-50 p-3">{message}</p>
+  return <main className="mx-auto max-w-4xl space-y-5 p-5 text-slate-900"><Link className="inline-block rounded border p-3" to={user?.user_type === 'super_admin' ? '/super-admin' : '/admin'}>Back to my admin dashboard</Link><h1 className="text-2xl font-bold">{user?.user_type === 'super_admin' ? 'Code of Conduct management' : 'Admin Code of Conduct'}</h1><p>{user?.user_type === 'super_admin' ? 'Approve staff documents and review submissions. Super Admin does not sign these staff forms.' : 'Read the approved rules for your role. Physical delivery to Recruitment is free. Optional electronic signing and submission costs ₦5,000. Signing and confirmed payment are both required.'}</p><p role="status" className="rounded bg-blue-50 p-3">{message}</p>
  {data.documents.length === 0 && user?.user_type !== 'super_admin' && <p>No approved document is available for your role yet. Please contact Recruitment.</p>}
  {data.documents.map(d => <section key={d.id} className="space-y-3 rounded-xl border p-4"><h2 className="font-semibold">{d.role.replace(/_/g, ' ')} — {d.version}</h2><button className="rounded border p-3" onClick={async () => {
         if (await download('/admin-conduct/documents/' + d.id + '/download', 'Code-of-Conduct.pdf')) setRead(d.id);

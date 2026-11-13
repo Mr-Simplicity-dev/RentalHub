@@ -323,7 +323,7 @@ const AgentDashboard = () => {
               </p>
 
               <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <QuickActionLink to="/property-protection?view=assigned" icon={<FaHome />} label="Property Protection" description="Assigned inspections, evidence and reports" />
+                <QuickActionLink to="/property-protection?view=assigned" icon={<FaHome />} label="Assigned protection inspections" description="Assigned inspections, evidence and reports" />
                 <QuickActionLink to="/my-properties" icon={<FaHome />} label={t('agent_dashboard.managed_properties')} description={t('agent_dashboard.managed_properties_desc')} />
                 <QuickActionLink to="/add-property" icon={<FaBuilding />} label={t('agent_dashboard.maintenance_assessments')} description={t('agent_dashboard.maintenance_assessments_desc')} />
                 <QuickActionLink to="/messages" icon={<FaCommentDots />} label={t('agent_dashboard.dispute_evidence')} description={t('agent_dashboard.dispute_evidence_desc')} dataTourId="action-dispute-evidence" />

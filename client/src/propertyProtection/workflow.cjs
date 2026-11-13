@@ -145,10 +145,10 @@ function fieldOptions(field, values, data, locations, staff) {
       return field.options || [];
   }
 }
-function actionsFor(data, user) {
+function actionsFor(data, user, view = defaultViewFor(user)) {
   if (!data)
     return [
-      "register",
+        ...(view === "owner" ? ["register"] : []),
       ...(user?.user_type === "super_admin" ? ["configureService"] : []),
     ];
   const p = data.permissions;
@@ -220,6 +220,7 @@ function viewsFor(user) {
   ];
 }
 module.exports = {
+  entryFor, defaultViewFor, resolveView, viewLabelFor, dashboardPathFor,
   viewsFor,
   labels,
   get,
@@ -229,3 +230,28 @@ module.exports = {
   fieldOptions,
   actionsFor,
 };
+
+function entryFor(user) {
+  const role = user?.user_type;
+  let view, title, description;
+  if (role === 'super_admin') { view='operations'; title='Property Protection management'; description='National oversight, assignments, service settings and prices'; }
+  else if (['state_admin','admin','lga_admin','zonal_admin'].includes(role)) { view='operations'; title='Property Protection review'; description='Review property records and assignments within your area'; }
+  else if (['super_support_admin','state_support_admin','lga_support_admin'].includes(role)) { view='assigned'; title='Assigned property cases'; description='Follow up assigned cases in the existing dispute conversation'; }
+  else if (['lawyer','state_lawyer','zonal_lawyer','super_lawyer'].includes(role)) { view='assigned'; title='Assigned property reviews'; description='Review assigned evidence and keep confidential findings private'; }
+  else if (role === 'agent') { view='assigned'; title='Assigned protection inspections'; description='Open assigned inspections and submit field evidence'; }
+  else if (['tenant','landlord'].includes(role)) { view='owner'; title='Amana Property Protection'; description='Private property records, checks and cases'; }
+  else return null;
+  return { view, title, description, path:'/property-protection?view='+view };
+}
+function defaultViewFor(user) { return entryFor(user)?.view || 'owner'; }
+function resolveView(user, requested) { return viewsFor(user).includes(requested) ? requested : defaultViewFor(user); }
+function viewLabelFor(user, view) { return view === 'owner' ? 'My property records' : view === 'assigned' ? 'Assigned work' : user?.user_type === 'super_admin' ? 'National oversight' : 'Area review'; }
+function dashboardPathFor(user) {
+ const role=user?.user_type;
+ if(role==='super_admin')return '/super-admin';
+ if(role==='agent')return '/agent/dashboard';
+ if(role==='tenant')return '/tenant/dashboard';
+ if(['lawyer','state_lawyer','zonal_lawyer','super_lawyer'].includes(role))return {lawyer:'/lawyer',state_lawyer:'/lawyer/state',zonal_lawyer:'/lawyer/zonal',super_lawyer:'/lawyer/super'}[role];
+ if(['super_support_admin','state_support_admin','lga_support_admin'].includes(role))return '/admin/'+{super_support_admin:'super-support-dashboard',state_support_admin:'state-support-dashboard',lga_support_admin:'lga-support-dashboard'}[role];
+ return ['state_admin','admin','lga_admin','zonal_admin'].includes(role)?'/admin':'/dashboard';
+}

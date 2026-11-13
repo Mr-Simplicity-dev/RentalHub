@@ -1,3 +1,4 @@
+import PropertyProtectionEntry from '../../components/common/PropertyProtectionEntry';
 import AssistedRegistrationCard from '../../components/admin/AssistedRegistrationCard';
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -113,6 +114,7 @@ const AdminDashboard = () => {
             Welcome, {user?.full_name || 'Administrator'}
           </p>
         </div>
+      <PropertyProtectionEntry />
 
         {Number(stats.pendingVerifications || 0) > 0 && (
           <div className="mb-6 rounded-lg border-l-4 border-amber-500 bg-amber-50 p-4">

@@ -1,7 +1,8 @@
+import PropertyProtectionEntry from '../components/common/PropertyProtectionEntry';
 import AssistedRegistrationCard from '../components/admin/AssistedRegistrationCard';
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { FaEye, FaEyeSlash, FaSearch, FaStar } from "react-icons/fa";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import api from "../services/api";
 import { useAuth } from "../hooks/useAuth";
@@ -827,6 +828,8 @@ export default function SuperAdminDashboard() {
     // tour analytics, department oversights, support/voice boards...). The
     // search must reach everything a super admin can open.
     const routeDestinations = [
+      { name: "route:conduct-management", label: "Code of Conduct management", detail: "Approve staff documents and review submissions", keywords: ["conduct", "staff", "documents", "recruitment"], path: "/admin/code-of-conduct" },
+      { name: "route:property-protection", label: "Property Protection", detail: "National records, assignments, service settings and prices", keywords: ["protection", "cases", "registry", "inspections", "monitoring"], path: "/property-protection?view=operations" },
       { name: "route:background-jobs", label: "Background jobs", detail: "Scheduler health and recent results", keywords: ["jobs", "scheduler", "monitor"], path: "/admin/background-jobs" },
       { name: "route:seo", label: "SEO Dashboard", detail: "SEO settings and Google indexing", keywords: ["seo", "google", "sitemap", "indexing"], path: "/super-admin/seo" },
       { name: "route:tour-analytics", label: "Tour Analytics", detail: "Guided-tour adoption analytics", keywords: ["tour", "onboarding", "walkthrough"], path: "/super-admin/tour-analytics" },
@@ -1361,6 +1364,8 @@ export default function SuperAdminDashboard() {
             </span>
           </div>
 
+          <PropertyProtectionEntry />
+          <Link className="my-3 inline-flex rounded-lg border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-800" to="/admin/code-of-conduct">Code of Conduct management</Link>
           <div className="space-y-5">
             {shortcutCategories.map((cat) => {
               const colorMap = {

@@ -1,3 +1,4 @@
+import PropertyProtectionEntry from '../../components/common/PropertyProtectionEntry';
 import AssistedRegistrationCard from '../../components/admin/AssistedRegistrationCard';
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { FaArrowDown, FaArrowUp, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
@@ -249,6 +250,7 @@ const StateSupportAdminDashboard = () => {
             </div>
           </div>
         </div>
+      <PropertyProtectionEntry />
       </section>
 
       <nav className="flex gap-2 overflow-x-auto rounded-xl border border-gray-200 bg-white p-2 shadow-sm">

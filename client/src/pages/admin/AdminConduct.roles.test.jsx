@@ -1,0 +1,15 @@
+import React,{act} from 'react';
+import {createRoot} from 'react-dom/client';
+import {MemoryRouter} from 'react-router-dom';
+import {within} from '@testing-library/dom';
+import {vi,test,expect,beforeEach,afterEach} from 'vitest';
+import AdminConduct from './AdminConduct';
+import api from '../../services/api';
+const current=vi.hoisted(()=>({role:'super_admin'}));
+vi.mock('../../hooks/useAuth',()=>({useAuth:()=>({user:{id:1,user_type:current.role}})}));
+vi.mock('../../services/api',()=>({default:{get:vi.fn(),post:vi.fn()}}));
+let root,container;
+beforeEach(()=>{globalThis.IS_REACT_ACT_ENVIRONMENT=true;vi.clearAllMocks();api.get.mockImplementation(async url=>({data:{data:url.endsWith('/mine')?{documents:[],submissions:[]}:[]}}));container=document.createElement('div');document.body.appendChild(container);root=createRoot(container);});
+afterEach(async()=>{await act(async()=>root.unmount());container.remove();});
+test('Super Admin manages conduct without personal signing or payment prompts',async()=>{current.role='super_admin';await act(async()=>root.render(<MemoryRouter><AdminConduct/></MemoryRouter>));expect(api.get).not.toHaveBeenCalledWith('/admin-conduct/mine');expect(api.get).toHaveBeenCalledWith('/admin-conduct/queue');expect(api.get).toHaveBeenCalledWith('/admin-conduct/documents');expect(within(container).getByRole('heading',{name:'Code of Conduct management'})).toBeTruthy();expect(container.textContent).not.toMatch(/₦5,000|No approved document is available for your role/);expect(within(container).getByRole('link',{name:'Back to my admin dashboard'})).toHaveAttribute('href','/super-admin');});
+test('Recruitment retains its own signing information and staff review queue',async()=>{current.role='recruitment_admin';await act(async()=>root.render(<MemoryRouter><AdminConduct/></MemoryRouter>));expect(api.get).toHaveBeenCalledWith('/admin-conduct/mine');expect(api.get).toHaveBeenCalledWith('/admin-conduct/queue');expect(container.textContent).toContain('₦5,000');expect(container.textContent).toContain('Recruitment submissions');});

@@ -1,3 +1,4 @@
+import PropertyProtectionEntry from '../../components/common/PropertyProtectionEntry';
 import AssistedRegistrationCard from '../../components/admin/AssistedRegistrationCard';
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { FaSyncAlt } from 'react-icons/fa';
@@ -126,6 +127,7 @@ const LgaSupportAdminDashboard = () => {
             <button onClick={loadDashboard} className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"><FaSyncAlt /> Refresh</button>
           </div>
         </div>
+      <PropertyProtectionEntry />
 
         <nav className="flex gap-2 overflow-x-auto rounded-xl border border-gray-200 bg-white p-2 shadow-sm">
           {workspaceTabs.map((tab) => (

@@ -1,3 +1,4 @@
+import PropertyProtectionEntry from '../../components/common/PropertyProtectionEntry';
 import AssistedRegistrationCard from '../../components/admin/AssistedRegistrationCard';
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdrawalBanner';
@@ -722,6 +723,7 @@ const SuperSupportAdminDashboard = () => {
           {refreshing && <span className="text-xs text-slate-400 animate-pulse">Syncing data...</span>}
         </div>
       </div>
+      <PropertyProtectionEntry />
 
       {/* Commission Withdrawal Banner */}
       <CommissionWithdrawalBanner />

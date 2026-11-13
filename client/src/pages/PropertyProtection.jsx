@@ -4,6 +4,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import api from "../services/api";
 import {
+  entryFor, resolveView, viewLabelFor, dashboardPathFor,
   actionSpec,
   actionsFor,
   fieldOptions,
@@ -28,7 +29,7 @@ export default function PropertyProtection() {
   const ui = useProtectionText(user);
   const [query, setQuery] = useSearchParams(),
     selected = query.get("property"),
-    view = query.get("view") || "owner";
+    view = resolveView(user, query.get("view"));
   const [rows, setRows] = useState([]),
     [hasMore, setHasMore] = useState(false),
     [data, setData] = useState(null),
@@ -225,7 +226,7 @@ export default function PropertyProtection() {
       setNotice("Saved.");
       if (action === "register")
         setQuery({
-          property: String(r.data.data.id),
+          property: String(r.data.data.id), view,
         });
       else await load();
     } catch (e) {
@@ -416,7 +417,7 @@ export default function PropertyProtection() {
   return (
     <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 text-slate-800">
       <div>
-        <Link to="/dashboard" className="text-sm underline">
+        <Link to={dashboardPathFor(user)} className="text-sm underline">
           {ui("Back to dashboard")}
         </Link>
         <h1 className="mt-3 text-3xl font-bold">
@@ -455,12 +456,12 @@ export default function PropertyProtection() {
                   })
                 }
               >
-                {labels(v)}
+                {ui(viewLabelFor(user, v))}
               </button>
             ))}
           </nav>
           <div className="flex flex-wrap gap-2">
-            {actionsFor(null, user).map((a) => (
+            {actionsFor(null, user, view).map((a) => (
               <button
                 key={a}
                 disabled={busy || !forms[a]}
@@ -471,6 +472,7 @@ export default function PropertyProtection() {
               </button>
             ))}
           </div>
+          {user?.user_type === "super_admin" && <Link className={button+" inline-flex items-center"} to="/super-admin?tab=pricing">Set protection prices by location</Link>}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {rows.map((p) => (
               <button
@@ -478,7 +480,7 @@ export default function PropertyProtection() {
                 className="rounded-2xl border bg-white p-5 text-left shadow-sm"
                 onClick={() =>
                   setQuery({
-                    property: String(p.id),
+                    property: String(p.id), view,
                   })
                 }
               >
@@ -513,7 +515,7 @@ export default function PropertyProtection() {
               })
             }
           >
-            {ui("Back to properties")}
+            {ui(view === "owner" ? "Back to properties" : "Back to work queue")}
           </button>
           <section className="rounded-2xl bg-slate-900 p-6 text-white">
             <h2 className="text-2xl font-bold">{data.property.title}</h2>

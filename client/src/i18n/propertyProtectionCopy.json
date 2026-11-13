@@ -53,7 +53,8 @@
     "workspace_assignedOfficer": "Assigned case officer",
     "workspace_assignedReviewer": "Assigned reviewer",
     "workspace_waiting": "Awaiting assignment",
-    "workspace_recordHistory": "Record history"
+    "workspace_recordHistory": "Record history",
+    "myRecords": "My property records"
   },
   "fr": {
     "product": "Protection immobilière Amana",
@@ -109,7 +110,8 @@
     "workspace_assignedOfficer": "Responsable du dossier",
     "workspace_assignedReviewer": "Personne chargée de l’examen",
     "workspace_waiting": "En attente d’affectation",
-    "workspace_recordHistory": "Historique du dossier"
+    "workspace_recordHistory": "Historique du dossier",
+    "myRecords": "Mes dossiers immobiliers"
   },
   "ar": {
     "product": "حماية أمانا للعقارات",
@@ -165,7 +167,8 @@
     "workspace_assignedOfficer": "مسؤول القضية المكلّف",
     "workspace_assignedReviewer": "المراجع المكلّف",
     "workspace_waiting": "بانتظار التكليف",
-    "workspace_recordHistory": "سجل التغييرات"
+    "workspace_recordHistory": "سجل التغييرات",
+    "myRecords": "سجلات عقاراتي"
   },
   "ru": {
     "product": "Защита недвижимости Amana",
@@ -221,7 +224,8 @@
     "workspace_assignedOfficer": "Ответственный по делу",
     "workspace_assignedReviewer": "Назначенный проверяющий",
     "workspace_waiting": "Ожидает назначения",
-    "workspace_recordHistory": "История записи"
+    "workspace_recordHistory": "История записи",
+    "myRecords": "Мои записи о недвижимости"
   },
   "zh": {
     "product": "Amana 房产保护",
@@ -277,7 +281,8 @@
     "workspace_assignedOfficer": "指派的案件负责人",
     "workspace_assignedReviewer": "指派的审核人员",
     "workspace_waiting": "等待分配",
-    "workspace_recordHistory": "记录历史"
+    "workspace_recordHistory": "记录历史",
+    "myRecords": "我的房产档案"
   },
   "ha": {
     "product": "Kariyar Kadarori ta Amana",
@@ -333,7 +338,8 @@
     "workspace_assignedOfficer": "Jami’in lamarin da aka ware",
     "workspace_assignedReviewer": "Mai nazari da aka ware",
     "workspace_waiting": "Ana jiran ware ma’aikaci",
-    "workspace_recordHistory": "Tarihin bayanai"
+    "workspace_recordHistory": "Tarihin bayanai",
+    "myRecords": "Bayanan kadarorina"
   },
   "yo": {
     "product": "Ààbò Ohun-ìní Amana",
@@ -389,7 +395,8 @@
     "workspace_assignedOfficer": "Alábòójútó ọ̀ràn tí a yàn",
     "workspace_assignedReviewer": "Olùyẹ̀wò tí a yàn",
     "workspace_waiting": "Ń dúró de ẹni tí a ó yàn",
-    "workspace_recordHistory": "Ìtàn àkọsílẹ̀"
+    "workspace_recordHistory": "Ìtàn àkọsílẹ̀",
+    "myRecords": "Àwọn àkọsílẹ̀ ohun-ìní mi"
   },
   "ig": {
     "product": "Nchedo Ala na Ụlọ Amana",
@@ -445,6 +452,7 @@
     "workspace_assignedOfficer": "Onye ọrụ okwu e kenyere",
     "workspace_assignedReviewer": "Onye nyocha e kenyere",
     "workspace_waiting": "Na-eche onye a ga-ekenye",
-    "workspace_recordHistory": "Akụkọ ndekọ"
+    "workspace_recordHistory": "Akụkọ ndekọ",
+    "myRecords": "Ndekọ ihe onwunwe m"
   }
 }

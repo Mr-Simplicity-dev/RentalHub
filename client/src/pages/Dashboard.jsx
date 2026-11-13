@@ -2134,7 +2134,7 @@ const Dashboard = () => {
                 note={graceCountdown?.label}
                 noteClass={graceCountdown?.className}
               />
-              <QuickActionCard title={t('propertyProtection.product')} description={t('propertyProtection.intro')} icon={<FaBalanceScale />} onClick={()=>navigate('/property-protection')} />
+              
               <QuickActionCard title={t('dashboardUx.my_disputes')}
                 description="View and manage disputes you are involved in"
                 icon={<FaBalanceScale />}

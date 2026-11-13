@@ -1,3 +1,4 @@
+import PropertyProtectionEntry from '../../components/common/PropertyProtectionEntry';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -346,6 +347,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
           </div>
         </div>
       </div>
+<PropertyProtectionEntry />
 
       {pendingActionCount > 0 && (
         <div className="rounded-lg border-l-4 border-red-500 bg-red-50 p-4">
