@@ -64,7 +64,7 @@ export default function PropertyCaseTools({
     }
   };
   return (
-    <section className="space-y-4 rounded-2xl border bg-white p-5">
+    <section className="space-y-4 rounded-2xl border bg-white p-5 border-slate-200">
       <h2 className="text-lg font-bold">{ui("Case meetings and review")}</h2>
       <p className="text-sm text-slate-600">
         {ui(
@@ -81,7 +81,7 @@ export default function PropertyCaseTools({
           aria-label="Approved meeting participant"
           value={target}
           onChange={(e) => setTarget(e.target.value)}
-          className="min-h-11 max-w-full rounded-lg border p-2"
+          className="min-h-11 max-w-full rounded-lg border p-2 border-slate-200"
         >
           <option value="">{ui("Choose participant")}</option>
           {people.map((p) => (
@@ -100,7 +100,7 @@ export default function PropertyCaseTools({
               ["closed", "resolved"].includes(dispute.status)
             }
             onClick={() => call(type)}
-            className="min-h-11 rounded-lg border px-4 disabled:opacity-50"
+            className="min-h-11 rounded-lg border px-4 disabled:opacity-50 border-slate-200"
           >
             {type === "audio" ? "Audio meeting" : "Video meeting"}
           </button>
@@ -136,7 +136,7 @@ export default function PropertyCaseTools({
       )}
       {professional && (
         <form
-          className="space-y-3 border-t pt-4"
+          className="space-y-3 border-t pt-4 border-slate-200"
           onSubmit={async (e) => {
             e.preventDefault();
             setBusy(true);
@@ -168,7 +168,7 @@ export default function PropertyCaseTools({
             {ui("Title")}
             <input
               required
-              className="mt-1 min-h-11 w-full rounded-lg border p-2"
+              className="mt-1 min-h-11 w-full rounded-lg border p-2 border-slate-200"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
@@ -178,7 +178,7 @@ export default function PropertyCaseTools({
             <textarea
               required
               minLength={15}
-              className="mt-1 w-full rounded-lg border p-2"
+              className="mt-1 w-full rounded-lg border p-2 border-slate-200"
               rows={4}
               value={content}
               onChange={(e) => setContent(e.target.value)}
@@ -194,7 +194,7 @@ export default function PropertyCaseTools({
               "Share this note with the record holder. Leave off for a confidential internal note.",
             )}
           </label>
-          <button disabled={busy} className="min-h-11 rounded-lg border px-4">
+          <button disabled={busy} className="min-h-11 rounded-lg border px-4 border-slate-200">
             {ui("Save assessment")}
           </button>
         </form>
@@ -204,7 +204,7 @@ export default function PropertyCaseTools({
           {ui("Outcome history")}
         </summary>
         {(dispute.protection_outcome_history || []).map((item, index) => (
-          <article key={index} className="mt-3 rounded-xl border p-3 text-sm">
+          <article key={index} className="mt-3 rounded-xl border p-3 text-sm border-slate-200">
             <p>
               {new Date(item.recorded_at).toLocaleString()} —{" "}
               {ui(item.outcome.replaceAll("_", " "))}

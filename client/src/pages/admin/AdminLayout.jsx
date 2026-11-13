@@ -1370,7 +1370,7 @@ const AdminLayoutContent = () => {
             </div>
           )}
 
-          {!isSuperAdmin && <NavLink to="/admin/code-of-conduct" className={navItem}><FaFileAlt className="mr-3" />My Code of Conduct</NavLink>}
+          {!isSuperAdmin && <NavLink to="/admin/code-of-conduct" className={navItem}><FaFileAlt className="mr-3" />{role === "recruitment_admin" || user?.is_recruitment_admin ? "Conduct documents and reviews" : "My Code of Conduct"}</NavLink>}
           {['super_support_admin', 'state_support_admin', 'lga_support_admin'].includes(role) && <>
             <NavLink to="/admin/whatsapp-support" className={navItem}><FaWhatsapp className="mr-3" />WhatsApp support inbox</NavLink>
             <NavLink to="/admin/support-languages" className={navItem}><FaHeadset className="mr-3" />Support languages and availability</NavLink>

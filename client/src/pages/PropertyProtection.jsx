@@ -1,3 +1,5 @@
+import Modal from '../components/common/Modal';
+import {FeaturePage,FeatureEmpty,FeatureBadge} from '../components/common/FeaturePage';
 import useProtectionText from "../i18n/useProtectionText";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -45,7 +47,6 @@ export default function PropertyProtection() {
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
   const epoch = useRef(0),
-    dialog = useRef(null),
     file = useRef(null),
     requestKeys = useRef({}),
     mounted = useRef(true);
@@ -100,9 +101,6 @@ export default function PropertyProtection() {
       mounted.current = false;
     };
   }, []);
-  useEffect(() => {
-    if (action) dialog.current?.focus();
-  }, [action]);
   const more = async () => {
     if (busy || !rows.length) return;
     setBusy(true);
@@ -415,23 +413,7 @@ export default function PropertyProtection() {
     );
   };
   return (
-    <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 text-slate-800">
-      <div>
-        <Link to={dashboardPathFor(user)} className="text-sm underline">
-          {ui("Back to dashboard")}
-        </Link>
-        <h1 className="mt-3 text-3xl font-bold">
-          {ui("Amana Property Protection")}
-        </h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6">
-          {ui(
-            "Basic property registration and case reporting are free. A platform check does not guarantee ownership or freeze an official land record.",
-          )}
-        </p>
-      </div>
-      <button type="button" className={button} disabled={busy} onClick={load}>
-        {ui("Refresh")}
-      </button>
+    <FeaturePage title={ui("Amana Property Protection")} description={ui("Basic property registration and case reporting are free. A platform check does not guarantee ownership or freeze an official land record.")} backTo={dashboardPathFor(user)} backLabel={ui("Back to dashboard")} actions={<button type="button" className="btn btn-secondary" disabled={busy} onClick={load}>{ui("Refresh")}</button>}>
       {error && (
         <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-800">
           {error}
@@ -444,10 +426,10 @@ export default function PropertyProtection() {
       )}
       {!selected ? (
         <>
-          <nav className="flex flex-wrap gap-2">
+          <nav aria-label={ui("Amana Property Protection")} className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2">
             {viewsFor(user).map((v) => (
               <button
-                className={button}
+                className={v === view ? "min-h-11 rounded-xl bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-900 ring-1 ring-blue-200" : button}
                 key={v}
                 aria-pressed={v === view}
                 onClick={() =>
@@ -477,7 +459,7 @@ export default function PropertyProtection() {
             {rows.map((p) => (
               <button
                 key={p.id}
-                className="rounded-2xl border bg-white p-5 text-left shadow-sm"
+                className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md max-sm:min-h-11 max-sm:min-w-11"
                 onClick={() =>
                   setQuery({
                     property: String(p.id), view,
@@ -490,7 +472,7 @@ export default function PropertyProtection() {
                   {ui(", ")}
                   {p.state_name}
                 </p>
-                <p className="mt-2 text-sm">{labels(p.verification_status)}</p>
+                <div className="mt-3"><FeatureBadge tone={p.verification_status === "verified_within_scope" ? "success" : "warning"}>{ui(labels(p.verification_status))}</FeatureBadge></div>
                 <p className="mt-2 text-xs">
                   {ui("Registered ")}
                   {format(p.created_at)}
@@ -503,7 +485,7 @@ export default function PropertyProtection() {
               {ui("Load more properties")}
             </button>
           )}
-          {!rows.length && <p>{ui("No property records in this view.")}</p>}
+          {!rows.length && <FeatureEmpty title={ui("No property records in this view.")}/>}
         </>
       ) : data && String(data.property.id) === String(selected) ? (
         <>
@@ -517,7 +499,7 @@ export default function PropertyProtection() {
           >
             {ui(view === "owner" ? "Back to properties" : "Back to work queue")}
           </button>
-          <section className="rounded-2xl bg-slate-900 p-6 text-white">
+          <section className="rounded-2xl bg-[#071A3D] p-5 text-white shadow-sm sm:p-6">
             <h2 className="text-2xl font-bold">{data.property.title}</h2>
             <p className="mt-2">{data.property.address}</p>
             <p className="mt-2">{labels(data.property.verification_status)}</p>
@@ -543,7 +525,7 @@ export default function PropertyProtection() {
                 </p>
               )}
           </section>
-          <section>
+          <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             {data.property.pending_update && (
               <details className="mb-4 rounded-xl border border-amber-200 p-4">
                 <summary>{ui("Record correction awaiting review")}</summary>
@@ -569,7 +551,7 @@ export default function PropertyProtection() {
           <section className="space-y-3">
             <h2 className="text-xl font-bold">{ui("Verification progress")}</h2>
             {data.checks.map((c) => (
-              <details key={c.stage} className="rounded-xl border p-4">
+              <details key={c.stage} className="rounded-xl border p-4 border-slate-200">
                 <summary className="cursor-pointer font-semibold">
                   {labels(c.stage)}
                   {ui(" \u2014 ")}
@@ -612,7 +594,7 @@ export default function PropertyProtection() {
               </details>
             ))}
           </section>
-          <section>
+          <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <h2 className="mb-3 text-xl font-bold">{ui("Private evidence")}</h2>
             <p className="mb-3 text-sm">
               {ui(
@@ -632,13 +614,13 @@ export default function PropertyProtection() {
               ))}
             </div>
           </section>
-          <section>
+          <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <h2 className="mb-3 text-xl font-bold">
               {ui("Optional paid checks")}
             </h2>
             <div className="grid gap-4 md:grid-cols-2">
               {services.map((s) => (
-                <article key={s.code} className="rounded-2xl border p-4">
+                <article key={s.code} className="rounded-2xl border p-4 border-slate-200">
                   <h3 className="font-bold">{labels(s.code)}</h3>
                   <p className="my-2 text-sm">{s.description}</p>
                   {s.code === "monitoring" && s.period_days && (
@@ -673,14 +655,14 @@ export default function PropertyProtection() {
               ))}
             </div>
           </section>
-          <section>
+          <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <h2 className="mb-3 text-xl font-bold">
               {ui("Service requests and payments")}
             </h2>
             {data.requests.map((r) => (
               <div
                 key={r.id}
-                className="mb-2 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4"
+                className="mb-2 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4 border-slate-200"
               >
                 <div>
                   {labels(r.service_code)}
@@ -712,10 +694,10 @@ export default function PropertyProtection() {
               </div>
             ))}
           </section>
-          <section>
+          <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <h2 className="mb-3 text-xl font-bold">{ui("Inspections")}</h2>
             {data.inspections.map((i) => (
-              <details key={i.id} className="mb-2 rounded-xl border p-4">
+              <details key={i.id} className="mb-2 rounded-xl border p-4 border-slate-200">
                 <summary>
                   {ui("#")}
                   {i.id}
@@ -734,7 +716,7 @@ export default function PropertyProtection() {
               </details>
             ))}
           </section>
-          <section>
+          <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <h2 className="mb-3 text-xl font-bold">{ui("Monitoring")}</h2>
             <p>
               {data.monitoring
@@ -767,7 +749,7 @@ export default function PropertyProtection() {
                 </button>
               )}
           </section>
-          <section>
+          <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <h2 className="mb-3 text-xl font-bold">
               {ui("Alerts for review")}
             </h2>
@@ -786,7 +768,7 @@ export default function PropertyProtection() {
               </article>
             ))}
           </section>
-          <section>
+          <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <h2 className="mb-3 text-xl font-bold">{ui("Cases")}</h2>
             <p className="mb-3 text-sm">
               {ui(
@@ -795,7 +777,7 @@ export default function PropertyProtection() {
             </p>
             {data.cases.map((c) => (
               <Link
-                className="mb-2 block rounded-xl border p-4 underline"
+                className="mb-2 block rounded-xl border p-4 underline border-slate-200"
                 key={c.id}
                 to={"/dispute/" + c.id}
               >
@@ -805,12 +787,12 @@ export default function PropertyProtection() {
               </Link>
             ))}
           </section>
-          <section>
+          <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <h2 className="mb-3 text-xl font-bold">
               {ui("Representative authority")}
             </h2>
             {data.representatives.map((r) => (
-              <p key={r.user_id} className="mb-2 rounded-xl border p-3">
+              <p key={r.user_id} className="mb-2 rounded-xl border p-3 border-slate-200">
                 {r.full_name}
                 {ui(" \xB7 Account ")}
                 {r.user_id}
@@ -827,50 +809,7 @@ export default function PropertyProtection() {
       ) : (
         <p>{ui("Loading property\u2026")}</p>
       )}
-      {action && forms[action] && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-3"
-          onKeyDown={(e) => {
-            if (e.key === "Escape" && !busy) setAction(null);
-            if (e.key === "Tab") {
-              const items = [
-                ...dialog.current.querySelectorAll(
-                  'button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex="0"]',
-                ),
-              ];
-              const first = items[0],
-                last = items.at(-1);
-              if (e.shiftKey && document.activeElement === first) {
-                e.preventDefault();
-                last?.focus();
-              } else if (!e.shiftKey && document.activeElement === last) {
-                e.preventDefault();
-                first?.focus();
-              }
-            }
-          }}
-        >
-          <section
-            ref={dialog}
-            tabIndex={-1}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="pp-form-title"
-            className="max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl"
-          >
-            <div className="mb-4 flex items-center justify-between gap-4">
-              <h2 id="pp-form-title" className="text-xl font-bold">
-                {ui(forms[action].title)}
-              </h2>
-              <button
-                type="button"
-                className={button}
-                disabled={busy}
-                onClick={() => setAction(null)}
-              >
-                {ui("Close")}
-              </button>
-            </div>
+      {action && forms[action] && <Modal isOpen title={ui(forms[action].title)} onClose={()=>!busy&&setAction(null)} busy={busy} size="medium">
             {error && (
               <p role="alert" className="mb-3 text-red-700">
                 {error}
@@ -889,19 +828,17 @@ export default function PropertyProtection() {
                   {control(f)}
                 </div>
               ))}
-              <button className={button + " bg-amber-300"} disabled={busy}>
+              <button className="btn btn-primary min-h-11" disabled={busy}>
                 {busy ? "Saving…" : "Save"}
               </button>
             </form>
-          </section>
-        </div>
-      )}
+      </Modal>}
       <>
         {data?.permissions.operations && (
-          <section>
+          <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <h2 className="text-xl font-bold">{ui("Review history")}</h2>
             {(data.operations || []).map((item) => (
-              <p key={item.id} className="mt-2 rounded-xl border p-3 text-sm">
+              <p key={item.id} className="mt-2 rounded-xl border p-3 text-sm border-slate-200">
                 {format(item.created_at)} — {item.actor_name || ui("Staff")} —{" "}
                 {ui(labels(item.action.replace("PROTECTION_", "")))}
               </p>
@@ -909,7 +846,7 @@ export default function PropertyProtection() {
           </section>
         )}
         {data?.property.record_history?.length > 0 && (
-          <section>
+          <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <h2 className="text-xl font-bold">{ui("Record history")}</h2>
             {data.property.record_history.map((item, index) => (
               <p key={index} className="mt-2 text-sm">
@@ -919,6 +856,6 @@ export default function PropertyProtection() {
           </section>
         )}
       </>
-    </main>
+    </FeaturePage>
   );
 }

@@ -265,7 +265,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-state-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-state-600 border-slate-200"></div>
       </div>
     );
   }
@@ -292,35 +292,35 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
               <button
                 type="button"
                 onClick={() => setActiveTab('transactions')}
-                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 max-sm:min-h-11 max-sm:min-w-11"
               >
                 View Transactions
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('users')}
-                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 max-sm:min-h-11 max-sm:min-w-11"
               >
                 Manage Users
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('withdrawals')}
-                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 max-sm:min-h-11 max-sm:min-w-11"
               >
                 Withdrawal History
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('oversight')}
-                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 max-sm:min-h-11 max-sm:min-w-11"
               >
                 Local Govt Oversight
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('property_requests')}
-                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 max-sm:min-h-11 max-sm:min-w-11"
               >
                 Property Requests
               </button>
@@ -333,7 +333,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
                 <button
                   type="button"
                   onClick={() => setActiveTab('withdrawals')}
-                  className="rounded-md border border-emerald-300 bg-white px-3 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100"
+                  className="rounded-md border border-emerald-300 bg-white px-3 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100 max-sm:min-h-11 max-sm:min-w-11"
                 >
                   Open Withdrawal History
                 </button>
@@ -364,14 +364,14 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
               <button
                 type="button"
                 onClick={() => setActiveTab('withdrawals')}
-                className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+                className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 max-sm:min-h-11 max-sm:min-w-11"
               >
                 Open Withdrawals
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('oversight')}
-                className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
+                className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 max-sm:min-h-11 max-sm:min-w-11"
               >
                 Open Oversight
               </button>
@@ -488,7 +488,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
               type="number"
               value={withdrawAmount}
               onChange={(e) => setWithdrawAmount(e.target.value)}
-              className="w-full border rounded px-3 py-2"
+              className="w-full border rounded px-3 py-2 border-slate-200"
               placeholder="Enter amount"
             />
           </div>
@@ -500,7 +500,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
               type="text"
               value={bankDetails.bank_name}
               onChange={(e) => setBankDetails({...bankDetails, bank_name: e.target.value})}
-              className="w-full border rounded px-3 py-2"
+              className="w-full border rounded px-3 py-2 border-slate-200"
               placeholder="e.g., GTBank"
             />
           </div>
@@ -512,7 +512,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
               type="text"
               value={bankDetails.account_number}
               onChange={(e) => setBankDetails({...bankDetails, account_number: e.target.value})}
-              className="w-full border rounded px-3 py-2"
+              className="w-full border rounded px-3 py-2 border-slate-200"
               placeholder="10-digit account number"
             />
           </div>
@@ -524,7 +524,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
               type="text"
               value={bankDetails.account_name}
               onChange={(e) => setBankDetails({...bankDetails, account_name: e.target.value})}
-              className="w-full border rounded px-3 py-2"
+              className="w-full border rounded px-3 py-2 border-slate-200"
               placeholder="Account holder name"
             />
           </div>
@@ -581,7 +581,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
               {/* Charts Row */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Weekly Earnings Chart */}
-                <div className="bg-white p-4 rounded-lg border">
+                <div className="bg-white p-4 rounded-lg border border-slate-200">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold">Weekly Earnings</h3>
                     <FaChartBar className="h-5 w-5 text-gray-400" />
@@ -601,7 +601,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
                 </div>
 
                 {/* Commission Breakdown */}
-                <div className="bg-white p-4 rounded-lg border">
+                <div className="bg-white p-4 rounded-lg border border-slate-200">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold">Commission Breakdown</h3>
                     <FaChartPie className="h-5 w-5 text-gray-400" />
@@ -631,12 +631,12 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
               </div>
 
               {/* Recent Transactions */}
-              <div className="bg-white p-4 rounded-lg border">
+              <div className="bg-white p-4 rounded-lg border border-slate-200">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">Recent Transactions</h3>
                   <button
                     onClick={() => setActiveTab('transactions')}
-                    className="text-sm text-blue-600 hover:text-blue-800"
+                    className="text-sm text-blue-600 hover:text-blue-800 max-sm:min-h-11 max-sm:min-w-11"
                   >
                     View All
                   </button>
@@ -783,7 +783,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h3 className="text-lg font-semibold">All Transactions</h3>
                 <div className="flex flex-col gap-2 sm:flex-row">
-                  <select className="rounded border px-3 py-1 text-sm">
+                  <select className="rounded border px-3 py-1 text-sm border-slate-200">
                     <option>All Types</option>
                     <option>rent_payment</option>
                     <option>tenant_subscription</option>
@@ -792,12 +792,12 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
                   </select>
                   <input
                     type="date"
-                    className="rounded border px-3 py-1 text-sm"
+                    className="rounded border px-3 py-1 text-sm border-slate-200"
                     placeholder="Start Date"
                   />
                   <input
                     type="date"
-                    className="rounded border px-3 py-1 text-sm"
+                    className="rounded border px-3 py-1 text-sm border-slate-200"
                     placeholder="End Date"
                   />
                 </div>
@@ -875,7 +875,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h3 className="text-lg font-semibold">Managed Users</h3>
                 <div className="flex flex-col gap-2 sm:flex-row">
-                  <select className="rounded border px-3 py-1 text-sm">
+                  <select className="rounded border px-3 py-1 text-sm border-slate-200">
                     <option>All Types</option>
                     <option>tenant</option>
                     <option>landlord</option>
@@ -963,7 +963,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
                     link.click();
                     document.body.removeChild(link);
                   }}
-                  className="flex items-center text-sm text-blue-600 hover:text-blue-800"
+                  className="flex items-center text-sm text-blue-600 hover:text-blue-800 max-sm:min-h-11 max-sm:min-w-11"
                 >
                   <FaDownload className="h-4 w-4 mr-1" />
                   Export CSV
@@ -1050,7 +1050,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
                   </div>
                   <button
                     onClick={fetchDashboardData}
-                    className="inline-flex items-center rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
+                    className="inline-flex items-center rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 max-sm:min-h-11 max-sm:min-w-11"
                   >
                     <FaSyncAlt className="mr-2 h-4 w-4" />
                     Refresh Oversight
@@ -1059,19 +1059,19 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="rounded-lg border bg-white p-4">
+                <div className="rounded-lg border bg-white p-4 border-slate-200">
                   <p className="text-sm text-gray-600">Total LGA Units Seen</p>
                   <p className="mt-2 text-2xl font-bold text-gray-900">{localGovernmentOversight.summary.totalLgaUnits}</p>
                 </div>
-                <div className="rounded-lg border bg-white p-4">
+                <div className="rounded-lg border bg-white p-4 border-slate-200">
                   <p className="text-sm text-gray-600">Covered LGA Units</p>
                   <p className="mt-2 text-2xl font-bold text-green-700">{localGovernmentOversight.summary.totalCoveredLgaUnits}</p>
                 </div>
-                <div className="rounded-lg border bg-white p-4">
+                <div className="rounded-lg border bg-white p-4 border-slate-200">
                   <p className="text-sm text-gray-600">Local Govt Admins</p>
                   <p className="mt-2 text-2xl font-bold text-blue-700">{localGovernmentOversight.summary.totalLocalAdmins}</p>
                 </div>
-                <div className="rounded-lg border bg-white p-4">
+                <div className="rounded-lg border bg-white p-4 border-slate-200">
                   <p className="text-sm text-gray-600">Active Local Admins</p>
                   <p className="mt-2 text-2xl font-bold text-purple-700">{localGovernmentOversight.summary.totalActiveLocalAdmins}</p>
                 </div>
@@ -1081,7 +1081,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
                 <select
                   value={oversightStateFilter}
                   onChange={(e) => setOversightStateFilter(e.target.value)}
-                  className="border rounded px-3 py-2 text-sm"
+                  className="border rounded px-3 py-2 text-sm border-slate-200"
                 >
                   {localGovernmentOversight.availableStates.map((state) => (
                     <option key={state} value={state}>
@@ -1093,7 +1093,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
                 <select
                   value={oversightLgaFilter}
                   onChange={(e) => setOversightLgaFilter(e.target.value)}
-                  className="border rounded px-3 py-2 text-sm"
+                  className="border rounded px-3 py-2 text-sm border-slate-200"
                 >
                   {localGovernmentOversight.availableLgas.map((lga) => (
                     <option key={lga} value={lga}>
@@ -1105,7 +1105,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
                 <select
                   value={oversightCoverageFilter}
                   onChange={(e) => setOversightCoverageFilter(e.target.value)}
-                  className="border rounded px-3 py-2 text-sm"
+                  className="border rounded px-3 py-2 text-sm border-slate-200"
                 >
                   <option value="all">All Coverage Status</option>
                   <option value="with_admin">With Local Admin</option>
@@ -1113,7 +1113,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
                 </select>
               </div>
 
-              <div className="overflow-x-auto rounded-lg border">
+              <div className="overflow-x-auto rounded-lg border border-slate-200">
                 <table className="min-w-full divide-y divide-gray-200 bg-white">
                   <thead className="bg-gray-50">
                     <tr>

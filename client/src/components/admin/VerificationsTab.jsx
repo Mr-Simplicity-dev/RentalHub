@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { useAuth } from '../../hooks/useAuth';
 import React, { useState } from "react";
 import api from "../../services/api";
@@ -374,7 +375,7 @@ const VerificationsTab = ({
       </div>
 
       {reviewDialog.open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+        createPortal(<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div role="dialog" aria-modal="true" aria-label="Identity review" className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-gray-200 bg-white p-6 shadow-xl">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -458,7 +459,7 @@ const VerificationsTab = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>, document.body)
       ) : null}
 
 

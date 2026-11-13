@@ -1,115 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { FaShieldAlt, FaTimes } from 'react-icons/fa';
-import {
-  cancelMfaChallenge,
-  dismissMfaEnrollment,
-  getMfaState,
-  submitMfaCode,
-  subscribeMfaChallenge,
-} from '../../services/mfaPromptService';
-
-// Shown when the server answers 403 MFA_REQUIRED: privileged dashboards need a
-// fresh 6-digit TOTP code before they will hand over data. Without this the
-// web dashboards simply look broken after a successful login.
-export default function MfaCodeModal() {
-  const { t } = useTranslation();
-  const [challenge, setChallenge] = useState(getMfaState());
-  const [code, setCode] = useState('');
-
-  useEffect(() => { const unsubscribe = subscribeMfaChallenge(setChallenge); setChallenge(getMfaState()); return unsubscribe; }, []);
-
-  useEffect(() => {
-    if (!challenge.visible) {
-      setCode('');
-    }
-  }, [challenge.visible]);
-
-  if (!challenge.visible) return null;
-
-  if (challenge.mode === 'enrollment') return <div role="dialog" aria-modal="true" aria-labelledby="mfa-enrollment-title" className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4"><section className="w-full max-w-md rounded-2xl bg-white p-6 text-center shadow-2xl"><h2 id="mfa-enrollment-title" className="text-lg font-bold text-gray-900">Set up two-factor authentication</h2><p className="my-4 text-sm text-gray-600">{challenge.message}</p><a href="/profile#two-factor-security" onClick={dismissMfaEnrollment} className="block min-h-11 rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white">Set up authenticator</a><button type="button" className="mt-3 min-h-11 px-4 text-sm text-gray-600" onClick={dismissMfaEnrollment}>Not now</button></section></div>;
-
-  const handleSubmit = (event) => {
-    event.preventDefault();
-    const value = code.trim();
-    if (value.length !== 6) return;
-    submitMfaCode(value);
-  };
-
-  return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
-              <FaShieldAlt className="text-xl" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">
-                {t('mfa_challenge.title', 'Two-factor check')}
-              </h3>
-              <p className="text-xs text-gray-500">
-                {t('mfa_challenge.subtitle', 'This screen is protected by two-factor authentication.')}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={cancelMfaChallenge}
-            className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-            aria-label={t('mfa_challenge.close', 'Close')}
-          >
-            <FaTimes className="text-xl" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-          <p className="text-sm text-gray-600">
-            {t(
-              'mfa_challenge.body',
-              'Enter the 6-digit code from your authenticator app (e.g. Google Authenticator) to unlock this screen.'
-            )}
-          </p>
-
-          <input
-            type="text"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-            value={code}
-            onChange={(event) => setCode(event.target.value.replace(/\D/g, ''))}
-            placeholder="123456"
-            autoFocus
-            className="w-full rounded-xl border border-gray-300 px-4 py-3 text-center text-2xl font-bold tracking-[0.5em] text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-          />
-
-          {challenge.attempt > 1 && (
-            <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              {challenge.message ||
-                t(
-                  'mfa_challenge.retry',
-                  'That code was not accepted. Codes change every 30 seconds, so try the next one.'
-                )}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={code.length !== 6}
-            className="block w-full rounded-xl bg-indigo-600 py-3 text-center text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
-          >
-            {t('mfa_challenge.unlock', 'Unlock')}
-          </button>
-
-          <button
-            type="button"
-            onClick={cancelMfaChallenge}
-            className="block w-full py-2 text-center text-sm font-medium text-gray-500 hover:text-gray-700"
-          >
-            {t('mfa_challenge.cancel', 'Not now')}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
+import React,{useEffect,useState} from 'react';
+import {useTranslation} from 'react-i18next';
+import Modal from './Modal';
+import {cancelMfaChallenge,dismissMfaEnrollment,getMfaState,submitMfaCode,subscribeMfaChallenge} from '../../services/mfaPromptService';
+export default function MfaCodeModal(){
+ const {t}=useTranslation(),[challenge,setChallenge]=useState(getMfaState()),[code,setCode]=useState('');
+ useEffect(()=>{const unsubscribe=subscribeMfaChallenge(setChallenge);setChallenge(getMfaState());return unsubscribe;},[]);
+ useEffect(()=>{if(!challenge.visible)setCode('');},[challenge.visible]);
+ if(!challenge.visible)return null;
+ if(challenge.mode==='enrollment')return <Modal isOpen onClose={dismissMfaEnrollment} title="Set up two-factor authentication" size="small" layer="security"><p className="text-sm leading-6 text-slate-600">{challenge.message}</p><div className="mt-5 space-y-3"><a href="/profile#two-factor-security" onClick={dismissMfaEnrollment} className="btn btn-primary block w-full text-center">Set up authenticator</a><button type="button" className="btn btn-secondary w-full" onClick={dismissMfaEnrollment}>Not now</button></div></Modal>;
+ const submit=event=>{event.preventDefault();if(code.trim().length===6)submitMfaCode(code.trim());};
+ return <Modal isOpen onClose={cancelMfaChallenge} title={t('mfa_challenge.title','Two-factor check')} size="small" layer="security"><form onSubmit={submit} className="space-y-5"><p className="text-sm leading-6 text-slate-600">{t('mfa_challenge.body','Enter the 6-digit code from your authenticator app (e.g. Google Authenticator) to unlock this screen.')}</p><label className="block"><span className="mb-2 block text-sm font-medium text-slate-800">{t('mfa_challenge.subtitle','This screen is protected by two-factor authentication.')}</span><input type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={event=>setCode(event.target.value.replace(/\D/g,''))} placeholder="123456" className="min-h-14 w-full rounded-xl border border-slate-300 px-4 py-3 text-center text-2xl font-semibold tracking-[0.35em] text-slate-900 outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100"/></label>{challenge.attempt>1&&<p role="alert" className="rounded-xl bg-amber-50 p-3 text-sm leading-6 text-amber-900">{challenge.message||t('mfa_challenge.retry','That code was not accepted. Codes change every 30 seconds, so try the next one.')}</p>}<button type="submit" disabled={code.length!==6} className="btn btn-primary w-full">{t('mfa_challenge.unlock','Unlock')}</button><button type="button" onClick={cancelMfaChallenge} className="btn btn-secondary w-full">{t('mfa_challenge.cancel','Not now')}</button></form></Modal>;
 }

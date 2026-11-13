@@ -1,3 +1,4 @@
+import InputDialog from '../common/InputDialog';
 import languageCatalog from '../../data/nigerianLanguages.json';
 const languageNames=languageCatalog.languages;
 import VolunteerRecruitmentControls, {OpportunityTypeField, OpportunityBadge} from './VolunteerRecruitmentControls';
@@ -99,6 +100,7 @@ const paymentBadge = (status) => {
 
 export default function RecruitmentAdminTab() {
   const [loading, setLoading] = useState(false);
+  const [interviewTarget,setInterviewTarget]=useState(null),[interviewSaving,setInterviewSaving]=useState(false);
   const [saving, setSaving] = useState(false);
   const [triggering, setTriggering] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -335,8 +337,10 @@ export default function RecruitmentAdminTab() {
       toast.success(`Applicant ${action}ed`);
       await loadApplicants(pagination.page);
       await loadCore();
+      return true;
     } catch (error) {
       toast.error(error.response?.data?.message || `Failed to ${action} applicant`);
+      return false;
     }
   };
 
@@ -358,13 +362,7 @@ export default function RecruitmentAdminTab() {
     }
   };
 
-  const setInterviewDate = async (applicant) => {
-    const value = window.prompt('Interview date and time (YYYY-MM-DD HH:mm)', '');
-    if (!value) return;
-    await updateApplicant(applicant.id, 'set-interview', {
-      interview_date: value.replace(' ', 'T'),
-    });
-  };
+  const setInterviewDate = applicant => setInterviewTarget(applicant);
 
   const triggerInterview = async () => {
     setTriggering(true);
@@ -425,8 +423,7 @@ export default function RecruitmentAdminTab() {
 
   return (
     <div className="space-y-6">
-<a href="/admin/code-of-conduct" className="inline-block rounded border px-4 py-3">Admin Code of Conduct: documents and submissions</a>
-<VolunteerRecruitmentControls status={status} analytics={analytics} onUpdated={loadCore} disabled={loading} />
+      <InputDialog isOpen={Boolean(interviewTarget)} title="Schedule applicant interview" message={interviewTarget ? `Choose the interview date and time for ${interviewTarget.full_name || "this applicant"}.` : ""} confirmText="Save interview date" isLoading={interviewSaving} onCancel={()=>!interviewSaving&&setInterviewTarget(null)} onConfirm={async values=>{setInterviewSaving(true);try{if(await updateApplicant(interviewTarget.id,"set-interview",{interview_date:values.interview_date.replace(" ","T")}))setInterviewTarget(null);}finally{setInterviewSaving(false);}}} inputs={[{name:"interview_date",label:"Interview date and time",type:"datetime-local",required:true}]}/>
 
       {/* ─── Header ─────────────────────────────────────── */}
       <motion.section
@@ -472,6 +469,7 @@ export default function RecruitmentAdminTab() {
           </div>
         </div>
       </motion.section>
+      <VolunteerRecruitmentControls status={status} analytics={analytics} onUpdated={loadCore} disabled={loading} />
 
       {/* ─── Metric Cards ───────────────────────────────── */}
       {loadError && (

@@ -78,7 +78,7 @@ const ChatBubble = ({ msg, isOwn, onRetry }) => {
             <span className="text-[10px] text-indigo-200 italic">Sending...</span>
           )}
           {isOwn && msg._failed && (
-            <button onClick={() => onRetry?.(msg)} className="ml-1 text-[10px] text-red-300 hover:text-red-200 underline">
+            <button onClick={() => onRetry?.(msg)} className="ml-1 text-[10px] text-red-300 hover:text-red-200 underline max-sm:min-h-11 max-sm:min-w-11">
               Retry
             </button>
           )}
@@ -769,7 +769,7 @@ const FloatingContactWidget = () => {
     <div className="flex items-center justify-between bg-gradient-to-r from-indigo-600 to-indigo-700 px-4 py-3 text-white">
       <div className="flex items-center gap-2">
         {view !== 'assistant' && view !== 'success' && (
-          <button onClick={() => { setView('assistant'); setActiveTicket(null); setConversation([]); setContactConv([]); setViewingContactTicket(null); }} className="text-white/80 hover:text-white p-0.5" aria-label={t('messages.widget.back', 'Back')}>
+          <button onClick={() => { setView('assistant'); setActiveTicket(null); setConversation([]); setContactConv([]); setViewingContactTicket(null); }} className="text-white/80 hover:text-white p-0.5 max-sm:min-h-11 max-sm:min-w-11" aria-label={t('messages.widget.back', 'Back')}>
             <FaArrowLeft size={14} />
           </button>
         )}
@@ -837,7 +837,7 @@ const FloatingContactWidget = () => {
 
           <div className={view==='assistant'?'flex min-h-0 flex-1 flex-col':'flex-1 overflow-y-auto p-4 space-y-3'} ref={listRef}>
             {/* ─── FORM VIEW (anonymous/fallback) ─── */}
-            {view === 'assistant' && <><WhatsAppBotWidget embedded onHumanRequest={({summary})=>{setForm(prev=>({...prev,subject:'Support follow-up',message:summary || ''}));setView(isAuthenticated?'auth-form':'form');}}/><div className="flex flex-wrap gap-2 border-t border-slate-200 p-3"><button onClick={()=>setView(isAuthenticated?'tickets':'check-status')} className="min-h-11 rounded-xl border px-3 text-sm">My tickets</button><button data-tour-id="support-new-ticket-workflow" onClick={()=>setView(isAuthenticated?'auth-form':'form')} className="min-h-11 rounded-xl border px-3 text-sm">Submit a ticket</button></div></>}
+            {view === 'assistant' && <><WhatsAppBotWidget embedded onHumanRequest={({summary})=>{setForm(prev=>({...prev,subject:'Support follow-up',message:summary || ''}));setView(isAuthenticated?'auth-form':'form');}}/><div className="flex flex-wrap gap-2 border-t border-slate-200 p-3"><button onClick={()=>setView(isAuthenticated?'tickets':'check-status')} className="min-h-11 rounded-xl border px-3 text-sm border-slate-200">My tickets</button><button data-tour-id="support-new-ticket-workflow" onClick={()=>setView(isAuthenticated?'auth-form':'form')} className="min-h-11 rounded-xl border px-3 text-sm border-slate-200">Submit a ticket</button></div></>}
             {view === 'form' && !isAuthenticated && (
               <form onSubmit={handleSubmit} className="space-y-3">
                 <p className="text-xs text-slate-500 dark:text-gray-400">{t('messages.widget.fill_form', "Fill this form and we'll get back to you via email.")}</p>
@@ -899,11 +899,11 @@ const FloatingContactWidget = () => {
                 <LanguageSkillsField preference value={form.preferred_language||''} onChange={preferred_language=>setForm(old=>({...old,preferred_language}))}/>
                 {error && <p className="text-xs text-red-600">{error}</p>}
                 <button type="submit" disabled={sending}
-                  className="flex items-center justify-center gap-2 w-full bg-indigo-600 text-white rounded-lg px-4 py-2.5 text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60 transition">
+                  className="flex items-center justify-center gap-2 w-full bg-indigo-600 text-white rounded-lg px-4 py-2.5 text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60 transition max-sm:min-h-11 max-sm:min-w-11">
                   {sending ? t('messages.widget.sending', 'Sending...') : <><FaPaperPlane className="w-3.5 h-3.5" /> {t('messages.widget.send_message', 'Send message')}</>}
                 </button>
                 <button type="button" onClick={() => { setView('check-status'); setLookupEmail(localStorage.getItem(LS_EMAIL) || ''); }}
-                  className="w-full text-center text-xs text-indigo-600 hover:underline">
+                  className="w-full text-center text-xs text-indigo-600 hover:underline max-sm:min-h-11 max-sm:min-w-11">
                   {t('messages.widget.check_status', 'Already contacted us? Check your ticket status')}
                 </button>
               </form>
@@ -917,7 +917,7 @@ const FloatingContactWidget = () => {
                   type="button"
                   onClick={handleCallSupport}
                   disabled={callingSupport || !connected}
-                  className="flex items-center justify-center gap-2 w-full border border-indigo-600 text-indigo-600 rounded-lg px-4 py-2.5 text-sm font-semibold hover:bg-indigo-50 disabled:opacity-60 transition mb-3"
+                  className="flex items-center justify-center gap-2 w-full border border-indigo-600 text-indigo-600 rounded-lg px-4 py-2.5 text-sm font-semibold hover:bg-indigo-50 disabled:opacity-60 transition mb-3 max-sm:min-h-11 max-sm:min-w-11"
                 >
                   <FaPhoneAlt className="w-3.5 h-3.5" />
                   {callingSupport ? t('messages.widget.connecting_support', 'Connecting…') : t('messages.widget.call_support', 'Call support')}
@@ -987,7 +987,7 @@ const FloatingContactWidget = () => {
                     } catch (err) { setError(err.response?.data?.message || t('messages.widget.create_failed', 'Failed to create ticket')); }
                     finally { setSending(false); }
                   }} disabled={sending}
-                    className="flex items-center justify-center gap-2 w-full bg-indigo-600 text-white rounded-lg px-4 py-2.5 text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60">
+                    className="flex items-center justify-center gap-2 w-full bg-indigo-600 text-white rounded-lg px-4 py-2.5 text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60 max-sm:min-h-11 max-sm:min-w-11">
                     {sending ? t('messages.widget.creating', 'Creating...') : <><FaPaperPlane className="w-3.5 h-3.5" /> {t('messages.widget.start_conversation_btn', 'Start conversation')}</>}
                   </button>
                 </div>
@@ -1003,7 +1003,7 @@ const FloatingContactWidget = () => {
                 {localStorage.getItem(LS_TICKET_ID) && (
                   <p className="mt-2 text-xs text-slate-400 dark:text-gray-400">{t('messages.widget.ticket', 'Ticket')} #<span className="font-mono">{localStorage.getItem(LS_TICKET_ID)}</span></p>
                 )}
-                <button onClick={handleClose} className="mt-4 text-sm text-indigo-600 hover:underline">{t('messages.widget.close_btn', 'Close')}</button>
+                <button onClick={handleClose} className="mt-4 text-sm text-indigo-600 hover:underline max-sm:min-h-11 max-sm:min-w-11">{t('messages.widget.close_btn', 'Close')}</button>
                 {sentConfirm && (
                   <p className="mt-2 text-xs text-green-600 flex items-center gap-1"><FaCheck size={10} /> {t('messages.widget.sent', 'Sent!')}</p>
                 )}
@@ -1021,12 +1021,12 @@ const FloatingContactWidget = () => {
                 ) : tickets.length === 0 ? (
                   <div className="text-center py-4">
                     <p className="text-sm text-slate-500 dark:text-gray-400 mb-3">{t('messages.widget.no_tickets', 'No tickets yet.')}</p>
-                    <button onClick={() => setView('form')} className="text-sm text-indigo-600 hover:underline">{t('messages.widget.start_new', 'Start a new conversation')}</button>
+                    <button onClick={() => setView('form')} className="text-sm text-indigo-600 hover:underline max-sm:min-h-11 max-sm:min-w-11">{t('messages.widget.start_new', 'Start a new conversation')}</button>
                   </div>
                 ) : (
                   tickets.map((ticket) => (
                     <button key={ticket.id} onClick={() => openTicketChat(ticket)}
-                      className="w-full text-left rounded-xl border border-slate-200 p-3 hover:border-indigo-300 hover:bg-indigo-50/50 transition">
+                      className="w-full text-left rounded-xl border border-slate-200 p-3 hover:border-indigo-300 hover:bg-indigo-50/50 transition max-sm:min-h-11 max-sm:min-w-11">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium text-slate-900 dark:text-gray-100 truncate flex-1">{ticket.subject}</p>
                         <span className={`ml-2 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
@@ -1049,7 +1049,7 @@ const FloatingContactWidget = () => {
               <div className="space-y-3">
                 {activeTicket.is_whatsapp&&<WhatsAppSupportEntry />}<DisputeHandoverPanel ticketId={activeTicket.id} /><SupportContactForms ticketId={activeTicket.id} />
                 <p className="text-xs font-semibold text-slate-500 dark:text-gray-400 truncate">{activeTicket.subject}</p>
-                {supportLoadError&&<button type="button" className="rounded border p-3 text-sm text-amber-800" onClick={()=>loadConversation(activeTicket.id)}>{t('support.conversation_failed')}</button>}
+                {supportLoadError&&<button type="button" className="rounded border p-3 text-sm text-amber-800 border-slate-200 max-sm:min-h-11 max-sm:min-w-11" onClick={()=>loadConversation(activeTicket.id)}>{t('support.conversation_failed')}</button>}
                 {loadingConv ? (
                   <div className="space-y-3 py-2">
                     {[1,2].map((i) => <div key={i} className={`h-12 rounded-xl bg-slate-100 dark:bg-gray-700 animate-pulse ${i % 2 === 0 ? 'ml-12' : 'mr-12'}`} />)}
@@ -1080,7 +1080,7 @@ const FloatingContactWidget = () => {
                   placeholder="your@email.com"
                   className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500" />
                 <button onClick={handleLookup} disabled={lookupLoading}
-                  className="w-full rounded-lg bg-indigo-600 text-white px-4 py-2 text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60">
+                  className="w-full rounded-lg bg-indigo-600 text-white px-4 py-2 text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60 max-sm:min-h-11 max-sm:min-w-11">
                   {lookupLoading ? t('messages.widget.searching', 'Searching...') : t('messages.widget.lookup', 'Check Tickets Status')}
                 </button>
                 
@@ -1091,7 +1091,7 @@ const FloatingContactWidget = () => {
                     {lookupTickets.map((ticket) => (
                       <div key={ticket.id}>
                         <button onClick={() => viewContactConversation(ticket)}
-                          className="w-full text-left rounded-xl border border-slate-200 p-3 hover:border-indigo-300 transition">
+                          className="w-full text-left rounded-xl border border-slate-200 p-3 hover:border-indigo-300 transition max-sm:min-h-11 max-sm:min-w-11">
                           <div className="flex items-center justify-between">
                             <p className="text-sm font-medium text-slate-900 dark:text-gray-100 truncate">{ticket.subject}</p>
                             <span className={`ml-2 rounded-full px-2 py-0.5 text-[10px] font-medium ${
@@ -1124,7 +1124,7 @@ const FloatingContactWidget = () => {
                                       </p>
                                     </div>
                                     {r._failed && (
-                                      <button onClick={() => retryContactReply(r)} className="shrink-0 text-xs text-red-500 hover:text-red-700 underline">
+                                      <button onClick={() => retryContactReply(r)} className="shrink-0 text-xs text-red-500 hover:text-red-700 underline max-sm:min-h-11 max-sm:min-w-11">
                                         Retry
                                       </button>
                                     )}
@@ -1150,7 +1150,7 @@ const FloatingContactWidget = () => {
                                 <div className="mb-1 flex items-center gap-1 rounded bg-red-50 px-2 py-1 text-xs text-red-600">
                                   <span className="inline-block h-2 w-2 rounded-full bg-red-500 animate-pulse" />
                                   {t('messages.widget.recording', 'Recording...')} {contactRecorder.formatDuration(contactRecorder.duration)}
-                                  <button onClick={contactRecorder.stop} className="ml-auto flex items-center gap-1 rounded bg-red-500 px-1.5 py-0.5 text-white hover:bg-red-600">
+                                  <button onClick={contactRecorder.stop} className="ml-auto flex items-center gap-1 rounded bg-red-500 px-1.5 py-0.5 text-white hover:bg-red-600 max-sm:min-h-11 max-sm:min-w-11">
                                     <FaStopCircle size={8} /> {t('messages.widget.stop', 'Stop')}
                                   </button>
                                 </div>
@@ -1158,7 +1158,7 @@ const FloatingContactWidget = () => {
                               {contactReplyFile && !contactRecorder.isRecording && (
                                 <div className="mb-1 flex items-center gap-1 rounded bg-slate-100 dark:bg-gray-700 px-2 py-1 text-xs text-slate-600 dark:text-gray-300">
                                   <FaPaperclip size={8} /> {contactReplyFile.name}
-                                  <button onClick={() => setContactReplyFile(null)} className="ml-auto text-red-500"><FaTimes size={8} /></button>
+                                  <button onClick={() => setContactReplyFile(null)} className="ml-auto text-red-500 max-sm:min-h-11 max-sm:min-w-11"><FaTimes size={8} /></button>
                                 </div>
                               )}
                               <div className="flex items-end gap-1.5">
@@ -1177,7 +1177,7 @@ const FloatingContactWidget = () => {
                                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleContactReply(); } }} />
                                 {contactRecorder.isRecording ? (
                                   <button onClick={contactRecorder.stop}
-                                    className="flex h-[36px] w-[36px] items-center justify-center rounded bg-red-500 text-white hover:bg-red-600 shrink-0">
+                                    className="flex h-[36px] w-[36px] items-center justify-center rounded bg-red-500 text-white hover:bg-red-600 shrink-0 max-sm:min-h-11 max-sm:min-w-11">
                                     <FaStopCircle size={10} />
                                   </button>
                                 ) : (
@@ -1185,13 +1185,13 @@ const FloatingContactWidget = () => {
                                     try { await contactRecorder.start(); }
                                     catch (err) { setError(err.message); }
                                   }}
-                                    className="flex h-[36px] w-[36px] items-center justify-center rounded border border-slate-300 dark:border-gray-600 text-slate-400 dark:text-gray-400 hover:bg-slate-50 shrink-0"
+                                    className="flex h-[36px] w-[36px] items-center justify-center rounded border border-slate-300 dark:border-gray-600 text-slate-400 dark:text-gray-400 hover:bg-slate-50 shrink-0 max-sm:min-h-11 max-sm:min-w-11"
                                     title={t('messages.widget.record_voice', 'Record voice message')}>
                                     <FaMicrophone size={10} />
                                   </button>
                                 )}
                                 <button onClick={handleContactReply} disabled={(!contactReplyText.trim() && !contactReplyFile && !contactRecorder.recordedFile) || sendingContactReply}
-                                  className="flex h-[36px] w-[36px] items-center justify-center rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 shrink-0">
+                                  className="flex h-[36px] w-[36px] items-center justify-center rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 shrink-0 max-sm:min-h-11 max-sm:min-w-11">
                                   {sendingContactReply ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <FaPaperPlane size={10} />}
                                 </button>
                               </div>
@@ -1205,7 +1205,7 @@ const FloatingContactWidget = () => {
                 {lookupTickets.length === 0 && !lookupLoading && lookupEmail.trim() && !error && (
                   <p className="text-xs text-slate-400 dark:text-gray-400 text-center">{t('messages.widget.no_tickets_email', 'No tickets found for this email.')}</p>
                 )}
-                <button onClick={() => setView('form')} className="w-full text-center text-xs text-indigo-600 hover:underline">{t('messages.widget.start_new', 'Start a new conversation')}</button>
+                <button onClick={() => setView('form')} className="w-full text-center text-xs text-indigo-600 hover:underline max-sm:min-h-11 max-sm:min-w-11">{t('messages.widget.start_new', 'Start a new conversation')}</button>
               </div>
             )}
           </div>
@@ -1217,7 +1217,7 @@ const FloatingContactWidget = () => {
                 <div className="mb-2 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600">
                   <span className="inline-block h-2 w-2 rounded-full bg-red-500 animate-pulse" />
                   {t('messages.widget.recording', 'Recording...')} {authRecorder.formatDuration(authRecorder.duration)}
-                  <button onClick={authRecorder.stop} className="ml-auto flex items-center gap-1 rounded-md bg-red-500 px-2 py-1 text-white hover:bg-red-600">
+                  <button onClick={authRecorder.stop} className="ml-auto flex items-center gap-1 rounded-md bg-red-500 px-2 py-1 text-white hover:bg-red-600 max-sm:min-h-11 max-sm:min-w-11">
                     <FaStopCircle size={10} /> {t('messages.widget.stop', 'Stop')}
                   </button>
                 </div>
@@ -1225,7 +1225,7 @@ const FloatingContactWidget = () => {
               {attachmentFile && !authRecorder.isRecording && (
                 <div className="mb-2 flex items-center gap-2 rounded-lg bg-slate-100 dark:bg-gray-700 px-3 py-1.5 text-xs text-slate-600 dark:text-gray-300">
                   <FaPaperclip size={10} /> {attachmentFile.name}
-                  <button onClick={() => setAttachmentFile(null)} className="ml-auto text-red-500 hover:text-red-700"><FaTimes size={10} /></button>
+                  <button onClick={() => setAttachmentFile(null)} className="ml-auto text-red-500 hover:text-red-700 max-sm:min-h-11 max-sm:min-w-11"><FaTimes size={10} /></button>
                 </div>
               )}
               <div className="flex items-end gap-2">
@@ -1248,7 +1248,7 @@ const FloatingContactWidget = () => {
                 )}
                 {authRecorder.isRecording ? (
                   <button onClick={authRecorder.stop}
-                    className="flex h-[36px] w-[36px] items-center justify-center rounded-lg bg-red-500 text-white hover:bg-red-600 shrink-0">
+                    className="flex h-[36px] w-[36px] items-center justify-center rounded-lg bg-red-500 text-white hover:bg-red-600 shrink-0 max-sm:min-h-11 max-sm:min-w-11">
                     <FaStopCircle size={14} />
                   </button>
                 ) : (
@@ -1256,13 +1256,13 @@ const FloatingContactWidget = () => {
                     try { await authRecorder.start(); }
                     catch (err) { setError(err.message); }
                   }}
-                    className="flex h-[36px] w-[36px] items-center justify-center rounded-lg border border-slate-300 dark:border-gray-600 text-slate-500 dark:text-gray-400 hover:bg-slate-50 shrink-0"
+                    className="flex h-[36px] w-[36px] items-center justify-center rounded-lg border border-slate-300 dark:border-gray-600 text-slate-500 dark:text-gray-400 hover:bg-slate-50 shrink-0 max-sm:min-h-11 max-sm:min-w-11"
                     title={t('messages.widget.record_voice', 'Record voice message')}>
                     <FaMicrophone size={12} />
                   </button>
                 )}
                 <button onClick={handleSendReply} disabled={(!replyText.trim() && !attachmentFile && !authRecorder.recordedFile) || sendingReply}
-                  className="flex h-[36px] w-[36px] items-center justify-center rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 shrink-0">
+                  className="flex h-[36px] w-[36px] items-center justify-center rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 shrink-0 max-sm:min-h-11 max-sm:min-w-11">
                   {sendingReply ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <FaPaperPlane size={12} />}
                 </button>
               </div>

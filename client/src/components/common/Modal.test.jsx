@@ -1,0 +1,12 @@
+import React from 'react';
+import {act} from 'react';
+import {createRoot} from 'react-dom/client';
+import {fireEvent,within} from '@testing-library/dom';
+import {vi} from 'vitest';
+import Modal from './Modal';
+vi.mock('react-i18next',()=>({useTranslation:()=>({t:(_k,f)=>f})}));
+let root,container;
+beforeEach(()=>{globalThis.IS_REACT_ACT_ENVIRONMENT=true;container=document.createElement('div');document.body.appendChild(container);root=createRoot(container);});
+afterEach(()=>{act(()=>root.unmount());container.remove();});
+test('a dialog is outside its dashboard card and releases the page when closed',()=>{const close=vi.fn();act(()=>root.render(<Modal isOpen title="Review" onClose={close}><input aria-label="Note"/></Modal>));const dialog=within(document.body).getByRole('dialog',{name:'Review'});expect(container.contains(dialog)).toBe(false);expect(document.body.style.overflow).toBe('hidden');expect(document.activeElement).toBe(within(dialog).getByLabelText('Note'));fireEvent.keyDown(dialog,{key:'Escape'});expect(close).toHaveBeenCalledTimes(1);act(()=>root.render(null));expect(document.body.style.overflow).toBe('');});
+test('a busy review cannot be dismissed before its save finishes',()=>{const close=vi.fn();act(()=>root.render(<Modal isOpen busy title="Saving review" onClose={close}>Saving</Modal>));const dialog=within(document.body).getByRole('dialog');fireEvent.keyDown(dialog,{key:'Escape'});expect(within(dialog).getByRole('button',{name:'Close'}).disabled).toBe(true);expect(close).not.toHaveBeenCalled();});

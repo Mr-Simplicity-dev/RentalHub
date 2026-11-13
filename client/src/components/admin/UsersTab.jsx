@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React, { useState } from "react";
 import api from "../../services/api";
 import { toast } from "react-toastify";
@@ -228,21 +229,21 @@ const UsersTab = ({
 
           <button
             onClick={() => openAccountAction(null, "bulk_ban")}
-            className="rounded-lg bg-red-600 px-3 py-1 text-sm text-white transition-colors hover:bg-red-700"
+            className="rounded-lg bg-red-600 px-3 py-1 text-sm text-white transition-colors hover:bg-red-700 max-sm:min-h-11 max-sm:min-w-11"
           >
             Ban
           </button>
 
           <button
             onClick={() => openAccountAction(null,"bulk_verify")}
-            className="rounded-lg bg-green-600 px-3 py-1 text-sm text-white transition-colors hover:bg-green-700"
+            className="rounded-lg bg-green-600 px-3 py-1 text-sm text-white transition-colors hover:bg-green-700 max-sm:min-h-11 max-sm:min-w-11"
           >
             Verify
           </button>
 
           <button
             onClick={() => bulkUsers("promote")}
-            className="rounded-lg bg-blue-600 px-3 py-1 text-sm text-white transition-colors hover:bg-blue-700"
+            className="rounded-lg bg-blue-600 px-3 py-1 text-sm text-white transition-colors hover:bg-blue-700 max-sm:min-h-11 max-sm:min-w-11"
           >
             Make Admin
           </button>
@@ -320,7 +321,7 @@ const UsersTab = ({
                                 <td className="p-3">
                   <button
                     onClick={() => setSelectedUserForModal(u)}
-                    className="text-blue-600 hover:text-blue-800 hover:underline transition text-left"
+                    className="text-blue-600 hover:text-blue-800 hover:underline transition text-left max-sm:min-h-11 max-sm:min-w-11"
                   >
                     {u.email}
                   </button>
@@ -382,7 +383,7 @@ const UsersTab = ({
                       u.user_type !== "super_admin" && (
                         <button
                           onClick={() => openAccountAction(u, "verify")}
-                          className="rounded-lg bg-green-600 px-2 py-1 text-xs text-white transition-colors hover:bg-green-700"
+                          className="rounded-lg bg-green-600 px-2 py-1 text-xs text-white transition-colors hover:bg-green-700 max-sm:min-h-11 max-sm:min-w-11"
                         >
                           Verify
                         </button>
@@ -393,7 +394,7 @@ const UsersTab = ({
                     ) && (
                       <button
                         onClick={() => promoteUser(u.id)}
-                        className="rounded-lg bg-blue-600 px-2 py-1 text-xs text-white transition-colors hover:bg-blue-700"
+                        className="rounded-lg bg-blue-600 px-2 py-1 text-xs text-white transition-colors hover:bg-blue-700 max-sm:min-h-11 max-sm:min-w-11"
                       >
                         Promote
                       </button>
@@ -402,7 +403,7 @@ const UsersTab = ({
                     {u.user_type !== "super_admin" && u.is_active && (
                       <button
                         onClick={() => openAccountAction(u, "ban")}
-                        className="rounded-lg bg-red-600 px-2 py-1 text-xs text-white transition-colors hover:bg-red-700"
+                        className="rounded-lg bg-red-600 px-2 py-1 text-xs text-white transition-colors hover:bg-red-700 max-sm:min-h-11 max-sm:min-w-11"
                       >
                         Ban
                       </button>
@@ -411,7 +412,7 @@ const UsersTab = ({
                     {!u.is_active && u.user_type !== "super_admin" && (
                       <button
                         onClick={() => openAccountAction(u, "unban")}
-                        className="rounded-lg bg-indigo-600 px-2 py-1 text-xs text-white transition-colors hover:bg-indigo-700"
+                        className="rounded-lg bg-indigo-600 px-2 py-1 text-xs text-white transition-colors hover:bg-indigo-700 max-sm:min-h-11 max-sm:min-w-11"
                       >
                         Unban
                       </button>
@@ -420,7 +421,7 @@ const UsersTab = ({
                     {u.user_type !== "super_admin" && (
                       <button
                         onClick={() => openAccountAction(u, "delete")}
-                        className="rounded-lg bg-gray-700 px-2 py-1 text-xs text-white transition-colors hover:bg-gray-800"
+                        className="rounded-lg bg-gray-700 px-2 py-1 text-xs text-white transition-colors hover:bg-gray-800 max-sm:min-h-11 max-sm:min-w-11"
                       >
                         Delete
                       </button>
@@ -457,7 +458,7 @@ const UsersTab = ({
 
             {/* USER DETAIL MODAL */}
       {selectedUserForModal && (
-        <div
+        createPortal(<div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
           onClick={() => setSelectedUserForModal(null)}
         >
@@ -472,7 +473,7 @@ const UsersTab = ({
               </h3>
               <button
                 onClick={() => setSelectedUserForModal(null)}
-                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none max-sm:min-h-11 max-sm:min-w-11"
               >
                 &times;
               </button>
@@ -644,7 +645,7 @@ const UsersTab = ({
                       NIN number on record{selectedUserForModal.nin ? ":" : " — not provided"}
                     </span>
                     {selectedUserForModal.nin && (
-                      <span className="text-xs text-gray-500 font-mono bg-white px-2 py-0.5 rounded border">
+                      <span className="text-xs text-gray-500 font-mono bg-white px-2 py-0.5 rounded border border-slate-200">
                         {selectedUserForModal.nin}
                       </span>
                     )}
@@ -751,7 +752,7 @@ const UsersTab = ({
               <button
                 type="button"
                 onClick={() => openRevalidationRequest(selectedUserForModal)}
-                className="w-full rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-700"
+                className="w-full rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 max-sm:min-h-11 max-sm:min-w-11"
               >
                 Request Credential Revalidation
               </button>
@@ -786,13 +787,13 @@ const UsersTab = ({
               </p>
             </div>
           </div>
-        </div>
+        </div>, document.body)
       )}
 
       {revalidationAction.open && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
+        createPortal(<div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-lg rounded-xl bg-white shadow-xl">
-            <div className="border-b px-6 py-4">
+            <div className="border-b px-6 py-4 border-slate-200">
               <h3 className="text-lg font-bold text-gray-900">Request Credential Revalidation</h3>
               <p className="text-sm text-gray-500">{revalidationAction.user?.full_name} · {revalidationAction.user?.email}</p>
             </div>
@@ -810,7 +811,7 @@ const UsersTab = ({
                     ["international_passport", "International passport"],
                     ["live_photo", "New live passport photo"],
                   ].map(([value, label]) => (
-                    <label key={value} className="flex items-center gap-2 rounded-lg border p-3 text-sm">
+                    <label key={value} className="flex items-center gap-2 rounded-lg border p-3 text-sm border-slate-200">
                       <input
                         type="checkbox"
                         checked={revalidationAction.fields.includes(value)}
@@ -850,7 +851,7 @@ const UsersTab = ({
               </label>
               {revalidationAction.error && <p className="text-sm text-red-600">{revalidationAction.error}</p>}
             </div>
-            <div className="flex justify-end gap-2 border-t px-6 py-4">
+            <div className="flex justify-end gap-2 border-t px-6 py-4 border-slate-200">
               <button
                 type="button"
                 className="btn btn-secondary"
@@ -869,11 +870,11 @@ const UsersTab = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>, document.body)
       )}
 
       {accountAction.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        createPortal(<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div role="dialog" aria-modal="true" aria-label="Account review" className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-xl">
             <div className="border-b border-soft px-6 py-4">
               <h3 className="text-lg font-semibold text-gray-900">
@@ -934,7 +935,7 @@ const UsersTab = ({
               <button
                 type="button"
                 onClick={closeAccountAction}
-                className="rounded-lg border border-soft px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-50"
+                className="rounded-lg border border-soft px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-50 max-sm:min-h-11 max-sm:min-w-11"
               >
                 Cancel
               </button>
@@ -952,7 +953,7 @@ const UsersTab = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>, document.body)
       )}
 
     </div>

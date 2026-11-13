@@ -1,74 +1,24 @@
-import React, { useEffect, useState } from 'react';
+import React,{useEffect,useState} from 'react';
 import api from '../../services/api';
 import LanguageSkillsField from '../common/LanguageSkillsField';
-import { languages } from '../../data/languagePolicy';
-export default function SupportLanguageDesk({
-  user
-}) {
-  const [skills, setSkills] = useState([]),
-    [rows, setRows] = useState([]),
-    [misses, setMisses] = useState([]),
-    [message, setMessage] = useState(''),
-    [busy, setBusy] = useState(false);
-  const senior = ['super_support_admin', 'super_admin'].includes(user?.user_type);
-  const allowed = ['lga_support_admin', 'state_support_admin', 'super_support_admin', 'super_admin'].includes(user?.user_type);
-  const load = async () => {
-    if (user?.user_type !== 'super_admin') {
-      const r = await api.get('/support-languages/profile');
-      setSkills(r.data.data.skills);
-    }
-    if (senior) {
-      const [a, b] = await Promise.all([api.get('/support-languages/review'), api.get('/support-languages/monitor')]);
-      setRows(a.data.data);
-      setMisses(b.data.data);
-    }
-  };
-  useEffect(() => {
-    if (allowed) load().catch(() => setMessage('Could not load language desk.'));
-  }, [allowed, user?.id, user?.user_type]); // eslint-disable-line react-hooks/exhaustive-deps
-  const action = async fn => {
-    setBusy(true);
-    try {
-      const r = await fn();
-      setMessage(r.data.message || 'Saved.');
-      await load();
-    } catch (e) {
-      setMessage(e.response?.data?.message || 'Could not save.');
-    } finally {
-      setBusy(false);
-    }
-  };
-  if (!allowed) return null;
-  return <details open className="my-4 rounded-xl border bg-white p-4 text-slate-900"><summary className="cursor-pointer font-semibold">{user?.user_type === 'super_admin' ? 'Language assessments and response review' : 'Support languages, availability and response review'}</summary><p role="status">{message}</p>{user?.user_type !== 'super_admin' && <><LanguageSkillsField english value={skills} onChange={setSkills} /><button disabled={busy} className="m-2 rounded bg-blue-900 p-3 text-white" onClick={() => action(() => api.put('/support-languages/profile', {
-      skills
-    }))}>Send skills for assessment</button><button disabled={busy} className="m-2 rounded border p-3" onClick={() => action(() => api.put('/support-languages/availability', {
-      available: true,
-      minutes: 60
-    }))}>Available for 1 hour</button><button disabled={busy} className="m-2 rounded border p-3" onClick={() => action(() => api.put('/support-languages/availability', {
-      available: false
-    }))}>Unavailable / on break</button></>}
- {senior && <><h3 className="font-semibold">Language assessments</h3><p>Check the agent’s speaking and writing before approval. You cannot approve yourself.</p><div className="max-h-96 overflow-auto">{rows.map(row => <div key={row.user_id + row.language_id} className="border-b p-3">{row.full_name} — {languages.find(x => x.id === row.language_id)?.name} — speaking: {row.oral}; writing: {row.written}; {row.status}<button disabled={busy || Number(row.user_id) === Number(user.id)} className="m-2 rounded border p-2" onClick={() => {
-            const note = window.prompt('Describe the language assessment (at least 10 characters):');
-            if (note) action(() => api.post('/support-languages/review', {
-              user_id: row.user_id,
-              language_id: row.language_id,
-              status: 'approved',
-              note
-            }));
-          }}>Approve</button><button disabled={busy || Number(row.user_id) === Number(user.id)} className="m-2 rounded border p-2" onClick={() => {
-            const note = window.prompt('Describe the assessment result:');
-            if (note) action(() => api.post('/support-languages/review', {
-              user_id: row.user_id,
-              language_id: row.language_id,
-              status: 'rejected',
-              note
-            }));
-          }}>Reject</button></div>)}</div><h3 className="mt-4 font-semibold">Requests that waited too long</h3><p>These are review records, not findings of misconduct. Check network, workload and availability first.</p>{misses.map(row => <p key={row.id} className="border-b p-2">Ticket #{row.ticket_id} — {row.full_name} — {row.reason.replace(/_/g, ' ')} — {new Date(row.created_at).toLocaleString()} — {row.review_status || 'pending'} {row.review_note || ''}{['excused', 'needs_followup'].map(status => <button key={status} disabled={busy || Number(row.agent_id) === Number(user.id)} className="m-2 rounded border p-2" onClick={() => {
-          const note = window.prompt('Record the reason after checking with the agent:');
-          if (note) action(() => api.post('/support-languages/monitor/' + row.id + '/review', {
-            status,
-            note
-          }));
-        }}>{status === 'excused' ? 'Record valid reason' : 'Needs follow-up'}</button>)}</p>)}</>}
- </details>;
+import InputDialog from '../common/InputDialog';
+import {FeatureSection,FeatureBadge,FeatureEmpty} from '../common/FeaturePage';
+import {languages} from '../../data/languagePolicy';
+const friendly=value=>String(value||'Not recorded').replace(/_/g,' ');
+export default function SupportLanguageDesk({user}){
+ const [skills,setSkills]=useState([]),[rows,setRows]=useState([]),[misses,setMisses]=useState([]),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[availableUntil,setAvailableUntil]=useState(null),[review,setReview]=useState(null),[reviewError,setReviewError]=useState('');
+ const senior=['super_support_admin','super_admin'].includes(user?.user_type),allowed=['lga_support_admin','state_support_admin','super_support_admin','super_admin'].includes(user?.user_type);
+ const load=async()=>{if(user?.user_type!=='super_admin'){const r=await api.get('/support-languages/profile');setSkills(r.data.data.skills);setAvailableUntil(r.data.data.availability?.available_until||null);}if(senior){const[a,b]=await Promise.all([api.get('/support-languages/review'),api.get('/support-languages/monitor')]);setRows(a.data.data);setMisses(b.data.data);}};
+ useEffect(()=>{if(allowed)load().catch(()=>setMessage('Could not load language desk.'));},[allowed,user?.id,user?.user_type]);
+ const action=async fn=>{setBusy(true);try{const r=await fn();setMessage(r.data.message||'Saved.');await load();return true;}catch(e){setMessage(e.response?.data?.message||'Could not save.');return false;}finally{setBusy(false);}};
+ const openReview=(kind,row,status)=>{setReviewError('');setReview({kind,row,status});};
+ const saveReview=async({note})=>{const body=review.kind==='language'?{user_id:review.row.user_id,language_id:review.row.language_id,status:review.status,note:note.trim()}:{status:review.status,note:note.trim()};const ok=await action(()=>api.post(review.kind==='language'?'/support-languages/review':'/support-languages/monitor/'+review.row.id+'/review',body));if(ok)setReview(null);else setReviewError('The review was not saved. Please check the message and try again.');};
+ if(!allowed)return null;
+ return <div className="space-y-6">
+   {message&&<p role="status" className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm leading-6 text-blue-900">{message}</p>}
+   {user?.user_type!=='super_admin'&&<><FeatureSection title="My language skills" description="Choose the languages you can use honestly. Speaking and writing are assessed separately."><LanguageSkillsField english value={skills} onChange={setSkills}/><div className="mt-5 flex flex-wrap gap-3"><button disabled={busy} className="btn btn-primary" onClick={()=>action(()=>api.put('/support-languages/profile',{skills}))}>Send skills for assessment</button></div></FeatureSection><FeatureSection title="Availability" description="Choose when you can take customer requests. Availability expires after one hour." actions={<FeatureBadge tone={Date.parse(availableUntil)>Date.now()?'success':'neutral'}>{Date.parse(availableUntil)>Date.now()?'Available':'Unavailable'}</FeatureBadge>}><div className="flex flex-wrap gap-3"><button disabled={busy} className="btn btn-primary" onClick={()=>action(()=>api.put('/support-languages/availability',{available:true,minutes:60}))}>Available for 1 hour</button><button disabled={busy} className="btn btn-secondary" onClick={()=>action(()=>api.put('/support-languages/availability',{available:false}))}>Unavailable / on break</button></div></FeatureSection></>}
+   {senior&&<><FeatureSection title="Language assessments" description="Check the agent’s speaking and writing before approval. You cannot approve yourself.">{rows.length?<div className="max-h-[36rem] space-y-3 overflow-y-auto pr-1">{rows.map(row=><article key={row.user_id+row.language_id} className="rounded-xl border border-slate-200 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="break-words font-semibold text-slate-900">{row.full_name}</h3><p className="mt-1 text-sm text-slate-600">{languages.find(x=>x.id===row.language_id)?.name||friendly(row.language_id)}</p></div><FeatureBadge tone={row.status==='approved'?'success':row.status==='rejected'?'danger':'warning'}>{friendly(row.status)}</FeatureBadge></div><dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-slate-500">Speaking / understanding</dt><dd className="mt-1 font-medium capitalize text-slate-800">{friendly(row.oral)}</dd></div><div><dt className="text-slate-500">Reading / writing</dt><dd className="mt-1 font-medium capitalize text-slate-800">{friendly(row.written)}</dd></div></dl><div className="mt-4 flex flex-wrap gap-2">{['approved','rejected'].map(status=><button key={status} disabled={busy||Number(row.user_id)===Number(user.id)} className={'btn '+(status==='approved'?'btn-primary':'btn-secondary')} onClick={()=>openReview('language',row,status)}>{status==='approved'?'Approve':'Reject'}</button>)}</div></article>)}</div>:<FeatureEmpty title="No language assessments to show" description="Submitted staff language skills will appear here."/>}</FeatureSection>
+   <FeatureSection title="Requests that waited too long" description="These are review records, not findings of misconduct. Check network, workload and availability first.">{misses.length?<div className="max-h-[36rem] space-y-3 overflow-y-auto pr-1">{misses.map(row=><article key={row.id} className="rounded-xl border border-slate-200 p-4"><div className="flex flex-wrap justify-between gap-3"><div><h3 className="font-semibold text-slate-900">Ticket #{row.ticket_id}</h3><p className="mt-1 text-sm text-slate-600">{row.full_name}</p></div><FeatureBadge tone={(row.review_status||'pending')==='pending'?'warning':'neutral'}>{friendly(row.review_status||'pending')}</FeatureBadge></div><p className="mt-3 text-sm text-slate-600">{friendly(row.reason)} · {new Date(row.created_at).toLocaleString()}</p>{row.review_note&&<p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-700">{row.review_note}</p>}<div className="mt-4 flex flex-wrap gap-2">{['excused','needs_followup'].map(status=><button key={status} disabled={busy||Number(row.agent_id)===Number(user.id)} className="btn btn-secondary" onClick={()=>openReview('response',row,status)}>{status==='excused'?'Record valid reason':'Needs follow-up'}</button>)}</div></article>)}</div>:<FeatureEmpty title="No delayed requests to review" description="Response monitoring records will appear here when a review is needed."/>}</FeatureSection></>}
+   <InputDialog isOpen={Boolean(review)} title={review?.kind==='language'?'Record language assessment':'Review delayed response'} message={reviewError||'Explain the evidence you checked. This note is kept with the review.'} confirmText="Save review" isLoading={busy} onCancel={()=>!busy&&setReview(null)} onConfirm={saveReview} inputs={[{name:'note',label:'Review note',type:'textarea',required:true,maxLength:2000,validate:value=>String(value||'').trim().length>=10||'Write a review note of at least 10 characters.'}]}/>
+ </div>;
 }

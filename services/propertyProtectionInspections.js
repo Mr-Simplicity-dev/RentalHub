@@ -37,7 +37,7 @@ function createInspections({ db, protection, audit, notify }) {
       const target = Number(body.agent_id);
       const agent = (
         await db.query(
-          "SELECT u.id,u.identity_verified,u.assigned_state_id,u.assigned_lga_name FROM users u JOIN platform_agents pa ON pa.agent_user_id=u.id AND pa.is_active=TRUE WHERE u.id=$1 AND u.user_type='agent' AND u.is_active=TRUE AND u.deleted_at IS NULL AND u.account_suspended_at IS NULL",
+          "SELECT u.id,u.identity_verified,(SELECT st.id FROM states st WHERE LOWER(TRIM(st.state_name))=LOWER(TRIM(u.assigned_state)) LIMIT 1) AS assigned_state_id,COALESCE(NULLIF(TRIM(u.assigned_lga),''),NULLIF(TRIM(u.assigned_city),'')) AS assigned_lga_name FROM users u JOIN platform_agents pa ON pa.agent_user_id=u.id AND pa.is_active=TRUE WHERE u.id=$1 AND u.user_type='agent' AND u.is_active=TRUE AND u.deleted_at IS NULL AND u.account_suspended_at IS NULL",
           [target],
         )
       ).rows[0];

@@ -1017,7 +1017,7 @@ function createService({
     });
     const rows = (
       await db.query(
-        "SELECT u.id,u.full_name,u.user_type,u.identity_verified,u.assigned_state,u.assigned_zone,u.assigned_state_id,u.assigned_lga_name,EXISTS(SELECT 1 FROM platform_agents pa WHERE pa.agent_user_id=u.id AND pa.is_active=TRUE) AS platform_agent,EXISTS(SELECT 1 FROM platform_lawyers pl WHERE pl.lawyer_user_id=u.id AND pl.is_active=TRUE) AS platform_professional FROM users u WHERE u.is_active=TRUE AND u.deleted_at IS NULL AND u.account_suspended_at IS NULL AND u.user_type IN ('agent','lawyer','state_lawyer','zonal_lawyer','super_lawyer','super_admin','state_admin','admin','lga_admin','zonal_admin','super_support_admin','state_support_admin','lga_support_admin')",
+        "SELECT u.id,u.full_name,u.user_type,u.identity_verified,u.assigned_state,u.assigned_zone,(SELECT st.id FROM states st WHERE LOWER(TRIM(st.state_name))=LOWER(TRIM(u.assigned_state)) LIMIT 1) AS assigned_state_id,COALESCE(NULLIF(TRIM(u.assigned_lga),''),NULLIF(TRIM(u.assigned_city),'')) AS assigned_lga_name,EXISTS(SELECT 1 FROM platform_agents pa WHERE pa.agent_user_id=u.id AND pa.is_active=TRUE) AS platform_agent,EXISTS(SELECT 1 FROM platform_lawyers pl WHERE pl.lawyer_user_id=u.id AND pl.is_active=TRUE) AS platform_professional FROM users u WHERE u.is_active=TRUE AND u.deleted_at IS NULL AND u.account_suspended_at IS NULL AND u.user_type IN ('agent','lawyer','state_lawyer','zonal_lawyer','super_lawyer','super_admin','state_admin','admin','lga_admin','zonal_admin','super_support_admin','state_support_admin','lga_support_admin')",
       )
     ).rows;
     return rows

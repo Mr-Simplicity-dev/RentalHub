@@ -1441,7 +1441,7 @@ const Dashboard = () => {
             <button
               type="button"
               onClick={() => setSurveyModalOpen(true)}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 max-sm:min-h-11 max-sm:min-w-11"
             >
               {t('dashboard.survey_continue', 'Continue Survey')}
             </button>
@@ -1461,7 +1461,7 @@ const Dashboard = () => {
               </p>
               <button
                 onClick={() => navigate('/verification-status')}
-                className="mt-3 text-sm font-semibold text-amber-900 hover:text-amber-950"
+                className="mt-3 text-sm font-semibold text-amber-900 hover:text-amber-950 max-sm:min-h-11 max-sm:min-w-11"
               >
                 Complete Revalidation {'>'}
               </button>
@@ -1481,7 +1481,7 @@ const Dashboard = () => {
               </p>
               <button
                 onClick={() => navigate('/verification-status')}
-                className="mt-3 text-sm font-semibold text-yellow-800 hover:text-yellow-900"
+                className="mt-3 text-sm font-semibold text-yellow-800 hover:text-yellow-900 max-sm:min-h-11 max-sm:min-w-11"
               >
                 {t('dashboard.verify_action')} →
               </button>
@@ -1501,7 +1501,7 @@ const Dashboard = () => {
               </p>
               <button
                 onClick={() => navigate('/verification-status')}
-                className="mt-3 text-sm font-semibold text-blue-800 hover:text-blue-900"
+                className="mt-3 text-sm font-semibold text-blue-800 hover:text-blue-900 max-sm:min-h-11 max-sm:min-w-11"
               >
                 {t('dashboardUx.view_verification')} →
               </button>
@@ -1521,7 +1521,7 @@ const Dashboard = () => {
               </p>
               <button
                 onClick={() => navigate('/verification-status')}
-                className="mt-3 text-sm font-semibold text-red-800 hover:text-red-900"
+                className="mt-3 text-sm font-semibold text-red-800 hover:text-red-900 max-sm:min-h-11 max-sm:min-w-11"
               >
                 Fix Verification {'>'}
               </button>
@@ -2192,7 +2192,7 @@ const Dashboard = () => {
       {showInspectionModal && user?.user_type === 'tenant' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b px-5 py-5 sm:px-6">
+            <div className="flex items-start justify-between gap-4 border-b px-5 py-5 sm:px-6 border-slate-200">
               <div className="flex items-start gap-3">
                 <div className="rounded-full bg-emerald-100 p-3 text-emerald-700">
                   <FaUserCheck className="text-xl" />
@@ -2207,7 +2207,7 @@ const Dashboard = () => {
               <button
                 type="button"
                 onClick={() => setShowInspectionModal(false)}
-                className="shrink-0 text-gray-400 hover:text-gray-600"
+                className="shrink-0 text-gray-400 hover:text-gray-600 max-sm:min-h-11 max-sm:min-w-11"
                 aria-label="Close inspection fee modal"
               >
                 <FaTimes className="text-xl" />
@@ -2384,7 +2384,7 @@ const Dashboard = () => {
       {showRefundModal && user?.user_type === 'tenant' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-200">
               <div className="flex items-center gap-3">
                 <FaMoneyBillWave className="text-orange-500 text-2xl" />
                 <h2 className="text-lg font-bold text-gray-800">
@@ -2395,12 +2395,12 @@ const Dashboard = () => {
                 {refundView !== 'success' && (
                   <button
                     onClick={() => setRefundView(v => v === 'history' ? 'form' : 'history')}
-                    className="text-sm text-indigo-600 hover:underline"
+                    className="text-sm text-indigo-600 hover:underline max-sm:min-h-11 max-sm:min-w-11"
                   >
                     {refundView === 'history' ? 'New Request' : 'View History'}
                   </button>
                 )}
-                <button onClick={() => setShowRefundModal(false)} className="text-gray-400 hover:text-gray-600">
+                <button onClick={() => setShowRefundModal(false)} className="text-gray-400 hover:text-gray-600 max-sm:min-h-11 max-sm:min-w-11">
                   <FaTimes className="text-xl" />
                 </button>
               </div>
@@ -2426,7 +2426,7 @@ const Dashboard = () => {
                     <p className="text-center text-gray-500 py-8">You have no refund requests yet.</p>
                   ) : (
                     myRefundRequests.map((rr) => (
-                      <div key={rr.id} className="border rounded-xl p-4 space-y-2">
+                      <div key={rr.id} className="border rounded-xl p-4 space-y-2 border-slate-200">
                         <div className="flex items-start justify-between gap-2">
                           <div>
                             <p className="font-semibold text-gray-800 text-sm">{rr.property_title}</p>
@@ -2640,7 +2640,7 @@ const Dashboard = () => {
       {showGraceModal && user?.user_type === 'tenant' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-200">
               <div className="flex items-center gap-3">
                 <FaClock className="text-indigo-500 text-2xl" />
                 <h2 className="text-lg font-bold text-gray-800">
@@ -2650,11 +2650,11 @@ const Dashboard = () => {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setGraceView(v => v === 'history' ? 'form' : 'history')}
-                  className="text-sm text-indigo-600 hover:underline"
+                  className="text-sm text-indigo-600 hover:underline max-sm:min-h-11 max-sm:min-w-11"
                 >
                   {graceView === 'history' ? 'New Request' : 'View History'}
                 </button>
-                <button onClick={() => setShowGraceModal(false)} className="text-gray-400 hover:text-gray-600">
+                <button onClick={() => setShowGraceModal(false)} className="text-gray-400 hover:text-gray-600 max-sm:min-h-11 max-sm:min-w-11">
                   <FaTimes className="text-xl" />
                 </button>
               </div>
@@ -2669,7 +2669,7 @@ const Dashboard = () => {
                     myGraceRequests.map((request) => {
                       const countdown = getCountdownInfo(request.grace_ends_at, 'Grace ends in', 'Grace expired by');
                       return (
-                        <div key={request.id} className="border rounded-xl p-4 space-y-2">
+                        <div key={request.id} className="border rounded-xl p-4 space-y-2 border-slate-200">
                           <div className="flex items-start justify-between gap-2">
                             <div>
                               <p className="font-semibold text-gray-800 text-sm">{request.property_title}</p>
@@ -2802,7 +2802,7 @@ const Dashboard = () => {
                 <h3 className="text-xl font-bold text-gray-900">Transportation Services</h3>
                 <button
                   onClick={() => setShowTransportModal(false)}
-                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                  className="text-gray-400 hover:text-gray-600 text-2xl max-sm:min-h-11 max-sm:min-w-11"
                 >
                   &times;
                 </button>
@@ -2987,7 +2987,7 @@ const Dashboard = () => {
               <button
                 type="button"
                 onClick={() => setShowRentSavingsAgreementModal(false)}
-                className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 max-sm:min-h-11 max-sm:min-w-11"
                 aria-label="Close rent savings agreement"
               >
                 ×
@@ -3085,7 +3085,7 @@ const Dashboard = () => {
       {showLandlordRefundModal && user?.user_type === 'landlord' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-200">
               <div className="flex items-center gap-3">
                 <FaUndo className="text-orange-500 text-2xl" />
                 <h2 className="text-lg font-bold text-gray-800">Refund Requests</h2>
@@ -3101,7 +3101,7 @@ const Dashboard = () => {
                   <option value="rejected">Rejected</option>
                   <option value="refunded">Refunded</option>
                 </select>
-                <button onClick={() => { setShowLandlordRefundModal(false); setSelectedRefund(null); }} className="text-gray-400 hover:text-gray-600">
+                <button onClick={() => { setShowLandlordRefundModal(false); setSelectedRefund(null); }} className="text-gray-400 hover:text-gray-600 max-sm:min-h-11 max-sm:min-w-11">
                   <FaTimes className="text-xl" />
                 </button>
               </div>
@@ -3112,7 +3112,7 @@ const Dashboard = () => {
                 <p className="text-center text-gray-500 py-8">No {landlordRefundFilter} refund requests.</p>
               ) : (
                 landlordRefunds.map(rr => (
-                  <div key={rr.id} className="border rounded-xl p-4 space-y-3">
+                  <div key={rr.id} className="border rounded-xl p-4 space-y-3 border-slate-200">
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="font-semibold text-gray-800">{rr.property_title}</p>
@@ -3157,7 +3157,7 @@ const Dashboard = () => {
                     {rr.status === 'pending' && (
                       <>
                         {selectedRefund === rr.id ? (
-                          <div className="border-t pt-3 space-y-3">
+                          <div className="border-t pt-3 space-y-3 border-slate-200">
                             <p className="text-sm font-semibold text-gray-700">How much would you like to refund?</p>
                             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                               {[
@@ -3248,21 +3248,21 @@ const Dashboard = () => {
                             <button
                               type="button"
                               onClick={() => { setSelectedRefund(rr.id); setApproveForm({ refund_type: 'full', refund_months: '', approved_amount: '', landlord_note: '' }); }}
-                              className="flex-1 flex items-center justify-center gap-2 bg-green-50 border border-green-300 text-green-700 rounded-lg py-2 text-sm font-medium hover:bg-green-100 transition"
+                              className="flex-1 flex items-center justify-center gap-2 bg-green-50 border border-green-300 text-green-700 rounded-lg py-2 text-sm font-medium hover:bg-green-100 transition max-sm:min-h-11 max-sm:min-w-11"
                             >
                               <FaThumbsUp /> Approve
                             </button>
                             <button
                               type="button"
                               onClick={() => setSelectedRefund(`reject_${rr.id}`)}
-                              className="flex-1 flex items-center justify-center gap-2 bg-red-50 border border-red-300 text-red-700 rounded-lg py-2 text-sm font-medium hover:bg-red-100 transition"
+                              className="flex-1 flex items-center justify-center gap-2 bg-red-50 border border-red-300 text-red-700 rounded-lg py-2 text-sm font-medium hover:bg-red-100 transition max-sm:min-h-11 max-sm:min-w-11"
                             >
                               <FaThumbsDown /> Reject
                             </button>
                           </div>
                         )}
                         {selectedRefund === `reject_${rr.id}` && (
-                          <div className="border-t pt-3 space-y-2">
+                          <div className="border-t pt-3 space-y-2 border-slate-200">
                             <p className="text-sm font-semibold text-red-700">Reason for rejection *</p>
                             <textarea
                               rows={2}
@@ -3277,7 +3277,7 @@ const Dashboard = () => {
                                 type="button"
                                 onClick={() => handleRejectRefund(rr.id)}
                                 disabled={refundActionLoading}
-                                className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white rounded-lg py-2 text-sm font-medium transition disabled:opacity-50"
+                                className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white rounded-lg py-2 text-sm font-medium transition disabled:opacity-50 max-sm:min-h-11 max-sm:min-w-11"
                               >
                                 <FaThumbsDown /> {refundActionLoading ? 'Processing...' : 'Confirm Reject'}
                               </button>
@@ -3298,7 +3298,7 @@ const Dashboard = () => {
       {showLandlordGraceModal && user?.user_type === 'landlord' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-200">
               <div className="flex items-center gap-3">
                 <FaClock className="text-indigo-500 text-2xl" />
                 <h2 className="text-lg font-bold text-gray-800">Tenant Grace Requests</h2>
@@ -3313,7 +3313,7 @@ const Dashboard = () => {
                   <option value="landlord_approved">Approved</option>
                   <option value="landlord_rejected">Rejected</option>
                 </select>
-                <button onClick={() => { setShowLandlordGraceModal(false); setSelectedGraceRequest(null); }} className="text-gray-400 hover:text-gray-600">
+                <button onClick={() => { setShowLandlordGraceModal(false); setSelectedGraceRequest(null); }} className="text-gray-400 hover:text-gray-600 max-sm:min-h-11 max-sm:min-w-11">
                   <FaTimes className="text-xl" />
                 </button>
               </div>
@@ -3326,7 +3326,7 @@ const Dashboard = () => {
                 landlordGraceRequests.map(request => {
                   const countdown = getCountdownInfo(request.grace_ends_at, 'Grace ends in', 'Grace expired by');
                   return (
-                    <div key={request.id} className="border rounded-xl p-4 space-y-3">
+                    <div key={request.id} className="border rounded-xl p-4 space-y-3 border-slate-200">
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <p className="font-semibold text-gray-800">{request.property_title}</p>
@@ -3368,7 +3368,7 @@ const Dashboard = () => {
                       {request.status === 'enabled' && (
                         <>
                           {selectedGraceRequest === request.id ? (
-                            <div className="border-t pt-3 space-y-3">
+                            <div className="border-t pt-3 space-y-3 border-slate-200">
                               <p className="text-sm font-semibold text-gray-700">Approve tenant-requested grace period</p>
                               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <div>
@@ -3427,14 +3427,14 @@ const Dashboard = () => {
                                     landlord_note: '',
                                   });
                                 }}
-                                className="flex-1 flex items-center justify-center gap-2 bg-green-50 border border-green-300 text-green-700 rounded-lg py-2 text-sm font-medium hover:bg-green-100 transition"
+                                className="flex-1 flex items-center justify-center gap-2 bg-green-50 border border-green-300 text-green-700 rounded-lg py-2 text-sm font-medium hover:bg-green-100 transition max-sm:min-h-11 max-sm:min-w-11"
                               >
                                 <FaThumbsUp /> Approve
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setSelectedGraceRequest(`reject_${request.id}`)}
-                                className="flex-1 flex items-center justify-center gap-2 bg-red-50 border border-red-300 text-red-700 rounded-lg py-2 text-sm font-medium hover:bg-red-100 transition"
+                                className="flex-1 flex items-center justify-center gap-2 bg-red-50 border border-red-300 text-red-700 rounded-lg py-2 text-sm font-medium hover:bg-red-100 transition max-sm:min-h-11 max-sm:min-w-11"
                               >
                                 <FaThumbsDown /> Reject
                               </button>
@@ -3442,7 +3442,7 @@ const Dashboard = () => {
                           )}
 
                           {selectedGraceRequest === `reject_${request.id}` && (
-                            <div className="border-t pt-3 space-y-2">
+                            <div className="border-t pt-3 space-y-2 border-slate-200">
                               <p className="text-sm font-semibold text-red-700">Reason for rejection *</p>
                               <textarea
                                 rows={2}
@@ -3457,7 +3457,7 @@ const Dashboard = () => {
                                   type="button"
                                   onClick={() => handleGraceResponse(request.id, 'reject')}
                                   disabled={graceActionLoading}
-                                  className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white rounded-lg py-2 text-sm font-medium transition disabled:opacity-50"
+                                  className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white rounded-lg py-2 text-sm font-medium transition disabled:opacity-50 max-sm:min-h-11 max-sm:min-w-11"
                                 >
                                   <FaThumbsDown /> {graceActionLoading ? 'Processing...' : 'Confirm Reject'}
                                 </button>
@@ -3503,7 +3503,7 @@ const LandlordPropertyFeeModal = ({
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4">
       <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl">
-        <div className="border-b px-6 py-5">
+        <div className="border-b px-6 py-5 border-slate-200">
           <div className="flex items-start gap-3">
             <div className="rounded-lg bg-amber-100 p-3 text-amber-700">
               <FaExclamationTriangle />

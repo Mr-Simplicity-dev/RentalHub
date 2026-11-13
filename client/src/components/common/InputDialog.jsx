@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { FaTimes, FaInfoCircle } from 'react-icons/fa';
+import Modal from './Modal';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const buildInitialInputValues = (inputs = [], initialValues = {}) => {
@@ -24,6 +24,7 @@ const InputDialog = ({
   initialValues = {}
 }) => {
   const { t } = useTranslation();
+  const fieldId = useId();
   const [inputValues, setInputValues] = useState(() =>
     buildInitialInputValues(inputs, initialValues)
   );
@@ -43,21 +44,18 @@ const InputDialog = ({
 
   const typeConfig = {
     info: {
-      icon: <FaInfoCircle className="h-6 w-6 text-blue-600" />,
-      bgColor: 'bg-blue-50',
-      borderColor: 'border-blue-200',
-      textColor: 'text-blue-800',
-      buttonColor: 'bg-blue-600 hover:bg-blue-700',
+      bgColor: 'bg-primary-50',
+      borderColor: 'border-primary-200',
+      textColor: 'text-primary-800',
+      buttonColor: 'bg-primary-600 hover:bg-primary-700',
     },
     warning: {
-      icon: <FaInfoCircle className="h-6 w-6 text-amber-600" />,
       bgColor: 'bg-amber-50',
       borderColor: 'border-amber-200',
       textColor: 'text-amber-800',
       buttonColor: 'bg-amber-600 hover:bg-amber-700',
     },
     danger: {
-      icon: <FaInfoCircle className="h-6 w-6 text-red-600" />,
       bgColor: 'bg-red-50',
       borderColor: 'border-red-200',
       textColor: 'text-red-800',
@@ -65,7 +63,7 @@ const InputDialog = ({
     },
   };
 
-  const config = typeConfig[type];
+  const config = typeConfig[type] || typeConfig.info;
 
   const validateInputs = () => {
     const newErrors = {};
@@ -74,7 +72,7 @@ const InputDialog = ({
     inputs.forEach(input => {
       const value = inputValues[input.name];
       
-      if (input.required && !value) {
+      if (input.required && !String(value || '').trim()) {
         newErrors[input.name] = t('input_dialog.required', '{{label}} is required', { label: input.label });
         isValid = false;
       }
@@ -106,55 +104,21 @@ const InputDialog = ({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-        {/* Background overlay */}
-        <div 
-          className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
-          onClick={onCancel}
-        />
-
-        {/* Modal */}
-        <div className="inline-block transform overflow-hidden rounded-lg bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:align-middle">
-          <div className={`px-6 py-4 ${config.bgColor} ${config.borderColor} border-b`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                {config.icon}
-                <h3 className="ml-3 text-lg font-medium leading-6 text-gray-900">
-                  {title}
-                </h3>
-              </div>
-              <button
-                onClick={onCancel}
-                className="rounded-md text-gray-400 hover:text-gray-500 focus:outline-none"
-                disabled={isLoading}
-              >
-                <FaTimes className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-
-          <div className="bg-white px-6 py-4">
-            {message && (
-              <div className="mb-4">
-                <p className={`text-sm ${config.textColor}`}>
-                  {message}
-                </p>
-              </div>
-            )}
-
-            <div className="space-y-4">
+  return <Modal isOpen={isOpen} onClose={onCancel} title={title} size="small" busy={isLoading} footer={<div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><button type="button" onClick={onCancel} disabled={isLoading} className="btn btn-secondary">{cancelText || t('common.cancel','Cancel')}</button><button type="button" onClick={handleConfirm} disabled={isLoading} className={`btn text-white ${config.buttonColor}`}>{isLoading?t('common.processing','Processing...'):confirmText||t('input_dialog.confirm','Confirm')}</button></div>}>
+    {message && <div className={`mb-5 rounded-xl border p-3 text-sm leading-6 ${config.bgColor} ${config.borderColor} ${config.textColor}`}>{message}</div>}
+    <div className="space-y-4">
               {inputs.map((input) => (
                 <div key={input.name}>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor={`${fieldId}-${input.name}`} className="block text-sm font-medium text-gray-700 mb-1">
                     {input.label} {input.required && <span className="text-red-500">*</span>}
                   </label>
                   {input.type === 'textarea' ? (
                     <textarea
+                      id={`${fieldId}-${input.name}`}
+                      maxLength={input.maxLength || 4000}
                       value={inputValues[input.name] || ''}
                       onChange={(e) => handleInputChange(input.name, e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 ${
                         errors[input.name] ? 'border-red-300' : 'border-gray-300'
                       }`}
                       placeholder={input.placeholder}
@@ -163,10 +127,11 @@ const InputDialog = ({
                     />
                   ) : (
                     <input
+                      id={`${fieldId}-${input.name}`}
                       type={input.type || 'text'}
                       value={inputValues[input.name] || ''}
                       onChange={(e) => handleInputChange(input.name, e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 ${
                         errors[input.name] ? 'border-red-300' : 'border-gray-300'
                       }`}
                       placeholder={input.placeholder}
@@ -181,41 +146,9 @@ const InputDialog = ({
                   )}
                 </div>
               ))}
-            </div>
-          </div>
-
-          <div className="bg-gray-50 px-6 py-4 sm:flex sm:flex-row-reverse">
-            <button
-              type="button"
-              onClick={handleConfirm}
-              disabled={isLoading}
-              className={`inline-flex w-full justify-center rounded-md border border-transparent px-4 py-2 text-base font-medium text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm ${config.buttonColor} ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
-            >
-              {isLoading ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  {t('input_dialog.processing', 'Processing...')}
-                </>
-              ) : (
-                confirmText ?? t('input_dialog.confirm', 'Confirm')
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={onCancel}
-              disabled={isLoading}
-              className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {cancelText ?? t('input_dialog.cancel', 'Cancel')}
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
-  );
+  </Modal>;
+
 };
 
 export default InputDialog;
