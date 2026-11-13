@@ -1,0 +1,16 @@
+import React,{act} from 'react';
+import {createRoot} from 'react-dom/client';
+import {MemoryRouter} from 'react-router-dom';
+import {within,fireEvent} from '@testing-library/dom';
+import {vi,test,expect,beforeEach,afterEach} from 'vitest';
+import CustomerGoogleSignIn from './CustomerGoogleSignIn';
+import api from '../services/api';
+vi.mock('react-i18next',()=>({useTranslation:()=>({t:(_key,fallback)=>fallback})}));
+vi.mock('../services/api',()=>({default:{get:vi.fn(),post:vi.fn()}}));
+let root,container;
+beforeEach(()=>{globalThis.IS_REACT_ACT_ENVIRONMENT=true;vi.clearAllMocks();const reply={data:{data:{id:'sample-request',clientId:'public-client',nonce:'sample-nonce',verifier:'sample-verifier'}}};api.get.mockResolvedValue(reply);api.post.mockResolvedValue(reply);window.google={accounts:{id:{initialize:vi.fn(),renderButton:vi.fn()}}};container=document.createElement('div');document.body.appendChild(container);root=createRoot(container);});
+afterEach(async()=>{await act(async()=>root.unmount());container.remove();delete window.google;});
+const mount=props=>act(async()=>root.render(<MemoryRouter initialEntries={['/google-signin?request=sample-request']}><CustomerGoogleSignIn {...props}/></MemoryRouter>));
+test('opening normal web sign-in does not spend a Google security request',async()=>{await mount({onSignedIn:vi.fn()});expect(api.post).not.toHaveBeenCalled();expect(window.google.accounts.id.initialize).not.toHaveBeenCalled();await act(async()=>fireEvent.click(within(container).getByRole('button',{name:'Continue with Google'})));expect(api.post).toHaveBeenCalledTimes(1);expect(api.post.mock.calls[0][0]).toBe('/auth/google/start');expect(window.google.accounts.id.initialize).toHaveBeenCalledWith(expect.objectContaining({nonce:'sample-nonce',auto_select:false}));});
+test('the mobile browser handover still loads the request chosen in the app',async()=>{await mount({mobile:true});expect(api.get).toHaveBeenCalledWith('/auth/google/mobile/sample-request',{skipAuth:true,skipAuthRefresh:true});expect(window.google.accounts.id.renderButton).toHaveBeenCalled();});
+test('a denied Google request stays stopped until the user explicitly retries',async()=>{api.post.mockRejectedValue({response:{data:{message:'Please wait before retrying.'}}});await mount({});await act(async()=>fireEvent.click(within(container).getByRole('button',{name:'Continue with Google'})));expect(api.post).toHaveBeenCalledTimes(1);expect(container.textContent).toContain('Please wait before retrying.');expect(within(container).getByRole('button',{name:'Retry Google sign-in'})).toBeTruthy();});

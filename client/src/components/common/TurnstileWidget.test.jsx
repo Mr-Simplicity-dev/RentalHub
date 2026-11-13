@@ -1,0 +1,16 @@
+import React,{act,createRef} from 'react';
+import {createRoot} from 'react-dom/client';
+import {within,fireEvent} from '@testing-library/dom';
+import {vi,test,expect,beforeEach,afterEach} from 'vitest';
+import TurnstileWidget from './TurnstileWidget';
+import {loadTurnstileScript} from '../../services/turnstileScript';
+vi.mock('react-i18next',()=>({useTranslation:()=>({t:(_key,fallback)=>fallback})}));
+vi.mock('../../services/turnstileScript',()=>({loadTurnstileScript:vi.fn()}));
+let root,container,sdk,options;
+beforeEach(()=>{globalThis.IS_REACT_ACT_ENVIRONMENT=true;vi.stubEnv('REACT_APP_TURNSTILE_SITE_KEY','public-test-site');vi.clearAllMocks();options=null;sdk={render:vi.fn((_el,config)=>{options=config;return 'test-widget'}),remove:vi.fn()};loadTurnstileScript.mockResolvedValue(sdk);container=document.createElement('div');document.body.appendChild(container);root=createRoot(container);});
+afterEach(async()=>{if(root)await act(async()=>root.unmount());container.remove();vi.useRealTimers();vi.unstubAllEnvs();});
+const mount=props=>act(async()=>root.render(<TurnstileWidget action="rentalhub_login" {...props}/>));
+test('valid tokens keep the declared action, expiry clears them, and ready widgets are cleaned up',async()=>{const onToken=vi.fn(),onExpire=vi.fn();await mount({onToken,onExpire});expect(options.action).toBe('rentalhub_login');await act(async()=>options.callback('test-token'));expect(onToken).toHaveBeenLastCalledWith('test-token');await act(async()=>options['expired-callback']());expect(onToken).toHaveBeenLastCalledWith(null);expect(onExpire).toHaveBeenCalled();await act(async()=>root.unmount());root=null;expect(sdk.remove).toHaveBeenCalledWith('test-widget');});
+test('a script failure explains the problem and a manual retry loads a fresh check',async()=>{loadTurnstileScript.mockRejectedValueOnce(Error('network'));const onToken=vi.fn();await mount({onToken});expect(within(container).getByRole('button',{name:'Retry security check'})).toBeTruthy();expect(onToken).toHaveBeenCalledWith(null);await act(async()=>fireEvent.click(within(container).getByRole('button',{name:'Retry security check'})));expect(loadTurnstileScript).toHaveBeenCalledTimes(2);expect(sdk.render).toHaveBeenCalledTimes(1);expect(onToken.mock.calls.every(x=>x[0]===null)).toBe(true);});
+test('provider errors and reset never create a successful token',async()=>{const ref=createRef(),onToken=vi.fn(),onError=vi.fn();await mount({ref,onToken,onError});await act(async()=>options['error-callback']('300030'));expect(onError).toHaveBeenCalledWith('300030');expect(within(container).getByRole('button',{name:'Retry security check'})).toBeTruthy();await act(async()=>ref.current.reset());expect(sdk.remove).toHaveBeenCalledWith('test-widget');expect(sdk.render).toHaveBeenCalledTimes(2);expect(onToken.mock.calls.every(x=>x[0]===null)).toBe(true);});
+test('slow verification offers retry while still requiring a real token',async()=>{vi.useFakeTimers();const onToken=vi.fn();await mount({onToken});await act(async()=>vi.advanceTimersByTime(45000));expect(within(container).getByRole('button',{name:'Retry security check'})).toBeTruthy();expect(onToken).not.toHaveBeenCalled();});
