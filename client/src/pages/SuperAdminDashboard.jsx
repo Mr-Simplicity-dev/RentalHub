@@ -1,3 +1,4 @@
+import AdminDashboardGate from '../components/admin/AdminDashboardGate';
 import PropertyProtectionEntry from '../components/common/PropertyProtectionEntry';
 import AssistedRegistrationCard from '../components/admin/AssistedRegistrationCard';
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
@@ -257,7 +258,7 @@ const getRequestErrorMessage = (error, fallback) => {
   return error?.message || fallback;
 };
 
-export default function SuperAdminDashboard() {
+function SuperAdminDashboardContent() {
 
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -1897,3 +1898,5 @@ export default function SuperAdminDashboard() {
     </div>
   );
 }
+
+export default function SuperAdminDashboard(){return <AdminDashboardGate endpoint="/auth/2fa/check">{()=> <SuperAdminDashboardContent/>}</AdminDashboardGate>;}

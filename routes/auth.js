@@ -152,6 +152,7 @@ router.post(
 
 // Two-factor authentication (TOTP + SMS fallback) for withdrawals
 router.get('/2fa/status', authenticate, authController.getTwoFactorStatus);
+router.get('/2fa/check', ...require('../services/dashboardMfaCheck').handlers());
 router.post('/2fa/totp/setup', authenticate, sensitiveActionLimiter, authController.setupTotp);
 router.post('/2fa/totp/confirm', authenticate, sensitiveActionLimiter, authController.confirmTotp);
 router.post('/2fa/totp/disable', authenticate, sensitiveActionLimiter, authController.disableTotp);

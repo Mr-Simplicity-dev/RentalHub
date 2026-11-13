@@ -16,7 +16,7 @@ export default function MfaCodeModal() {
   const [challenge, setChallenge] = useState(getMfaState());
   const [code, setCode] = useState('');
 
-  useEffect(() => subscribeMfaChallenge(setChallenge), []);
+  useEffect(() => { const unsubscribe = subscribeMfaChallenge(setChallenge); setChallenge(getMfaState()); return unsubscribe; }, []);
 
   useEffect(() => {
     if (!challenge.visible) {

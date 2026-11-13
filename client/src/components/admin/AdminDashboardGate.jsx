@@ -1,0 +1,8 @@
+import React,{useEffect,useState} from 'react';
+import api from '../../services/api';
+export default function AdminDashboardGate({endpoint,children}){
+ const [attempt,setAttempt]=useState(0),[state,setState]=useState({key:endpoint,ready:false,error:'',data:null});
+ useEffect(()=>{let active=true;setState({key:endpoint,ready:false,error:'',data:null});api.get(endpoint).then(response=>{if(!active)return;if(response.data?.success!==true||response.data?.data?.verified!==true)throw Error('Unexpected verification response');setState({key:endpoint,ready:true,error:'',data:response.data.data});}).catch(error=>{if(active)setState({key:endpoint,ready:false,data:null,error:error.message==='MFA_CHALLENGE_CANCELLED'?'Verification was cancelled. Please verify to open this workspace.':error.response?.data?.message||'Could not verify access. Please try again.'});});return()=>{active=false;};},[endpoint,attempt]);
+ if(state.key===endpoint&&state.ready)return children(state.data);
+ return <main className="mx-auto my-10 max-w-xl rounded-2xl border border-slate-200 bg-white p-6 text-center"><h1 className="text-xl font-semibold">Administrator verification</h1>{state.error?<><p role="alert" className="my-4 text-sm text-slate-700">{state.error}</p><button type="button" className="min-h-11 rounded-xl bg-blue-900 px-5 py-3 font-semibold text-white" onClick={()=>setAttempt(n=>n+1)}>Verify access</button></>:<p role="status" className="mt-4 text-sm text-slate-600">Checking administrator access…</p>}</main>;
+}
