@@ -1,0 +1,8 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+const file=path.resolve(__dirname,'../../routes/mobileDiagnostics.js'),source=fs.readFileSync(file,'utf8');
+function check(platform,version,buildNumber){const mod={exports:{}};vm.runInNewContext(source,{module:mod,exports:mod.exports,__dirname:path.dirname(file),process:{env:{MOBILE_IOS_LATEST_VERSION:'1.0.3',MOBILE_IOS_BUILD_NUMBER:'13'}},require:n=>n==='fs'?{readFileSync:()=>JSON.stringify({version:'1.0.65',buildNumber:'76'})}:n.includes('/database')?{}:n.includes('validateRequest')?()=>{}:require(n)});const handler=mod.exports.stack.find(x=>x.route?.path==='/app-version').route.stack[0].handle;let data;handler({query:{platform,version,buildNumber}},{json:r=>{data=r.data;}});return data;}
+test('installed Android 1.0.65 build76 does not repeat the update notice',()=>assert.equal(check('android','1.0.65','76').update_available,false));
+test('older Android build75 can see the new update',()=>assert.equal(check('android','1.0.64','75').update_available,true));
+test('a newer Android build is not told to install an older release',()=>assert.equal(check('android','1.0.66','77').update_available,false));
+test('iPhone build13 compares with the iOS release rather than Android build76',()=>{const r=check('ios','1.0.3','13');assert.equal(r.latest_version,'1.0.3');assert.equal(r.update_available,false);});
+test('iOS has its own older-build and version-only comparisons',()=>{assert.equal(check('ios','1.0.2','12').update_available,true);assert.equal(check('ios','1.0.3',undefined).update_available,false);assert.equal(check('ios','1.0.65','70').update_available,false);});

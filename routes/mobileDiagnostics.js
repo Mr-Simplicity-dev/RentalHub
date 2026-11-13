@@ -247,7 +247,9 @@ router.get('/app-version', (req, res) => {
 
   let deployedBuildNumber = null;
   try {
-    deployedBuildNumber = JSON.parse(fs.readFileSync(BUILD_INFO_PATH, 'utf8'))?.buildNumber || null;
+    deployedBuildNumber = isIos
+      ? process.env.MOBILE_IOS_BUILD_NUMBER || '13'
+      : JSON.parse(fs.readFileSync(BUILD_INFO_PATH, 'utf8'))?.buildNumber || null;
   } catch {
     deployedBuildNumber = null;
   }

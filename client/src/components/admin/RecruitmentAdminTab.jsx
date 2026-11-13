@@ -422,7 +422,7 @@ export default function RecruitmentAdminTab() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 [&_button]:min-h-11">
       <InputDialog isOpen={Boolean(interviewTarget)} title="Schedule applicant interview" message={interviewTarget ? `Choose the interview date and time for ${interviewTarget.full_name || "this applicant"}.` : ""} confirmText="Save interview date" isLoading={interviewSaving} onCancel={()=>!interviewSaving&&setInterviewTarget(null)} onConfirm={async values=>{setInterviewSaving(true);try{if(await updateApplicant(interviewTarget.id,"set-interview",{interview_date:values.interview_date.replace(" ","T")}))setInterviewTarget(null);}finally{setInterviewSaving(false);}}} inputs={[{name:"interview_date",label:"Interview date and time",type:"datetime-local",required:true}]}/>
 
       {/* ─── Header ─────────────────────────────────────── */}
@@ -667,11 +667,11 @@ export default function RecruitmentAdminTab() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-slate-900 truncate">{role.title} <OpportunityBadge type={role.opportunity_type} /></p>
-                        <p className="text-[11px] text-slate-500">{role.type} &middot; {role.cycle_title || '—'}</p>
-                        <p className="text-[11px] text-slate-400">
+                        <p className="text-xs text-slate-500">{role.type} &middot; {role.cycle_title || '—'}</p>
+                        <p className="text-xs text-slate-400">
                           {formatCurrency(role.application_fee)} / {formatCurrency(role.premium_fee)}
                           {role.is_active !== undefined && (
-                            <span className={`ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${role.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>
+                            <span className={`ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-semibold ${role.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>
                               {role.is_active ? 'Active' : 'Inactive'}
                             </span>
                           )}
@@ -752,7 +752,7 @@ export default function RecruitmentAdminTab() {
           <div className="mt-4 max-h-56 space-y-2 overflow-y-auto pr-1">
             {activeLocations.slice(0, 12).map((location) => (
               <div key={location.id} className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 flex items-center gap-2">
-                <FaCheckCircle className="text-[10px] text-emerald-600" />
+                <FaCheckCircle className="text-xs text-emerald-600" />
                 {location.state_name} / {location.lga_name === '__ALL__' ? 'All LGAs' : location.lga_name}
               </div>
             ))}
@@ -887,25 +887,25 @@ export default function RecruitmentAdminTab() {
                   </td>
                   <td className="px-4 py-3">
                     <p className="font-semibold text-slate-900">{applicant.full_name}</p><ul className="mt-2 text-xs text-slate-600">{(applicant.language_skills||[]).map(row=><li key={row.language_id}>{languageNames.find(x=>x.id===row.language_id)?.name}: speaking {row.oral}; writing {row.written} (self-reported)</li>)}</ul>
-                    <p className="text-[11px] text-slate-400 font-mono">{applicant.reference_number}</p>
+                    <p className="text-xs text-slate-400 font-mono">{applicant.reference_number}</p>
                     <p className="text-xs text-slate-500 truncate max-w-[180px]">{applicant.email_address}</p>
                   </td>
                   <td className="px-4 py-3">
                     <p className="font-medium text-slate-800">{applicant.role_title} <OpportunityBadge type={applicant.opportunity_type} /></p>{applicant.opportunity_type==='volunteer'&&<details className="mt-2 max-w-sm text-xs leading-5 text-slate-600"><summary className="cursor-pointer">Volunteer answers</summary><p className="whitespace-pre-wrap break-words">Motivation: {applicant.volunteer_motivation}</p><p className="whitespace-pre-wrap break-words">Suitability: {applicant.suitability_reason}</p><p className="whitespace-pre-wrap break-words">Availability: {applicant.availability}</p></details>}
-                    <p className="text-[11px] text-slate-500">{applicant.opportunity_type==='volunteer'?'Not Applicable':applicant.application_track} &middot; {formatCurrency(applicant.application_fee)}</p>
+                    <p className="text-xs text-slate-500">{applicant.opportunity_type==='volunteer'?'Not Applicable':applicant.application_track} &middot; {formatCurrency(applicant.application_fee)}</p>
                   </td>
                   <td className="px-4 py-3">
                     <p className="text-slate-800 text-xs">{applicant.state_name}</p>
-                    <p className="text-[11px] text-slate-500">{applicant.lga_name}</p>
-                    <p className="text-[11px] font-semibold text-slate-600">{applicant.area_locality}</p>
+                    <p className="text-xs text-slate-500">{applicant.lga_name}</p>
+                    <p className="text-xs font-semibold text-slate-600">{applicant.area_locality}</p>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${paymentBadge(applicant.payment_status)}`}>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${paymentBadge(applicant.payment_status)}`}>
                       {applicant.opportunity_type==='volunteer'?'Not Applicable':applicant.payment_status}
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${statusBadge(applicant.status)}`}>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusBadge(applicant.status)}`}>
                       {String(applicant.status || '').replace(/_/g, ' ')}
                     </span>
                   </td>
@@ -920,22 +920,22 @@ export default function RecruitmentAdminTab() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap justify-end gap-1.5">
-                      <button type="button" onClick={() => updateApplicant(applicant.id, 'shortlist')} className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[10px] font-bold text-white hover:bg-emerald-700 transition-colors">
+                      <button type="button" onClick={() => updateApplicant(applicant.id, 'shortlist')} className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-emerald-700 transition-colors">
                         Shortlist
                       </button>
-                      <button type="button" onClick={() => updateApplicant(applicant.id, 'approve')} className="rounded-lg bg-blue-600 px-2.5 py-1 text-[10px] font-bold text-white hover:bg-blue-700 transition-colors">
+                      <button type="button" onClick={() => updateApplicant(applicant.id, 'approve')} className="rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-blue-700 transition-colors">
                         Approve
                       </button>
-                      <button type="button" onClick={() => updateApplicant(applicant.id, 'reject')} className="rounded-lg bg-red-600 px-2.5 py-1 text-[10px] font-bold text-white hover:bg-red-700 transition-colors">
+                      <button type="button" onClick={() => updateApplicant(applicant.id, 'reject')} className="rounded-lg bg-red-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-red-700 transition-colors">
                         Reject
                       </button>
-                      <button type="button" onClick={() => setInterviewDate(applicant)} className="rounded-lg bg-indigo-600 px-2.5 py-1 text-[10px] font-bold text-white hover:bg-indigo-700 transition-colors">
+                      <button type="button" onClick={() => setInterviewDate(applicant)} className="rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-indigo-700 transition-colors">
                         Interview
                       </button>
-                      <button type="button" onClick={() => downloadBlob(`/recruitment/admin/reports/applicant/${applicant.id}`, `applicant-${applicant.id}.pdf`)} className="rounded-lg border border-slate-200 px-2.5 py-1 text-[10px] font-bold text-slate-700 hover:bg-slate-50 transition-colors">
+                      <button type="button" onClick={() => downloadBlob(`/recruitment/admin/reports/applicant/${applicant.id}`, `applicant-${applicant.id}.pdf`)} className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors">
                         PDF
                       </button>
-                      <button type="button" onClick={() => downloadBlob(`/recruitment/admin/documents/download/${applicant.id}`, `documents-${applicant.id}.zip`)} className="rounded-lg border border-slate-200 px-2.5 py-1 text-[10px] font-bold text-slate-700 hover:bg-slate-50 transition-colors">
+                      <button type="button" onClick={() => downloadBlob(`/recruitment/admin/documents/download/${applicant.id}`, `documents-${applicant.id}.zip`)} className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors">
                         ZIP
                       </button>
                     </div>
