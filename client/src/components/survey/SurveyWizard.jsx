@@ -174,8 +174,6 @@ export default function SurveyWizard({
     setSaving(true);
     try {
       await api.post('/survey/save', { response_id: responseId, answers, consent_flags: consentFlags });
-    } catch {
-      // silent autosave — the server keeps previous answers
     } finally {
       setSaving(false);
     }

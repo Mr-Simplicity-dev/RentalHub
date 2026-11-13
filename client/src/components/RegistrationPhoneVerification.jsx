@@ -1,10 +1,12 @@
+import emailCopy from '../utils/registrationEmailCopy.cjs';
 import React, { useRef, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import api from '../services/api';
 
 const options = { skipAuth: true, skipAuthRefresh: true };
 export default function RegistrationPhoneVerification({ pending, onVerified, onClose }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const emailText=emailCopy[i18n.resolvedLanguage||i18n.language]||emailCopy.en;
   const [challenge, setChallenge] = useState(pending.challenge);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -62,6 +64,7 @@ export default function RegistrationPhoneVerification({ pending, onVerified, onC
     <form onSubmit={verify} className="my-auto w-full max-w-md rounded-2xl bg-white p-6 text-center shadow-2xl">
       <h2 id="registration-phone-title" className="text-xl font-bold text-gray-900">{t('register.otp_title')}</h2>
       <p className="mt-3 text-sm text-gray-600" role="status">{phoneGrant.current ? identityPending ? statusMessage : t('register.phone_verified_continue') : sent ? t(pending.flow === 'free' ? 'register.otp_body' : 'register.otp_pre_payment_body') : busy ? t('register.otp_sending') : t('register.otp_send_failed')}</p>
+      <p className="mt-3 rounded-xl bg-slate-50 p-3 text-sm leading-6 text-slate-600">{emailText.before}</p>
       <label className="sr-only" htmlFor="registration-phone-code">{t('register.otp_title')}</label>
       <input id="registration-phone-code" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={event => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} disabled={busy || Boolean(phoneGrant.current)} autoFocus className="mt-4 w-full rounded-xl border border-gray-300 px-4 py-3 text-center text-2xl font-bold tracking-widest" />
       {error ? <p role="alert" className="mt-3 text-sm text-red-700">{error}</p> : null}

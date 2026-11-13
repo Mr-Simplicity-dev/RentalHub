@@ -1,3 +1,4 @@
+import EmailVerificationNotice from '../components/common/EmailVerificationNotice';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -1382,7 +1383,7 @@ const Dashboard = () => {
   return (
     <div className="bg-gray-50 min-h-screen py-8">
       {surveyGate && (
-        <div className="fixed inset-0 z-[100] overflow-y-auto bg-white">
+        <div className="fixed inset-0 z-[100] overflow-y-auto bg-white"><div className="mx-auto max-w-3xl px-4 pt-4"><EmailVerificationNotice /></div>
           <SurveyWizard
             surveyType={surveyStatus?.survey_type || 'tenant'}
             mode="partA"
@@ -1410,6 +1411,7 @@ const Dashboard = () => {
       )}
 
       <div className="container mx-auto px-4">
+        <EmailVerificationNotice />
         {/* Welcome Section */}
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-gray-900">

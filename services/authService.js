@@ -1336,8 +1336,8 @@ const assignAgentRoundRobin = async ({ landlordUserId, stateId, lgaName }) => {
       AND u.user_type = 'agent'
       AND u.account_suspended_at IS NULL
       AND u.deleted_at IS NULL
-      AND u.assigned_state_id = $1
-      AND u.assigned_lga_name = $2
+      AND LOWER(TRIM(u.assigned_state)) = (SELECT LOWER(TRIM(state_name)) FROM states WHERE id = $1)
+      AND LOWER(TRIM(COALESCE(NULLIF(TRIM(u.assigned_lga), ''), u.assigned_city))) = LOWER(TRIM($2::text))
     ORDER BY u.id ASC
   `;
   let agentsParams = [stateId, lgaName];
@@ -1354,7 +1354,7 @@ const assignAgentRoundRobin = async ({ landlordUserId, stateId, lgaName }) => {
         AND u.user_type = 'agent'
         AND u.account_suspended_at IS NULL
         AND u.deleted_at IS NULL
-        AND u.assigned_state_id = $1
+        AND LOWER(TRIM(u.assigned_state)) = (SELECT LOWER(TRIM(state_name)) FROM states WHERE id = $1)
       ORDER BY u.id ASC
     `;
     agentsResult = await db.query(agentsQuery, [stateId]);
@@ -1849,6 +1849,7 @@ const createUserFromPreparedRegistration = async ({
         identity_document_type: newUser.identity_document_type,
         nin_verified: newUser.nin_verified,
         phone_verified: newUser.phone_verified === true,
+        email_verified: newUser.email_verified === true,
         nationality: newUser.nationality,
         preferred_state_id: newUser.preferred_state_id,
         preferred_state_name: preparedRegistration.preferredStateName || null,

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
+import { useSearchParams, useNavigate, useParams, useLocation } from 'react-router-dom';
 import api from '../services/api';
 import { setAuthSession } from '../services/authStorage';
 import { useTranslation } from 'react-i18next';
@@ -8,13 +8,14 @@ const VerifyEmail = () => {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const params = useParams();
+  const location = useLocation();
   const token = searchParams.get('token') || params.token;
   const [destination, setDestination] = useState('/login');
   const navigate = useNavigate();
 
   const [status, setStatus] = useState('verifying'); // verifying | success | error
   const [message, setMessage] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(location.state?.email || '');
   const [sending, setSending] = useState(false);
   const [sendMessage, setSendMessage] = useState('');
   const [countdown, setCountdown] = useState(3); // seconds before redirect
@@ -34,8 +35,11 @@ const VerifyEmail = () => {
           const { token: authToken, user } = res.data.data || res.data;
 
           // 🔐 Auto-login
-          setAuthSession(authToken, user);
-          api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
+          if (authToken && user && !res.data.requires_sign_in) {
+            setAuthSession(authToken, user);
+            api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
+            setDestination(user.user_type === "tenant" ? "/tenant/dashboard" : "/dashboard");
+          }
 
           setStatus('success');
           setMessage(res.data.message || t('verify_email.success_msg'));

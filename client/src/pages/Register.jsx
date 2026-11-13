@@ -1,3 +1,4 @@
+import {rememberRegistrationEmail} from '../components/common/EmailVerificationNotice';
 import { preparePassportDocument } from '../utils/passportDocument';
 import {readRegistrationDraft,saveRegistrationDraft,clearRegistrationDraft} from '../utils/registrationDraft';
 import React, { useEffect, useState, useRef, useMemo } from 'react';
@@ -123,6 +124,7 @@ const Register = () => {
   const [legacyCodeSent, setLegacyCodeSent] = useState(false);
   const legacyInitialSend = useRef(null);
   const applyVerifiedRegistration = async data => {
+    rememberRegistrationEmail(data);
     if (data.token && data.user) {
       completeRegistrationDraft(); setAuthSession(data.token, data.user);
       window.location.assign(data.user.user_type === 'tenant' ? '/tenant/dashboard' : '/dashboard');
@@ -479,6 +481,7 @@ const Register = () => {
 
           sessionStorage.removeItem('rentalhub.registration-proof:' + registrationReference);
           completeRegistrationDraft();
+          rememberRegistrationEmail(response.data.data);
           setAuthSession(token, user);
           api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
@@ -886,6 +889,7 @@ return;
     }
 
     if (response.success) {
+  rememberRegistrationEmail(response.data);
   completeRegistrationDraft();
   toast.success(t('register.registration_success'));
 
@@ -1438,6 +1442,7 @@ return (
                 if (response.data?.success) {
                   const { token, user } = response.data.data;
                   completeRegistrationDraft();
+          rememberRegistrationEmail(response.data.data);
           setAuthSession(token, user);
                   api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
                   toast.success(t('register.registration_success'));

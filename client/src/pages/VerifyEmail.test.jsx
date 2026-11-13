@@ -11,3 +11,5 @@ test('failed email resend is visible and does not claim a verification message w
  await act(async()=>root.render(<MemoryRouter initialEntries={['/verify-email']}><Routes><Route path="/verify-email" element={<VerifyEmail/>}/></Routes></MemoryRouter>));
  await act(async()=>fireEvent.change(container.querySelector('input[type="email"]'),{target:{value:'user@example.test'}}));await act(async()=>fireEvent.submit(container.querySelector('form')));expect(container.textContent).toContain('Mail temporarily unavailable');expect(setAuthSession).not.toHaveBeenCalled();
 });
+
+test('staff email verification does not invent a session when sign-in is required',async()=>{api.get.mockResolvedValue({data:{success:true,requires_sign_in:true,user:{id:3,user_type:'state_admin',email_verified:true}}});await act(async()=>root.render(<MemoryRouter initialEntries={['/verify-email/staff-token']}><Routes><Route path="/verify-email/:token" element={<VerifyEmail/>}/></Routes></MemoryRouter>));expect(setAuthSession).not.toHaveBeenCalled();expect(api.defaults.headers.common.Authorization).not.toBe('Bearer undefined');});

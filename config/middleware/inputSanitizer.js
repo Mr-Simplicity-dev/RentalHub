@@ -55,9 +55,25 @@ const sanitizeObject = (obj, depth = 0) => {
   return sanitized;
 };
 
+// Only the questionnaire's exact answer IDs may contain dots, and only on
+// survey write routes. Values still pass through the normal text cleaner.
+const surveyAnswerKeys = new Set(['tenant', 'landlord'].flatMap(type =>
+  require('../survey').getQuestions(type).map(question => question.key)));
+const surveyWrites = new Set(['/api/survey/save', '/api/survey/public/submit', '/api/survey/public/draft', '/api/admin/survey/paper-entry']);
 const inputSanitizer = (req, res, next) => {
+  const route = String(req.originalUrl || '').split('?')[0].replace(/\/$/, '');
+  let surveyAnswers;
+  if (req.method === 'POST' && surveyWrites.has(route) && isObject(req.body?.answers)) {
+    surveyAnswers = {};
+    for (const [key, value] of Object.entries(req.body.answers)) {
+      if (!surveyAnswerKeys.has(key)) continue;
+      if (isObject(value) || (Array.isArray(value) && value.some(item => isObject(item) || Array.isArray(item)))) continue;
+      surveyAnswers[key] = sanitizeValue(value, 5000);
+    }
+  }
   if (req.body && isObject(req.body)) {
     req.body = sanitizeObject(req.body);
+    if (surveyAnswers) req.body.answers = surveyAnswers;
   }
   if (req.query && isObject(req.query)) {
     req.query = sanitizeObject(req.query);

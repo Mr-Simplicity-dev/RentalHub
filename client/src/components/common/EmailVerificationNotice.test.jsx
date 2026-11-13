@@ -1,0 +1,11 @@
+import React,{act} from 'react';
+import {createRoot} from 'react-dom/client';
+import {MemoryRouter} from 'react-router-dom';
+import {within} from '@testing-library/dom';
+import {vi} from 'vitest';
+import Notice,{rememberRegistrationEmail} from './EmailVerificationNotice';
+const auth=vi.hoisted(()=>({user:null}));vi.mock('../../hooks/useAuth',()=>({useAuth:()=>auth}));vi.mock('react-i18next',()=>({useTranslation:()=>({i18n:{language:'en'}})}));let root,container;
+beforeEach(()=>{globalThis.IS_REACT_ACT_ENVIRONMENT=true;sessionStorage.clear();auth.user={id:1,user_type:'landlord',email:'person@example.test',email_verified:false};container=document.createElement('div');document.body.appendChild(container);root=createRoot(container);});afterEach(()=>{act(()=>root.unmount());container.remove();});const render=()=>act(()=>root.render(<MemoryRouter><Notice/></MemoryRouter>));
+test('new customers see delivery confirmation and the email verification action',()=>{rememberRegistrationEmail({user:auth.user,email_verification:{required:true,sent:true}});render();expect(container.textContent).toContain('We sent a verification email to person@example.test');expect(within(container).getByRole('link',{name:'Verify email'}).getAttribute('href')).toBe('/verify-email');});
+test('a failed mail send has an honest recovery notice',()=>{rememberRegistrationEmail({user:auth.user,email_verification:{required:true,sent:false}});render();expect(container.textContent).toContain('could not be sent');expect(container.textContent).not.toContain('We sent');});
+test('verified customers and staff do not receive a verification reminder',()=>{auth.user.email_verified=true;render();expect(container.textContent).toBe('');auth.user.email_verified=false;auth.user.user_type='super_admin';render();expect(container.textContent).toBe('');});
