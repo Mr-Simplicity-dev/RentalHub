@@ -1,2 +1,0 @@
-import {defineConfig} from 'vite';import react from '@vitejs/plugin-react';import tailwindcss from '@tailwindcss/vite';import {fileURLToPath} from 'node:url';
-export default defineConfig({root:fileURLToPath(new URL('../../',import.meta.url)),plugins:[{name:'seo-review-api',enforce:'pre',resolveId(source,importer){if(importer?.replaceAll('\\','/').endsWith('/SeoIntelligencePanel.jsx')&&source==='../../services/api')return fileURLToPath(new URL('./api.js',import.meta.url));}},tailwindcss(),react()],server:{host:'127.0.0.1',port:5178,strictPort:true}});
