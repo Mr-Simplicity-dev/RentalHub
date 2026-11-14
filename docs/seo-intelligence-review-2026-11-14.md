@@ -1,5 +1,7 @@
 # Amana RentalHub NG — SEO implementation and review report
 
+This is the pre-deployment review. The later authorised live release is recorded in [the production deployment report](production-release-1.0.66-2026-11-14.md).
+
 Date: 14 November 2026. Status: **local review release; not deployed or published**.
 
 ## 1. What is ready, in simple words
