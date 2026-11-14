@@ -11,10 +11,12 @@ const {
 } = require('../config/utils/seoHtmlRenderer');
 
 const renderForCrawler = (req, data, renderFn, res) => {
-  if (!isSearchCrawler(req.headers['user-agent'])) {
+  if (req.baseUrl === '/api' || /application\/json/i.test(req.headers.accept || '') || !isSearchCrawler(req.headers['user-agent'])) {
     return false;
   }
-  const html = renderFn(data);
+  const html = renderFn({ ...data, ...data.seo }).replace(/<script\s/g, `<script nonce="${res.locals?.cspNonce || ''}" `);
+  res.set('Vary', 'User-Agent, Accept');
+  if (data.indexable === false) res.set('X-Robots-Tag', 'noindex, follow');
   res.set('Content-Type', 'text/html; charset=utf-8');
   res.set('Cache-Control', 'public, max-age=3600');
   res.send(html);

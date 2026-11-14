@@ -1,5 +1,14 @@
-# https://www.robotstxt.org/robotstxt.html
 User-agent: *
-Disallow:
+Disallow: /api/
+Disallow: /admin/
+Disallow: /super-admin/
+Disallow: /tenant/
+Disallow: /landlord/
+Disallow: /dashboard
+Disallow: /profile
+Disallow: /messages
+Disallow: /login
+Disallow: /register
+Disallow: /uploads/
 
 Sitemap: https://rentalhub.com.ng/sitemap.xml

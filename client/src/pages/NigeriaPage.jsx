@@ -11,6 +11,7 @@ export default function NigeriaPage() {
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true); setError(''); setData(null);
 
     const loadPage = async () => {
       try {
@@ -45,11 +46,11 @@ export default function NigeriaPage() {
   }, [t]);
 
   if (loading) {
-    return <div className="px-4 py-16 text-center text-gray-600">{t('nigeria_page.loading')}</div>;
+    return <><Helmet><meta name="robots" content="noindex,follow" /></Helmet><div className="px-4 py-16 text-center text-gray-600">{t('nigeria_page.loading')}</div></>;
   }
 
   if (error || !data?.success) {
-    return <div className="px-4 py-16 text-center text-red-600">{error || t('nigeria_page.unavailable')}</div>;
+    return <><Helmet><meta name="robots" content="noindex,follow" /></Helmet><div className="px-4 py-16 text-center text-red-600">{error || t('nigeria_page.unavailable')}</div></>;
   }
 
   return (
@@ -58,6 +59,7 @@ export default function NigeriaPage() {
         <title>{data.seo.title}</title>
         <meta name="description" content={data.seo.description} />
         <link rel="canonical" href={data.canonical} />
+        <meta name="robots" content={data.indexable === false ? "noindex,follow" : "index,follow"} />
       </Helmet>
 
       <div className="bg-stone-50">

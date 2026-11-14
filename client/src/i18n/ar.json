@@ -1747,7 +1747,9 @@
     "load_failed": "Failed to load location page",
     "na": "N/A",
     "no_photo": "No photo",
-    "property_fallback_type": "Rental"
+    "property_fallback_type": "Rental",
+    "search_guidance": "اختيار عقار",
+    "sample_method": "الإيجارات السنوية المعلنة فقط. العينة: {{count}} إعلانًا. هذه ليست إيجارات متفقًا عليها."
   },
   "nigeria_page": {
     "loading": "Loading Nigeria rental directory...",

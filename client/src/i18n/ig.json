@@ -1752,7 +1752,9 @@
     "load_failed": "Ibudata ibe ọnọdụ dara",
     "na": "N/A",
     "no_photo": "Enweghị foto",
-    "property_fallback_type": "Mgbazinye"
+    "property_fallback_type": "Mgbazinye",
+    "search_guidance": "Ịhọrọ ụlọ",
+    "sample_method": "Naanị ụgwọ afọ e depụtara. Ọnụ ọgụgụ: ụlọ {{count}}. Ọ bụghị ụgwọ e kwekọrịtara."
   },
   "nigeria_page": {
     "loading": "Na-ebudata ndekọ mgbazinye Naịjirịa...",

@@ -356,6 +356,7 @@ Start your search today and find the best home in ${location}.
           )}\n\n${content}`;
 
           await Blog.create({
+            status: "draft",
             title,
             slug,
             content: fullContent,
@@ -502,6 +503,8 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
+app.use(require('./config/middleware/seoRobots'));
+app.use('/', require('./routes/publicPropertySeoRoutes'));
 app.use('/', locationRoutes);
 app.use('/', blogRoutes);
 app.use('/.well-known', appLinksRoutes);
@@ -677,13 +680,13 @@ app.get('/api/health', async (req, res) => {
   res.status(statusCode).json(buildHealthCheckPayload({ status: healthStatus }));
 });
 
-app.get('/sitemap.xml', async (req, res) => {
+app.get(['/sitemap.xml','/sitemap-:part(\\d+).xml'], async (req, res) => {
   try {
-    const sitemap = await generateSitemap();
+    const sitemap = await generateSitemap({part:req.params.part});
     res.header('Content-Type', 'application/xml');
     res.send(sitemap);
   } catch (err) {
-    res.status(500).send('Error generating sitemap');
+    res.status(err.status===404?404:503).send(err.status===404?'Sitemap part not found':'Sitemap is temporarily unavailable');
   }
 });
 
@@ -958,6 +961,7 @@ const startBackgroundServices = () => {
 
   backgroundServicesStarted = true;
   startMongoCronJobs();
+  require('./jobs/seoJobs').startSeoJobs();
   ensureSurveyBoundaryData();
 startPaymentJobs();
 startPropertyJobs();

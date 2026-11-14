@@ -1,27 +1,9 @@
-const { getSitemapUrls } = require('./seoPageService');
-
-const formatSitemapDate = (value) => {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
-};
-
-exports.generateSitemap = async () => {
-  const urls = await getSitemapUrls();
-  const lastmod = formatSitemapDate(new Date());
-
-  const urlEntries = urls
-    .map(
-      (url) => `
-    <url>
-      <loc>${url}</loc>
-      ${lastmod ? `<lastmod>${lastmod}</lastmod>` : ''}
-    </url>`
-    )
-    .join('');
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-  <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-    ${urlEntries}
-  </urlset>`;
-};
+const {getSitemapUrls}=require('./seoPageService');
+const {escapeXml,canonicalUrl}=require('./seoPolicy');
+const {getFrontendUrl}=require('./frontendUrl');
+let cached=null;
+const wrap=rows=>'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+rows.join('')+'</urlset>';
+async function build(force){if(!force&&cached&&Date.now()-cached.at<60000)return cached;const entries=await getSitemapUrls({withMetadata:true}),seen=new Set(),groups=[];let rows=[],bytes=0,lastmod=null,count=0;const flush=()=>{if(rows.length){groups.push({xml:wrap(rows),lastmod});rows=[];bytes=0;lastmod=null;}};for(const entry of entries){const value=typeof entry==='string'?{url:entry}:entry,url=canonicalUrl(value.url);if(seen.has(url))continue;seen.add(url);const date=value.lastmod?new Date(value.lastmod):null,updated=date&&Number.isFinite(date.getTime())?date.toISOString():null,row='<url><loc>'+escapeXml(url)+'</loc>'+(updated?'<lastmod>'+updated+'</lastmod>':'')+'</url>';if(rows.length>=45000||bytes+Buffer.byteLength(row)>45*1024*1024)flush();rows.push(row);bytes+=Buffer.byteLength(row);count++;if(updated&&(!lastmod||updated>lastmod))lastmod=updated;}flush();if(!groups.length)groups.push({xml:wrap([]),lastmod:null});const origin=getFrontendUrl(),index=groups.length>1,xml=index?'<?xml version="1.0" encoding="UTF-8"?><sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+groups.map((g,n)=>'<sitemap><loc>'+escapeXml(origin+'/sitemap-'+(n+1)+'.xml')+'</loc>'+(g.lastmod?'<lastmod>'+g.lastmod+'</lastmod>':'')+'</sitemap>').join('')+'</sitemapindex>':groups[0].xml;cached={xml,groups,at:Date.now(),urlCount:count,format:index?'sitemapindex':'urlset'};return cached;}
+const generateSitemap=async({force=false,part}={})=>{const result=await build(force);if(part!==undefined){const number=Number(part);if(!Number.isInteger(number)||number<1||number>result.groups.length)throw Object.assign(new Error('Sitemap part not found.'),{status:404,code:'SITEMAP_PART_NOT_FOUND'});return result.groups[number-1].xml;}return result.xml;};
+const getSitemapInfo=async()=>{const c=await build(false);return {urlCount:c.urlCount,partCount:c.groups.length,format:c.format,generatedAt:new Date(c.at).toISOString()};};
+module.exports={generateSitemap,getSitemapInfo,invalidateSitemap:()=>{cached=null;}};

@@ -1,3 +1,4 @@
+import {safeStructuredJson} from '../utils/seoJson';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
@@ -359,7 +360,7 @@ const PropertyDetail = () => {
   const propertySeoDescription = propertyLocation
     ? `Browse verified details for ${property.title} in ${propertyLocation}. See rent, property features, photos, and in-platform enquiries on RentalHub.`
     : `Browse verified details for ${property.title} on RentalHub.`;
-  const propertyCanonical = `${window.location.origin}/properties/${property.id}`;
+  const propertyCanonical = `https://rentalhub.com.ng/properties/${property.id}`;
   const propertyShareImageRaw =
     property.photos?.[0] ||
     property.primary_photo ||
@@ -394,6 +395,7 @@ const PropertyDetail = () => {
         <title>{propertySeoTitle}</title>
         <meta name="description" content={propertySeoDescription} />
         <link rel="canonical" href={propertyCanonical} />
+        <meta name="robots" content={property.is_verified && property.is_available ? "index,follow" : "noindex,follow"} />
         <meta property="og:title" content={propertySeoTitle} />
         <meta property="og:description" content={propertySeoDescription} />
         <meta property="og:url" content={propertyCanonical} />
@@ -403,7 +405,7 @@ const PropertyDetail = () => {
         <meta name="twitter:title" content={propertySeoTitle} />
         <meta name="twitter:description" content={propertySeoDescription} />
         <meta name="twitter:image" content={propertyShareImage} />
-        <script type="application/ld+json">{JSON.stringify(propertySchema)}</script>
+        <script type="application/ld+json">{safeStructuredJson(propertySchema)}</script>
       </Helmet>
 
       {/* Image Gallery */}

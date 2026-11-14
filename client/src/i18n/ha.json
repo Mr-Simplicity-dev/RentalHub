@@ -1752,7 +1752,9 @@
     "load_failed": "An kasa lodawa shafin wuri",
     "na": "N/A",
     "no_photo": "Babu hoto",
-    "property_fallback_type": "Haya"
+    "property_fallback_type": "Haya",
+    "search_guidance": "Zaɓen gida",
+    "sample_method": "Hayar shekara da aka tallata kawai. Samfur: gidaje {{count}}. Ba hayar da aka riga aka amince da ita ba ce."
   },
   "nigeria_page": {
     "loading": "Ana lodawa kundayen adireshin haya na Najeriya...",

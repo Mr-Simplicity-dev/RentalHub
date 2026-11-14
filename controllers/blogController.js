@@ -1,42 +1,6 @@
-const Blog = require("../models/Blog");
-const { submitURL } = require("../config/utils/googleIndexing");
-const { getFrontendUrl } = require("../config/utils/frontendUrl");
-
-exports.getBlog = async (req, res) => {
-  try {
-    const { slug } = req.params;
-
-    const blog = await Blog.findOne({ slug });
-
-    if (!blog) {
-      return res.status(404).json({
-        success: false,
-        message: "Blog not found"
-      });
-    }
-
-    // 🔥 SEO DATA
-    const seo = {
-      title: blog.title,
-      description: blog.content.substring(0, 160),
-    };
-
-    // 🔗 Canonical URL
-    const canonical = `${getFrontendUrl()}/blog/${blog.slug}`;
-
-    res.json({
-      success: true,
-      seo,
-      canonical,
-      data: blog
-    });
-
-  } catch (error) {
-    req.logger.error("Get blog error:", error);
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch blog"
-    });
-  }
-};
+const {renderArticleBody,articlePlainText}=require('../config/utils/blogHtml');
+const Blog=require('../models/Blog');
+const {getFrontendUrl}=require('../config/utils/frontendUrl');
+const {renderPageHtml,escapeHtml}=require('../config/utils/seoHtmlRenderer');
+const {safeJson}=require('../config/utils/seoPolicy');
+exports.getBlog=async(req,res)=>{try{if(!/^[a-z0-9-]{1,160}$/.test(req.params.slug))return res.status(404).json({success:false,message:'Article not found'});if(Blog.db.readyState!==1)return res.status(503).json({success:false,message:'Articles are temporarily unavailable'});const blog=await Blog.findOne({slug:req.params.slug,$or:[{status:'published'},{status:{$exists:false}}]}).lean();if(!blog)return res.status(404).json({success:false,message:'Article not found'});const description=articlePlainText(blog.content).slice(0,160),canonical=getFrontendUrl()+'/blog/'+blog.slug;res.vary('Accept');if(req.accepts(['html','json'])==='html'){const body='<h1>'+escapeHtml(blog.title)+'</h1>'+renderArticleBody(blog.content)+'<p><a href="/properties">Search current rental properties</a></p>';const jsonLd=safeJson({'@context':'https://schema.org','@type':'Article',headline:blog.title,url:canonical,...(blog.publishedAt?{datePublished:new Date(blog.publishedAt).toISOString()}:{}),...(blog.updatedAt?{dateModified:new Date(blog.updatedAt).toISOString()}:{}),publisher:{'@type':'Organization',name:'Amana RentalHub NG'}});const html=renderPageHtml({title:blog.title,description,canonical,body,jsonLd}).replace(/<script\s/g,`<script nonce="${res.locals?.cspNonce||''}" `);return res.type('html').send(html);}return res.json({success:true,seo:{title:blog.title,description},canonical,data:{title:blog.title,slug:blog.slug,content:renderArticleBody(blog.content),keywords:blog.keywords,publishedAt:blog.publishedAt}});}catch(e){req.logger?.error('Article unavailable',{code:e.code});return res.status(503).json({success:false,message:'Article is temporarily unavailable'});}};

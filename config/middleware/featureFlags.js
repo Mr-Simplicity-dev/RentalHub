@@ -226,6 +226,7 @@ const isMaintenanceBypassRoute = (req) => {
     '/auth/me',
     '/auth/refresh',
     '/auth/refresh-token',
+    '/admin/seo/google/callback',
   ];
 
   if (allowedExactRoutes.includes(path)) {

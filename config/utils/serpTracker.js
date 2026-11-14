@@ -11,7 +11,9 @@ const getSerpApiKey = () => {
 
 const normalizeHostname = (value) => {
   try {
-    return new URL(value).hostname.toLowerCase().replace(/^www\./, '');
+    const parsed=new URL(value);
+    if(!['http:','https:'].includes(parsed.protocol)||parsed.username||parsed.password)return null;
+    return parsed.hostname.toLowerCase().replace(/^www\./, '');
   } catch {
     return null;
   }
@@ -20,6 +22,7 @@ const normalizeHostname = (value) => {
 const normalizeComparableUrl = (value) => {
   try {
     const parsed = new URL(value);
+    if(!['http:','https:'].includes(parsed.protocol)||parsed.username||parsed.password)return null;
     const hostname = parsed.hostname.toLowerCase().replace(/^www\./, '');
     const pathname = parsed.pathname.replace(/\/+$/, '') || '/';
     return `${hostname}${pathname}`;
@@ -54,14 +57,11 @@ const findTargetResult = (organicResults, targetUrl, match = 'domain') => {
 
   if (!result) return null;
 
-  const fallbackPosition = results.indexOf(result) + 1;
   const parsedPosition = Number(result.position);
+  if(!Number.isInteger(parsedPosition)||parsedPosition<1)throw Object.assign(new Error('SerpAPI returned no valid position for this result.'),{code:'SERP_INVALID_DATA'});
 
   return {
-    position:
-      Number.isInteger(parsedPosition) && parsedPosition > 0
-        ? parsedPosition
-        : fallbackPosition,
+    position: parsedPosition,
     resultUrl: result.link,
     resultTitle: result.title || null,
   };
@@ -86,11 +86,14 @@ const fetchOrganicResults = async (keyword, options = {}) => {
         hl: options.language || 'en',
         gl: options.country || 'ng',
         num: searchDepth,
+        ...(options.location ? {location:String(options.location).slice(0,150)} : {}),
         api_key: apiKey,
       },
       timeout: 15000,
     });
 
+    if (response.data?.error || response.data?.search_metadata?.status === 'Error') throw Object.assign(new Error('SerpAPI rejected the request. Check account access and credits.'), { code: 'SERP_PROVIDER_ERROR' });
+    if (!Array.isArray(response.data?.organic_results) && response.data?.search_information?.organic_results_state !== 'Fully empty') throw Object.assign(new Error('SerpAPI did not return a valid result list.'), { code: 'SERP_INVALID_DATA' });
     return Array.isArray(response.data?.organic_results)
       ? response.data.organic_results
       : [];
@@ -101,7 +104,7 @@ const fetchOrganicResults = async (keyword, options = {}) => {
 
     const providerMessage = error.response?.data?.error;
     if (providerMessage) {
-      throw new Error(`SerpAPI request failed: ${providerMessage}`);
+      throw Object.assign(new Error('SerpAPI rejected the request. Check configuration and credits.'), {code:'SERP_PROVIDER_ERROR'});
     }
 
     throw error;

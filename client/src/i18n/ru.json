@@ -1747,7 +1747,9 @@
     "load_failed": "Failed to load location page",
     "na": "N/A",
     "no_photo": "No photo",
-    "property_fallback_type": "Rental"
+    "property_fallback_type": "Rental",
+    "search_guidance": "Выбор жилья",
+    "sample_method": "Только объявленная годовая аренда. Выборка: {{count}} объявлений. Это не согласованная цена."
   },
   "nigeria_page": {
     "loading": "Loading Nigeria rental directory...",

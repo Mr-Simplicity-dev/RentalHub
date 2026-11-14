@@ -4,7 +4,7 @@ const db = require('../config/middleware/database');
 const crypto = require('crypto');
 const { validationResult } = require('express-validator');
 const { cloudinary } = require('../config/middleware/upload');
-const { submitURL } = require("../config/utils/googleIndexing");
+
 const { getFrontendUrl } = require('../config/utils/frontendUrl');
 const { getPropertyDisputeParticipants } = require('../config/utils/propertyDisputeParticipants');
 const { getPropertyManagerContext } = require('../config/utils/agentSystem');
@@ -1561,13 +1561,7 @@ exports.createProperty = async (req, res) => {
       enqueuePropertyTour(property.id).catch(() => {});
     }
 
-    // 🔥 Submit property URL to Google (non-blocking)
-const propertyUrl = `${getFrontendUrl()}/properties/${property.id}`;
-
-// Don't break your API if indexing fails
-submitURL(propertyUrl).catch((err) =>
-  req.logger.error('Google indexing failed:', err.message)
-);
+    require('../config/utils/sitemapGenerator').invalidateSitemap();
 
     res.status(201).json({
       success: true,

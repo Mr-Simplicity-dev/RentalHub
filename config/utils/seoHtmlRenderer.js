@@ -1,3 +1,4 @@
+const { safeJson } = require('./seoPolicy');
 // Renders SEO page data (seoPageService) into a complete, crawler-friendly
 // HTML document. Served to search-engine bots so /nigeria* pages become
 // indexable even though the client app renders them client-side.
@@ -20,6 +21,7 @@ const formatMoney = (value) => {
 const isSearchCrawler = (userAgent = '') => {
   const ua = String(userAgent || '').toLowerCase();
   return (
+    ua.includes('rentalhubseoreview') ||
     ua.includes('googlebot') ||
     ua.includes('bingbot') ||
     ua.includes('duckduckbot') ||
@@ -48,14 +50,14 @@ const renderStats = (stats) => {
       <tbody>
         ${rows.map(([k, v]) => `<tr><th>${escapeHtml(k)}</th><td>${escapeHtml(v)}</td></tr>`).join('')}
       </tbody>
-    </table>`;
+    </table><p>${escapeHtml(stats?.methodology || '')}</p>`;
 };
 
 const renderContentBlocks = (content) => {
   const blocks = [
     ['Overview', content?.overview],
     ['What the market looks like', content?.marketSummary],
-    ['How this page is built for renters', content?.strategy],
+    ['Choosing a rental home', content?.strategy],
   ].filter(([, text]) => text);
   return blocks
     .map(([heading, text]) => `<h2>${escapeHtml(heading)}</h2><p>${escapeHtml(text)}</p>`)
@@ -88,7 +90,7 @@ const renderProperties = (properties = []) => {
         .map(
           (p) =>
             `<li><a href="${escapeHtml(p.url)}">${escapeHtml(p.title || 'Property')}</a> — ${
-              p.city || p.state_name || 'Nigeria'
+              escapeHtml(p.city || p.state_name || 'Nigeria')
             }${p.rent_amount ? ` — ${formatMoney(p.rent_amount)}` : ''}</li>`
         )
         .join('')}
@@ -116,16 +118,18 @@ const renderJsonLd = ({ title, description, canonical, faq = [] }) => {
       })),
     });
   }
-  return `<script type="application/ld+json">${JSON.stringify(graph)}</script>`;
+  return `<script type="application/ld+json">${safeJson(graph)}</script>`;
 };
 
-const renderShell = ({ title, description, canonical, body, jsonLd }) => `<!doctype html>
+const renderShell = ({ title, description, canonical, body, jsonLd, indexable = true }) => `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>${escapeHtml(title)}</title>
   <meta name="description" content="${escapeHtml(description)}"/>
+  <meta name="robots" content="${indexable ? 'index,follow' : 'noindex,follow'}"/>
+  <meta property="og:image" content="${escapeHtml(new URL(canonical).origin)}/og-preview.svg"/>
   <link rel="canonical" href="${escapeHtml(canonical)}"/>
   <meta property="og:type" content="website"/>
   <meta property="og:title" content="${escapeHtml(title)}"/>
@@ -149,7 +153,7 @@ const toSafeNumber = (value) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-exports.renderLocationHtml = ({ title, description, canonical, location, stats, content, faq, properties, links }) => {
+exports.renderLocationHtml = ({ title, description, canonical, location, stats, content, faq, properties, links, indexable }) => {
   const body = `
     <h1>${escapeHtml(title)}</h1>
     ${renderStats(stats)}
@@ -165,10 +169,11 @@ exports.renderLocationHtml = ({ title, description, canonical, location, stats, 
     canonical,
     body,
     jsonLd: renderJsonLd({ title, description, canonical, faq }),
+    indexable,
   });
 };
 
-exports.renderDirectoryHtml = ({ title, description, canonical, states, popular_areas }) => {
+exports.renderDirectoryHtml = ({ title, description, canonical, states, popular_areas, indexable }) => {
   const body = `
     <h1>${escapeHtml(title)}</h1>
     <p>${escapeHtml(description)}</p>
@@ -183,7 +188,7 @@ exports.renderDirectoryHtml = ({ title, description, canonical, states, popular_
         )
         .join('')}
     </ul>
-    ${renderProperties(popular_areas)}`;
+    ${renderLinkList('Available areas', (popular_areas || []).map(area => ({name:area.area_name,url:area.url})))}`;
 
   return renderShell({
     title,
@@ -191,10 +196,11 @@ exports.renderDirectoryHtml = ({ title, description, canonical, states, popular_
     canonical,
     body,
     jsonLd: renderJsonLd({ title, description, canonical }),
+    indexable,
   });
 };
 
-exports.renderAreaHtml = ({ title, description, canonical, stats, content, faq, properties, links }) => {
+exports.renderAreaHtml = ({ title, description, canonical, stats, content, faq, properties, links, indexable }) => {
   const body = `
     <h1>${escapeHtml(title)}</h1>
     ${renderStats(stats)}
@@ -209,7 +215,11 @@ exports.renderAreaHtml = ({ title, description, canonical, stats, content, faq, 
     canonical,
     body,
     jsonLd: renderJsonLd({ title, description, canonical, faq }),
+    indexable,
   });
 };
 
 exports.isSearchCrawler = isSearchCrawler;
+
+exports.renderPageHtml = renderShell;
+exports.escapeHtml = escapeHtml;

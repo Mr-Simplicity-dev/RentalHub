@@ -1,3 +1,4 @@
+import {safeStructuredJson} from '../utils/seoJson';
 import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link, useParams } from 'react-router-dom';
@@ -6,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 export default function AreaPage() {
   const { t } = useTranslation();
   const currency = (amount) =>
-    Number.isFinite(Number(amount))
+    Number.isFinite(Number(amount)) && Number(amount) > 0
       ? `₦${Math.round(Number(amount)).toLocaleString('en-NG')}`
       : t('area_page.na');
 
@@ -17,6 +18,7 @@ export default function AreaPage() {
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true); setError(''); setData(null);
 
     const loadPage = async () => {
       try {
@@ -51,11 +53,11 @@ export default function AreaPage() {
   }, [areaSlug, citySlug, stateSlug, t]);
 
   if (loading) {
-    return <div className="px-4 py-16 text-center text-gray-600">{t('area_page.loading')}</div>;
+    return <><Helmet><meta name="robots" content="noindex,follow" /></Helmet><div className="px-4 py-16 text-center text-gray-600">{t('area_page.loading')}</div></>;
   }
 
   if (error || !data?.success) {
-    return <div className="px-4 py-16 text-center text-red-600">{error || t('area_page.not_found')}</div>;
+    return <><Helmet><meta name="robots" content="noindex,follow" /></Helmet><div className="px-4 py-16 text-center text-red-600">{error || t('area_page.not_found')}</div></>;
   }
 
   const areaLabel = `${data.area.name}, ${data.area.state}`;
@@ -79,7 +81,8 @@ export default function AreaPage() {
         <meta name="description" content={data.seo.description} />
         <meta name="keywords" content={(data.seo.keywords || []).join(', ')} />
         <link rel="canonical" href={data.canonical} />
-        <script type="application/ld+json">{JSON.stringify(faqSchema)}</script>
+        <meta name="robots" content={data.indexable === false ? "noindex,follow" : "index,follow"} />
+        <script type="application/ld+json">{safeStructuredJson(faqSchema)}</script>
       </Helmet>
 
       <div className="bg-stone-50">
@@ -133,7 +136,7 @@ export default function AreaPage() {
               </p>
             </div>
             <div className="rounded-3xl bg-white p-6 shadow-sm">
-              <p className="text-xs uppercase tracking-wide text-gray-500">{t('area_page.average_rent')}</p>
+              <p className="text-xs uppercase tracking-wide text-gray-500">{t('area_page.average_rent')} · {t('location_page.sample_method', { count: Number(data.stats?.sample_size || 0) })}</p>
               <p className="mt-2 text-3xl font-bold text-gray-900">
                 {currency(data.stats?.avg_rent)}
               </p>

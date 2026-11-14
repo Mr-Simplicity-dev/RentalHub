@@ -95,6 +95,7 @@ Start your search today and find the best properties in ${location}.
           if (exists) continue;
 
           await Blog.create({
+            status: "draft",
             title,
             slug,
             content: generateContent(location),
@@ -114,19 +115,7 @@ Start your search today and find the best properties in ${location}.
 
     console.log(`✅ ${count} blog posts created`);
 
-    // 🔥 Submit to Google Indexing API
-    try {
-      const result = await submitUrl('https://rentalhub.com.ng', 'URL_UPDATED');
-      if (result.success) {
-        console.log("✅ Homepage submitted to Google Indexing API");
-      } else if (result.skipped) {
-        console.log("⚠️ Google Indexing skipped:", result.reason);
-      } else {
-        console.error("⚠️ Google Indexing failed:", result.error);
-      }
-    } catch (err) {
-      console.error("⚠️ Google Indexing error:", err.message);
-    }
+    console.log("Drafts need explicit administrator approval before publication.");
 
   } catch (err) {
     console.error("❌ Blog generation error:", err);

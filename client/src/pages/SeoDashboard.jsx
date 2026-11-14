@@ -1,3 +1,4 @@
+import SeoIntelligencePanel from '../components/admin/SeoIntelligencePanel';
 import { useEffect, useState, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import {
@@ -74,8 +75,8 @@ const SeoDashboard = () => {
 
   const handlePingGoogle = async () => {
     try {
-      const res = await api.post('/admin/seo/ping-google');
-      toast.success(res.data?.data?.success ? t('seo_dashboard.google_pinged') : t('seo_dashboard.google_ping_alt'));
+      const res = await api.post('/admin/seo/search-console/submit-sitemap');
+      toast.success(res.data?.data?.google_accepted ? 'Google accepted the sitemap. Indexing is not guaranteed.' : 'Sitemap submission has not been confirmed.');
     } catch (err) {
       toast.error(err.response?.data?.message || t('seo_dashboard.google_ping_failed'));
     }
@@ -139,7 +140,7 @@ const SeoDashboard = () => {
             <FaSearch /> {t('seo_dashboard.view_sitemap')}
           </button>
           <button onClick={handlePingGoogle} className="btn btn-primary gap-2">
-            <FaExternalLinkAlt /> {t('seo_dashboard.ping_google')}
+            <FaExternalLinkAlt /> Submit sitemap to Google
           </button>
         </div>
       </div>
@@ -255,8 +256,9 @@ const SeoDashboard = () => {
                 <p className="truncate text-xs font-medium text-gray-600" title={ranking.keyword}>
                   {ranking.keyword}
                 </p>
+                <p className="mt-1 text-xs text-gray-600">{ranking.searchLocation||ranking.searchCountry} · {ranking.searchLanguage}{ranking.movement!=null?` · Movement: ${ranking.movement>0?'+':''}${ranking.movement}`:''}</p>
                 <p className={`mt-2 text-2xl font-bold ${ranking.found ? 'text-green-600' : 'text-gray-500'}`}>
-                  {ranking.found ? `#${ranking.position}` : t('seo_dashboard.not_in_top', { depth: ranking.searchDepth || 100 })}
+                  {ranking.found ? `#${ranking.position}` : (ranking.resultsReturned!=null?`Not found in ${ranking.resultsReturned} returned results`:'Not found in returned results')}
                 </p>
               </div>
             ))}
@@ -285,7 +287,7 @@ const SeoDashboard = () => {
                   <td className="px-5 py-3 font-medium text-gray-900">{ranking.keyword}</td>
                   <td className="px-5 py-3">
                     <span className={`font-semibold ${ranking.found ? 'text-green-600' : 'text-gray-500'}`}>
-                      {ranking.found ? `#${ranking.position}` : t('seo_dashboard.not_found', { depth: ranking.searchDepth || 100 })}
+                      {ranking.found ? `#${ranking.position}` : (ranking.resultsReturned!=null?`Not found in ${ranking.resultsReturned} returned results`:'Not found in returned results')}
                     </span>
                   </td>
                   <td className="max-w-xs px-5 py-3">
@@ -372,6 +374,8 @@ const SeoDashboard = () => {
           </table>
         </div>
       </div>
+
+      <SeoIntelligencePanel />
 
       {showSitemap && sitemapXml && (
         <div className="rounded-xl border border-soft bg-white shadow-sm">

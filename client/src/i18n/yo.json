@@ -1752,7 +1752,9 @@
     "load_failed": "Ojú-ewé ibi kò ṣeé gbàjáde",
     "na": "N/A",
     "no_photo": "Kò sí àwòrán",
-    "property_fallback_type": "Yíyá"
+    "property_fallback_type": "Yíyá",
+    "search_guidance": "Yíyan ilé",
+    "sample_method": "Owó ilé ọdún tí a polówó nìkan. Àpẹẹrẹ: ilé {{count}}. Kì í ṣe owó tí a ti fohùn ṣọ̀kan."
   },
   "nigeria_page": {
     "loading": "Ń gbàjáde àtòjọ yíyá Nàìjíríà...",

@@ -1,3 +1,4 @@
+import {safeStructuredJson} from '../utils/seoJson';
 import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link, useParams } from 'react-router-dom';
@@ -6,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 export default function LocationPage() {
   const { t } = useTranslation();
   const currency = (amount) =>
-    Number.isFinite(Number(amount))
+    Number.isFinite(Number(amount)) && Number(amount) > 0
       ? `₦${Math.round(Number(amount)).toLocaleString('en-NG')}`
       : t('location_page.na');
 
@@ -47,6 +48,7 @@ export default function LocationPage() {
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true); setError(''); setData(null);
 
     const loadPage = async () => {
       try {
@@ -86,11 +88,11 @@ export default function LocationPage() {
   }, [stateSlug, lgaSlug, t]);
 
   if (loading) {
-    return <div className="px-4 py-16 text-center text-gray-600">{t('location_page.loading')}</div>;
+    return <><Helmet><meta name="robots" content="noindex,follow" /></Helmet><div className="px-4 py-16 text-center text-gray-600">{t('location_page.loading')}</div></>;
   }
 
   if (error || !data?.success) {
-    return <div className="px-4 py-16 text-center text-red-600">{error || t('location_page.not_found')}</div>;
+    return <><Helmet><meta name="robots" content="noindex,follow" /></Helmet><div className="px-4 py-16 text-center text-red-600">{error || t('location_page.not_found')}</div></>;
   }
 
   const faqSchema = {
@@ -152,12 +154,13 @@ export default function LocationPage() {
         <meta name="description" content={data.seo.description} />
         <meta name="keywords" content={(data.seo.keywords || []).join(', ')} />
         <link rel="canonical" href={data.canonical} />
+        <meta name="robots" content={data.indexable === false ? "noindex,follow" : "index,follow"} />
         <meta property="og:title" content={data.seo.title} />
         <meta property="og:description" content={data.seo.description} />
         <meta property="og:url" content={data.canonical} />
         <meta property="og:type" content="website" />
-        <script type="application/ld+json">{JSON.stringify(faqSchema)}</script>
-        <script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script>
+        <script type="application/ld+json">{safeStructuredJson(faqSchema)}</script>
+        <script type="application/ld+json">{safeStructuredJson(breadcrumbSchema)}</script>
       </Helmet>
 
       <div className="bg-stone-50">
@@ -197,7 +200,7 @@ export default function LocationPage() {
                   </p>
                 </div>
                 <div className="rounded-2xl bg-stone-100 p-4">
-                  <p className="text-xs uppercase tracking-wide text-gray-500">{t('location_page.average_rent')}</p>
+                  <p className="text-xs uppercase tracking-wide text-gray-500">{t('location_page.average_rent')} · {t('location_page.sample_method', { count: Number(data.stats?.sample_size || 0) })}</p>
                   <p className="mt-2 text-2xl font-bold text-gray-900">
                     {currency(data.stats?.avg_rent)}
                   </p>
@@ -212,7 +215,7 @@ export default function LocationPage() {
             </section>
 
             <aside className="rounded-3xl bg-primary-900 p-8 text-white shadow-sm">
-              <h2 className="text-xl font-semibold">{t('location_page.ranking_strategy')}</h2>
+              <h2 className="text-xl font-semibold">{t('location_page.search_guidance')}</h2>
               <p className="mt-3 text-sm leading-7 text-primary-100">{data.content?.strategy}</p>
 
               <div className="mt-6 space-y-2">
