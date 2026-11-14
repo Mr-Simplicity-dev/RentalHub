@@ -123,3 +123,25 @@ Video-Presets_290_Royalty_Free_Background_Music_Tracks/
 /client/public/assets/
 /client/public/index.html
 /client/.codex-tmp/
+
+# Generated server installers and earlier deployment staging
+/tools/local-face/vendor/
+__pycache__/
+*.pyc
+/.apk-*/
+/.dispute-privacy-*/
+/.identity-fix-*/
+/.local-privacy-*/
+/.mobile-51-*/
+/.mobile-new.apk
+/.passport-fix-*/
+/.phone-gate-*/
+/.prembly-retry-*/
+/.registration-geo-*/
+/.registration-recovery-*/
+/.role-constraint-*/
+/.support-customer-*/
+/-files -s RentalHubMobile
+/-tree HEAD RentalHubMobile
+/tatus --short
+/tatus --short --branch
