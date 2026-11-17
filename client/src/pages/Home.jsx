@@ -10,6 +10,8 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/useAuth';
 import FloatingContactWidget from '../components/common/FloatingContactWidget';
 import WhatsAppBotWidget from '../components/common/WhatsAppBotWidget';
+import CommercialVideoShowcase from '../components/promo/CommercialVideoShowcase';
+import ProductDemoCommercial from '../components/promo/ProductDemoCommercial';
 import api from '../services/api';
 
 const HUBSPOT_LANG_MAP = {
@@ -241,6 +243,29 @@ const Home = () => {
 
   return (
     <div className="w-full max-w-full overflow-x-hidden bg-white">
+      {/* Promo Commercial Top Announcement Bar */}
+      <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-amber-950 border-b border-emerald-500/30 text-white py-2.5 px-4 text-center">
+        <div className="container mx-auto flex flex-wrap items-center justify-center gap-2 text-xs sm:text-sm font-medium">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[11px] uppercase tracking-wide border border-emerald-500/40">
+            Product Tour Premiere
+          </span>
+          <span>Official 3D App Commercial (Abuja &amp; Kano • 9:16 &amp; 16:9 Cuts • 3 Soundtrack Presets)</span>
+          <a
+            href="#commercial-showcase"
+            className="inline-flex items-center gap-1 font-bold text-amber-300 hover:text-amber-200 underline underline-offset-4 ml-1 transition"
+          >
+            Watch Demo &darr;
+          </a>
+          <span className="text-slate-500 hidden sm:inline">|</span>
+          <Link
+            to="/promo"
+            className="text-emerald-300 hover:text-emerald-200 font-semibold underline underline-offset-4 hidden sm:inline"
+          >
+            Open Studio &rarr;
+          </Link>
+        </div>
+      </div>
+
       {showAppPrompt && (
         <section className="relative mx-4 mt-4 overflow-hidden rounded-2xl border border-primary-100 bg-gradient-to-r from-primary-50 to-white shadow-card animate-slideInRight transition-all duration-300 hover:-translate-y-0.5 hover:shadow-cardHover">
           <button
@@ -362,6 +387,14 @@ const Home = () => {
       </section>
 
       <AdSpace placement="home_top" variant="marquee" className="bg-white py-4" />
+
+      {/* Featured 3D Commercial Studio */}
+      <div id="commercial-showcase" className="bg-slate-950 py-10">
+        <div className="container mx-auto px-4 max-w-7xl mb-8">
+          <ProductDemoCommercial />
+        </div>
+        <CommercialVideoShowcase isStandalone={false} />
+      </div>
 
       {treatedCases && (
         <section className="bg-slate-50 py-16">

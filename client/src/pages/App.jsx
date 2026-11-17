@@ -142,6 +142,7 @@ const SuperSupportAdminDashboard = React.lazy(() => import('./admin/SuperSupport
 const RecruitmentAdminDashboard = React.lazy(() => import('./admin/RecruitmentAdminDashboard'));
 const TourAnalytics = React.lazy(() => import('./admin/TourAnalytics'));
 const TourMusicLibrary = React.lazy(() => import('./admin/TourMusicLibrary'));
+const PromoPage = React.lazy(() => import('./PromoPage'));
 
 const queryClient = new QueryClient();
 const LANGUAGE_OPTIONS = [
@@ -846,6 +847,9 @@ function App() {
               <Route path="/admin/assisted-registration" element={<ProtectedRoute><AssistedRegistration /></ProtectedRoute>} />
               {/* Public Routes */}
               <Route path="/" element={<Home />} />
+              <Route path="/promo" element={<PromoPage />} />
+              <Route path="/commercial" element={<PromoPage />} />
+              <Route path="/video-preview" element={<PromoPage />} />
               <Route path="/login" element={<Login />} />
               <Route path="/mobile-google-sign-in" element={<CustomerGoogleSignIn mobile />} />
               <Route path="/register" element={<Register />} />
