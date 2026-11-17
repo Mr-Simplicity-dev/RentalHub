@@ -84,6 +84,9 @@ const Profile = () => {
   const [passport, setPassport] = useState(null);
   const [passportPreview, setPassportPreview] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [photoSaveError, setPhotoSaveError] = useState('');
+  const autoSavedPhoto = useRef(null);
+  const savePhotoRef = useRef(null);
   const [pendingRedirect, setPendingRedirect] = useState(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraLoading, setCameraLoading] = useState(false);
@@ -621,6 +624,7 @@ const Profile = () => {
       return;
     }
 
+    setPhotoSaveError('');
     setUploading(true);
     try {
       let tokenToUse = liveCaptureToken;
@@ -659,6 +663,7 @@ const Profile = () => {
         res = await sendUpload(tokenToUse);
       }
 
+      if (res.data?.success !== true) throw Error(res.data?.message || 'Photo was not saved. Please try again.');
       if (res.data?.success) {
         toast.success(t(res.data.verification_pending ? 'profile.photo_review_pending' : 'profile.upload_success'));
         if (res.data.user) {
@@ -675,11 +680,20 @@ const Profile = () => {
         }
       }
     } catch (err) {
+      setPhotoSaveError(err?.response?.data?.message || t('profile.upload_failed'));
       toast.error(err?.response?.data?.message || t('profile.upload_failed'));
     } finally {
       setUploading(false);
     }
   };
+
+  savePhotoRef.current = handleUpload;
+  useEffect(() => {
+    if (passport && autoSavedPhoto.current !== passport) {
+      autoSavedPhoto.current = passport;
+      savePhotoRef.current();
+    }
+  }, [passport]);
 
   const handleProfileInputChange = (field) => (event) => {
     const value = event.target.value;
@@ -1149,7 +1163,7 @@ const Profile = () => {
                 {!cameraActive ? (
                   <button
                     onClick={startCamera}
-                    disabled={cameraLoading}
+                    disabled={cameraLoading || uploading}
                     className="btn btn-secondary w-full sm:w-72"
                     type="button"
                   >
@@ -1172,6 +1186,8 @@ const Profile = () => {
             )}
 
             <label className="my-4 flex items-start gap-3 text-sm text-gray-700"><input type="checkbox" checked={photoConsent} onChange={event=>setPhotoConsent(event.target.checked)} className="mt-1 h-5 w-5 shrink-0" /><span>{t('profile.face_gallery_consent')}</span></label>
+            {uploading && <p role="status" className="mt-3 text-center">{t('profile.saving_photo', 'Saving your photo…')}</p>}
+            {photoSaveError && <p role="alert" className="mt-3 text-center text-red-700">{photoSaveError}</p>}
             {passportPreview && (
               <div className="mb-5 rounded-xl border border-gray-200 p-4 bg-white">
                 <p className="text-sm font-medium text-gray-700 mb-3">{t('profile.captured_preview')}</p>
@@ -1186,14 +1202,14 @@ const Profile = () => {
               </div>
             )}
 
-            {passport && (
+            {passport && photoSaveError && (
               <div className="mt-3 flex justify-center">
                 <button
                   onClick={handleUpload}
                   disabled={uploading || !passport}
                   className="btn btn-primary w-full sm:w-72"
                 >
-                  {uploading ? t('profile.uploading') : t('profile.upload')}
+                  {t('profile.retry_photo_save', 'Try saving photo again')}
                 </button>
               </div>
             )}

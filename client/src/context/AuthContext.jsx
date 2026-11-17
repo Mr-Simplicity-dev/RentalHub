@@ -89,6 +89,19 @@ export const AuthProvider = ({ children }) => {
     setAuthUser(userData);
   }, []);
 
+  useEffect(() => {
+    if (!user?.id) return;
+    let active = true, running = false;
+    const refresh = async () => {
+      if (document.visibilityState !== 'visible' || running) return;
+      running = true;
+      try {const latest = await authService.getCurrentUser(); if (active && latest?.success && latest.data) updateUser(latest.data);} catch {}
+      finally {running = false;}
+    };
+    window.addEventListener('focus',refresh); document.addEventListener('visibilitychange',refresh);
+    return () => {active=false;window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);};
+  }, [user?.id, updateUser]);
+
   const establishSession = async (data) => {
     setAuthSession(data.token,data.user);
     if(data.token)api.defaults.headers.common.Authorization='Bearer '+data.token;

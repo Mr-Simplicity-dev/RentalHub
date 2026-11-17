@@ -19,7 +19,7 @@ function face({ size = 0.4, eye = 0.02, nose = 0.5 } = {}) {
   }
   return { multiFaceLandmarks: [points] };
 }
-test('camera mounts its stream, completes capture, previews and uploads to customer endpoint', async () => {
+test('camera completes liveness and saves once automatically without an upload button', async () => {
   vi.useFakeTimers();
   const container = document.createElement('div'); document.body.append(container);
   const root = createRoot(container);
@@ -52,10 +52,13 @@ test('camera mounts its stream, completes capture, previews and uploads to custo
     await act(async () => vi.advanceTimersByTime(700));
     expect(ui.getByAltText('Captured')).toBeTruthy();
     expect(stop).toHaveBeenCalled();
-    await act(async () => fireEvent.click(ui.getByText('Upload Photo')));
+    expect(ui.queryByRole('button',{name:'Upload Photo'})).toBeNull();
     expect(api.post.mock.calls.at(-1)[0]).toBe('/customer/photo');
     expect(api.post.mock.calls.at(-1)[2].headers['X-Capture-Token']).toBe('customer-session');
     expect(saved).toHaveBeenCalledOnce();
+    expect(api.post.mock.calls.filter(([url])=>url==='/customer/photo')).toHaveLength(1);
+    const form=api.post.mock.calls.at(-1)[1];
+    expect(form.get('biometric_consent')).toBe('true');
   } finally {
     await act(async () => root.unmount());
     container.remove(); script.remove(); delete window.FaceMesh;

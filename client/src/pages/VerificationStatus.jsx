@@ -1,3 +1,4 @@
+import {getReviewStatus} from '../utils/verificationStatus';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaCheckCircle, FaClock, FaExclamationTriangle, FaUserCircle, FaCamera } from 'react-icons/fa';
@@ -125,15 +126,7 @@ const VerificationStatus = () => {
     loadLatestStatus();
   }, [loadLatestStatus]);
 
-  const verificationStatus = useMemo(() => {
-    const hasSubmittedVerification = !!user?.passport_photo_url;
-    if (user?.identity_verification_status === 'provider_pending') return 'provider_pending';
-    if (user?.identity_verified) return 'verified';
-    if (user?.identity_verification_status === 'rejected') return 'rejected';
-    if (user?.identity_verification_status === 'revalidation_required') return 'revalidation_required';
-    if (user?.identity_verification_status === 'pending' || hasSubmittedVerification) return 'pending';
-    return 'not_submitted';
-  }, [user?.identity_verification_status, user?.identity_verified, user?.passport_photo_url]);
+  const verificationStatus = getReviewStatus(user);
 
   const statusDetails = useMemo(() => {
     const statuses = {
@@ -188,8 +181,14 @@ const VerificationStatus = () => {
         textClass: 'text-yellow-700',
       },
     };
-    return statuses[verificationStatus] || statuses.not_submitted;
+    return statuses[verificationStatus] || {title:t('verification_status.unavailable','Status unavailable'),description:t('verification_status.refresh_status','Refresh to load your current verification status.'),icon:<FaExclamationTriangle/>,cardClass:'bg-gray-50',titleClass:'text-gray-800',textClass:'text-gray-700'};
   }, [activeRevalidation, verificationStatus, t]);
+
+  useEffect(() => {
+    const refresh = () => {if (document.visibilityState === 'visible') loadLatestStatus();};
+    window.addEventListener('focus', refresh); document.addEventListener('visibilitychange', refresh);
+    return () => {window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh);};
+  }, [loadLatestStatus]);
 
   const handleRefresh = async () => {
     setRefreshing(true);

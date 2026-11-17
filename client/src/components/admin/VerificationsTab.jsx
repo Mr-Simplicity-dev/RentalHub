@@ -1,3 +1,4 @@
+import {getReviewStatus as resolveReviewStatus, getReviewStatusLabel} from '../../utils/verificationStatus';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../../hooks/useAuth';
 import React, { useState } from "react";
@@ -54,13 +55,7 @@ const VerificationsTab = ({
   const [reviewError, setReviewError] = useState("");
   const [reviewBusy, setReviewBusy] = useState(false);
 
-  const getReviewStatus = (verification) => {
-    if (verification?.identity_verification_status) {
-      return verification.identity_verification_status;
-    }
-
-    return verification?.identity_verified ? "verified" : "pending";
-  };
+  const getReviewStatus = resolveReviewStatus;
 
   const openReviewDialog = (verification, action) => {
     setReviewError("");
@@ -132,6 +127,7 @@ const VerificationsTab = ({
           >
             <option value="pending">Awaiting review</option>
             <option value="not_submitted">Incomplete</option>
+            <option value="provider_pending">Verification in progress</option>
             <option value="revalidation_required">Revalidation required</option>
             <option value="verified">Verified</option>
             <option value="rejected">Rejected</option>
@@ -255,13 +251,7 @@ const VerificationsTab = ({
                                 : "bg-yellow-100 text-yellow-700"
                           }`}
                       >
-                        {reviewStatus === "verified"
-                          ? "Verified"
-                          : reviewStatus === "rejected"
-                            ? "Rejected"
-                            : reviewStatus === "revalidation_required"
-                              ? "Revalidation Required"
-                            : reviewStatus === "not_submitted" ? "Incomplete" : "Awaiting review"}
+                        {reviewStatus === "not_submitted" ? "Incomplete" : getReviewStatusLabel(v)}
                       </span>
                       {reviewStatus === "not_submitted" && <p className="mt-2 max-w-48 text-xs text-slate-600">{!v.passport_photo_url ? "Face photo needed. " : ""}{!(v.nin || v.international_passport_number) ? "NIN or passport needed. " : ""}User completes these steps in Profile.</p>}
                     </td>

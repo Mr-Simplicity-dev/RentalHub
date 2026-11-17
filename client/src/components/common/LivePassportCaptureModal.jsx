@@ -153,6 +153,7 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title, sessionEndpoint =
   }, []);
 
   const startCamera = useCallback(async () => {
+    setSaveError('');
     setCameraLoading(true);
     setCameraError('');
     setLivenessError('');
@@ -234,26 +235,36 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title, sessionEndpoint =
     }, 650);
   }, [canCaptureLive, cameraActive, capturePhoto, stopResources]);
 
+  const autoSavedImage = useRef(null);
+  const [saveError,setSaveError] = useState('');
   const handleUpload = useCallback(async () => {
     if (!capturedImage) return;
+    setSaveError('');
     setUploadingPhoto(true);
     try {
       const blob = await fetch(capturedImage).then((r) => r.blob());
       const formData = new FormData();
       formData.append('passport', blob, `passport-capture-${Date.now()}.jpg`);
       formData.append('capture_source', 'live_camera');
+      formData.append('biometric_consent',consentConfirmed ? 'true' : 'false');
+      formData.append('biometric_consent_version','local-face-2026-11');
       if (liveCaptureToken) formData.append('live_capture_token', liveCaptureToken);
-      await api.post(uploadEndpoint, formData, { headers: { 'Content-Type': 'multipart/form-data', 'X-Capture-Token': liveCaptureToken } });
+      const result = await api.post(uploadEndpoint, formData, { headers: { 'Content-Type': 'multipart/form-data', 'X-Capture-Token': liveCaptureToken } });
+      if (result.data?.success !== true) throw Error(result.data?.message || 'Photo was not saved. Please try again.');
       toast.success(t('live_passport_capture.passport_uploaded', 'Passport photo uploaded successfully'));
       onCapture?.();
       onClose?.();
     } catch (err) {
+      setSaveError(err.response?.data?.message || t('live_passport_capture.upload_failed', 'Could not save photo'));
       toast.error(err.response?.data?.message || t('live_passport_capture.upload_failed', 'Upload failed'));
     } finally {
       setUploadingPhoto(false);
     }
-  }, [capturedImage, liveCaptureToken, onCapture, onClose, t, uploadEndpoint]);
+  }, [capturedImage, liveCaptureToken, onCapture, onClose, t, uploadEndpoint, consentConfirmed]);
 
+  useEffect(() => {
+    if (capturedImage && autoSavedImage.current !== capturedImage) {autoSavedImage.current = capturedImage; handleUpload();}
+  }, [capturedImage, handleUpload]);
   useEffect(() => { return () => stopResources(); }, [stopResources]);
 
   return (
@@ -275,17 +286,18 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title, sessionEndpoint =
           </div>
         )}
 
+        {saveError && <p role="alert" className="p-3 text-red-300">{saveError}</p>}
         {captured && !cameraActive && (
           <div className="text-center py-4 space-y-4">
             <img src={capturedImage} alt={t('live_passport_capture.captured_alt', 'Captured')} className="mx-auto max-h-60 rounded-lg border-2 border-green-500" />
-            <p className="text-sm text-green-400 font-medium">{t('live_passport_capture.liveness_passed', 'Liveness checks passed. Tap upload to proceed.')}</p>
+            <p className="text-sm text-green-400 font-medium">{saveError ? t('profile.photo_save_failed', 'Photo not saved. Try again.') : t('profile.saving_photo', 'Saving your photo…')}</p>
             <div className="flex justify-center gap-3">
               <button onClick={startCamera} disabled={cameraLoading || uploadingPhoto} className="inline-flex items-center gap-1 rounded-lg bg-zinc-700 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-600 transition">
                 <FaRedo /> {t('live_passport_capture.retake', 'Retake')}
               </button>
-              <button onClick={handleUpload} disabled={uploadingPhoto} className="inline-flex items-center gap-1 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 transition disabled:opacity-60">
-                {uploadingPhoto ? t('live_passport_capture.uploading', 'Uploading...') : t('live_passport_capture.upload_photo', 'Upload Photo')}
-              </button>
+              {saveError && <button onClick={handleUpload} disabled={uploadingPhoto} className="inline-flex items-center gap-1 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 transition disabled:opacity-60">
+                {t('profile.retry_photo_save', 'Try saving photo again')}
+              </button>}
             </div>
           </div>
         )}

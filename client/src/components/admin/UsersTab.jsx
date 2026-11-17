@@ -1,3 +1,4 @@
+import {getReviewStatusLabel} from '../../utils/verificationStatus';
 import { createPortal } from 'react-dom';
 import React, { useState } from "react";
 import api from "../../services/api";
@@ -689,15 +690,7 @@ const UsersTab = ({
                         : "bg-gray-100 text-gray-600"
                     }`}
                   >
-                    {selectedUserForModal.identity_verification_status === "verified"
-                      ? "Verified"
-                      : selectedUserForModal.identity_verification_status === "pending"
-                      ? "Pending Review"
-                      : selectedUserForModal.identity_verification_status === "revalidation_required"
-                      ? "Revalidation Required"
-                      : selectedUserForModal.identity_verification_status === "rejected"
-                      ? "Rejected"
-                      : "Not Submitted"}
+                    {getReviewStatusLabel(selectedUserForModal)}
                   </span>
 
                   <p className="text-sm text-gray-500 mt-1">
@@ -710,8 +703,8 @@ const UsersTab = ({
                       : selectedUserForModal.identity_verification_status === "rejected"
                       ? "Identity verification was rejected by an admin. The user may need to resubmit."
                       : selectedUserForModal.identity_verification_status === "verified"
-                      ? "Identity has been verified by an admin. All verification steps are complete."
-                      : ""}
+                      ? "Identity review is complete. Email and phone verification have their own status."
+                      : selectedUserForModal.identity_verification_status === "provider_pending" ? "The identity provider is still processing this verification." : "Refresh to load the current verification status."}
                   </p>
 
                   {selectedUserForModal.identity_verified_at && (

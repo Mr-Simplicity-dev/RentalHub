@@ -1,3 +1,4 @@
+import {getReviewStatus} from '../utils/verificationStatus';
 import EmailVerificationNotice from '../components/common/EmailVerificationNotice';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
@@ -287,13 +288,7 @@ const Dashboard = () => {
   const [graceActionLoading, setGraceActionLoading] = useState(false);
 
   const hasSubmittedVerification = !!user?.passport_photo_url;
-  const verificationReviewStatus =
-    user?.identity_verification_status ||
-    (user?.identity_verified
-      ? 'verified'
-      : hasSubmittedVerification
-        ? 'pending'
-        : 'not_submitted');
+  const verificationReviewStatus = getReviewStatus(user);
 
   const loadPaidPropertyLocations = useCallback(async () => {
     if (user?.user_type !== 'tenant') return;

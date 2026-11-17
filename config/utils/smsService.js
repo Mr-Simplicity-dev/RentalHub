@@ -81,13 +81,13 @@ function getSmsProviderOrder() {
     }
   });
 
-  SMS_PROVIDERS.forEach((provider) => {
-    if (!uniqueOrder.includes(provider)) {
-      uniqueOrder.push(provider);
-    }
-  });
 
-  return uniqueOrder;
+  return uniqueOrder.filter(provider => {
+    if (provider !== 'twilio') return true;
+    const service = cleanEnv(process.env.TWILIO_MESSAGING_SERVICE_SID);
+    const sender = [process.env.TWILIO_FROM, process.env.TWILIO_PHONE_NUMBER].map(cleanEnv).some(value => /^\+[1-9]\d{7,14}$/.test(value));
+    return Boolean(process.env.TWILIO_ACCOUNT_SID && (process.env.TWILIO_AUTH_TOKEN || (process.env.TWILIO_API_KEY && process.env.TWILIO_API_SECRET)) && (/^MG[a-f0-9]{32}$/i.test(service) || sender));
+  });
 }
 
 function getTwilioConfig() {
@@ -96,8 +96,9 @@ function getTwilioConfig() {
   // API key preferred over the master Auth Token (least privilege + revocable).
   const apiKeySid = cleanEnv(process.env.TWILIO_API_KEY);
   const apiKeySecret = cleanEnv(process.env.TWILIO_API_SECRET);
-  const from = cleanEnv(process.env.TWILIO_FROM || process.env.TWILIO_PHONE_NUMBER);
-  const messagingServiceSid = cleanEnv(process.env.TWILIO_MESSAGING_SERVICE_SID);
+  const from = [process.env.TWILIO_FROM, process.env.TWILIO_PHONE_NUMBER].map(cleanEnv).find(value => /^\+[1-9]\d{7,14}$/.test(value)) || '';
+  const configuredService = cleanEnv(process.env.TWILIO_MESSAGING_SERVICE_SID);
+  const messagingServiceSid = /^MG[a-f0-9]{32}$/i.test(configuredService) ? configuredService : '';
 
   if (!accountSid) {
     throw new Error('TWILIO_ACCOUNT_SID is not set in environment variables');
@@ -108,7 +109,7 @@ function getTwilioConfig() {
   }
 
   if (!from && !messagingServiceSid) {
-    throw new Error('TWILIO_FROM or TWILIO_MESSAGING_SERVICE_SID is not set in environment variables');
+    throw new Error('SMS backup unavailable: configure a valid TWILIO_FROM number or TWILIO_MESSAGING_SERVICE_SID; placeholder values cannot send messages');
   }
 
   return {

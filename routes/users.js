@@ -1,3 +1,4 @@
+const {getReviewStatus} = require('../config/utils/verificationStatus');
 const express = require('express');
 const router = express.Router();
 const db = require('../config/middleware/database');
@@ -1995,13 +1996,7 @@ router.get('/verification/status', authenticate, async (req, res) => {
       has_identity_number: hasIdentityNumber,
       passport: !!user.passport_photo_url,
       identity: user.identity_verified,
-      review_status:
-        user.identity_verification_status ||
-        (user.identity_verified
-          ? 'verified'
-          : user.passport_photo_url && hasIdentityNumber
-            ? 'pending'
-            : 'not_submitted'),
+      review_status: getReviewStatus(user),
       overall_complete: (user.email_verified || (user.assisted_registration && !user.email)) && 
                         user.phone_verified && 
                         ninStepComplete && 

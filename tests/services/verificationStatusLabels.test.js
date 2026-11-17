@@ -1,0 +1,6 @@
+const test=require('node:test'),assert=require('node:assert/strict');const {getReviewStatus,getReviewStatusLabel}=require('../../config/utils/verificationStatus');
+test('verified server flags override an old not-submitted label',()=>{assert.equal(getReviewStatus({identity_verified:true,identity_verification_status:'not_submitted'}),'verified');assert.equal(getReviewStatus({}, {identity:true,review_status:'not_submitted'}),'verified');});
+test('an active revalidation request is never presented as complete',()=>{assert.equal(getReviewStatus({identity_verified:true,identity_verification_status:'revalidation_required'}),'revalidation_required');});
+test('processing and new unknown states are never labelled not submitted',()=>{assert.equal(getReviewStatusLabel({identity_verification_status:'provider_pending'}),'Verification in progress');assert.equal(getReviewStatusLabel({identity_verification_status:'new_future_state'}),'Status unavailable');});
+test('missing submission and a submitted face photo remain different',()=>{assert.equal(getReviewStatus({}),'not_submitted');assert.equal(getReviewStatus({passport_photo_url:'private.jpg'}),'pending');});
+test('current API review status takes precedence over cached profile status',()=>{assert.equal(getReviewStatus({identity_verification_status:'not_submitted'}, {review_status:'pending',identity:false}),'pending');});
