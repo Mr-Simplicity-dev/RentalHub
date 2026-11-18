@@ -47,8 +47,15 @@ const Toggle = ({ checked, onChange, label, hint }) => (
   </label>
 );
 
+const getAudioSrc = (url) => {
+  if (!url) return '';
+  if (/^https?:\/\//i.test(url)) return url;
+  return `/${String(url).replace(/^\/+/, '')}`;
+};
+
 const TourMusicLibrary = () => {
   const [tracks, setTracks] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, totalPages: 1 });
   const [settings, setSettings] = useState({
     music_enabled: true,
     default_volume: 0.25,
@@ -63,14 +70,20 @@ const TourMusicLibrary = () => {
   const [audioPreview, setAudioPreview] = useState(null);
   const fileInputRef = useRef(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (page = 1) => {
     setLoading(true);
     try {
       const [tracksResponse, settingsResponse] = await Promise.all([
-        api.get(`${MUSIC_BASE}/tracks`, { params: { includeArchived: 'true' } }),
+        api.get(`${MUSIC_BASE}/tracks`, { params: { includeArchived: 'true', page, limit: 50 } }),
         api.get(`${MUSIC_BASE}/settings`),
       ]);
       setTracks(tracksResponse.data?.data || []);
+      if (tracksResponse.data?.pagination) {
+        setPagination(tracksResponse.data.pagination);
+      } else {
+        const data = tracksResponse.data?.data || [];
+        setPagination({ page: 1, limit: 50, total: data.length, totalPages: 1 });
+      }
       if (settingsResponse.data?.data) {
         setSettings((prev) => ({ ...prev, ...settingsResponse.data.data }));
       }
@@ -82,7 +95,7 @@ const TourMusicLibrary = () => {
   }, []);
 
   useEffect(() => {
-    load();
+    load(1);
   }, [load]);
 
   useEffect(() => () => {
@@ -139,7 +152,7 @@ const TourMusicLibrary = () => {
       if (audioPreview) URL.revokeObjectURL(audioPreview);
       setAudioPreview(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
-      await load();
+      await load(pagination.page);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Upload failed');
     } finally {
@@ -163,7 +176,7 @@ const TourMusicLibrary = () => {
     try {
       await api.delete(`${MUSIC_BASE}/tracks/${track.id}`);
       toast.success('Track archived');
-      await load();
+      await load(pagination.page);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Could not archive the track');
     }
@@ -198,13 +211,13 @@ const TourMusicLibrary = () => {
         </p>
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
           <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">
-            {activeTracks.length} active
+            {pagination.total} total tracks
+          </span>
+          <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">
+            {activeTracks.length} on this page (non-archived)
           </span>
           <span className="rounded-full bg-emerald-50 px-3 py-1 font-semibold text-emerald-700">
-            {licensedCount} cleared for commercial use
-          </span>
-          <span className="rounded-full bg-amber-50 px-3 py-1 font-semibold text-amber-700">
-            {activeTracks.length - licensedCount} awaiting licence
+            {licensedCount} licensed on this page
           </span>
         </div>
       </header>
@@ -440,7 +453,8 @@ const TourMusicLibrary = () => {
             No tracks yet. Tours fall back to silence until an approved track is added.
           </p>
         ) : (
-          <ul className="mt-3 divide-y divide-slate-100">
+          <>
+            <ul className="mt-3 divide-y divide-slate-100">
             {tracks.map((track) => (
               <li key={track.id} className="flex flex-col gap-3 py-4 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
@@ -464,9 +478,9 @@ const TourMusicLibrary = () => {
                   <p className="text-xs text-slate-500">
                     {[track.mood, track.license_type, track.license_source]
                       .filter(Boolean)
-                      .join(' · ') || 'No metadata'}
+                      .join(' | ') || 'No metadata'}
                   </p>
-                  <audio controls src={track.file_url} className="mt-2 w-full max-w-md">
+                  <audio controls preload="none" src={getAudioSrc(track.file_url)} className="mt-2 w-full max-w-md">
                     <track kind="captions" />
                   </audio>
                 </div>
@@ -516,6 +530,32 @@ const TourMusicLibrary = () => {
               </li>
             ))}
           </ul>
+            {pagination.totalPages > 1 && (
+              <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4 text-sm">
+                <span className="text-slate-600">
+                  Page {pagination.page} of {pagination.totalPages} ({pagination.total} tracks)
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => load(pagination.page - 1)}
+                    disabled={loading || pagination.page <= 1}
+                    className="rounded-lg border border-slate-300 px-3 py-1.5 disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => load(pagination.page + 1)}
+                    disabled={loading || pagination.page >= pagination.totalPages}
+                    className="rounded-lg border border-slate-300 px-3 py-1.5 disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </section>
     </div>

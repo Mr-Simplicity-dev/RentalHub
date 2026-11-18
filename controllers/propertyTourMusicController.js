@@ -20,14 +20,36 @@ const ALLOWED_EXT = ['.mp3', '.wav', '.aac', '.m4a'];
 
 exports.listTracks = async (req, res) => {
   try {
-    const { active, mood, includeArchived } = req.query;
+    const { active, mood, includeArchived, page = '1', limit = '50' } = req.query;
     let where = '1=1';
     const params = [];
     if (active === 'true') where += ' AND is_active = TRUE AND is_archived = FALSE';
     if (mood) { params.push(mood); where += ` AND mood = $${params.length}`; }
     if (includeArchived !== 'true') where += ' AND is_archived = FALSE';
-    const result = await db.query(`SELECT * FROM property_tour_music WHERE ${where} ORDER BY priority DESC, created_at DESC`, params);
-    res.json({ success: true, data: result.rows });
+
+    const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+    const limitNum = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+    const offset = (pageNum - 1) * limitNum;
+
+    const countResult = await db.query(`SELECT COUNT(*)::int AS total FROM property_tour_music WHERE ${where}`, params);
+    const total = countResult.rows[0]?.total || 0;
+
+    const dataParams = [...params, limitNum, offset];
+    const result = await db.query(
+      `SELECT * FROM property_tour_music WHERE ${where} ORDER BY priority DESC, created_at DESC LIMIT $${dataParams.length - 1} OFFSET $${dataParams.length}`,
+      dataParams
+    );
+
+    res.json({
+      success: true,
+      data: result.rows,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.max(Math.ceil(total / limitNum), 1),
+      },
+    });
   } catch (error) {
     logger.error('List tour music error:', error.message);
     res.status(500).json({ success: false, message: 'Failed to load music library' });

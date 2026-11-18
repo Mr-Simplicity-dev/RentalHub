@@ -862,9 +862,24 @@ app.use('/api/admin/inspections', adminLimiter, adminInspectionRoutes);
 app.use('/api', generalOpsLimiter, appealRoutes);
 app.use('/api', generalOpsLimiter, locationRoutes);
 
+const tourMusicPresetsPath = path.join(__dirname, 'Video-Presets_290_Royalty_Free_Background_Music_Tracks');
+if (fs.existsSync(tourMusicPresetsPath)) {
+  app.use('/Video-Presets_290_Royalty_Free_Background_Music_Tracks', express.static(tourMusicPresetsPath, {
+    dotfiles: 'deny',
+    index: false,
+    setHeaders: (res, filePath) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      const ext = path.extname(filePath).toLowerCase();
+      if (ext === '.mp3') res.setHeader('Content-Type', 'audio/mpeg');
+      else if (ext === '.wav') res.setHeader('Content-Type', 'audio/wav');
+      res.setHeader('Accept-Ranges', 'bytes');
+    },
+  }));
+}
+
 app.use(express.static(clientBuildPath));
 
-app.get(/^\/(?!api\/|socket\.io\/|uploads\/).*/, (req, res, next) => {
+app.get(/^\/(?!api\/|socket\.io\/|uploads\/|Video-Presets_290_Royalty_Free_Background_Music_Tracks\/).*/, (req, res, next) => {
   if (!fs.existsSync(clientIndexPath)) return next();
   if (!res.locals.cspNonce) return res.sendFile(clientIndexPath);
   const html = fs.readFileSync(clientIndexPath, 'utf8');
