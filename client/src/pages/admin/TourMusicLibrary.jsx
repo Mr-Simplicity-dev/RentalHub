@@ -531,10 +531,10 @@ const TourMusicLibrary = () => {
               </li>
             ))}
           </ul>
-            {pagination.totalPages > 1 && (
+            {pagination.total > 0 && (
               <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4 text-sm">
                 <span className="text-slate-600">
-                  Page {pagination.page} of {pagination.totalPages} ({pagination.total} tracks)
+                  Showing {(pagination.page - 1) * pagination.limit + 1}–{Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} tracks (Page {pagination.page} of {pagination.totalPages})
                 </span>
                 <div className="flex gap-2">
                   <button
