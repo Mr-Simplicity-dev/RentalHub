@@ -1881,7 +1881,7 @@ router.put('/profile', authenticate, [
         if (key === 'phone' && !value) {
           continue;
         }
-        updates.push(`${key} = ${paramCount}`);
+        updates.push(`${key} = $${paramCount}`);
         params.push(value);
         paramCount++;
         if (key === 'phone' && phoneChanged) {
