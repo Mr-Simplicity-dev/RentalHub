@@ -70,6 +70,7 @@ const EmailMarketingTab = () => {
   const [stats, setStats] = useState(null);
 
   // Subscribers
+  const SUB_PAGE_SIZE = 30;
   const [subscribers, setSubscribers] = useState([]);
   const [subSearch, setSubSearch] = useState('');
   const [subPage, setSubPage] = useState(1);
@@ -109,10 +110,10 @@ const EmailMarketingTab = () => {
 
   const loadSubscribers = useCallback(async (search = '', page = 1) => {
     try {
-      const params = { page, limit: 30 };
+      const params = { page, limit: SUB_PAGE_SIZE };
       if (search) params.search = search;
       const res = await api.get('/email-marketing/subscribers', { params });
-      setSubscribers(res.data.data);
+      setSubscribers(res.data.data || []);
       setSubTotal(res.data.pagination?.total || 0);
     } catch {
       toast.error('Failed to load subscribers');
@@ -499,7 +500,7 @@ const EmailMarketingTab = () => {
     }
   };
 
-  const totalPages = Math.ceil(subTotal / 30);
+  const totalPages = Math.max(Math.ceil(subTotal / SUB_PAGE_SIZE), 1);
 
   // ─── Renderers ────────────────────────────────────────────────────────────
   const renderOverview = () => (
@@ -691,11 +692,17 @@ const EmailMarketingTab = () => {
           </DataTable>
         </div>
 
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2">
-            <SecondaryButton disabled={subPage <= 1} onClick={() => setSubPage((p) => Math.max(1, p - 1))} aria-label="Previous page" className="px-3 py-2"><FaChevronLeft /></SecondaryButton>
-            <span className="text-sm text-gray-600">Page {subPage} of {totalPages}</span>
-            <SecondaryButton disabled={subPage >= totalPages} onClick={() => setSubPage((p) => p + 1)} aria-label="Next page" className="px-3 py-2"><FaChevronRight /></SecondaryButton>
+        {subTotal > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-3">
+            <span className="text-sm text-gray-600">
+              Showing {(subPage - 1) * SUB_PAGE_SIZE + 1}–{Math.min(subPage * SUB_PAGE_SIZE, subTotal)} of {subTotal} contacts (Page {subPage} of {totalPages})
+            </span>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <SecondaryButton disabled={subPage <= 1} onClick={() => setSubPage((p) => Math.max(1, p - 1))} aria-label="Previous page" className="px-3 py-2"><FaChevronLeft /></SecondaryButton>
+                <SecondaryButton disabled={subPage >= totalPages} onClick={() => setSubPage((p) => p + 1)} aria-label="Next page" className="px-3 py-2"><FaChevronRight /></SecondaryButton>
+              </div>
+            )}
           </div>
         )}
       </div>

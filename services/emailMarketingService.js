@@ -198,7 +198,22 @@ const listSubscribers = async (req, res) => {
       [...params, parseInt(limit, 10), offset]
     );
 
-    res.json({ success: true, data: rows, pagination: { page: parseInt(page, 10), limit: parseInt(limit, 10), total } });
+    const data = rows.map((row) => {
+      let email = row.email || row.email_address || row.mail || row.contact_email || '';
+      if (!email) {
+        for (const [key, value] of Object.entries(row)) {
+          if (!value) continue;
+          if (/email|mail/i.test(key) && String(value).includes('@')) {
+            email = String(value).trim();
+            break;
+          }
+        }
+      }
+      const full_name = row.full_name || row.fullName || row.name || row.contact_name || row.display_name || '';
+      return { ...row, email, full_name };
+    });
+
+    res.json({ success: true, data, pagination: { page: parseInt(page, 10), limit: parseInt(limit, 10), total } });
   } catch (error) {
     req.logger.error('List subscribers error:', error.message);
     res.status(500).json({ success: false, message: 'Failed to load subscribers' });
