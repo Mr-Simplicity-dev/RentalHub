@@ -103,6 +103,7 @@ const SmsMarketingTab = () => {
 
   const [stats, setStats] = useState(null);
 
+  const SUB_PAGE_SIZE = 30;
   const [subscribers, setSubscribers] = useState([]);
   const [subSearch, setSubSearch] = useState('');
   const [subPage, setSubPage] = useState(1);
@@ -142,10 +143,10 @@ const SmsMarketingTab = () => {
 
   const loadSubscribers = useCallback(async (search = '', page = 1) => {
     try {
-      const params = { page, limit: 30 };
+      const params = { page, limit: SUB_PAGE_SIZE };
       if (search) params.search = search;
       const res = await api.get('/sms-marketing/subscribers', { params });
-      setSubscribers(res.data.data);
+      setSubscribers(res.data.data || []);
       setSubTotal(res.data.pagination?.total || 0);
     } catch {
       toast.error('Failed to load SMS subscribers');
@@ -554,7 +555,7 @@ const SmsMarketingTab = () => {
     }
   };
 
-  const totalPages = Math.ceil(subTotal / 30);
+  const totalPages = Math.max(Math.ceil(subTotal / SUB_PAGE_SIZE), 1);
 
   const segments = getSegments(campaignForm.content);
 
@@ -729,8 +730,8 @@ const SmsMarketingTab = () => {
           <DataTable columns={['S/N', 'Phone', 'Name', 'Source', 'Type', 'Status', 'Added', 'Actions']}>
             {subscribers.map((sub, index) => (
               <tr key={sub.id} className="transition-colors hover:bg-gray-50/70">
-                <Td className="text-gray-600">{(subPage - 1) * 50 + index + 1}</Td>
-                <Td className="font-medium text-gray-900">{sub.phone}</Td>
+                <Td className="text-gray-600">{(subPage - 1) * SUB_PAGE_SIZE + index + 1}</Td>
+                <Td className="font-medium text-gray-900">{sub.phone || '\u2014'}</Td>
                 <Td className="text-gray-600">{sub.full_name || '\u2014'}</Td>
                 <Td><span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium">{sub.source}</span></Td>
                 <Td className="text-gray-600">{sub.user_type || '\u2014'}</Td>
@@ -762,23 +763,29 @@ const SmsMarketingTab = () => {
           </DataTable>
         )}
 
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2">
-            <SecondaryButton
-              aria-label="Previous page"
-              disabled={subPage <= 1}
-              onClick={() => setSubPage((p) => Math.max(1, p - 1))}
-            >
-              <FaChevronLeft />
-            </SecondaryButton>
-            <span className="text-sm text-gray-600">Page {subPage} of {totalPages}</span>
-            <SecondaryButton
-              aria-label="Next page"
-              disabled={subPage >= totalPages}
-              onClick={() => setSubPage((p) => p + 1)}
-            >
-              <FaChevronRight />
-            </SecondaryButton>
+        {subTotal > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-3">
+            <span className="text-sm text-gray-600">
+              Showing {(subPage - 1) * SUB_PAGE_SIZE + 1}–{Math.min(subPage * SUB_PAGE_SIZE, subTotal)} of {subTotal} contacts (Page {subPage} of {totalPages})
+            </span>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <SecondaryButton
+                  aria-label="Previous page"
+                  disabled={subPage <= 1}
+                  onClick={() => setSubPage((p) => Math.max(1, p - 1))}
+                >
+                  <FaChevronLeft />
+                </SecondaryButton>
+                <SecondaryButton
+                  aria-label="Next page"
+                  disabled={subPage >= totalPages}
+                  onClick={() => setSubPage((p) => p + 1)}
+                >
+                  <FaChevronRight />
+                </SecondaryButton>
+              </div>
+            )}
           </div>
         )}
       </div>
