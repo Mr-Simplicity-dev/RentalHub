@@ -20,7 +20,7 @@ function createRuntime({db,logger,cron,exit=code=>process.exit(code),timers={set
  async function once(name,fn){await register(name,'startup','once');return execute(name,fn);}
  function lost(error){if(!leader||stopping)return;leader=false;logger.error('Background job leadership lost; restarting worker',{code:error?.code||'JOB_LEADER_LOST'});timers.setTimeout(()=>exit(1),1000).unref?.();}
  async function elect(){
-  if(leader||starting||stopping)return;starting=true;let candidate;
+  if(leader||starting||stopping||(typeof db.isMockActive==='function'&&db.isMockActive()))return;starting=true;let candidate;
   try{candidate=await db.connect();const locked=(await candidate.query('SELECT pg_try_advisory_lock(2047,1) AS locked')).rows[0]?.locked;if(!locked){candidate.release();return;}
    client=candidate;client.on?.('error',lost);client.on?.('end',()=>lost());
    await client.query(`INSERT INTO background_job_runtime(app,owner_id,host,process_id,pm_id,started_at,heartbeat_at,status) VALUES('rentalhub',$1,$2,$3,$4,NOW(),NOW(),'leader') ON CONFLICT(app) DO UPDATE SET owner_id=$1,host=$2,process_id=$3,pm_id=$4,started_at=NOW(),heartbeat_at=NOW(),status='leader'`,[owner,os.hostname(),process.pid,String(env.pm_id??'standalone')]);

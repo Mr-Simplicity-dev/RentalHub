@@ -1836,6 +1836,16 @@ router.get('/:userId', authenticate, async (req, res) => {
   }
 });
 
+const normalizePhoneKey = (value) => {
+  const raw = String(value || '').trim();
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return null;
+  if (/^0[789]\d{9}$/.test(digits)) return `+234${digits.slice(1)}`;
+  if (/^234[789]\d{9}$/.test(digits)) return `+${digits}`;
+  if (raw.startsWith('+') && /^[1-9]\d{7,14}$/.test(digits)) return `+${digits}`;
+  return digits;
+};
+
 // Update user profile
 router.put('/profile', authenticate, [
   body('full_name').optional({ checkFalsy: true }).trim().isLength({ min: 2, max: 255 }).withMessage('Full name must be 2-255 characters'),
@@ -1846,6 +1856,21 @@ router.put('/profile', authenticate, [
   try {
     const userId = req.user.id;
 
+    const existingResult = await db.query(
+      'SELECT id, phone FROM users WHERE id = $1',
+      [userId]
+    );
+    if (!existingResult.rows.length) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const existingPhone = existingResult.rows[0].phone;
+    const nextPhone = req.body?.phone;
+    const phoneChanged = Boolean(
+      nextPhone &&
+      normalizePhoneKey(nextPhone) !== normalizePhoneKey(existingPhone)
+    );
+
     const allowedColumns = new Set(['full_name', 'phone', 'bio', 'avatar_url']);
     const updates = [];
     const params = [];
@@ -1853,10 +1878,13 @@ router.put('/profile', authenticate, [
 
     for (const [key, value] of Object.entries(req.body)) {
       if (allowedColumns.has(key)) {
-        updates.push(`${key} = $${paramCount}`);
+        if (key === 'phone' && !value) {
+          continue;
+        }
+        updates.push(`${key} = ${paramCount}`);
         params.push(value);
         paramCount++;
-        if (key === 'phone') {
+        if (key === 'phone' && phoneChanged) {
           updates.push('phone_verified = FALSE');
         }
       }
@@ -1869,9 +1897,14 @@ router.put('/profile', authenticate, [
       });
     }
 
-    if(req.body?.phone){
-      const duplicate=await db.query('SELECT id FROM users WHERE id<>$1 AND deleted_at IS NULL AND rentalhub_phone_key(phone)=rentalhub_phone_key($2) LIMIT 1',[userId,req.body.phone]);
-      if(duplicate.rows.length)return res.status(409).json({success:false,message:'This phone number is already registered.'});
+    if (phoneChanged) {
+      const duplicate = await db.query(
+        'SELECT id FROM users WHERE id<>$1 AND deleted_at IS NULL AND rentalhub_phone_key(phone)=rentalhub_phone_key($2) LIMIT 1',
+        [userId, nextPhone]
+      );
+      if (duplicate.rows.length) {
+        return res.status(409).json({ success: false, message: 'This phone number is already registered.' });
+      }
     }
     updates.push('updated_at = CURRENT_TIMESTAMP');
     params.push(userId);

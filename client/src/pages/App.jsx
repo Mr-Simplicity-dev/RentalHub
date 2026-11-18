@@ -979,6 +979,7 @@ function App() {
               <Route path="/tenancy-agreements/:id" element={<TenancyAgreementDetail />} />
               <Route path="/subscribed-properties" element={<SubscribedProperties />} />
               <Route path="/support" element={<Support />} />
+              <Route path="/contact" element={<Navigate to="/support" replace />} />
               <Route path="/support/tickets/:ticketId" element={<ProtectedRoute><SupportTicketEntry /></ProtectedRoute>} />
               <Route path="/dispute/:disputeId" element={<DisputeDetails />} />
               <Route path="/nigeria" element={<NigeriaPage />} />

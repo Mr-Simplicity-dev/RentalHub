@@ -704,19 +704,22 @@ const Profile = () => {
   };
 
   const handleProfileSave = async () => {
-    const payload = {
-      full_name: profileForm.full_name?.trim(),
-      phone: profileForm.phone?.trim(),
-    };
+    const fullName = profileForm.full_name?.trim();
+    const nextPhone = profileForm.phone?.trim();
 
-    if (!payload.full_name) {
+    if (!fullName) {
       toast.error('Full name is required.');
       return;
     }
 
-    if (!payload.phone) {
+    if (!nextPhone) {
       toast.error('Phone number is required.');
       return;
+    }
+
+    const payload = { full_name: fullName };
+    if (nextPhone !== String(user?.phone || '').trim()) {
+      payload.phone = nextPhone;
     }
 
     setSavingProfile(true);
@@ -808,7 +811,29 @@ const Profile = () => {
                 onChange={handleProfileInputChange('phone')}
               />
             ) : (
-              <span className="ml-2">{user?.phone}</span>
+              <span className="ml-2 inline-flex flex-wrap items-center gap-2">
+                <span>{user?.phone || t('profile.not_provided')}</span>
+                {user?.phone ? (
+                  user?.phone_verified ? (
+                    <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-700">
+                      {t('profile.phone_verified_badge', 'Verified')}
+                    </span>
+                  ) : (
+                    <>
+                      <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                        {t('profile.phone_unverified_badge', 'Not verified')}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn-outline px-3 py-1 text-xs"
+                        onClick={() => navigate('/verify-phone')}
+                      >
+                        {t('verify_phone.title', 'Verify Phone')}
+                      </button>
+                    </>
+                  )
+                ) : null}
+              </span>
             )}
           </div>
           <div><strong>{t('profile.nin')}:</strong> <span className="ml-2">{user?.nin || t('profile.not_provided')}</span></div>

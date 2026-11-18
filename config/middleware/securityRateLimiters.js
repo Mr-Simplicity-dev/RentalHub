@@ -217,6 +217,12 @@ const assistantReadLimiter = buildLimiter({name:'account-assistant',windowMs:60 
 
 const assistedRegistrationQuoteLimiter = buildLimiter({ name: 'assisted-registration-quote', windowMs: 60 * 60 * 1000, max: 120, keyGenerator: req => String(req.user.id), message: 'Too many fee reviews. Please try again later.' });
 const assistedRegistrationCreateLimiter = buildLimiter({ name: 'assisted-registration-create', windowMs: 60 * 60 * 1000, max: 60, keyGenerator: req => String(req.user.id), message: 'Too many assisted registrations. Please try again later.' });
+const mobileTelemetryLimiter = buildLimiter({
+  name: 'mobile-telemetry',
+  windowMs: Number(process.env.MOBILE_TELEMETRY_WINDOW_MS) || 15 * 60 * 1000,
+  max: Number(process.env.MOBILE_TELEMETRY_MAX) || 30,
+  message: 'Too many mobile telemetry requests. Please try again shortly.',
+});
 module.exports = {
   assistedRegistrationQuoteLimiter,
   assistedRegistrationCreateLimiter,
@@ -243,4 +249,5 @@ module.exports = {
   registrationLimiter,
   tourEventLimiter,
   voiceTokenLimiter,
+  mobileTelemetryLimiter,
 };

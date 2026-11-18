@@ -141,6 +141,13 @@ router.post(
   propertyController.createPropertyImageCaptureSession
 );
 
+router.post(
+  '/image-capture-session',
+  authenticate,
+  isLandlordOrAgent,
+  propertyController.createPropertyImageCaptureSession
+);
+
 // Create new property (with media)
 router.post(
   '/',

@@ -426,6 +426,9 @@ app.use(helmet({
         "https://static.cloudflareinsights.com",
         "https://accounts.google.com",
         "https://maps.googleapis.com",
+        "https://eventgw.twilio.com",
+        "https://*.twilio.com",
+        "wss://*.twilio.com",
       ],
       imgSrc: [
         "'self'",
@@ -848,6 +851,8 @@ app.use('/api/property-protection', adminLimiter, require('./routes/propertyProt
 app.use('/api/whatsapp-support', adminLimiter, require('./routes/whatsappSupport'));
 app.use('/api/support', adminLimiter, supportRoutes);
 app.use('/api/system', adminLimiter, systemRoutes);
+app.post('/api/mobile/diagnostics/crash', require('./config/middleware/securityRateLimiters').mobileTelemetryLimiter, require('./config/middleware/auth').optionalAuthenticate);
+app.post('/api/mobile/analytics/events', require('./config/middleware/securityRateLimiters').mobileTelemetryLimiter, require('./config/middleware/auth').optionalAuthenticate);
 app.use('/api/mobile', generalOpsLimiter, mobileDiagnosticsRoutes);
 app.use('/api/voice', voiceRoutes);
 app.use('/api/damage-reports', generalOpsLimiter, damageReportRoutes);

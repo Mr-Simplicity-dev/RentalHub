@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
+import { toast } from 'react-toastify';
 import FumigationMap from './FumigationMap';
 import {
   FaSprayCan,
@@ -70,12 +71,13 @@ const FumigationFleetTracker = ({ adminLevel = 'national' }) => {
         resolution_note: resolutionNote.trim()
       });
       if (res.data?.success) {
+        toast.success('Incident marked as resolved');
         setResolvingIncident(null);
         setResolutionNote('');
         fetchFleetData();
       }
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to resolve incident');
+      toast.error(err.response?.data?.message || 'Failed to resolve incident');
     } finally {
       setSubmittingResolution(false);
     }

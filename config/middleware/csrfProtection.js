@@ -28,6 +28,9 @@ const CSRF_EXEMPT_PATHS = new Set([
   '/api/palmpay/webhook',
   '/api/mobile/diagnostics/crash',
   '/api/mobile/analytics/events',
+  '/api/downloads/version',
+  '/api/downloads/latest-version',
+  '/api/downloads/app-version',
 ]);
 
 const maybeCookieAuth = (cookies) => {
@@ -47,15 +50,20 @@ const csrfProtection = (req, res, next) => {
     return next();
   }
 
-  // 2. Native mobile clients cannot be CSRF attacked (mobile apps run outside web browser sandbox)
-  const clientHeader = String(req.headers['x-rentalhub-client'] || req.headers['x-client-platform'] || '').toLowerCase();
-  if (clientHeader === 'native' || clientHeader === 'mobile' || clientHeader === 'android' || clientHeader === 'ios') {
+  const cookies = parseCookies(req.headers.cookie);
+
+  // 2. Requests explicitly authenticated via Bearer token are API calls, not ambient cookie requests
+  const authHeader = String(req.headers.authorization || '');
+  if (authHeader.startsWith('Bearer ') && authHeader.length > 7) {
     return next();
   }
 
-  // 3. Requests explicitly authenticated via Bearer token are API calls, not ambient cookie requests
-  const authHeader = String(req.headers.authorization || '');
-  if (authHeader.startsWith('Bearer ') && authHeader.length > 7) {
+  // 3. Native mobile clients cannot be CSRF attacked when not relying on ambient browser cookies
+  const clientHeader = String(req.headers['x-rentalhub-client'] || req.headers['x-client-platform'] || '').toLowerCase();
+  if (
+    (clientHeader === 'native' || clientHeader === 'mobile' || clientHeader === 'android' || clientHeader === 'ios') &&
+    !maybeCookieAuth(cookies)
+  ) {
     return next();
   }
 
@@ -79,8 +87,6 @@ const csrfProtection = (req, res, next) => {
   }
 
   // 6. Only enforce CSRF if ambient session cookies are present (browser session).
-  const cookies = parseCookies(req.headers.cookie);
-
   if (!maybeCookieAuth(cookies)) {
     return next();
   }

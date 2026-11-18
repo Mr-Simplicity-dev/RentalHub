@@ -79,6 +79,48 @@ router.get('/bookings/:bookingId/tracking',
   transportationController.getBookingTracking
 );
 
+// Customer confirms delivery completion signoff or reports a problem
+router.post('/bookings/:bookingId/signoff',
+  authenticate,
+  isTenant,
+  async (req, res) => {
+    try {
+      const TransportationTrackingService = require('../services/transportationTrackingService');
+      const bookingId = Number(req.params.bookingId);
+      const {
+        satisfied,
+        rating,
+        feedback,
+        note,
+        problem_reported,
+        problemReported,
+        problem_description,
+        problemDescription
+      } = req.body || {};
+
+      const isProblem = Boolean(problem_reported ?? problemReported) || satisfied === false;
+      const result = await TransportationTrackingService.confirmTenantSignoff({
+        bookingId,
+        tenantUser: req.user,
+        satisfied,
+        rating,
+        feedback: feedback ?? note,
+        note,
+        problemReported: isProblem,
+        problemDescription: problem_description ?? problemDescription
+      });
+
+      return res.json({
+        success: true,
+        data: result,
+        message: isProblem ? 'Issue recorded and escalated to support' : 'Delivery receipt confirmed'
+      });
+    } catch (error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
+
 // Cancel transportation booking
 router.delete('/bookings/:bookingId/cancel',
   authenticate,

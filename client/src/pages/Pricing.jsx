@@ -470,7 +470,7 @@ const Pricing = () => {
                 <h3 className="text-lg font-bold text-gray-900 mb-2">{addon.name}</h3>
                 <p className="text-gray-600 text-sm leading-relaxed mb-6">{addon.desc}</p>
                 <Link
-                  to="/contact"
+                  to="/support"
                   className="inline-flex items-center gap-2 text-primary-600 font-semibold text-sm hover:text-primary-700 transition-colors"
                 >
                   {t('pricing.addons_inquire')} <FaArrowRight className="text-xs" />

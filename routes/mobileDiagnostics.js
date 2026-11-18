@@ -11,6 +11,17 @@ const router = express.Router();
 // "latest version" so the update check stays in sync with what was shipped,
 // instead of a manually maintained env var.
 const BUILD_INFO_PATH = path.resolve(__dirname, '..', 'uploads', 'version.json');
+const MOBILE_APP_CONFIG_PATH = path.resolve(__dirname, '..', 'RentalHubMobile', 'app.json');
+const MAX_TELEMETRY_METADATA_BYTES = 4096;
+
+const readMobileAppConfig = () => {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(MOBILE_APP_CONFIG_PATH, 'utf8'));
+    return parsed?.expo || {};
+  } catch {
+    return {};
+  }
+};
 
 const readDeployedVersion = () => {
   try {
@@ -114,10 +125,26 @@ const platformUpdateUrl = (platform) =>
   platformApkUrl(platform) || platformStoreUrl(platform);
 
 // iOS and Android ship on separate tracks: version.json describes the Android
-// build, so using it for iOS would tell every iPhone it is 1.0.39 behind and
-// loop the update prompt forever. iOS therefore answers from its own version.
+// build, so using it for iOS would tell every iPhone it is behind and loop the
+// update prompt forever. iOS answers from env override or RentalHubMobile/app.json.
 const readIosVersion = () =>
-  process.env.MOBILE_IOS_LATEST_VERSION || '1.0.3';
+  process.env.MOBILE_IOS_LATEST_VERSION || readMobileAppConfig()?.version || '1.0.52';
+
+const readIosBuildNumber = () =>
+  process.env.MOBILE_IOS_BUILD_NUMBER ||
+  String(readMobileAppConfig()?.ios?.buildNumber || '').trim() ||
+  '63';
+
+const validateTelemetryMetadata = (value) => {
+  if (value === undefined) return true;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Metadata must be a JSON object');
+  }
+  if (Buffer.byteLength(JSON.stringify(value), 'utf8') > MAX_TELEMETRY_METADATA_BYTES) {
+    throw new Error('Metadata exceeds maximum allowed size');
+  }
+  return true;
+};
 
 router.post(
   '/diagnostics/crash',
@@ -128,7 +155,7 @@ router.post(
     body('platform').optional().isString().trim().isLength({ max: 40 }),
     body('app_version').optional().isString().trim().isLength({ max: 80 }),
     body('route_name').optional().isString().trim().isLength({ max: 120 }),
-    body('metadata').optional().isObject(),
+    body('metadata').optional().custom(validateTelemetryMetadata),
   ],
   validateRequest,
   async (req, res) => {
@@ -146,8 +173,8 @@ router.post(
 
       const result = await db.query(
         `INSERT INTO mobile_crash_reports
-          (message, stack, component_stack, platform, app_version, route_name, metadata)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+          (message, stack, component_stack, platform, app_version, route_name, user_id, metadata)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING id, created_at`,
         [
           message,
@@ -156,6 +183,7 @@ router.post(
           platform,
           app_version,
           route_name,
+          req.user?.id || null,
           JSON.stringify({
             ...metadata,
             user_agent: req.get('User-Agent') || null,
@@ -182,7 +210,7 @@ router.post(
     body('platform').optional().isString().trim().isLength({ max: 40 }),
     body('app_version').optional().isString().trim().isLength({ max: 80 }),
     body('session_id').optional().isString().trim().isLength({ max: 120 }),
-    body('metadata').optional().isObject(),
+    body('metadata').optional().custom(validateTelemetryMetadata),
   ],
   validateRequest,
   async (req, res) => {
@@ -210,6 +238,7 @@ router.post(
           session_id,
           JSON.stringify({
             ...metadata,
+            user_id: req.user?.id || null,
             user_agent: req.get('User-Agent') || null,
           }),
         ]
@@ -248,21 +277,29 @@ router.get('/app-version', (req, res) => {
   let deployedBuildNumber = null;
   try {
     deployedBuildNumber = isIos
-      ? process.env.MOBILE_IOS_BUILD_NUMBER || '13'
+      ? readIosBuildNumber()
       : JSON.parse(fs.readFileSync(BUILD_INFO_PATH, 'utf8'))?.buildNumber || null;
   } catch {
     deployedBuildNumber = null;
   }
 
+  const minimumBuildNumber = isIos
+    ? process.env.MOBILE_IOS_MINIMUM_BUILD_NUMBER || null
+    : process.env.MOBILE_MINIMUM_BUILD_NUMBER ||
+      process.env.MOBILE_ANDROID_MINIMUM_BUILD_NUMBER ||
+      null;
+
   // Prefer build number (versionCode/buildNumber) over semver when both are present
   // so reinstalling the same versionName/build doesn't show "update available".
-  const buildComparison = compareBuildNumbers(req.query.buildNumber || req.query.build || req.query.versionCode, deployedBuildNumber);
+  const clientBuild = req.query.buildNumber || req.query.build || req.query.versionCode;
+  const buildComparison = compareBuildNumbers(clientBuild, deployedBuildNumber);
+  const minimumBuildComparison = compareBuildNumbers(clientBuild, minimumBuildNumber);
 
   const updateAvailable = currentVersion
     ? (buildComparison !== null ? buildComparison < 0 : compareVersions(currentVersion, latestVersion) < 0)
     : false;
   const updateRequired = currentVersion
-    ? (buildComparison !== null ? buildComparison < 0 && false : compareVersions(currentVersion, minimumVersion) < 0)
+    ? (minimumBuildComparison !== null ? minimumBuildComparison < 0 : compareVersions(currentVersion, minimumVersion) < 0)
     : false;
 
   return res.json({

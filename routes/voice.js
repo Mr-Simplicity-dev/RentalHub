@@ -1,4 +1,4 @@
-﻿// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Twilio dual-carrier voice support system.
 //
 // Carriers:
@@ -2332,6 +2332,42 @@ router.get('/token', voiceTokenLimiter, authenticate, requireVoiceAgent, (req, r
       message: 'Failed to generate voice access token.',
     });
   }
+});
+
+router.get('/ice-servers', voiceTokenLimiter, authenticate, (req, res) => {
+  const iceServers = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+  ];
+
+  const turnUrl = String(process.env.TURN_URL || '').trim();
+  const turnUsername = String(process.env.TURN_USERNAME || '').trim();
+  const turnPassword = String(process.env.TURN_PASSWORD || '').trim();
+
+  if (turnUrl) {
+    const urls = turnUrl.split(',').map((item) => item.trim()).filter(Boolean);
+    const seen = new Set(urls);
+    for (const url of urls) {
+      iceServers.push({
+        urls: url,
+        username: turnUsername || undefined,
+        credential: turnPassword || undefined,
+      });
+      if (url.startsWith('turn:')) {
+        const tlsUrl = `turns:${url.slice(5)}`;
+        if (!seen.has(tlsUrl)) {
+          seen.add(tlsUrl);
+          iceServers.push({
+            urls: tlsUrl,
+            username: turnUsername || undefined,
+            credential: turnPassword || undefined,
+          });
+        }
+      }
+    }
+  }
+
+  return res.json({ success: true, data: iceServers });
 });
 
 module.exports = router;

@@ -389,12 +389,37 @@ const mockQuery = async (sql = '', params = []) => {
 
 let realPool = null;
 let useMock = false;
+let mockActivatedLogged = false;
 const allowDemoDatabase =
   process.env.ALLOW_IN_MEMORY_DEMO_DB === 'true' ||
   process.env.NODE_ENV !== 'production';
 
+const formatDbError = (err) => {
+  if (!err) return 'connection unavailable';
+  if (err.message) return err.message;
+  if (Array.isArray(err.errors) && err.errors.length > 0) {
+    const nested = err.errors
+      .map((item) => item?.message || item?.code)
+      .filter(Boolean)
+      .join('; ');
+    if (nested) return nested;
+  }
+  return err.code || 'connection unavailable';
+};
+
+const activateMock = (err) => {
+  useMock = true;
+  if (!mockActivatedLogged) {
+    mockActivatedLogged = true;
+    logger.info(`Database unavailable in non-production mode; using in-memory mock client (${formatDbError(err)}).`);
+  }
+};
+
 const isConnectionError = (err) => {
   if (!err) return false;
+  if (Array.isArray(err.errors) && err.errors.some(isConnectionError)) {
+    return true;
+  }
   return (
     err.code === 'ECONNREFUSED' ||
     err.code === 'ENOTFOUND' ||
@@ -411,13 +436,18 @@ const isConnectionError = (err) => {
 try {
   realPool = new Pool(poolConfig);
   realPool.on('error', (err) => {
-    logger.warn('Database pool connection error:', err.message);
-    if (allowDemoDatabase) useMock = true;
+    if (allowDemoDatabase) {
+      activateMock(err);
+      return;
+    }
+    logger.warn('Database pool connection error:', formatDbError(err));
   });
 } catch (err) {
-  logger.warn('DB pool initialization failed:', err.message);
-  if (!allowDemoDatabase) throw err;
-  useMock = true;
+  if (!allowDemoDatabase) {
+    logger.warn('DB pool initialization failed:', formatDbError(err));
+    throw err;
+  }
+  activateMock(err);
 }
 
 const db = {
@@ -433,14 +463,7 @@ const db = {
         return res;
       } catch (err) {
         if (isConnectionError(err) && allowDemoDatabase) {
-          logger.warn('Database unreachable, activating in-memory mock:', err.message);
-          useMock = true;
-          return mockQuery(text, params);
-        }
-        if (!allowDemoDatabase) throw err;
-        if (isConnectionError(err)) {
-          logger.warn('Database unreachable, activating in-memory mock:', err.message);
-          useMock = true;
+          activateMock(err);
           return mockQuery(text, params);
         }
         throw err;
@@ -453,9 +476,10 @@ const db = {
       try {
         return await realPool.connect();
       } catch (err) {
-        if (allowDemoDatabase) {
-          logger.warn('Database connect failed, using mock client:', err.message);
-          useMock = true;
+        if (allowDemoDatabase && isConnectionError(err)) {
+          activateMock(err);
+        } else if (allowDemoDatabase) {
+          activateMock(err);
         } else {
           throw err;
         }

@@ -676,6 +676,103 @@ class TransportationTrackingService {
   }
 
   /**
+   * Tenant confirms safe cargo delivery or reports a transit issue
+   */
+  static async confirmTenantSignoff({
+    bookingId,
+    tenantUser,
+    tenantId,
+    satisfied = true,
+    rating = null,
+    feedback = '',
+    note = '',
+    problemReported = false,
+    problemDescription = ''
+  }) {
+    const numBookingId = Number(bookingId);
+    const booking = await this.getBookingForTracking(numBookingId);
+    if (!booking) {
+      throw new Error('Transportation booking not found');
+    }
+
+    const effectiveUser = tenantUser || (tenantId ? { id: tenantId, user_type: 'tenant' } : null);
+    const isProblem = Boolean(problemReported) || satisfied === false;
+
+    if (effectiveUser && effectiveUser.user_type === 'tenant' && Number(booking.tenant_id) !== Number(effectiveUser.id)) {
+      throw new Error('Unauthorized: only the booking tenant can confirm delivery signoff');
+    }
+
+    const now = new Date();
+    const noteText = isProblem
+      ? `Issue reported: ${problemDescription || note || feedback || 'Delivery issue'}`
+      : (note || feedback || 'Tenant confirmed safe delivery receipt');
+
+    try {
+      await db.query(
+        `UPDATE transportation_bookings
+         SET tracking_status = CASE WHEN $1 THEN tracking_status ELSE 'completed' END,
+             booking_status = CASE WHEN $1 THEN booking_status ELSE 'completed' END,
+             is_tracking_active = false,
+             dropoff_confirmed_at = COALESCE(dropoff_confirmed_at, $2),
+             updated_at = $2
+         WHERE id = $3`,
+        [isProblem, now, numBookingId]
+      );
+    } catch (e) {
+      logger.warn?.('DB update transportation tenant signoff failed:', e.message);
+    }
+
+    try {
+      await db.query(
+        `INSERT INTO transportation_booking_operations (
+          booking_id, admin_id, actor_name, event_type, note, metadata
+        ) VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          numBookingId,
+          effectiveUser?.id || null,
+          effectiveUser?.full_name || 'Tenant',
+          isProblem ? 'tenant_reported_issue' : 'tenant_signed_off',
+          noteText,
+          JSON.stringify({ rating, problemReported: isProblem, feedback: feedback || note || '' })
+        ]
+      );
+    } catch (e) {
+      logger.warn?.('DB log transportation tenant signoff failed:', e.message);
+    }
+
+    if (!isProblem) {
+      booking.tracking_status = 'completed';
+      booking.booking_status = 'completed';
+    }
+    booking.is_tracking_active = false;
+    booking.dropoff_confirmed_at = booking.dropoff_confirmed_at || now.toISOString();
+    booking.tenant_confirmed_at = now.toISOString();
+    booking.tenant_feedback = feedback || note || '';
+    booking.tenant_problem_reported = isProblem;
+    booking.tenant_problem_description = problemDescription || '';
+    mockTrackingStates.set(numBookingId, booking);
+
+    this.broadcastTrackingEvent(numBookingId, 'transportation:tenant_signoff', {
+      booking_id: numBookingId,
+      tenant_confirmed_at: now.toISOString(),
+      problem_reported: isProblem,
+      problem_description: problemDescription,
+      feedback: feedback || note || ''
+    }, {
+      state: booking.property_state,
+      lga: booking.property_lga
+    });
+
+    return {
+      success: true,
+      booking_id: numBookingId,
+      customer_satisfaction_status: isProblem ? 'problem_reported' : 'confirmed_satisfied',
+      problem_reported: isProblem,
+      confirmed_at: now.toISOString()
+    };
+  }
+
+  /**
    * Get full tracking summary for customer or driver
    */
   static async getTrackingSummary(bookingId) {

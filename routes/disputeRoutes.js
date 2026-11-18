@@ -9,7 +9,7 @@ const validateRequest = require('../config/middleware/validateRequest');
 const { canAccessDispute } = require('../config/middleware/disputeAccessMiddleware');
 
 router.post(
-  '/disputes/:disputeId/seal',
+  '/:disputeId/seal',
   authenticate,
   allowRoles('admin','lawyer'),
   [param('disputeId').isInt()],

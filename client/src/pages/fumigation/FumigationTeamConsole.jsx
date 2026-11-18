@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useSocket } from '../../hooks/useSocket';
 import api from '../../services/api';
+import { toast } from 'react-toastify';
 import BackToDashboard from '../../components/common/BackToDashboard';
 import FumigationMap from '../../components/fumigation/FumigationMap';
 import {
@@ -200,7 +201,7 @@ const FumigationTeamConsole = () => {
         fetchAssignedJobs();
       }
     } catch (e) {
-      alert(e.response?.data?.message || e.message || 'Status update failed');
+      toast.error(e.response?.data?.message || e.message || 'Status update failed');
     }
   };
 
@@ -214,10 +215,15 @@ const FumigationTeamConsole = () => {
       return;
     }
 
+    if (!afterPhotoUrl.trim()) {
+      setCompletionError('Post-treatment verification photo URL is required before marking this job complete.');
+      return;
+    }
+
     setCompleting(true);
     try {
-      const beforeArr = beforePhotoUrl.trim() ? [beforePhotoUrl.trim()] : ['https://images.unsplash.com/photo-1584820927498-cfe5211fd8bf?w=500&auto=format&fit=crop&q=60'];
-      const afterArr = afterPhotoUrl.trim() ? [afterPhotoUrl.trim()] : ['https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=500&auto=format&fit=crop&q=60'];
+      const beforeArr = beforePhotoUrl.trim() ? [beforePhotoUrl.trim()] : [];
+      const afterArr = [afterPhotoUrl.trim()];
 
       // Submit formal service report & complete status
       const res = await api.post(`/fumigation/team/jobs/${selectedJob.id}/status`, {
@@ -268,7 +274,7 @@ const FumigationTeamConsole = () => {
         loadJobManifest(selectedJob.id);
       }
     } catch (e) {
-      alert(e.response?.data?.message || 'Failed to report incident');
+      toast.error(e.response?.data?.message || 'Failed to report incident');
     } finally {
       setReportingIncident(false);
     }
@@ -569,9 +575,10 @@ const FumigationTeamConsole = () => {
                   <label className="text-slate-300 font-semibold block mb-1">Post-Treatment Verification Photo URL *</label>
                   <input
                     type="url"
+                    required
                     value={afterPhotoUrl}
                     onChange={(e) => setAfterPhotoUrl(e.target.value)}
-                    placeholder="https://... photo link (or leave blank for sample photo)"
+                    placeholder="https://... required photo proof link"
                     className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white outline-none focus:border-emerald-500"
                   />
                 </div>

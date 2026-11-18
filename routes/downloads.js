@@ -36,6 +36,10 @@ const getBuildInfo = () => {
     buildNumber: String(
       saved.buildNumber || (expo.android && expo.android.versionCode) || '1'
     ),
+    iosVersion: process.env.MOBILE_IOS_LATEST_VERSION || expo.version || pkg.version || '1.0.0',
+    iosBuildNumber: String(
+      process.env.MOBILE_IOS_BUILD_NUMBER || (expo.ios && expo.ios.buildNumber) || '1'
+    ),
     lastUpdated: saved.lastUpdated || new Date().toISOString(),
   };
 };
@@ -116,11 +120,11 @@ const serveVersion = (req, res) => {
         apkAvailable,
         lastUpdated: info.lastUpdated,
       },
-      // iOS is on its own release track; mirroring the Android build here would
-      // advertise an iOS update that no App Store build can satisfy.
+      // iOS can still be overridden independently via MOBILE_IOS_* env vars if an App Store
+      // review lags behind the Android release, defaulting to app.json's expo.ios metadata.
       ios: {
-        version: process.env.MOBILE_IOS_LATEST_VERSION || '1.0.3',
-        buildNumber: String(process.env.MOBILE_IOS_BUILD_NUMBER || '13'),
+        version: info.iosVersion,
+        buildNumber: info.iosBuildNumber,
         downloadUrl: null,
         lastUpdated: info.lastUpdated,
       },
