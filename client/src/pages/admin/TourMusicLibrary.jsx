@@ -50,7 +50,8 @@ const Toggle = ({ checked, onChange, label, hint }) => (
 const getAudioSrc = (url) => {
   if (!url) return '';
   if (/^https?:\/\//i.test(url)) return url;
-  return `/${String(url).replace(/^\/+/, '')}`;
+  const normalized = String(url).replace(/^\/+/, '');
+  return `/${normalized.split('/').map(encodeURIComponent).join('/')}`;
 };
 
 const TourMusicLibrary = () => {
