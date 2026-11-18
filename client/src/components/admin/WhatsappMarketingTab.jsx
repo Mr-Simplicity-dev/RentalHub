@@ -1491,7 +1491,7 @@ const WhatsappMarketingTab = () => {
                 {contacts.map((c, index) => (
                   <tr key={c.id} className="transition-colors hover:bg-gray-50/70">
                     <Td className="text-gray-600">{(contactPage - 1) * contactPageSize + index + 1}</Td>
-                    <Td className="font-mono font-medium text-gray-900">{c.phone}</Td>
+                    <Td className="font-mono font-medium text-gray-900">{c.phone || c.phone_number || c.mobile || c.number || '—'}</Td>
                     <Td>
                       <div className="flex items-center gap-1.5">
                         {c.full_name ? (

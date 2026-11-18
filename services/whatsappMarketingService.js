@@ -639,11 +639,26 @@ const listContacts = async (req, res) => {
 
     params.push(limit, offset);
     const { rows } = await db.query(
-      `SELECT id, phone, full_name, source, subscribed, wa_status, wa_checked_at, import_batch, created_at, updated_at
+      `SELECT *
        FROM whatsapp_contacts ${whereClause}
        ORDER BY COALESCE(updated_at, created_at) DESC, id DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
       params
     );
+
+    const contacts = rows.map((row) => {
+      let phone = row.phone || row.phone_number || row.mobile || row.number || row.whatsapp_number || row.wa_number || row.contact_phone || row.msisdn || '';
+      if (!phone) {
+        for (const [key, value] of Object.entries(row)) {
+          if (!value) continue;
+          if (/phone|mobile|number|msisdn|contact|wa/i.test(key) && String(value).replace(/\D/g, '').length >= 7) {
+            phone = String(value);
+            break;
+          }
+        }
+      }
+      const full_name = row.full_name || row.fullName || row.name || row.contact_name || row.display_name || '';
+      return { ...row, phone, full_name };
+    });
 
     const stats = await db.query(
       `SELECT
@@ -667,7 +682,7 @@ const listContacts = async (req, res) => {
     res.json({
       success: true,
       data: {
-        contacts: rows,
+        contacts,
         stats: stats.rows[0],
         batches,
         pagination: {
