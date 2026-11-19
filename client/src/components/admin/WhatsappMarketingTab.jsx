@@ -421,14 +421,14 @@ const WhatsappMarketingTab = () => {
       const res = await api.post('/whatsapp-marketing/contacts/import', payload);
       const { added, updated, total } = res.data.data;
       toast.success(
-        `Import complete: ${added} new contacts added, ${updated || 0} updated. All ${validContacts.length} contacts are viewable below.`
+        `Import complete: ${added} new contacts added, ${updated || 0} updated. Earlier contacts have been kept.`
       );
       setCsvFile(null);
       setCsvContacts([]);
       setContactSearch('');
-      setSelectedBatch(importedBatch);
+      setSelectedBatch('');
       setContactPage(1);
-      loadContacts('', 1, importedBatch, contactPageSize);
+      loadContacts('', 1, '', contactPageSize);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Import failed');
     } finally {
