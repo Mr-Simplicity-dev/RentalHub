@@ -23,12 +23,13 @@ export default function TourMusicPlayer({ track }) {
   };
 
   useEffect(() => {
+    const player = audio.current;
     const stopOther = event => { if (event.detail !== id) stop(); };
     window.addEventListener(PLAY_EVENT, stopOther);
     return () => {
       window.removeEventListener(PLAY_EVENT, stopOther);
       request.current?.abort();
-      audio.current?.pause();
+      player?.pause();
       if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
     };
   }, [id]);
