@@ -1,0 +1,1 @@
+Face models by Google / MediaPipe. Apache License 2.0. TensorFlow.js 4.22.0 with @tensorflow-models/face-landmarks-detection 1.0.6. User images stay in the browser during landmark analysis; model files are served locally. Official source URLs and SHA-256 checksums are in manifest.json.

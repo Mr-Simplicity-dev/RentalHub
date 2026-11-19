@@ -1,0 +1,29 @@
+{
+  "license": "Apache-2.0",
+  "files": [
+    {
+      "file": "detector/model.json",
+      "source": "https://www.kaggle.com/api/v1/models/mediapipe/face-detection/tfJs/short/1/download",
+      "sha256": "c131145fade749f714d39811f282e973760a69cb9e1a9c22f91e132bd8dcd396",
+      "bytes": 75722
+    },
+    {
+      "file": "detector/group1-shard1of1.bin",
+      "source": "https://www.kaggle.com/api/v1/models/mediapipe/face-detection/tfJs/short/1/download",
+      "sha256": "e9b69ee1c1f8cd33c58120bcd75bf8c56bfba20c880f447e9d293ec102059d4b",
+      "bytes": 201268
+    },
+    {
+      "file": "landmarks/model.json",
+      "source": "https://www.kaggle.com/api/v1/models/mediapipe/face-landmarks-detection/tfJs/attention-mesh/1/download",
+      "sha256": "df2f0944de7d65f8ce0377deb2ee658e24eca778f8e4d6fd70689e2d59f9634b",
+      "bytes": 934817
+    },
+    {
+      "file": "landmarks/group1-shard1of1.bin",
+      "source": "https://www.kaggle.com/api/v1/models/mediapipe/face-landmarks-detection/tfJs/attention-mesh/1/download",
+      "sha256": "1ae49614abaa80c6efce9b39e2ec316314fc4d6fab183409afb0a97ae13ba892",
+      "bytes": 2382414
+    }
+  ]
+}

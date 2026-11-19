@@ -1,1 +1,4 @@
 migrations/*.sql text eol=lf
+
+# Preserve publisher model bytes and manifest checksums on every OS
+/client/public/models/live-face/v1/** -text

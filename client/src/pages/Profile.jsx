@@ -97,6 +97,7 @@ const Profile = () => {
     baseArea: null,
   });
   const autoCaptureTriggeredRef = useRef(false);
+  const photoRunRef = useRef(0);
 
   const canCaptureLive = useMemo(() => (
     livenessChecks.faceDetected &&
@@ -243,6 +244,7 @@ const Profile = () => {
 
   useEffect(() => {
     return () => {
+      photoRunRef.current += 1;
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
       }
@@ -259,6 +261,7 @@ const Profile = () => {
   }, [passportPreview]);
 
   const stopCamera = useCallback(() => {
+    photoRunRef.current += 1;
     detectionEnabledRef.current = false;
     if (detectionLoopRef.current) {
       cancelAnimationFrame(detectionLoopRef.current);
@@ -406,11 +409,13 @@ const Profile = () => {
   const initFaceMesh = useCallback(async () => {
     setLivenessError('');
     setFaceMeshReady(false);
+    const run = photoRunRef.current;
 
     try {
       if (typeof window === 'undefined') return;
 
       const faceMesh = await createLiveFaceMesh();
+      if (run !== photoRunRef.current) {faceMesh.close(); return;}
 
       faceMesh.setOptions({
         maxNumFaces: 1,
@@ -425,6 +430,7 @@ const Profile = () => {
       setFaceMeshReady(true);
       runDetectionLoop();
     } catch (error) {
+      if (run !== photoRunRef.current) return;
       console.error('FaceMesh init failed:', error);
       setLivenessError('Live checks unavailable. Use a supported browser and stable internet.');
       setFaceMeshReady(false);
