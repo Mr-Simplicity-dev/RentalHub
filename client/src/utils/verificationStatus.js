@@ -4,7 +4,8 @@ function getReviewStatus(user = {}, status) {
  const raw = source.review_status || source.identity_verification_status || user?.identity_verification_status;
  if (raw === 'revalidation_required') return raw;
  if (source.identity === true || source.identity_verified === true || (!status && user?.identity_verified === true)) return 'verified';
- if (raw && Object.hasOwn(labels, raw)) return raw;
+ if (raw === 'verified' && (source.identity === false || source.identity_verified === false)) return 'unknown';
+ if (raw && Object.prototype.hasOwnProperty.call(labels, raw)) return raw;
  if (raw) return 'unknown';
  if (source.passport === true || source.passport_photo_url) return 'pending';
  return 'not_submitted';

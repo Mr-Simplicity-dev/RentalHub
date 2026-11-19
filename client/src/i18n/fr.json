@@ -326,15 +326,18 @@
     "live_capture_title": "Capture de passeport en direct",
     "live_step_1": "1. Démarrez la caméra et effectuez tous les contrôles de présence.",
     "live_step_2": "2. Capturez une photo nette de votre visage dans le cadre.",
-    "live_step_3": "3. Téléversez après la capture. Le téléversement de fichier est désactivé.",
+    "live_step_3": "3. Votre photo est enregistrée automatiquement après la capture.",
     "opening_camera": "Ouverture de la caméra...",
     "capture": "Capturer",
     "open_live_camera": "Ouvrir la caméra en direct",
     "captured_preview": "Aperçu du passeport capturé",
-    "preview_hint": "Assurez-vous que votre visage est net et entièrement visible avant le téléversement.",
+    "preview_hint": "Votre photo est enregistrée automatiquement après la capture.",
     "camera_guide": "Gardez votre visage dans le guide et terminez tous les contrôles.",
     "face_gallery_consent": "J’accepte la comparaison de mon visage et son stockage sécurisé sur le serveur privé de RentalHub pour vérifier mon identité et éviter les comptes en double. Sans mon accord, le personnel examinera ma photo manuellement.",
-    "photo_review_pending": "Photo enregistrée. La vérification de votre identité est en cours d’examen."
+    "photo_review_pending": "Photo enregistrée. La vérification de votre identité est en cours d’examen.",
+    "saving_photo": "Enregistrement de votre photo…",
+    "retry_photo_save": "Réessayer d’enregistrer la photo",
+    "photo_save_failed": "Photo non enregistrée. Réessayez."
   },
   "property_types": {
     "apartment": "Appartement",
@@ -1608,7 +1611,9 @@
     "nationality_helper": "Enter the nationality associated with the international passport.",
     "dob_helper": "Enter the date of birth associated with the credential.",
     "submit_success": "Credentials submitted securely. They are now awaiting super-admin review.",
-    "submit_error": "Unable to submit credential revalidation."
+    "submit_error": "Unable to submit credential revalidation.",
+    "unavailable": "Statut indisponible",
+    "refresh_status": "Impossible de charger le statut. Faites glisser vers le bas pour réessayer."
   },
   "my_damage_reports": {
     "title": "Damage Reports",

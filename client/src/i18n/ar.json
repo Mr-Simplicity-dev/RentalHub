@@ -301,12 +301,12 @@
     "live_capture_title": "التقاط جواز السفر المباشر",
     "live_step_1": "1. ابدأ الكاميرا وأكمل جميع فحوصات الحيوية.",
     "live_step_2": "2. التقط صورة وجه واضحة داخل الإطار.",
-    "live_step_3": "3. ارفع بعد الالتقاط. رفع الملفات معطل.",
+    "live_step_3": "3. تُحفظ صورتك تلقائياً بعد التقاطها.",
     "opening_camera": "جارٍ فتح الكاميرا...",
     "capture": "التقاط",
     "open_live_camera": "فتح الكاميرا الحية",
     "captured_preview": "معاينة جواز السفر الملتقط",
-    "preview_hint": "تأكد من أن وجهك واضح وظاهر بالكامل قبل الرفع.",
+    "preview_hint": "تُحفظ صورتك تلقائياً بعد التقاطها.",
     "camera_guide": "أبقِ وجهك داخل الدليل وأكمل جميع الفحوصات.",
     "totp_title": "الأمان الثنائي",
     "totp_desc": "احمِ عمليات السحب باستخدام تطبيق المصادقة (مثل Google Authenticator). تُستخدم رموز SMS تلقائيًا حتى تقوم بتفعيل هذا.",
@@ -334,7 +334,10 @@
     "totp_disabling": "جارٍ التعطيل...",
     "totp_confirm_disable": "تعطيل المصادقة الثنائية",
     "face_gallery_consent": "أوافق على مطابقة وجهي وتخزينه بأمان على خادم RentalHub الخاص للتحقق من هويتي ومنع الحسابات المكررة. بدون الموافقة سيراجع الموظفون صورتي يدويًا.",
-    "photo_review_pending": "تم حفظ الصورة. التحقق من الهوية بانتظار المراجعة."
+    "photo_review_pending": "تم حفظ الصورة. التحقق من الهوية بانتظار المراجعة.",
+    "saving_photo": "جارٍ حفظ صورتك…",
+    "retry_photo_save": "حاول حفظ الصورة مرة أخرى",
+    "photo_save_failed": "لم تُحفظ الصورة. حاول مجدداً."
   },
   "property_types": {
     "apartment": "شقة",
@@ -1608,7 +1611,9 @@
     "nationality_helper": "Enter the nationality associated with the international passport.",
     "dob_helper": "Enter the date of birth associated with the credential.",
     "submit_success": "Credentials submitted securely. They are now awaiting super-admin review.",
-    "submit_error": "Unable to submit credential revalidation."
+    "submit_error": "Unable to submit credential revalidation.",
+    "unavailable": "الحالة غير متاحة",
+    "refresh_status": "تعذر تحميل حالة التحقق. اسحب لأسفل لإعادة المحاولة."
   },
   "my_damage_reports": {
     "title": "Damage Reports",

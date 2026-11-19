@@ -326,15 +326,18 @@
     "live_capture_title": "实时护照拍摄",
     "live_step_1": "1. 启动摄像头并完成所有活体检测。",
     "live_step_2": "2. 在框内拍摄一张清晰的脸部照片。",
-    "live_step_3": "3. 拍摄后上传。文件上传已禁用。",
+    "live_step_3": "3. 拍摄后照片会自动保存。",
     "opening_camera": "正在打开摄像头...",
     "capture": "拍摄",
     "open_live_camera": "打开实时摄像头",
     "captured_preview": "已拍摄护照预览",
-    "preview_hint": "上传前请确保您的脸部清晰且完全可见。",
+    "preview_hint": "拍摄后照片会自动保存。",
     "camera_guide": "请将脸部保持在引导框内并完成所有检测。",
     "face_gallery_consent": "我同意在RentalHub自己的私有服务器上进行人脸比对并安全存储，以验证身份并防止重复账户。如不同意，工作人员将人工审核我的照片。",
-    "photo_review_pending": "照片已保存，身份验证等待审核。"
+    "photo_review_pending": "照片已保存，身份验证等待审核。",
+    "saving_photo": "正在保存照片…",
+    "retry_photo_save": "重新保存照片",
+    "photo_save_failed": "照片未保存。请重试。"
   },
   "property_types": {
     "apartment": "公寓",
@@ -1608,7 +1611,9 @@
     "nationality_helper": "Enter the nationality associated with the international passport.",
     "dob_helper": "Enter the date of birth associated with the credential.",
     "submit_success": "Credentials submitted securely. They are now awaiting super-admin review.",
-    "submit_error": "Unable to submit credential revalidation."
+    "submit_error": "Unable to submit credential revalidation.",
+    "unavailable": "状态暂不可用",
+    "refresh_status": "无法加载验证状态。请下拉重试。"
   },
   "my_damage_reports": {
     "title": "Damage Reports",

@@ -326,15 +326,18 @@
     "live_capture_title": "Живой захват паспорта",
     "live_step_1": "1. Запустите камеру и выполните все проверки живости.",
     "live_step_2": "2. Сделайте чёткое фото лица в кадре.",
-    "live_step_3": "3. Загрузите после захвата. Загрузка файла отключена.",
+    "live_step_3": "3. Фото сохраняется автоматически после съёмки.",
     "opening_camera": "Открытие камеры...",
     "capture": "Захват",
     "open_live_camera": "Открыть живую камеру",
     "captured_preview": "Предпросмотр захваченного паспорта",
-    "preview_hint": "Убедитесь, что ваше лицо чёткое и полностью видно перед загрузкой.",
+    "preview_hint": "Фото сохраняется автоматически после съёмки.",
     "camera_guide": "Держите лицо в направляющей и выполните все проверки.",
     "face_gallery_consent": "Я согласен на сравнение лица и безопасное хранение на собственном сервере RentalHub для подтверждения личности и предотвращения повторных аккаунтов. Без согласия фотографию проверит сотрудник.",
-    "photo_review_pending": "Фото сохранено. Подтверждение личности ожидает проверки."
+    "photo_review_pending": "Фото сохранено. Подтверждение личности ожидает проверки.",
+    "saving_photo": "Сохранение фото…",
+    "retry_photo_save": "Повторить сохранение фото",
+    "photo_save_failed": "Фото не сохранено. Повторите попытку."
   },
   "property_types": {
     "apartment": "Квартира",
@@ -1608,7 +1611,9 @@
     "nationality_helper": "Enter the nationality associated with the international passport.",
     "dob_helper": "Enter the date of birth associated with the credential.",
     "submit_success": "Credentials submitted securely. They are now awaiting super-admin review.",
-    "submit_error": "Unable to submit credential revalidation."
+    "submit_error": "Unable to submit credential revalidation.",
+    "unavailable": "Статус недоступен",
+    "refresh_status": "Не удалось загрузить статус проверки. Потяните вниз для повтора."
   },
   "my_damage_reports": {
     "title": "Damage Reports",

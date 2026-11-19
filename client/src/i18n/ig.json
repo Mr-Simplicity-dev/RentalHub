@@ -331,15 +331,18 @@
     "live_capture_title": "Ịse Foto Paspọtụ Ndụ",
     "live_step_1": "1. Mepụta igwefoto ma mezue nyocha ndụ niile.",
     "live_step_2": "2. Seere foto ihu doro anya n'ime oghere ahụ.",
-    "live_step_3": "3. Bulite mgbe ị sesịrị. Emechiri ibulite faịlụ.",
+    "live_step_3": "3. A ga-echekwa foto gị na-akpaghị aka mgbe esechara ya.",
     "opening_camera": "Na-emeghe igwefoto...",
     "capture": "Sere",
     "open_live_camera": "Meghee Igwefoto Ndụ",
     "captured_preview": "Nlele paspọtụ esere",
-    "preview_hint": "Gbaa mbọ hụ na ihu gị doro anya ma pụta ìhè zuru ezu tupu ibulite.",
+    "preview_hint": "A ga-echekwa foto gị na-akpaghị aka mgbe esechara ya.",
     "camera_guide": "Debe ihu gị n'ime ntuziaka ahụ ma mezue nyocha niile.",
     "face_gallery_consent": "Ekwenyere m ka e jiri ihu m tụnyere njirimara m ma chekwaa ya na sava nzuzo RentalHub iji gbochie akaụntụ abụọ. Ọ bụrụ na ekweghị m, onye ọrụ ga-enyocha foto m.",
-    "photo_review_pending": "Echekwara foto. Nyocha njirimara na-eche nyocha onye ọrụ."
+    "photo_review_pending": "Echekwara foto. Nyocha njirimara na-eche nyocha onye ọrụ.",
+    "saving_photo": "A na-echekwa foto gị…",
+    "retry_photo_save": "Nwaa ịchekwa foto ọzọ",
+    "photo_save_failed": "Echekwaghị foto. Nwaa ọzọ."
   },
   "property_types": {
     "apartment": "Ụlọ Apatamenti",
@@ -1613,7 +1616,9 @@
     "nationality_helper": "Tinye obodo jikọrọ na paspọtụ mba ọzọ.",
     "dob_helper": "Tinye ụbọchị ọmụmụ jikọrọ na nkwenye ahụ.",
     "submit_success": "Ezigarawo nkwenye n'ụzọ dị nchebe. Ha na-echere nyocha super-admin ugbu a.",
-    "submit_error": "Enweghị ike izinye mmegharị nkwenye."
+    "submit_error": "Enweghị ike izinye mmegharị nkwenye.",
+    "unavailable": "Ọnọdụ adịghị ugbu a",
+    "refresh_status": "Enweghị ike ịgụ ọnọdụ nkwenye. Dọrọ ala ka ị nwaa ọzọ."
   },
   "my_damage_reports": {
     "title": "Akụkọ Mmebi",

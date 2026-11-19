@@ -331,15 +331,18 @@
     "live_capture_title": "Yíyà Fótó Ìwé Ìrìnnà Láàyè",
     "live_step_1": "1. Bẹ̀rẹ̀ kámẹ́rà kí o sì parí gbogbo àwọn àyẹ̀wò ìwàláàyè.",
     "live_step_2": "2. Yà fótó ojú tó dára nínú fírámù.",
-    "live_step_3": "3. Gbé sílẹ̀ lẹ́yìn yíyà. Kò ṣeé fipamọ́ fáìlì.",
+    "live_step_3": "3. A ó fi fọ́tò rẹ pamọ́ fúnra rẹ̀ lẹ́yìn tí a bá yà á.",
     "opening_camera": "Ń ṣí kámẹ́rà...",
     "capture": "Yà",
     "open_live_camera": "Ṣí Kámẹ́rà Láàyè",
     "captured_preview": "Àwòrán ìwé ìrìnnà tí a yà",
-    "preview_hint": "Rí i dájú pé ojú rẹ ṣe pọ́n tó kí o tó gbé sílẹ̀.",
+    "preview_hint": "A ó fi fọ́tò rẹ pamọ́ fúnra rẹ̀ lẹ́yìn tí a bá yà á.",
     "camera_guide": "Mú ojú rẹ sí inú ìtọ́sọ́nà kí o sì parí gbogbo àyẹ̀wò.",
     "face_gallery_consent": "Mo gbà kí a fi ojú mi wé ẹ̀rí ìdánimọ̀ mi, kí a sì tọ́jú rẹ̀ láìléwu lórí ẹ̀rọ ìpamọ́ àdáni RentalHub láti dènà àkọọlẹ́ ẹ̀ẹ̀mejì. Bí mi ò bá gbà, òṣìṣẹ́ yóò ṣe àyẹ̀wò fọ́tò mi.",
-    "photo_review_pending": "A ti fi fọ́tò pamọ́. Àyẹ̀wò ìdánimọ̀ ń dúró de òṣìṣẹ́."
+    "photo_review_pending": "A ti fi fọ́tò pamọ́. Àyẹ̀wò ìdánimọ̀ ń dúró de òṣìṣẹ́.",
+    "saving_photo": "À ń fi fọ́tò rẹ pamọ́…",
+    "retry_photo_save": "Gbìyànjú láti fi fọ́tò pamọ́ lẹ́ẹ̀kan sí i",
+    "photo_save_failed": "A kò fi fọ́tò pamọ́. Tún gbìyànjú."
   },
   "property_types": {
     "apartment": "Apartment",
@@ -1613,7 +1616,9 @@
     "nationality_helper": "Tẹ orílẹ̀-èdè tó sopọ̀ mọ́ ìwé ìrìnà àgbáyé sílẹ̀.",
     "dob_helper": "Tẹ ọjọ́ ìbí tó sopọ̀ mọ́ ìwé ẹ̀rí náà sílẹ̀.",
     "submit_success": "Wọ́n ti fi àwọn ìwé ẹ̀rí rẹ sílẹ̀ pẹ̀lú ààbò. Wọ́n ń dúró fún àtúnyẹ̀wò super-admin báyìí.",
-    "submit_error": "Àtúnmúdájú ìwé ẹ̀rí kò ṣeé fi sílẹ̀."
+    "submit_error": "Àtúnmúdájú ìwé ẹ̀rí kò ṣeé fi sílẹ̀.",
+    "unavailable": "A kò rí ipò náà",
+    "refresh_status": "A kò lè ṣí ipò ìdánimọ̀. Fà sílẹ̀ láti tún gbìyànjú."
   },
   "my_damage_reports": {
     "title": "Àwọn Ìròyìn Ibajẹ́",

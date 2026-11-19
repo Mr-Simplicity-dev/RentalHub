@@ -331,17 +331,20 @@
     "live_capture_title": "Live Passport Capture",
     "live_step_1": "1. Start camera and complete all liveness checks.",
     "live_step_2": "2. Capture a clear face photo inside the frame.",
-    "live_step_3": "3. Upload after capture. File upload is disabled.",
+    "live_step_3": "3. Your photo is saved automatically after capture.",
     "opening_camera": "Opening camera...",
     "capture": "Capture",
     "open_live_camera": "Open Live Camera",
     "captured_preview": "Captured passport preview",
-    "preview_hint": "Ensure your face is sharp and fully visible before uploading.",
+    "preview_hint": "Your photo is saved automatically after capture.",
     "camera_guide": "Keep your face inside the guide and complete all checks.",
     "face_gallery_consent": "I agree to private face matching and secure storage on RentalHub’s own server to verify my identity and prevent duplicate accounts. Without consent, staff will review my photo manually.",
     "photo_review_pending": "Photo saved. Identity verification is awaiting review.",
     "phone_verified_badge": "Verified",
-    "phone_unverified_badge": "Not verified"
+    "phone_unverified_badge": "Not verified",
+    "saving_photo": "Saving your photo…",
+    "retry_photo_save": "Try saving photo again",
+    "photo_save_failed": "Photo not saved. Try again."
   },
   "property_types": {
     "apartment": "Apartment",
@@ -1618,7 +1621,9 @@
     "nationality_helper": "Enter the nationality associated with the international passport.",
     "dob_helper": "Enter the date of birth associated with the credential.",
     "submit_success": "Credentials submitted securely. They are now awaiting super-admin review.",
-    "submit_error": "Unable to submit credential revalidation."
+    "submit_error": "Unable to submit credential revalidation.",
+    "unavailable": "Status unavailable",
+    "refresh_status": "Could not load verification status. Pull down to try again."
   },
   "my_damage_reports": {
     "title": "Property Reports",

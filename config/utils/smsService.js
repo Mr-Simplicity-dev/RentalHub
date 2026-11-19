@@ -136,6 +136,7 @@ function normalizePhone(phone) {
   if (!digits) return null;
 
   digits = digits.replace(/[^\d+]/g, '');
+  const international = digits.startsWith('+') || digits.startsWith('00');
 
   if (digits.startsWith('+')) {
     digits = digits.slice(1);
@@ -149,13 +150,13 @@ function normalizePhone(phone) {
 
   const countryCode = cleanEnv(process.env.SMS_DEFAULT_COUNTRY_CODE || DEFAULT_COUNTRY_CODE).replace(/\D/g, '');
 
-  if (countryCode && digits.startsWith('0')) {
+  if (!international && countryCode && digits.startsWith('0')) {
     digits = `${countryCode}${digits.slice(1)}`;
-  } else if (countryCode === '234' && /^[789]\d{9}$/.test(digits)) {
+  } else if (!international && countryCode === '234' && /^[789]\d{9}$/.test(digits)) {
     digits = `234${digits}`;
   }
 
-  return /^\d{8,15}$/.test(digits) ? digits : null;
+  return /^[1-9]\d{7,14}$/.test(digits) ? digits : null;
 }
 
 function getSmsStatusCallbackBaseUrl() {

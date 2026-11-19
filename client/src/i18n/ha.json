@@ -331,15 +331,18 @@
     "live_capture_title": "Ɗaukar Fasfo Kai Tsaye",
     "live_step_1": "1. Kunna kyamara kuma ka kammala duk duban rai.",
     "live_step_2": "2. Ɗauki cikakken hoton fuska a cikin firam.",
-    "live_step_3": "3. Aika bayan ɗauka. An kashe ɗaukar fayil.",
+    "live_step_3": "3. Ana ajiye hotonka kai tsaye bayan an ɗauka.",
     "opening_camera": "Ana buɗe kyamara...",
     "capture": "Ɗauka",
     "open_live_camera": "Buɗe Kyamara Kai Tsaye",
     "captured_preview": "Samfuran fasfon da aka ɗauka",
-    "preview_hint": "Tabbatar cewa fuskarka tana da haske kuma a bayyane take kafin ɗauka.",
+    "preview_hint": "Ana ajiye hotonka kai tsaye bayan an ɗauka.",
     "camera_guide": "Ki riƙe fuskarki a cikin jagora kuma ki kammala duk dubawa.",
     "face_gallery_consent": "Na yarda a kwatanta fuskata kuma a adana bayananta a uwar garken sirri ta RentalHub domin tabbatar da shaidata da hana maimaita asusu. Idan ban yarda ba, ma’aikaci zai duba hotona.",
-    "photo_review_pending": "An ajiye hoton. Tabbatar da shaida na jiran dubawa."
+    "photo_review_pending": "An ajiye hoton. Tabbatar da shaida na jiran dubawa.",
+    "saving_photo": "Ana ajiye hotonka…",
+    "retry_photo_save": "Sake gwada ajiye hoton",
+    "photo_save_failed": "Ba a ajiye hoton ba. Sake gwadawa."
   },
   "property_types": {
     "apartment": "Apartment",
@@ -1613,7 +1616,9 @@
     "nationality_helper": "Shigar da ƙasa ta asali da ke da alaƙa da fasfo na ƙasa da ƙasa.",
     "dob_helper": "Shigar da ranar haihuwa da ke da alaƙa da takardar shaida.",
     "submit_success": "An aika takardun shaida cikin aminci. Yanzu suna jiran duba super-admin.",
-    "submit_error": "Ba a iya aika sake tabbatar da takardu ba."
+    "submit_error": "Ba a iya aika sake tabbatar da takardu ba.",
+    "unavailable": "Ba a samu matsayin ba",
+    "refresh_status": "Ba a iya loda matsayin tantancewa ba. Ja ƙasa don sake gwadawa."
   },
   "my_damage_reports": {
     "title": "Rahoton Lalacewa",

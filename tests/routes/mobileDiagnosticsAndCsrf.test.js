@@ -69,7 +69,10 @@ test('csrfProtection blocks spoofed X-RentalHub-Client when ambient auth cookie 
   assert.equal(cookieFreeNativeAllowed.status, 200);
 });
 
-test('mobileDiagnostics syncs iOS version/buildNumber from app.json, evaluates updateRequired, and rejects oversized metadata', async () => {
+test('mobileDiagnostics respects the published iOS override, evaluates updateRequired, and rejects oversized metadata', async t => {
+  const previous = {version:process.env.MOBILE_IOS_LATEST_VERSION,build:process.env.MOBILE_IOS_BUILD_NUMBER};
+  process.env.MOBILE_IOS_LATEST_VERSION='1.0.52';process.env.MOBILE_IOS_BUILD_NUMBER='63';
+  t.after(()=>{for(const [key,value] of [['MOBILE_IOS_LATEST_VERSION',previous.version],['MOBILE_IOS_BUILD_NUMBER',previous.build]]){if(value===undefined)delete process.env[key];else process.env[key]=value;}});
   const diagPath = path.resolve(__dirname, '../../routes/mobileDiagnostics.js');
   const dbPath = path.resolve(__dirname, '../../config/middleware/database.js');
   const inserts = [];

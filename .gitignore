@@ -145,3 +145,6 @@ __pycache__/
 /-tree HEAD RentalHubMobile
 /tatus --short
 /tatus --short --branch
+
+# Private environment copy created locally
+/.env copy
