@@ -146,7 +146,7 @@ router.get('/my-services', authenticate, async (req, res) => {
     });
   } catch (error) {
     logger.error?.('Get my services error:', error);
-    return res.status(500).json({ success: false, message: 'Failed to retrieve services' });
+    return res.status(error.statusCode || 500).json({ success: false, message: 'Failed to retrieve services' });
   }
 });
 
@@ -158,6 +158,7 @@ router.get('/:serviceType/:bookingId', authenticate, async (req, res) => {
   try {
     const { serviceType, bookingId } = req.params;
     const numId = Number(bookingId);
+    if (!Number.isSafeInteger(numId) || numId <= 0) return res.status(400).json({success:false,message:"Valid booking ID required"});
 
     if (serviceType === 'transportation') {
       const summary = await TransportationTrackingService.getTrackingSummary(numId, req.user);
@@ -173,7 +174,7 @@ router.get('/:serviceType/:bookingId', authenticate, async (req, res) => {
 
     return res.status(400).json({ success: false, message: 'Unsupported service type' });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(error.statusCode || 500).json({ success: false, message: error.message });
   }
 });
 

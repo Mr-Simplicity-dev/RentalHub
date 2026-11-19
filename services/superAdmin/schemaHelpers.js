@@ -138,8 +138,8 @@ const createIdentityVerificationOperation = async ({
   note = null,
   userSnapshot = {},
   metadata = {},
-}) => {
-  await db.query(
+}, queryable = db) => {
+  await queryable.query(
     `INSERT INTO identity_verification_operations (
        user_id,
        actor_id,
@@ -171,9 +171,9 @@ const buildDeletedUniqueValue = (prefix, userId) => `${prefix}${userId}${Date.no
 
 // ---- Audit Helper ----
 
-const logAction = async (actorId, action, targetType = null, targetId = null) => {
+const logAction = async (actorId, action, targetType = null, targetId = null, queryable = db) => {
 
-  await db.query(
+  await queryable.query(
 
     `INSERT INTO audit_logs (actor_id, action, target_type, target_id)
 

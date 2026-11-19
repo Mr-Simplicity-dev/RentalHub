@@ -720,6 +720,9 @@ const promoteToAdmin = async (req, res) => {
 
 
   try {
+    const reason = String(req.body?.reason || req.body?.note || "").trim();
+    if (!reason || reason.length > 2000) return res.status(400).json({message:"A promotion reason of up to 2,000 characters is required"});
+    await ensureAdminAccountOperationSchema();
 
     const result = await db.query(
 
@@ -727,7 +730,7 @@ const promoteToAdmin = async (req, res) => {
 
        SET user_type = 'admin', updated_at = NOW()
 
-       WHERE id = $1 AND user_type <> 'super_admin'
+       WHERE id = $1 AND user_type IN ('tenant','landlord','agent') AND deleted_at IS NULL AND is_active = TRUE
 
        RETURNING id`,
 
@@ -745,6 +748,7 @@ const promoteToAdmin = async (req, res) => {
 
 
 
+    await createAdminAccountOperation({adminUserId:Number(id),actorId:req.user.id,actorName:getAdminOperationActorName(req.user),eventType:'user_promoted_to_admin',note:reason,metadata:{new_role:'admin'}});
     await logAction(req.user.id, 'PROMOTE_TO_ADMIN', 'user', id);
 
 

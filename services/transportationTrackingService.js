@@ -1,3 +1,4 @@
+const {canOperateBooking,assertTrackingAccess}=require('../config/utils/serviceTrackingAccess');
 const db = require('../config/middleware/database');
 const { getRealtimeIo } = require('../config/utils/realtimeEmitter');
 const logger = require('../config/utils/logger') || console;
@@ -150,42 +151,7 @@ class TransportationTrackingService {
   /**
    * Check if user is authorized driver for this booking
    */
-  static isAuthorizedDriver(booking, user) {
-    if (!booking || !user) return false;
-    
-    // Super admins & transportation admins are always authorized
-    const adminRoles = [
-      'super_admin',
-      'super_transportation_admin',
-      'state_transportation_admin',
-      'lga_transportation_admin',
-      'admin'
-    ];
-    if (adminRoles.includes(user.user_type)) return true;
-
-    // Direct driver_id match
-    if (booking.driver_id && Number(booking.driver_id) === Number(user.id)) {
-      return true;
-    }
-
-    // Phone number match with Nigerian format normalization (080 vs +23480)
-    if (booking.driver_phone && user.phone) {
-      const norm1 = String(booking.driver_phone).replace(/\D/g, '').replace(/^234/, '').replace(/^0+/, '');
-      const norm2 = String(user.phone).replace(/\D/g, '').replace(/^234/, '').replace(/^0+/, '');
-      if (norm1 && norm2 && (norm1 === norm2 || norm1.endsWith(norm2) || norm2.endsWith(norm1))) {
-        return true;
-      }
-    }
-
-    // Name match fallback (if normalized)
-    if (booking.driver_name && user.full_name) {
-      if (booking.driver_name.trim().toLowerCase() === user.full_name.trim().toLowerCase()) {
-        return true;
-      }
-    }
-
-    return false;
-  }
+  static isAuthorizedDriver(booking, user) { return canOperateBooking(booking, user, "transportation"); }
 
   /**
    * Get booking with tracking data
@@ -775,7 +741,7 @@ class TransportationTrackingService {
   /**
    * Get full tracking summary for customer or driver
    */
-  static async getTrackingSummary(bookingId) {
+  static async getTrackingSummary(bookingId, requestingUser = null) {
     const booking = await this.getBookingForTracking(bookingId);
     if (!booking) {
       return null;

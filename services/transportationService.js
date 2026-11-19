@@ -268,7 +268,7 @@ class TransportationController {
         });
       }
 
-      const summary = await TransportationTrackingService.getTrackingSummary(bookingId);
+      const summary = await TransportationTrackingService.getTrackingSummary(bookingId, req.user);
       if (!summary) {
         return res.status(404).json({
           success: false,

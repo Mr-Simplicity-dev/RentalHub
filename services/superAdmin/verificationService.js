@@ -281,94 +281,48 @@ const getIdentityVerifications = async (req, res) => {
 
 const approveIdentityVerification = async (req, res) => {
   const { userId } = req.params;
-
+  const reviewNote = String(req.body?.review_note || req.body?.note || '').trim();
+  if (!reviewNote || reviewNote.length > 2000) return res.status(400).json({ success: false, message: 'An approval note of up to 2,000 characters is required.' });
+  let client;
+  let committed = false;
   try {
     await ensureVerificationAuditSchema();
     await ensureIdentityVerificationOperationSchema();
-    try{await require('../identityPhotoService').guardManualVerification(userId,req.user.id);}catch(error){return res.status(error.statusCode || 503).json({success:false,message:error.message});}
-    if(!String(req.body?.review_note || req.body?.note || '').trim())return res.status(400).json({success:false,message:'An approval note is required.'});
-
-    const reviewNote = String(req.body?.review_note || req.body?.note || '').trim() || null;
-
-    await db.query('BEGIN');
-
-    const existingResult = await db.query(
+    await require('../identityPhotoService').guardManualVerification(userId, req.user.id);
+    client = await db.connect();
+    await client.query('BEGIN');
+    const existingResult = await client.query(
       `SELECT id, full_name, email, user_type, identity_document_type, nationality,
               identity_verified, identity_verification_status, passport_photo_url,
-              identity_verified_at, identity_verified_by
-       FROM users
-       WHERE id = $1
-         AND deleted_at IS NULL
-         AND user_type <> 'super_admin'
-       FOR UPDATE`,
-      [userId]
-    );
-
-    if (!existingResult.rows.length) {
-      await db.query('ROLLBACK');
-      return res.status(404).json({ message: 'User not found or not eligible for verification' });
-    }
-
+              identity_verified_at, identity_verified_by,
+              (NULLIF(TRIM(passport_photo_url), '') IS NOT NULL) AS has_live_photo,
+              (NULLIF(TRIM(nin), '') IS NOT NULL OR NULLIF(TRIM(international_passport_number), '') IS NOT NULL) AS has_identity_document
+       FROM users WHERE id = $1 AND deleted_at IS NULL AND user_type <> 'super_admin' FOR UPDATE`, [userId]);
     const existingUser = existingResult.rows[0];
-
-    const result = await db.query(
-      `UPDATE users
-       SET identity_verified = TRUE,
-
-           identity_verification_status = 'verified',
-
-           identity_verified_by = $2,
-
-           identity_verified_at = NOW(),
-
-           updated_at = NOW()
-
-       WHERE id = $1
-
-         AND deleted_at IS NULL
-
-         AND user_type <> 'super_admin'
-
-         AND passport_photo_url IS NOT NULL
-
-         AND (nin IS NOT NULL OR international_passport_number IS NOT NULL)
-
-       RETURNING id`,
-
-      [userId, req.user.id]
-    );
-
-    if (!result.rows.length) {
-      await db.query('ROLLBACK');
-      return res.status(404).json({ message: 'User not found or not eligible for verification' });
+    if (!existingUser) { await client.query('ROLLBACK'); return res.status(404).json({ success: false, message: 'User not found or not eligible for verification' }); }
+    if (!existingUser.has_live_photo || !existingUser.has_identity_document) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ success: false, code: 'VERIFICATION_INCOMPLETE', message: 'The user must capture a live face photo and provide their NIN or passport in Profile before approval.', required_fields: [...(existingUser.has_live_photo ? [] : ['live_photo']), ...(existingUser.has_identity_document ? [] : ['identity_document'])] });
     }
-
-    await createIdentityVerificationOperation({
-      userId: Number(userId),
-      actorId: req.user.id,
-      actorName: getAdminOperationActorName(req.user),
-      eventType: 'identity_verified',
-      note: reviewNote,
-      userSnapshot: existingUser,
-      metadata: {
-        old_status: existingUser.identity_verification_status,
-        new_status: 'verified',
-      },
-    });
-
-    await db.query('COMMIT');
-    await require('../identityPhotoService').approveCurrentPhotoTemplate(userId);
-    await logAction(req.user.id, 'VERIFY_USER', 'user', userId);
-
-    res.json({ success: true, message: 'User verified' });
-  } catch (err) {
-    await db.query('ROLLBACK');
-    req.logger.error(err);
-    res.status(500).json({ message: 'Failed to verify user' });
-  }
+    await client.query(
+      `UPDATE users SET identity_verified = TRUE, identity_verification_status = 'verified',
+       identity_verified_by = $2, identity_verified_at = NOW(), updated_at = NOW()
+       WHERE id = $1`, [userId, req.user.id]);
+    await createIdentityVerificationOperation({ userId: Number(userId), actorId: req.user.id,
+      actorName: getAdminOperationActorName(req.user), eventType: 'identity_verified', note: reviewNote,
+      userSnapshot: existingUser, metadata: { old_status: existingUser.identity_verification_status, new_status: 'verified' } }, client);
+    await logAction(req.user.id, 'VERIFY_USER', 'user', userId, client);
+    await client.query('COMMIT');
+    committed = true;
+    try { await require('../identityPhotoService').approveCurrentPhotoTemplate(userId); }
+    catch { req.logger?.warn?.('Photo template needs follow-up after identity approval'); }
+    return res.json({ success: true, message: 'User verified' });
+  } catch (error) {
+    if (client && !committed) await client.query('ROLLBACK').catch(() => {});
+    req.logger?.error?.('Identity approval failed', { code: error.code || 'APPROVAL_FAILED' });
+    return res.status(error.statusCode || 500).json({ success: false, message: error.statusCode ? error.message : 'Failed to verify user' });
+  } finally { client?.release(); }
 };
-
-
 
 // PATCH /api/super/verifications/:userId/reject
 

@@ -87,7 +87,7 @@ router.get(
   async (req, res) => {
     try {
       const { bookingId } = req.params;
-      const summary = await TransportationTrackingService.getTrackingSummary(bookingId);
+      const summary = await TransportationTrackingService.getTrackingSummary(bookingId, req.user);
 
       if (!summary) {
         return res.status(404).json({

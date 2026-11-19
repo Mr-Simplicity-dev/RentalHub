@@ -1,3 +1,4 @@
+const {canOperateBooking,assertTrackingAccess}=require('../config/utils/serviceTrackingAccess');
 const db = require('../config/middleware/database');
 const { getRealtimeIo } = require('../config/utils/realtimeEmitter');
 const logger = require('../config/utils/logger') || console;
@@ -155,64 +156,7 @@ class FumigationTrackingService {
    * Check if user is authorized fumigation specialist/technician for this booking
    * IMPORTANT: Strictly exclude transportation-specific roles!
    */
-  static isAuthorizedTeam(booking, user) {
-    if (!booking || !user) return false;
-
-    // Strict exclusion: Super Transportation Admin has NO fumigation administrative authority
-    const transportRoles = [
-      'super_transportation_admin',
-      'state_transportation_admin',
-      'lga_transportation_admin',
-      'zonal_transportation_admin',
-      'transportation_admin'
-    ];
-    if (transportRoles.includes(user.user_type)) {
-      return false;
-    }
-
-    // Authorized platform & fumigation admin roles
-    const adminRoles = [
-      'super_admin',
-      'super_fumigation_admin',
-      'zonal_fumigation_admin',
-      'zonal_admin',
-      'state_fumigation_admin',
-      'state_admin',
-      'lga_fumigation_admin',
-      'lga_admin',
-      'fumigation_admin',
-      'admin'
-    ];
-    if (adminRoles.includes(user.user_type)) {
-      return true;
-    }
-
-    // Direct team_id match
-    const teamId = booking.team_id || booking.assigned_team_id || booking.assigned_provider_id || booking.team_leader_id;
-    if (teamId && Number(teamId) === Number(user.id)) {
-      return true;
-    }
-
-    // Phone number match with Nigerian format normalization (080 vs +23480)
-    const teamPhone = booking.team_phone || booking.assigned_team_phone || booking.provider_phone;
-    if (teamPhone && user.phone) {
-      const norm1 = String(teamPhone).replace(/\D/g, '').replace(/^234/, '').replace(/^0+/, '');
-      const norm2 = String(user.phone).replace(/\D/g, '').replace(/^234/, '').replace(/^0+/, '');
-      if (norm1 && norm2 && (norm1 === norm2 || norm1.endsWith(norm2) || norm2.endsWith(norm1))) {
-        return true;
-      }
-    }
-
-    // Team name match fallback
-    const teamName = booking.team_name || booking.assigned_team_leader || booking.provider_name;
-    if (teamName && user.full_name) {
-      if (teamName.trim().toLowerCase() === user.full_name.trim().toLowerCase()) {
-        return true;
-      }
-    }
-
-    return false;
-  }
+  static isAuthorizedTeam(booking, user) { return canOperateBooking(booking, user, "fumigation"); }
 
   /**
    * Retrieve booking with fumigation tracking and property context
@@ -969,6 +913,7 @@ class FumigationTrackingService {
     const numBookingId = Number(bookingId);
     const booking = await this.getBookingForTracking(numBookingId);
     if (!booking) return null;
+    if (requestingUser) assertTrackingAccess(booking, requestingUser, "fumigation");
 
     // 1. Fetch pings trail (breadcrumb history)
     let pings = [];
@@ -1094,8 +1039,8 @@ class FumigationTrackingService {
         distance_km: distanceKm
       },
       safety_instructions: {
-        chemical_name: booking.chemical_used || serviceReport?.chemical_name || 'Approved EPA/NAFDAC Insecticide',
-        nafdac_reg_number: booking.chemical_registration_number || serviceReport?.nafdac_reg_number || 'NAFDAC-REG-04-2218',
+        chemical_name: booking.chemical_used || serviceReport?.chemical_name || null,
+        nafdac_reg_number: booking.chemical_registration_number || serviceReport?.nafdac_reg_number || null,
         ventilation_hours: booking.ventilation_hours_required || 4.0,
         reentry_seconds_remaining: reentrySecondsRemaining,
         is_reentry_safe: isReentrySafe,
@@ -1128,15 +1073,15 @@ class FumigationTrackingService {
         tenant_phone: booking.tenant_phone
       },
       team: {
-        id: booking.team_id || 10,
+        id: booking.team_id || null,
         name: booking.team_name || 'Amana Certified Fumigation Squad',
-        phone: booking.team_phone || '+234 800 262 6200',
+        phone: booking.team_phone || null,
         avatar_url: booking.team_avatar_url || null,
-        vehicle_plate: booking.team_vehicle_plate || 'ARH-FUM-01',
+        vehicle_plate: booking.team_vehicle_plate || null,
         vehicle_type: booking.team_vehicle_type || 'van',
-        rating: 4.9,
-        is_verified: true,
-        license_number: 'FUM-NG-2026-9921',
+        rating: booking.team_rating ?? null,
+        is_verified: booking.team_verified === true,
+        license_number: booking.team_license_number || null,
         equipment: booking.team_equipment_details || 'Thermal Fogger, ULV Misting Unit, Heavy Duty Respirators'
       },
       telemetry: {
@@ -1199,11 +1144,11 @@ class FumigationTrackingService {
           'Keep domestic pets and plants outside until the ventilation period has fully elapsed.'
         ].join('\n'),
         safety_checklist: [
-          { item: 'All food and cookware securely sealed', verified: true },
-          { item: 'Occupants and pets evacuated', verified: true },
-          { item: 'Aquarium and bird cages protected/removed', verified: true },
-          { item: 'Windows closed for chemical saturation', verified: true },
-          { item: 'NAFDAC verified chemicals utilized', verified: true }
+          { item: 'All food and cookware securely sealed', verified: null },
+          { item: 'Occupants and pets evacuated', verified: null },
+          { item: 'Aquarium and bird cages protected/removed', verified: null },
+          { item: 'Windows closed for chemical saturation', verified: null },
+          { item: 'NAFDAC verified chemicals utilized', verified: null }
         ]
       },
       evidence: {

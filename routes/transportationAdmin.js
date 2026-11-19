@@ -6036,7 +6036,7 @@ router.get('/bookings/:bookingId/pings', [param('bookingId').isInt()], validateR
       return res.status(404).json({ success: false, message: 'Transportation booking not found' });
     }
 
-    const summary = await TransportationTrackingService.getTrackingSummary(bookingId);
+    const summary = await TransportationTrackingService.getTrackingSummary(bookingId, req.user);
     return res.json({
       success: true,
       data: summary?.breadcrumb_trail || [],

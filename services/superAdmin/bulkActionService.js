@@ -12,8 +12,8 @@ const bulkUserAction = async (req, res) => {
     await ensureVerificationAuditSchema();
     await ensureAdminAccountOperationSchema();
 
-    if (!Array.isArray(ids) || !ids.length) {
-      return res.status(400).json({ message: 'No users selected' });
+    if (!Array.isArray(ids) || !ids.length || ids.length > 100 || ids.some(id => !Number.isSafeInteger(Number(id)) || Number(id) <= 0)) {
+      return res.status(400).json({ message: 'Select between 1 and 100 valid users' });
     }
 
     let query;
@@ -43,6 +43,8 @@ const bulkUserAction = async (req, res) => {
       case 'verify':
         await ensureIdentityVerificationOperationSchema();
         if(!reason)return res.status(400).json({message:'A bulk verification review note is required.'});
+        const selected = await db.query("SELECT id FROM users WHERE id=ANY($1::int[]) AND deleted_at IS NULL AND user_type<>'super_admin' AND NULLIF(TRIM(passport_photo_url),'') IS NOT NULL AND (NULLIF(TRIM(nin),'') IS NOT NULL OR NULLIF(TRIM(international_passport_number),'') IS NOT NULL)", [ids]);
+        if (selected.rows.length !== new Set(ids.map(Number)).size) return res.status(409).json({message:'Every selected user must have a live face photo and a NIN or passport before bulk verification.'});
         for(const id of ids){try{await require('../identityPhotoService').guardManualVerification(id,req.user.id);}catch(error){return res.status(error.statusCode || 503).json({message:error.message});}}
         query = `
           UPDATE users
@@ -62,7 +64,8 @@ const bulkUserAction = async (req, res) => {
         logActionName = 'BULK_VERIFY_USERS';
         break;
       case 'promote':
-        query = `UPDATE users SET user_type = 'admin', updated_at = NOW() WHERE id = ANY($1) AND user_type <> 'super_admin'`;
+        if (!reason || reason.length > 2000) return res.status(400).json({message:'A bulk promotion reason is required'});
+        query = `UPDATE users SET user_type = 'admin', updated_at = NOW() WHERE id = ANY($1) AND user_type IN ('tenant','landlord','agent') AND deleted_at IS NULL AND is_active=TRUE RETURNING id`; 
         logActionName = 'BULK_PROMOTE_USERS';
         break;
       default:
@@ -73,6 +76,9 @@ const bulkUserAction = async (req, res) => {
 
     if(action==='verify'){
       for(const row of actionResult.rows){await require('../identityPhotoService').approveCurrentPhotoTemplate(row.id);await createIdentityVerificationOperation({userId:row.id,actorId:req.user.id,actorName:getAdminOperationActorName(req.user),eventType:'identity_verified',note:reason,userSnapshot:row,metadata:{bulk_action:true}});}
+    }
+    if (action === 'promote') {
+      for (const row of actionResult.rows) await createAdminAccountOperation({adminUserId:row.id,actorId:req.user.id,actorName:getAdminOperationActorName(req.user),eventType:'user_promoted_to_admin',note:reason,metadata:{bulk_action:true,new_role:'admin'}});
     }
     if (action === 'ban') {
       for (const row of actionResult.rows) {
