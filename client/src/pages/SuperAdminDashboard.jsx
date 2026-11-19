@@ -999,8 +999,8 @@ function SuperAdminDashboardContent() {
     }
   };
 
-  const promoteUser = async (id) => {
-    await api.patch(`/super/users/${id}/promote`);
+  const promoteUser = async (id, reason = "") => {
+    await api.patch(`/super/users/${id}/promote`, { reason: String(reason || "").trim() });
     toast.success("User promoted");
     loadUsers();
     loadAdminPerformance();

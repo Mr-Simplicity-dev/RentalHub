@@ -240,17 +240,18 @@ const DriverTripConsole = () => {
   const submitProof = async (e) => {
     e.preventDefault();
     if (!selectedTripId) return;
+    if (!proofUrl.trim()) { toast.error('Add a real pickup or delivery photo before submitting proof.'); return; }
     setSubmittingProof(true);
     try {
       const res = await api.post('/transportation/driver/status', {
         booking_id: Number(selectedTripId),
         status: proofType,
         note: proofNote,
-        proof_url: proofUrl || 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=600&q=80'
+        proof_url: proofUrl.trim()
       });
 
       if (res.data?.success) {
-        toast.success('Service proof verified and logged');
+        toast.success('Service proof submitted and logged');
         setShowProofModal(false);
         setProofNote('');
         setProofUrl('');

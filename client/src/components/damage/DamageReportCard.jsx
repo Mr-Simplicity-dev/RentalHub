@@ -12,7 +12,7 @@ const DamageReportCard = ({ propertyId }) => {
   const loadReport = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/properties/${propertyId}/damage-report/latest-published`);
+      const response = await api.get(`/damage-reports/properties/${propertyId}/damage-report/latest-published`);
       
       if (response.data?.success && response.data?.data) {
         setReport(response.data.data);

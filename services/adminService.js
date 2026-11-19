@@ -1936,7 +1936,9 @@ exports.getUserById = async (req, res) => {
 
     const result = await db.query(
       `SELECT id, full_name, email, phone, user_type,
-              email_verified, phone_verified, identity_verified,
+              email_verified, phone_verified, identity_verified, identity_verification_status,
+              (NULLIF(TRIM(passport_photo_url), '') IS NOT NULL) AS has_live_photo,
+              (NULLIF(TRIM(nin), '') IS NOT NULL OR NULLIF(TRIM(international_passport_number), '') IS NOT NULL) AS has_identity_document,
               created_at,
               COALESCE(account_ops.operations, '[]'::json) AS account_operations
        FROM users

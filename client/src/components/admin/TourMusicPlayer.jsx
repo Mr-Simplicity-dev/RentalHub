@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
-import { FaPlay, FaPause, FaStop } from 'react-icons/fa';
+import { FaStop } from 'react-icons/fa';
 import api from '../../services/api';
 
 const PLAY_EVENT = 'rentalhub:tour-music-preview';
@@ -9,15 +9,20 @@ export default function TourMusicPlayer({ track }) {
   const audio = useRef(null);
   const request = useRef(null);
   const objectUrl = useRef(null);
+  const attemptedFallback = useRef(false);
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState('');
+  const [hint, setHint] = useState('');
+  const cloudSource = /^https:\/\/res\.cloudinary\.com\//i.test(track.file_url || '');
+  const endpoint = '/super/property-tour-music/tracks/' + track.id + '/audio';
+  const source = cloudSource ? track.file_url : (api.defaults?.baseURL || '/api').replace(/\/$/, '') + endpoint;
 
   const stop = () => {
     request.current?.abort();
     request.current = null;
     if (audio.current) {
       audio.current.pause();
-      audio.current.currentTime = 0;
+      try { audio.current.currentTime = 0; } catch { /* Metadata may not have loaded yet. */ }
     }
     setStatus('idle');
   };
@@ -34,58 +39,59 @@ export default function TourMusicPlayer({ track }) {
     };
   }, [id]);
 
-  const play = async () => {
-    if (status === 'playing') { audio.current.pause(); return; }
-    window.dispatchEvent(new CustomEvent(PLAY_EVENT, { detail: id }));
-    setError('');
-    setStatus('loading');
+  const loadFallback = async () => {
+    request.current?.abort();
     const controller = new AbortController();
     request.current = controller;
+    attemptedFallback.current = true;
+    setError(''); setHint(''); setStatus('loading');
     try {
-      if (!audio.current.getAttribute('src')) {
-        if (/^https:\/\/res\.cloudinary\.com\//i.test(track.file_url || '')) {
-          audio.current.src = track.file_url;
-        } else {
-          const response = await api.get('/super/property-tour-music/tracks/' + track.id + '/audio', {
-            responseType: 'blob', signal: controller.signal,
-          });
-          if (controller.signal.aborted) return;
-          if (!response.data?.size || !/^audio\//i.test(response.data.type || '')) throw new Error('The server did not return an audio file.');
-          objectUrl.current = URL.createObjectURL(response.data);
-          audio.current.src = objectUrl.current;
-        }
+      let response;
+      try {
+        response = await api.get(endpoint, { responseType: 'blob', signal: controller.signal });
+      } catch (failure) {
+        if (failure.response?.status !== 403 || controller.signal.aborted) throw failure;
+        await api.get('/super/property-tour-music/settings', { signal: controller.signal });
+        response = await api.get(endpoint, { responseType: 'blob', signal: controller.signal });
       }
       if (controller.signal.aborted) return;
+      if (!response.data?.size || !/^audio\//i.test(response.data.type || '')) throw new Error('Audio was not returned');
+      if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
+      objectUrl.current = URL.createObjectURL(response.data);
+      audio.current.src = objectUrl.current;
       audio.current.muted = false;
       await audio.current.play();
     } catch (failure) {
       if (controller.signal.aborted) return;
       setStatus('idle');
-      setError(failure.response?.status === 404 ? 'Audio file is missing. Please upload this track again.' : 'Could not play this track. Check your connection and try again.');
+      if (failure.name === 'NotAllowedError') setHint('Audio is ready. Press Play on the player.');
+      else setError(failure.response?.status === 404 ? 'Audio file is missing. Please upload this track again.' : 'Could not play this track. Check your connection and try again.');
     } finally {
       if (request.current === controller) request.current = null;
     }
   };
 
+  const failed = () => {
+    if (!cloudSource && !attemptedFallback.current) { loadFallback(); return; }
+    setStatus('idle'); setError('Could not play this audio file. Please retry or upload it again.');
+  };
+
   return (
     <div className="mt-2 w-full max-w-md space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={play} disabled={status === 'loading'} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm" aria-label={(status === 'playing' ? 'Pause ' : 'Play ') + track.title}>
-          {status === 'playing' ? <FaPause /> : <FaPlay />}
-          {status === 'loading' ? 'Loading…' : status === 'playing' ? 'Pause' : 'Play'}
-        </button>
-        <button type="button" onClick={stop} disabled={status === 'idle'} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm disabled:opacity-50" aria-label={'Stop ' + track.title}>
-          <FaStop /> Stop
+      <div className="flex items-center gap-2">
+        <audio ref={audio} controls preload="none" src={source} className="min-w-0 flex-1" aria-label={'Audio preview: ' + track.title}
+          onPlay={() => { window.dispatchEvent(new CustomEvent(PLAY_EVENT, { detail: id })); setError(''); setHint(''); setStatus('playing'); }}
+          onPause={() => setStatus(previous => previous === 'idle' || previous === 'loading' ? previous : 'paused')}
+          onEnded={() => { if (audio.current) audio.current.currentTime = 0; setStatus('idle'); }} onError={failed}>
+          <track kind="captions" />
+        </audio>
+        <button type="button" onClick={stop} disabled={status === 'idle'} className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm disabled:opacity-50" aria-label={'Stop ' + track.title}>
+          <FaStop aria-hidden="true" /> Stop
         </button>
       </div>
-      <audio ref={audio} controls preload="none" className="w-full" aria-label={'Audio preview: ' + track.title}
-        onPlay={() => { window.dispatchEvent(new CustomEvent(PLAY_EVENT, { detail: id })); setStatus('playing'); }}
-        onPause={() => setStatus(previous => previous === 'idle' ? 'idle' : 'paused')}
-        onEnded={() => { if (audio.current) audio.current.currentTime = 0; setStatus('idle'); }}
-        onError={() => { setStatus('idle'); setError('Could not play this audio file. Please retry or upload it again.'); }}>
-        <track kind="captions" />
-      </audio>
-      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+      {status === 'loading' && <p role="status" className="text-sm text-slate-600">Loading audio…</p>}
+      {hint && <p role="status" className="text-sm text-slate-600">{hint}</p>}
+      {error && <div role="alert" className="text-sm text-red-700">{error} <button type="button" className="underline" onClick={cloudSource ? () => { audio.current.load(); audio.current.play().catch(failed); } : loadFallback}>Retry audio</button></div>}
     </div>
   );
 }

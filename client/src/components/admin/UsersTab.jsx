@@ -45,7 +45,7 @@ const UsersTab = ({
       const steps = [];
       if (!user.email_verified) steps.push("Verify your email address");
       if (!user.phone_verified) steps.push("Verify your phone number");
-      if (!user.passport_photo_url) steps.push("Upload your identity document (passport photo)");
+      if (!user.passport_photo_url) steps.push("Capture your live face photo in Profile");
       if (!user.nin && !user.international_passport_number) steps.push("Provide your NIN or International Passport number");
 
       const message = steps.length > 0
@@ -84,7 +84,7 @@ const UsersTab = ({
     setRevalidationAction({
       open: true,
       user,
-      fields: user?.passport_photo_url ? [] : ["live_photo"],
+      fields: [...(user?.passport_photo_url ? [] : ["live_photo"]), ...((user?.nin || user?.international_passport_number) ? [] : [user?.identity_document_type === "passport" ? "international_passport" : "nin"])],
       reason: "",
       instructions: "",
       due_at: "",
@@ -181,7 +181,7 @@ const UsersTab = ({
     const { user, action, reason } = accountAction;
     const normalizedReason = reason.trim();
 
-    if ((action === "ban" || action === "delete" || action === "bulk_ban" || action === "bulk_verify" || action === "verify") && !normalizedReason) {
+    if ((action === "ban" || action === "delete" || action === "bulk_ban" || action === "bulk_verify" || action === "verify" || action === "promote") && !normalizedReason) {
       setAccountActionError(action === "delete" ? "Deletion reason is required." : "A decision reason is required.");
       return;
     }
@@ -192,6 +192,8 @@ const UsersTab = ({
         if (!user.passport_photo_url || !(user.nin || user.international_passport_number)) { setAccountActionError("The user must submit their face photo and NIN or passport before approval."); return; }
         const completed = await verifyIdentity(user.id, normalizedReason);
         if (completed === false) { setAccountActionError("Approval was not completed. Check the review message and try again."); return; }
+      } else if (action === "promote") {
+        await promoteUser(user.id, normalizedReason);
       } else if (action === "ban") {
         await banUser(user.id, normalizedReason);
       } else if (action === "unban") {
@@ -394,7 +396,7 @@ const UsersTab = ({
                       u.user_type
                     ) && (
                       <button
-                        onClick={() => promoteUser(u.id)}
+                        onClick={() => openAccountAction(u, "promote")}
                         className="rounded-lg bg-blue-600 px-2 py-1 text-xs text-white transition-colors hover:bg-blue-700 max-sm:min-h-11 max-sm:min-w-11"
                       >
                         Promote
@@ -534,7 +536,7 @@ const UsersTab = ({
                   {selectedUserForModal.passport_photo_url ? (
                     <div className="flex items-center gap-2 text-green-700">
                       <span>✅</span>
-                      <span>Identity document uploaded</span>
+                      <span>Face photo captured</span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 text-gray-400 line-through">
@@ -871,7 +873,7 @@ const UsersTab = ({
           <div role="dialog" aria-modal="true" aria-label="Account review" className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-xl">
             <div className="border-b border-soft px-6 py-4">
               <h3 className="text-lg font-semibold text-gray-900">
-                {accountAction.action === "verify" ? "Review identity approval" : accountAction.action === "bulk_verify" ? "Verify selected users" : accountAction.action === "bulk_ban"
+                {accountAction.action === "promote" ? "Promote user to admin" : accountAction.action === "verify" ? "Review identity approval" : accountAction.action === "bulk_verify" ? "Verify selected users" : accountAction.action === "bulk_ban"
                   ? "Ban selected users"
                   : accountAction.action === "ban"
                   ? "Ban user"
@@ -890,7 +892,7 @@ const UsersTab = ({
               <label className="block text-sm font-medium text-gray-700">
                 {["verify", "bulk_verify"].includes(accountAction.action) ? "Approval note (required)" : accountAction.action === "unban" ? "Admin note" : "Reason"}
               </label>
-              {accountAction.action === "verify" && (!accountAction.user?.passport_photo_url || !(accountAction.user?.nin || accountAction.user?.international_passport_number)) && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Incomplete verification: the user must submit { !accountAction.user?.passport_photo_url ? "a face photo" : "their identity document" } in their Profile before approval.</p>}
+              {accountAction.action === "verify" && (!accountAction.user?.passport_photo_url || !(accountAction.user?.nin || accountAction.user?.international_passport_number)) && <div role="status" className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><p>Incomplete verification: { !accountAction.user?.passport_photo_url ? "a live face photo is missing." : "a NIN or passport number is missing." } The user must complete this in Profile. An approval note cannot replace the missing evidence.</p><button type="button" className="min-h-11 font-semibold underline" onClick={() => { const person=accountAction.user; const reason=accountAction.reason; closeAccountAction(); openRevalidationRequest(person); setRevalidationAction(previous=>({...previous,reason})); }}>Request missing verification steps</button></div>}
               <textarea
                 aria-label={["verify", "bulk_verify"].includes(accountAction.action) ? "Approval note" : "Decision reason"}
                 maxLength={2000}
@@ -935,7 +937,7 @@ const UsersTab = ({
               <button
                 type="button"
                 onClick={submitAccountAction}
-                disabled={accountActionBusy || (accountAction.action === "verify" && (!accountAction.user?.passport_photo_url || !(accountAction.user?.nin || accountAction.user?.international_passport_number)))}
+                disabled={accountActionBusy || (accountAction.action !== "unban" && !accountAction.reason.trim())}
                 className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${
                   accountAction.action === "delete" || accountAction.action === "ban" || accountAction.action === "bulk_ban"
                     ? "bg-red-600 hover:bg-red-700"
