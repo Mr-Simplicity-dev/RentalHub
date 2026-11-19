@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const makeGate = require('../../services/registrationPhoneGate');
 
 function setup({ smsFails = false } = {}) {
-  const rows = new Map(); let sent = 0;
+  const rows = new Map(); let sent = 0; const stopped = [];
   const db = { query: async (sql, args = []) => {
     if (/BEGIN|COMMIT|ROLLBACK|pg_advisory/.test(sql)) return { rows: [] };
     if (sql.includes('SELECT id') && sql.includes('consumed_at IS NOT NULL')) { const row = rows.get(args[0]); return { rows: row?.consumed && row.payload_digest === args[1] && row.created > Date.now()-86400000 ? [row] : [] }; }
@@ -18,8 +18,8 @@ function setup({ smsFails = false } = {}) {
     throw Error('Unexpected SQL: ' + sql);
   } };
   db.connect = async () => ({ query: db.query, release() {} });
-  const gate = makeGate({ db, secret: () => 'test-secret-only', sendVerificationCode: async () => { sent++; return { success: !smsFails, code: 123456 }; } });
-  return { gate, rows, sent: () => sent };
+  const gate = makeGate({ db, markVerificationCodeUsed:async(phone,code)=>stopped.push({phone,code}), secret: () => 'test-secret-only', sendVerificationCode: async () => { sent++; return { success: !smsFails, code: 123456 }; } });
+  return { gate, rows, stopped, sent: () => sent };
 }
 const details = { user_type: 'tenant', phone: '08012345678', email: 'test@example.test', password: 'test-password', payment_method: 'paystack', registration_flow: 'paid' };
 test('sends once before payment, stores only hashed code, returns ten-minute challenge', async () => {
@@ -34,6 +34,7 @@ test('tenant, landlord and free registrations verify only their bound details', 
     const f = setup(), c = await f.gate.send(payload);
     const grant = await f.gate.verify({ ...payload, phone_challenge: c.phone_challenge, otp: '123456' });
     assert.equal(require('jsonwebtoken').decode(grant).purpose, 'registration-phone');
+    assert.deepEqual(f.stopped,[{phone:payload.phone,code:'123456'}]);
     await assert.rejects(f.gate.verify({ ...payload, phone_challenge: c.phone_challenge, otp: '123456' }), { code: 'OTP_EXPIRED' });
   }
 });

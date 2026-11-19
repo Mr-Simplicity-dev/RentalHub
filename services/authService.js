@@ -4836,6 +4836,7 @@ exports.verifyPhone = async (req, res) => {
 
     // Clear OTP
     await otpDelete(userId);
+    await markVerificationCodeUsed(phone, storedOTP.code);
 
     await logOtpEvent({
       userId, contact: phone, channel: 'sms', purpose: 'verify_phone',
