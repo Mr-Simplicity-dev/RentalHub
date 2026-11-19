@@ -7,11 +7,11 @@ const {
 } = require('../../controllers/locationController');
 
 const router = express.Router();
-router.use(require('../../config/utils/propertyContactPrivacy').hidePropertyContacts);
+const { hidePropertyContacts } = require('../../config/utils/propertyContactPrivacy');
 
-router.get('/nigeria', getNigeriaDirectory);
-router.get('/nigeria/:stateSlug/:lgaSlug', getLocationPage);
-router.get('/nigeria/:stateSlug', getLocationPage);
-router.get('/areas/:stateSlug/:citySlug/:areaSlug', getAreaPage);
+router.get('/nigeria', hidePropertyContacts, getNigeriaDirectory);
+router.get('/nigeria/:stateSlug/:lgaSlug', hidePropertyContacts, getLocationPage);
+router.get('/nigeria/:stateSlug', hidePropertyContacts, getLocationPage);
+router.get('/areas/:stateSlug/:citySlug/:areaSlug', hidePropertyContacts, getAreaPage);
 
 module.exports = router;
