@@ -1,3 +1,4 @@
+import {createLiveFaceMesh} from '../../utils/liveFaceMesh';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FaTimes, FaCheckCircle, FaRedo } from 'react-icons/fa';
 import api from '../../services/api';
@@ -18,26 +19,6 @@ const computeEAR = (landmarks, eyeIdx) => {
   const horizontal = distance(p1, p4);
   if (!horizontal) return 0;
   return vertical / (2 * horizontal);
-};
-
-const loadExternalScript = (src) => {
-  if (typeof window === 'undefined') return Promise.reject(new Error('Window not available'));
-  const existing = document.querySelector(`script[src="${src}"]`);
-  if (existing) {
-    if (existing.getAttribute('data-loaded') === 'true') return Promise.resolve();
-    return new Promise((resolve, reject) => {
-      existing.addEventListener('load', () => resolve(), { once: true });
-      existing.addEventListener('error', () => reject(new Error(`Could not load script: ${src}`)), { once: true });
-    });
-  }
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = src;
-    script.async = true;
-    script.onload = () => { script.setAttribute('data-loaded', 'true'); resolve(); };
-    script.onerror = () => reject(new Error(`Could not load script: ${src}`));
-    document.body.appendChild(script);
-  });
 };
 
 const LivePassportCaptureModal = ({ onCapture, onClose, title, sessionEndpoint = '/users/verification/live-capture/session', uploadEndpoint = '/users/upload-passport', consentConfirmed = false, language }) => {
@@ -165,9 +146,6 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title, sessionEndpoint =
       if (!session.data?.data?.token) throw new Error('Unable to start photo capture. Please try again.');
       if (run !== cameraRunRef.current) return;
       setLiveCaptureToken(session.data.data.token);
-      await loadExternalScript('https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js');
-      const FaceMesh = window.FaceMesh;
-      if (!FaceMesh) throw new Error('FaceMesh not loaded');
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'user' } } });
       if (run !== cameraRunRef.current) { stream.getTracks().forEach(track => track.stop()); return; }
       streamRef.current = stream;
@@ -175,7 +153,8 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title, sessionEndpoint =
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
-      const mesh = new FaceMesh({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}` });
+      const mesh = await createLiveFaceMesh();
+      if (run !== cameraRunRef.current) {mesh.close(); return;}
       mesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
       mesh.onResults((results) => { if (detectionEnabledRef.current) handleFaceResults(results); });
       faceMeshRef.current = mesh;

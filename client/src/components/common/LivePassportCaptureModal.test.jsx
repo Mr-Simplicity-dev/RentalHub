@@ -1,9 +1,11 @@
+import {createLiveFaceMesh} from '../../utils/liveFaceMesh';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { fireEvent, within } from '@testing-library/dom';
 import { vi } from 'vitest';
 import LivePassportCaptureModal from './LivePassportCaptureModal';
 import api from '../../services/api';
+vi.mock('../../utils/liveFaceMesh',()=>({createLiveFaceMesh:vi.fn()}));
 vi.mock('../../services/api', () => ({ default: { post: vi.fn() } }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (_key, text) => text }) }));
 vi.mock('react-toastify', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -27,9 +29,7 @@ test('camera completes liveness and saves once automatically without an upload b
   script.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js';
   script.setAttribute('data-loaded', 'true'); document.body.append(script);
   let onResults;
-  window.FaceMesh = class {
-    setOptions() {} onResults(fn) { onResults = fn; } send() { return Promise.resolve(); } close() {}
-  };
+  createLiveFaceMesh.mockImplementation(async()=>({setOptions(){},onResults(fn){onResults=fn;},async send(){},close(){}}));
   const stop = vi.fn();
   const stream = { getTracks: () => [{ stop }] };
   Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: vi.fn(async () => stream) } });

@@ -1,3 +1,4 @@
+import {createLiveFaceMesh} from '../utils/liveFaceMesh';
 import UserAvatar from '../components/common/UserAvatar';
 import AssistedPasswordForm from '../components/common/AssistedPasswordForm';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -37,34 +38,6 @@ const computeEAR = (landmarks, eyeIdx) => {
   const horizontal = distance(p1, p4);
   if (!horizontal) return 0;
   return vertical / (2 * horizontal);
-};
-
-const loadExternalScript = (src) => {
-  if (typeof window === 'undefined') {
-    return Promise.reject(new Error('Window is not available.'));
-  }
-  const existing = document.querySelector(`script[src="${src}"]`);
-  if (existing) {
-    if (existing.getAttribute('data-loaded') === 'true') {
-      return Promise.resolve();
-    }
-    return new Promise((resolve, reject) => {
-      existing.addEventListener('load', () => resolve(), { once: true });
-      existing.addEventListener('error', () => reject(new Error(`Could not load script: ${src}`)), { once: true });
-    });
-  }
-
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = src;
-    script.async = true;
-    script.onload = () => {
-      script.setAttribute('data-loaded', 'true');
-      resolve();
-    };
-    script.onerror = () => reject(new Error(`Could not load script: ${src}`));
-    document.body.appendChild(script);
-  });
 };
 
 const Profile = () => {
@@ -437,17 +410,7 @@ const Profile = () => {
     try {
       if (typeof window === 'undefined') return;
 
-      if (!window.FaceMesh) {
-        await loadExternalScript('https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js');
-      }
-
-      if (!window.FaceMesh) {
-        throw new Error('FaceMesh library unavailable');
-      }
-
-      const faceMesh = new window.FaceMesh({
-        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
-      });
+      const faceMesh = await createLiveFaceMesh();
 
       faceMesh.setOptions({
         maxNumFaces: 1,
