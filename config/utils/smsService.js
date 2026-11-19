@@ -712,6 +712,17 @@ async function sendSMS(phoneNumber, message, options = {}) {
   };
 }
 
+async function markVerificationCodeUsed(phoneNumber, code) {
+  const phone = normalizePhone(phoneNumber);
+  if (!phone || !/^\d{6}$/.test(String(code || ''))) return;
+  try {
+    await db.query(`UPDATE sms_delivery_attempts SET verification_code = NULL,
+      fallback_triggered = TRUE, fallback_reason = 'otp_verified',
+      expires_at = LEAST(expires_at, NOW()), updated_at = NOW()
+      WHERE phone_number = $1 AND verification_code = $2 AND purpose = 'otp_verification'`, [phone, String(code)]);
+  } catch (error) {logger.warn('Could not stop used OTP backup delivery', {code:error.code || 'SMS_CANCEL_FAILED'});}
+}
+
 async function triggerSmsFallbackForAttempt(attempt, reason) {
   const expiresAt = new Date(attempt.expires_at).getTime();
 
@@ -730,6 +741,8 @@ async function triggerSmsFallbackForAttempt(attempt, reason) {
          updated_at = NOW()
      WHERE id = $1
        AND fallback_triggered = FALSE
+       AND expires_at > NOW()
+       AND (purpose <> 'otp_verification' OR verification_code IS NOT NULL)
      RETURNING id`,
     [attempt.id, reason]
   );
@@ -1008,6 +1021,7 @@ async function sendVerificationCode(phoneNumber) {
 module.exports = {
   sendSMS,
   sendVerificationCode,
+  markVerificationCodeUsed,
   normalizePhone,
   getSmsProviderOrder,
   getSmsStatusCallbackUrl,

@@ -38,7 +38,7 @@ const {
   sendAgentInviteEmail,
   sendAgentAssignmentNoticeEmail,
 } = require('../config/utils/emailService');
-const { sendVerificationCode } = require('../config/utils/smsService');
+const { sendVerificationCode, markVerificationCodeUsed } = require('../config/utils/smsService');
 const { validatePhoneForTier } = require('../config/utils/helpers');
 const { isCountryNameValid } = require('../config/utils/countryWhitelist');
 const {
@@ -85,7 +85,7 @@ const {
 } = require('../config/utils/sessionToken');
 const redis = require('../config/utils/redis');
 
-const registrationPhoneGate = require('./registrationPhoneGate')({ db, sendVerificationCode, secret: () => process.env.JWT_SECRET });
+const registrationPhoneGate = require('./registrationPhoneGate')({ db, sendVerificationCode, markVerificationCodeUsed, secret: () => process.env.JWT_SECRET });
 const { hashGrant } = require('./registrationPhoneGate');
 const phoneGateResponse = async (req, res, flow) => {
   if (req.registrationPhoneGrant) return false;

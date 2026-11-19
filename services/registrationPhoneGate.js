@@ -13,7 +13,7 @@ const digestPayload = (payload, secret) => {
 const hashGrant = grant => crypto.createHash('sha256').update(String(grant || '')).digest('hex');
 const fail = (message, code, statusCode = 400) => Object.assign(new Error(message), { code, statusCode });
 
-module.exports = ({ db, sendVerificationCode, secret }) => {
+module.exports = ({ db, sendVerificationCode, markVerificationCodeUsed = async () => {}, secret }) => {
   const fingerprint = payload => digestPayload(payload, secret());
   const codeHash = (id, code) => crypto.createHmac('sha256', secret()).update(`${id}:${code}`).digest('hex');
   const send = async payload => {
@@ -50,6 +50,7 @@ module.exports = ({ db, sendVerificationCode, secret }) => {
     if (expected.length !== supplied.length || !crypto.timingSafeEqual(expected, supplied)) throw fail('Invalid verification code.', 'OTP_INVALID');
     const consumed = await db.query(`UPDATE registration_phone_challenges SET consumed_at = NOW() WHERE id = $1 AND consumed_at IS NULL RETURNING id`, [id]);
     if (!consumed.rows.length) throw fail('This code has already been used. Request a new code.', 'OTP_EXPIRED');
+    await markVerificationCodeUsed(payload.phone, payload.otp);
     return jwt.sign({ purpose: 'registration-phone', challenge: id, fingerprint: fingerprint(payload) }, secret(), { algorithm: 'HS256', expiresIn: '24h', audience: 'rentalhub-registration' });
   };
   const resume = async (payload, token) => {
