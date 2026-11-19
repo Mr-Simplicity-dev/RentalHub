@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticate } = require('../config/middleware/auth');
+const { requirePrivilegedMfa } = require('../config/utils/twoFactor');
 const {
   getAnalysis,
   getProjections,
@@ -21,6 +22,7 @@ const { requireDiasporaAdmin } = require('../services/diasporaAdminService');
 // The survey admin panel is restricted to the same financial/super roles.
 router.use(authenticate);
 router.use(requireDiasporaAdmin);
+router.use(requirePrivilegedMfa);
 
 // Analysis + projections
 router.get('/analysis', getAnalysis);

@@ -747,6 +747,8 @@ class TransportationTrackingService {
       return null;
     }
 
+    if (requestingUser) assertTrackingAccess(booking, requestingUser, "transportation");
+
     // Retrieve recent pings (up to last 100)
     let pings = [];
     try {

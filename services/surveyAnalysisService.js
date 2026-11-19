@@ -7,6 +7,7 @@
 
 const db = require('../config/middleware/database');
 const survey = require('../config/survey');
+const { surveyResponse } = require('../config/utils/surveyContact');
 
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 
@@ -18,23 +19,23 @@ const loadResponses = async ({ type, from, to, source, completedOnly = true }) =
 
   if (type) {
     params.push(type);
-    clauses.push(`survey_type = $${params.length}`);
+    clauses.push(`sr.survey_type = ${params.length}`);
   }
   if (completedOnly) {
-    clauses.push('completed_at IS NOT NULL');
+    clauses.push('sr.completed_at IS NOT NULL');
   }
-  clauses.push('superseded_at IS NULL');
+  clauses.push('sr.superseded_at IS NULL');
   if (from) {
     params.push(from);
-    clauses.push(`completed_at >= $${params.length}`);
+    clauses.push(`sr.completed_at >= ${params.length}`);
   }
   if (to) {
     params.push(to);
-    clauses.push(`completed_at <= $${params.length}`);
+    clauses.push(`sr.completed_at <= ${params.length}`);
   }
   if (source) {
     params.push(source);
-    clauses.push(`source = $${params.length}`);
+    clauses.push(`sr.source = ${params.length}`);
   }
 
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
@@ -122,8 +123,10 @@ const buildNPS = (rows, npsKey) => {
   let total = 0;
 
   for (const row of rows) {
-    const value = Number(row.answers?.[npsKey]);
-    if (!Number.isFinite(value)) continue;
+    const raw = row.answers?.[npsKey];
+    if (raw === null || raw === undefined || raw === '' || typeof raw === 'boolean') continue;
+    const value = Number(raw);
+    if (!Number.isInteger(value) || value < 0 || value > 10) continue;
     total++;
     if (value >= 9) promoters++;
     else if (value >= 7) passives++;
@@ -245,20 +248,22 @@ const buildOpenAnswers = (type, rows) => {
 // ── Full analysis bundle ───────────────────────────────────────────────────
 
 const computeAnalysis = async ({ type, from, to, source }) => {
-  const rows = await loadResponses({
+  const allRows = await loadResponses({
+    completedOnly: false,
     type,
     from: from || null,
     to: to || null,
     source: source || null,
   });
 
+  const rows = allRows.filter(row => row.completed_at);
   const frequencies = buildFrequencies(type, rows);
   const nps = buildNPS(rows, type === 'landlord' ? 'L9.8' : 'T8.9');
   const feature = buildFeatureRanking(type, rows, frequencies);
   const open = buildOpenAnswers(type, rows);
 
-  const total = rows.length;
-  const completed = rows.filter((r) => r.completed_at).length;
+  const total = allRows.length;
+  const completed = rows.length;
   const byState = {};
   for (const row of rows) {
     const key = row.state_name || 'Unknown';
@@ -329,6 +334,8 @@ const computeAnalysis = async ({ type, from, to, source }) => {
     meta: {
       total,
       completed,
+      partial: total - completed,
+      analysed: completed,
       avg_time_seconds: avgTime,
       by_state: stateBreakdown,
       by_source: bySource,
@@ -521,7 +528,7 @@ exports.listResponses = async (req, res) => {
     const limit = Math.min(100, Math.max(10, Number(req.query.limit) || 25));
 
     const params = [];
-    const clauses = ['1=1'];
+    const clauses = ['sr.superseded_at IS NULL'];
     if (type !== 'all') {
       params.push(type);
       clauses.push(`sr.survey_type = $${params.length}`);
@@ -543,14 +550,15 @@ exports.listResponses = async (req, res) => {
               sr.admin_mode, sr.admin_date, sr.state_id, sr.lga_name,
               sr.respondent_name, sr.respondent_phone, sr.respondent_email,
               sr.respondent_location, sr.respondent_state_of_origin, sr.has_email,
-              sr.agent_user_id, sr.agent_name, sr.agent_phone,
-              sr.agent_lga, sr.agent_location,
+              sr.agent_user_id, COALESCE(NULLIF(sr.agent_name,''),ag.full_name) AS agent_name, COALESCE(NULLIF(sr.agent_phone,''),ag.phone) AS agent_phone,
+              COALESCE(NULLIF(sr.agent_lga,''),NULLIF(ag.assigned_lga,''),NULLIF(ag.assigned_city,'')) AS agent_lga, sr.agent_location,
               sr.part_a_completed_at, sr.completed_at, sr.time_spent_seconds,
-              sr.created_at,
-              s.state_name, u.full_name AS user_full_name, u.email AS user_email
+              sr.created_at,sr.answers,sr.consent_flags,
+              s.state_name, u.full_name AS user_full_name, u.email AS user_email, u.phone AS user_phone
        FROM survey_responses sr
        LEFT JOIN states s ON s.id = sr.state_id
        LEFT JOIN users u ON u.id = sr.user_id
+       LEFT JOIN users ag ON ag.id = sr.agent_user_id
        WHERE ${where} AND sr.superseded_at IS NULL
        ORDER BY sr.created_at DESC
        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
@@ -559,7 +567,7 @@ exports.listResponses = async (req, res) => {
 
     return res.json({
       success: true,
-      data: { total, page, limit, responses: result.rows },
+      data: { total, page, limit, responses: result.rows.map(surveyResponse) },
     });
   } catch (error) {
     req.logger.error('Survey responses list error:', error);

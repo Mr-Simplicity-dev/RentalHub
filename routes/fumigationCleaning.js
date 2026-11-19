@@ -152,7 +152,7 @@ router.get('/bookings/:bookingId/tracking',
         message: 'Fumigation live tracking telemetry retrieved successfully'
       });
     } catch (error) {
-      return res.status(500).json({ success: false, message: error.message });
+      return res.status(error.statusCode || 500).json({ success: false, message: error.message });
     }
   }
 );

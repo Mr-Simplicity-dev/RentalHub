@@ -82,7 +82,7 @@ router.get('/assigned', authenticate, requireTeamOrAdmin, async (req, res) => {
     });
   } catch (error) {
     logger.error?.('Get assigned fumigation jobs error:', error);
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
       message: 'Failed to retrieve assigned jobs'
     });
@@ -126,7 +126,7 @@ router.get(
       });
     } catch (error) {
       logger.error?.('Get fumigation job manifest error:', error);
-      return res.status(500).json({
+      return res.status(error.statusCode || 500).json({
         success: false,
         message: 'Failed to retrieve job manifest'
       });
@@ -445,7 +445,7 @@ router.get('/history', authenticate, requireTeamOrAdmin, async (req, res) => {
       message: 'Fumigation job history retrieved successfully'
     });
   } catch (error) {
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
       message: 'Failed to retrieve job history'
     });

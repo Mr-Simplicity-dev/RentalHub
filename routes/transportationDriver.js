@@ -67,7 +67,7 @@ router.get('/assigned', authenticate, requireDriverOrAdmin, async (req, res) => 
     });
   } catch (error) {
     logger.error?.('Get assigned trips error:', error);
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
       message: 'Failed to retrieve assigned trips'
     });
@@ -111,7 +111,7 @@ router.get(
       });
     } catch (error) {
       logger.error?.('Get driver trip details error:', error);
-      return res.status(500).json({
+      return res.status(error.statusCode || 500).json({
         success: false,
         message: 'Failed to retrieve trip manifest'
       });
@@ -198,7 +198,7 @@ router.post(
       });
     } catch (error) {
       logger.error?.('Record location error:', error);
-      return res.status(500).json({
+      return res.status(error.statusCode || 500).json({
         success: false,
         message: error.message || 'Failed to record location'
       });
@@ -269,7 +269,7 @@ router.post(
       });
     } catch (error) {
       logger.error?.('Update driver status error:', error);
-      return res.status(500).json({
+      return res.status(error.statusCode || 500).json({
         success: false,
         message: error.message || 'Failed to update trip status'
       });
@@ -339,7 +339,7 @@ router.post(
       });
     } catch (error) {
       logger.error?.('Report incident error:', error);
-      return res.status(500).json({
+      return res.status(error.statusCode || 500).json({
         success: false,
         message: error.message || 'Failed to report incident'
       });
@@ -393,7 +393,7 @@ router.get('/history', authenticate, requireDriverOrAdmin, async (req, res) => {
     });
   } catch (error) {
     logger.error?.('Get driver history error:', error);
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
       message: 'Failed to retrieve trip history'
     });

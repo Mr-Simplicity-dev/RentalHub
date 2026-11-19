@@ -16,7 +16,7 @@ function canOperateBooking(booking,user,domain) {
   if(roles.has(role)) {
     const state=normalized(booking.property_state || booking.state_name || booking.state);
     const lga=normalized(booking.property_lga || booking.lga_name || booking.lga);
-    if(role.startsWith('zonal_'))return Boolean(user.assigned_zone&&state&&canonicalZone(user.assigned_zone)===canonicalZone(zoneForState(state)));
+    if(role.startsWith('zonal_')){const zone=canonicalZone(user.assigned_zone);return Boolean(zone&&state&&zone===canonicalZone(zoneForState(state)));}
     if(!state||!user.assigned_state||state!==normalized(user.assigned_state))return false;
     if(role.startsWith('state_'))return true;
     return Boolean(lga&&(user.assigned_lga||user.assigned_city)&&lga===normalized(user.assigned_lga||user.assigned_city));

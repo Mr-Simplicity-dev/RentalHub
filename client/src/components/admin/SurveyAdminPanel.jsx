@@ -23,6 +23,7 @@ const SurveyAdminPanel = () => {
   const [analysis, setAnalysis] = useState(null);
   const [projections, setProjections] = useState(null);
   const [responses, setResponses] = useState(null);
+  const [responsesPage, setResponsesPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [projUsers, setProjUsers] = useState(10000);
   const [projAvg, setProjAvg] = useState(500000);
@@ -100,7 +101,7 @@ const SurveyAdminPanel = () => {
 
   const loadResponses = useCallback(async () => {
     try {
-      const res = await api.get(`/admin/survey/responses?type=${type}&limit=50`);
+      const res = await api.get(`/admin/survey/responses?type=${type}&limit=50&page=${responsesPage}`);
       setResponses(res.data.data);
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to load responses");
@@ -339,7 +340,7 @@ const SurveyAdminPanel = () => {
         <div className="flex items-center gap-2">
           <select
             value={type}
-            onChange={(e) => setType(e.target.value)}
+            onChange={(e) => { setResponsesPage(1); setType(e.target.value); }}
             className="rounded-lg border border-soft px-3 py-2 text-sm"
           >
             <option value="tenant">Tenants</option>
@@ -747,15 +748,15 @@ const SurveyAdminPanel = () => {
                   <tr key={r.id}>
                     <td className="px-3 py-2 font-mono text-xs text-gray-700">{r.respondent_code}</td>
                     <td className="px-3 py-2 text-gray-700">
-                      <p className="font-medium">{r.respondent_name || r.user_full_name || "—"}</p>
+                      <p className="font-medium">{r.respondent_name || r.user_full_name || "Not provided yet"}</p>
                       <p className="text-xs text-gray-400">{r.lga_name || r.state_name || ""}</p>
                     </td>
-                    <td className="px-3 py-2 text-gray-600">{r.respondent_phone || "—"}</td>
+                    <td className="px-3 py-2 text-gray-600">{r.respondent_phone || "Not provided yet"}</td>
                     <td className="px-3 py-2 text-gray-600">
-                      {r.has_email ? (r.respondent_email || "—") : <span className="text-xs font-semibold text-gray-400">NO EMAIL</span>}
+                      {r.email_status === "no_email" ? <span className="text-xs font-semibold text-gray-400">NO EMAIL</span> : (r.respondent_email || "Not provided yet")}
                     </td>
-                    <td className="px-3 py-2 text-gray-600">{r.respondent_location || "—"}</td>
-                    <td className="px-3 py-2 text-gray-600">{r.respondent_state_of_origin || "—"}</td>
+                    <td className="px-3 py-2 text-gray-600">{r.respondent_location || "Not provided yet"}</td>
+                    <td className="px-3 py-2 text-gray-600">{r.respondent_state_of_origin || "Not provided yet"}</td>
                     <td className="px-3 py-2 text-gray-700">
                       {r.agent_name ? (
                         <span>
@@ -763,16 +764,16 @@ const SurveyAdminPanel = () => {
                           {r.agent_phone ? <span className="block text-xs text-gray-400">{r.agent_phone}</span> : null}
                         </span>
                       ) : (
-                        "—"
+                        r.agent_display || "Not recorded"
                       )}
                     </td>
-                    <td className="px-3 py-2 text-gray-600">{r.agent_lga || "—"}</td>
+                    <td className="px-3 py-2 text-gray-600">{r.agent_lga || (r.source === "public_link" && !r.agent_user_id ? "Not applicable" : "Not recorded")}</td>
                     <td className="px-3 py-2 text-gray-600">{r.source}{r.admin_mode ? ` (${r.admin_mode})` : ""}</td>
                     <td className="px-3 py-2">
                       {r.completed_at ? (
                         <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">Completed</span>
                       ) : (
-                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">Partial</span>
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">Partial · {r.answer_count ?? 0} answered</span>
                       )}
                     </td>
                     <td className="px-3 py-2 text-right">
@@ -797,6 +798,8 @@ const SurveyAdminPanel = () => {
               </tbody>
             </table>
           </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm"><p>{responses?.total ?? 0} responses · Page {responses?.page ?? responsesPage}</p><div className="flex gap-2"><button type="button" className="btn btn-secondary" disabled={responsesPage<=1} onClick={()=>setResponsesPage(page=>page-1)}>Previous</button><button type="button" className="btn btn-secondary" disabled={responsesPage*50 >= (responses?.total ?? 0)} onClick={()=>setResponsesPage(page=>page+1)}>Next</button></div></div>
 
           {paperOpen && (
             <div className="fixed inset-0 z-[110] overflow-y-auto bg-white">

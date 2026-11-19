@@ -38,7 +38,7 @@ const authenticate = async (req, res, next) => {
     const { userId, tokenVersion } = getSessionTokenIdentity(decoded);
 
     const result = await db.query(
-      `SELECT id, email, user_type, identity_verified, subscription_active,
+      `SELECT id, email, phone, phone_verified, user_type, identity_verified, subscription_active,
               assigned_state, assigned_city, assigned_lga, assigned_zone, full_name, is_recruitment_admin,
               preferred_state_id, preferred_lga_name, assisted_registration,
               deleted_at, is_active,
@@ -112,7 +112,7 @@ const optionalAuthenticate = async (req, res, next) => {
     const { userId, tokenVersion } = getSessionTokenIdentity(decoded);
 
     const result = await db.query(
-      `SELECT id, email, user_type, identity_verified, subscription_active,
+      `SELECT id, email, phone, phone_verified, user_type, identity_verified, subscription_active,
               assigned_state, assigned_city, assigned_lga, assigned_zone, full_name, is_recruitment_admin,
               preferred_state_id, preferred_lga_name, assisted_registration,
               deleted_at, is_active,

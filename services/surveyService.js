@@ -7,6 +7,7 @@ const axios = require('axios');
 const db = require('../config/middleware/database');
 const survey = require('../config/survey');
 const surveyBoundary = require('./surveyBoundary');
+const { surveyContact } = require('../config/utils/surveyContact');
 
 // New codes carry the ARH platform prefix; historical RH... codes remain
 // valid because respondent_code lookups are exact-match.
@@ -568,86 +569,54 @@ exports.startSurvey = async (req, res) => {
 exports.savePublicDraft = async (req, res) => {
   try {
     const { survey_type, answers, consent_flags, resume_token, contact, agent } = req.body;
-
     const type = String(survey_type || 'tenant').toLowerCase();
-    if (!survey.getQuestionnaire(type)) {
-      return res.status(400).json({ success: false, message: 'Unknown survey type' });
-    }
+    if (!survey.getQuestionnaire(type)) return res.status(400).json({success:false,message:'Unknown survey type'});
+    if (resume_token && !/^[A-Za-z0-9_-]{24,64}$/.test(String(resume_token))) return res.status(400).json({success:false,message:'Invalid survey resume token'});
     const safeAnswers = normalizeAnswers(type, answers);
-    // Location/VPN gate â€” enforced on every draft save.
     const gate = await enforceLocationGate(req, req.body || {});
-    if (!gate.allowed) {
-      return res.status(403).json({
-        success: false,
-        code: 'LOCATION_BLOCKED',
-        message: LOCATION_REASONS[gate.reason] || 'Survey unavailable at this location',
-      });
-    }
-
-    const token = String(resume_token || '').slice(0, 64) || generateResumeToken();
-
+    if (!gate.allowed) return res.status(403).json({success:false,code:'LOCATION_BLOCKED',message:LOCATION_REASONS[gate.reason] || 'Survey unavailable at this location'});
+    const token = String(resume_token || '') || generateResumeToken();
+    const person = surveyContact(contact);
+    const flags = {...(consent_flags || {})};
+    if (typeof contact?.no_email === 'boolean') flags.contact_no_email = contact.no_email;
     const agentUser = req.user?.user_type === 'marketing_agent' ? req.user : null;
-    const agentName = String(agent?.name || agentUser?.full_name || '').trim().slice(0, 200);
-    const agentPhone = String(agent?.phone || agentUser?.phone || '').replace(/\s+/g, '').slice(0, 30);
-    const agentLga = String(agent?.lga || '').trim().slice(0, 120);
-    const agentLocation = String(agent?.location || '').trim().slice(0, 255);
-
-    const existing = await db.query(
-      `SELECT id FROM survey_responses WHERE resume_token = $1 AND completed_at IS NULL`,
-      [token]
-    );
-
-    if (existing.rows.length) {
-      await db.query(
-        `UPDATE survey_responses
-         SET answers = answers || $2::jsonb,
-             consent_flags = consent_flags || $3::jsonb,
-             agent_user_id = COALESCE(agent_user_id, $4),
-             agent_name = COALESCE(NULLIF($5, ''), agent_name),
-             agent_phone = COALESCE(NULLIF($6, ''), agent_phone),
-             agent_lga = COALESCE(NULLIF($7, ''), agent_lga),
-             agent_location = COALESCE(NULLIF($8, ''), agent_location),
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = $1`,
-        [
-          existing.rows[0].id,
-          JSON.stringify(safeAnswers),
-          JSON.stringify(consent_flags || {}),
-          agentUser ? agentUser.id : null,
-          agentName,
-          agentPhone,
-          agentLga,
-          agentLocation,
-        ]
-      );
-      return res.json({ success: true, data: { resume_token: token, draft: true } });
+    const agentName = String(agent?.name || agentUser?.full_name || '').trim().slice(0,200);
+    const agentPhone = String(agent?.phone || agentUser?.phone || '').replace(/\s+/g,'').slice(0,30);
+    const agentLga = String(agent?.lga || '').trim().slice(0,120);
+    const agentLocation = String(agent?.location || '').trim().slice(0,255);
+    let stateId = null;
+    if (req.body.state_id || req.body.state_name) {
+      const state = req.body.state_id
+        ? await db.query('SELECT id FROM states WHERE id=$1', [Number(req.body.state_id) || null])
+        : await db.query('SELECT id FROM states WHERE LOWER(TRIM(state_name))=LOWER(TRIM($1)) LIMIT 1', [String(req.body.state_name).trim()]);
+      stateId = state.rows[0]?.id || null;
     }
-
+    const lgaName = String(req.body.lga_name || '').trim().slice(0,120);
+    const existing = await db.query('SELECT id,survey_type,completed_at,superseded_at,user_id FROM survey_responses WHERE resume_token=$1', [token]);
+    const row = existing.rows[0];
+    if (row && (row.completed_at || row.superseded_at || row.survey_type!==type)) return res.status(409).json({success:false,message:'This survey draft can no longer be changed.'});
+    if (row?.user_id && Number(row.user_id)!==Number(req.user?.id)) return res.status(403).json({success:false,message:'Sign in to continue this linked survey.'});
+    if (row) {
+      await db.query(
+        `UPDATE survey_responses SET answers=COALESCE(answers,'{}'::jsonb)||$2::jsonb, consent_flags=COALESCE(consent_flags,'{}'::jsonb)||$3::jsonb,
+         agent_user_id=COALESCE(agent_user_id,$4), agent_name=COALESCE(NULLIF($5,''),agent_name), agent_phone=COALESCE(NULLIF($6,''),agent_phone),
+         agent_lga=COALESCE(NULLIF($7,''),agent_lga), agent_location=COALESCE(NULLIF($8,''),agent_location),
+         respondent_name=COALESCE(NULLIF($9,''),respondent_name),respondent_phone=COALESCE(NULLIF($10,''),respondent_phone),
+         respondent_email=CASE WHEN $12::boolean=FALSE THEN NULL ELSE COALESCE(NULLIF($11,''),respondent_email) END,
+         has_email=COALESCE($12::boolean,has_email),respondent_location=COALESCE(NULLIF($13,''),respondent_location),
+         respondent_state_of_origin=COALESCE(NULLIF($14,''),respondent_state_of_origin),state_id=COALESCE($15,state_id),lga_name=COALESCE(NULLIF($16,''),lga_name),updated_at=CURRENT_TIMESTAMP
+         WHERE id=$1 AND completed_at IS NULL AND superseded_at IS NULL`,
+        [row.id,JSON.stringify(safeAnswers),JSON.stringify(flags),agentUser?.id||null,agentName,agentPhone,agentLga,agentLocation,person.name,person.phone,person.email,person.hasEmail,person.location,person.origin,stateId,lgaName]);
+      return res.json({success:true,data:{resume_token:token,draft:true}});
+    }
     await db.query(
-      `INSERT INTO survey_responses
-         (survey_type, survey_version, respondent_code, source,
-          resume_token, consent_flags, answers,
-          agent_user_id, agent_name, agent_phone, agent_lga, agent_location)
-       VALUES ($1, $2, $3, 'public_link', $4, $5, $6, $7, $8, $9, $10, $11)`,
-      [
-        type,
-        survey.SURVEY_VERSION,
-        generateRespondentCode(),
-        token,
-        JSON.stringify(consent_flags || {}),
-        JSON.stringify(safeAnswers),
-        agentUser ? agentUser.id : null,
-        agentName,
-        agentPhone,
-        agentLga,
-        agentLocation,
-      ]
-    );
-
-    return res.status(201).json({ success: true, data: { resume_token: token, draft: true } });
+      `INSERT INTO survey_responses(survey_type,survey_version,respondent_code,source,resume_token,consent_flags,answers,agent_user_id,agent_name,agent_phone,agent_lga,agent_location,respondent_name,respondent_phone,respondent_email,has_email,respondent_location,respondent_state_of_origin,state_id,lga_name)
+       VALUES($1,$2,$3,'public_link',$4,$5,$6,$7,$8,$9,$10,$11,NULLIF($12,''),NULLIF($13,''),NULLIF($14,''),COALESCE($15::boolean,TRUE),NULLIF($16,''),NULLIF($17,''),$18,NULLIF($19,''))`,
+      [type,survey.SURVEY_VERSION,generateRespondentCode(),token,JSON.stringify(flags),JSON.stringify(safeAnswers),agentUser?.id||null,agentName,agentPhone,agentLga,agentLocation,person.name,person.phone,person.email,person.hasEmail,person.location,person.origin,stateId,lgaName]);
+    return res.status(201).json({success:true,data:{resume_token:token,draft:true}});
   } catch (error) {
-    req.logger.error('Public survey draft error:', error);
-    return res.status(500).json({ success: false, message: 'Failed to save survey draft' });
+    req.logger?.error?.('Public survey draft error:', {code:error.code||'DRAFT_SAVE_FAILED'});
+    return res.status(500).json({success:false,message:'Failed to save survey draft'});
   }
 };
 
@@ -689,7 +658,8 @@ exports.resumeSurvey = async (req, res) => {
 
     const result = await db.query(
       `SELECT id, survey_type, survey_version, respondent_code, source,
-              answers, consent_flags, completed_at, superseded_at
+              answers, consent_flags, completed_at, superseded_at,
+              respondent_name,respondent_phone,respondent_email,respondent_location,respondent_state_of_origin,has_email
        FROM survey_responses
        WHERE resume_token = $1
        LIMIT 1`,
@@ -706,6 +676,7 @@ exports.resumeSurvey = async (req, res) => {
       data: {
         response_id: row.id,
         survey_type: row.survey_type,
+        contact: {name:row.respondent_name || "",phone:row.respondent_phone || "",email:row.respondent_email || "",location:row.respondent_location || "",state_of_origin:row.respondent_state_of_origin || "",no_email:row.has_email===false},
         answers: row.answers || {},
         consent_flags: row.consent_flags || {},
         completed: Boolean(row.completed_at),

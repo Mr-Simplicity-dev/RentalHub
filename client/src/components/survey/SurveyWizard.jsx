@@ -110,6 +110,7 @@ export default function SurveyWizard({
                 onComplete?.(draft);
                 return;
               }
+              if (draft.contact) setContact(previous => ({...previous,...draft.contact}));
               setAnswers(draft.answers || {});
               setConsentFlags(draft.consent_flags || {});
               setResumedDraft(true);
@@ -191,6 +192,7 @@ export default function SurveyWizard({
           answers,
           consent_flags: consentFlags,
           resume_token: token,
+          contact,
           agent: agentMode ? { ...agentSession } : undefined,
           state_name: locationInfo?.state || '',
           lga_name: locationInfo?.lga || '',
@@ -204,7 +206,7 @@ export default function SurveyWizard({
       }
     }, 1200);
     return () => clearTimeout(timer);
-  }, [answers, consentFlags, surveyType, agentMode, agentSession, publicMode, paperMode, locationInfo]);
+  }, [answers, consentFlags, contact, surveyType, agentMode, agentSession, publicMode, paperMode, locationInfo]);
 
   const setAnswer = (value) => {
     if (!currentQuestion) return;
