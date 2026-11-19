@@ -860,8 +860,7 @@ const importContacts = async (req, res) => {
          VALUES ${values.join(', ')}
          ON CONFLICT (phone) DO UPDATE SET
            full_name = COALESCE(EXCLUDED.full_name, whatsapp_contacts.full_name),
-           import_batch = COALESCE(EXCLUDED.import_batch, whatsapp_contacts.import_batch),
-           subscribed = TRUE,
+           import_batch = COALESCE(whatsapp_contacts.import_batch, EXCLUDED.import_batch),
            updated_at = CURRENT_TIMESTAMP
          RETURNING (xmax = 0) AS inserted`,
         params

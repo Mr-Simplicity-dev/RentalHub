@@ -11,6 +11,7 @@ import {
   FaTimesCircle,
 } from 'react-icons/fa';
 import api from '../../services/api';
+import TourMusicPlayer from '../../components/admin/TourMusicPlayer';
 
 const MUSIC_BASE = '/super/property-tour-music';
 
@@ -46,13 +47,6 @@ const Toggle = ({ checked, onChange, label, hint }) => (
     </span>
   </label>
 );
-
-const getAudioSrc = (url) => {
-  if (!url) return '';
-  if (/^https?:\/\//i.test(url)) return url;
-  const normalized = String(url).replace(/^\/+/, '');
-  return `/${normalized.split('/').map(encodeURIComponent).join('/')}`;
-};
 
 const TourMusicLibrary = () => {
   const [tracks, setTracks] = useState([]);
@@ -481,9 +475,7 @@ const TourMusicLibrary = () => {
                       .filter(Boolean)
                       .join(' | ') || 'No metadata'}
                   </p>
-                  <audio controls preload="none" src={getAudioSrc(track.file_url)} className="mt-2 w-full max-w-md">
-                    <track kind="captions" />
-                  </audio>
+                  <TourMusicPlayer track={track} />
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
@@ -492,7 +484,7 @@ const TourMusicLibrary = () => {
                     className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs"
                   >
                     {track.is_active ? <FaPauseCircle /> : <FaPlayCircle />}
-                    {track.is_active ? 'Pause' : 'Activate'}
+                    {track.is_active ? 'Disable for tours' : 'Enable for tours'}
                   </button>
                   <button
                     type="button"

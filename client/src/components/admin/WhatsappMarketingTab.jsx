@@ -1042,7 +1042,7 @@ const WhatsappMarketingTab = () => {
       >
         <div className="space-y-5">
           <Banner tone="info" title="How this works">
-            A number only counts as reachable if Meta confirms it is on WhatsApp. Imported numbers start as
+            Recovered contacts need their own WhatsApp permission before campaigns. SMS permission alone does not confirm this. A number only counts as reachable if Meta confirms it is on WhatsApp. Imported numbers start as
             <strong> Not checked </strong>
             until you run the check. Numbers Meta rejects are skipped automatically when you build an audience.
           </Banner>
@@ -1050,7 +1050,7 @@ const WhatsappMarketingTab = () => {
           {contactStats ? (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div className="rounded-lg border border-gray-100 bg-gray-50/60 p-3">
-                <p className="text-xs uppercase tracking-wide text-gray-400">Total in System</p>
+                <p className="text-xs uppercase tracking-wide text-gray-400">Saved WhatsApp contacts</p>
                 <p className="text-lg font-semibold text-gray-900">{contactStats.total ?? 0}</p>
               </div>
               <div className="rounded-lg border border-green-100 bg-green-50/60 p-3">
@@ -1487,7 +1487,7 @@ const WhatsappMarketingTab = () => {
             />
           ) : (
             <div className="space-y-4">
-              <DataTable columns={['S/N', 'Number', 'Name', 'Batch', 'Source', 'On WhatsApp', 'Added', 'Actions']}>
+              <DataTable columns={['S/N', 'Number', 'Name', 'Batch', 'Source', 'WhatsApp permission', 'On WhatsApp', 'Added', 'Actions']}>
                 {contacts.map((c, index) => (
                   <tr key={c.id} className="transition-colors hover:bg-gray-50/70">
                     <Td className="text-gray-600">{(contactPage - 1) * contactPageSize + index + 1}</Td>
@@ -1528,6 +1528,7 @@ const WhatsappMarketingTab = () => {
                       </button>
                     </Td>
                     <Td className="text-xs uppercase text-gray-500">{c.source}</Td>
+                    <Td><span className={c.subscribed ? "badge bg-green-100 text-green-700" : "badge bg-amber-100 text-amber-800"}>{c.subscribed ? "Subscribed" : "Permission not confirmed"}</span></Td>
                     <Td>
                       {c.wa_status === 'valid' ? (
                         <span className="badge bg-green-100 text-green-700">🟢 On WhatsApp</span>

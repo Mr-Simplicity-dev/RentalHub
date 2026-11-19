@@ -5,6 +5,7 @@ const uploadTourMusic = require('../config/middleware/tourMusicUpload');
 const ctrl = require('../controllers/propertyTourMusicController');
 
 router.get('/tracks', authenticate, requireSuperAdmin, ctrl.listTracks);
+router.get('/tracks/:id/audio', authenticate, requireSuperAdmin, ctrl.previewTrack);
 router.get('/settings', authenticate, requireSuperAdmin, ctrl.getSettings);
 router.put('/settings', authenticate, requireSuperAdmin, ctrl.updateSettings);
 router.post('/upload', authenticate, requireSuperAdmin, uploadTourMusic, ctrl.uploadTrack);

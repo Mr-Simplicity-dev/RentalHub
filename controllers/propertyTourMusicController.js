@@ -2,6 +2,8 @@ const db = require('../config/middleware/database');
 const cloudinary = require('cloudinary').v2;
 const fs = require('fs');
 const logger = require('../config/utils/logger');
+const path = require('path');
+const { resolveLocalTourMusic } = require('../config/utils/tourMusicPath');
 
 let cloudinaryConfigured = false;
 const ensureCloudinary = () => {
@@ -239,5 +241,22 @@ exports.selectTrackForProperty = async (propertyType) => {
   } catch (error) {
     logger.warn('Select tour music track error:', error.message);
     return null;
+  }
+};
+
+exports.previewTrack = async (req, res, next) => {
+  if (!/^[1-9]\d*$/.test(String(req.params.id))) return res.status(400).json({ message: 'Invalid track' });
+  try {
+    const { rows } = await db.query('SELECT file_url FROM property_tour_music WHERE id = $1', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ message: 'Track not found' });
+    const file = resolveLocalTourMusic(rows[0].file_url, path.resolve(__dirname, '..'));
+    if (!file) return res.status(404).json({ message: 'Audio file is unavailable. Please upload the track again.' });
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.sendFile(file, { cacheControl: false, dotfiles: 'deny' }, error => {
+      if (error && !res.headersSent) next(error);
+    });
+  } catch (error) {
+    logger.error('Preview tour music error:', error.code || 'PREVIEW_FAILED');
+    if (!res.headersSent) res.status(500).json({ message: 'Could not load the audio preview' });
   }
 };
