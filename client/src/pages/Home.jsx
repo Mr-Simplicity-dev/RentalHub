@@ -388,8 +388,8 @@ const Home = () => {
 
       <AdSpace placement="home_top" variant="marquee" className="bg-white py-4" />
 
-      {/* Featured 3D Commercial Studio */}
-      <div id="commercial-showcase" className="bg-slate-950 py-10">
+      {/* Amana RentalHub Product Presentation & Commercial Showcase */}
+      <div id="commercial-showcase" className="bg-[#071A3D] py-12">
         <div className="container mx-auto px-4 max-w-7xl mb-8">
           <ProductDemoCommercial />
         </div>

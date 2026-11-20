@@ -1,578 +1,957 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Link } from 'react-router-dom';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   FaPlay,
   FaPause,
-  FaVolumeMute,
-  FaVolumeUp,
   FaRedo,
-  FaCheckCircle,
-  FaShieldAlt,
-  FaSearch,
-  FaStar,
-  FaLock,
-  FaCalendarCheck,
-  FaDownload,
-  FaBolt,
-  FaWater,
-  FaBuilding,
+  FaVolumeUp,
+  FaVolumeMute,
   FaExpand,
-  FaCompress
+  FaCompress,
+  FaSearch,
+  FaMapMarkerAlt,
+  FaShieldAlt,
+  FaCheckCircle,
+  FaFileContract,
+  FaWallet,
+  FaUserCheck,
+  FaBed,
+  FaBath,
+  FaCalculator,
+  FaLock,
+  FaChevronLeft,
+  FaChevronRight,
+  FaArrowRight,
+  FaBuilding,
+  FaClipboardCheck,
 } from 'react-icons/fa';
 
-const SCENES = [
-  { id: 'search', label: '1. Smart Search', time: '0:00 - 0:08' },
-  { id: 'listings', label: '2. Verified Cards', time: '0:08 - 0:20' },
-  { id: 'reviews', label: '3. Water & Power Reviews', time: '0:20 - 0:32' },
-  { id: 'inspection', label: '4. One-Tap Booking', time: '0:32 - 0:44' },
-  { id: 'escrow', label: '5. Escrow Protection', time: '0:44 - 0:54' },
-  { id: 'cta', label: '6. Download CTA', time: '0:54 - 1:04' },
+const BRAND = {
+  navy: '#071A3D',
+  navyElevated: '#0C244E',
+  gold: '#C89B3C',
+  goldSoft: '#E2C275',
+  slateBorder: 'rgba(148, 163, 184, 0.22)',
+};
+
+const AUDIO_MODES = [
+  { id: 'executive', label: 'Ambient Score' },
+  { id: 'minimal', label: 'Soft Pulse' },
 ];
 
-const MUSIC_PRESETS = [
-  { id: 1, name: 'Preset 01: "Happy"', genre: 'Upbeat Acoustic & Rhythm', src: '/audio/track_01_happy.mp3' },
-  { id: 2, name: 'Preset 02: "To Be Happy"', genre: 'Modern Pop Uplift', src: '/audio/track_02_to_be_happy.mp3' },
-  { id: 3, name: 'Preset 03: "Inspirational Acoustic"', genre: 'Warm Strings & Guitars', src: '/audio/track_03_inspirational_acoustic.mp3' },
+const SCENES = [
+  {
+    id: 0,
+    duration: 7000,
+    indexLabel: '01',
+    route: '/properties',
+    category: 'Property Discovery',
+    title: 'Structured Search Across Nigeria',
+    summary:
+      'Filter rental listings by state, LGA, bedroom count, and annual budget—or submit a guided property request when sourcing specific accommodation.',
+    highlights: [
+      'State and LGA coverage across all 36 states and the FCT',
+      'Structured rent, bedroom, and property-type filters',
+      'Built-in tenant property request submission',
+    ],
+  },
+  {
+    id: 1,
+    duration: 7500,
+    indexLabel: '02',
+    route: '/properties/1042',
+    category: 'Listing Transparency',
+    title: 'Clear Property Profiles & Verification Status',
+    summary:
+      'Inspect property specifications, landlord verification indicators, structured amenities, and move-in cost estimates before committing.',
+    highlights: [
+      'Visible listing and landlord verification indicators',
+      'Integrated monthly and move-in rent calculator',
+      'Structured property features and tenant review summaries',
+    ],
+  },
+  {
+    id: 2,
+    duration: 7500,
+    indexLabel: '03',
+    route: '/verify-identity',
+    category: 'Identity & Access',
+    title: 'Identity-Verified Enquiries & Detail Unlock',
+    summary:
+      'Account identity verification helps establish accountable enquiries before unlocking full addresses, property videos, and direct landlord communication.',
+    highlights: [
+      'Account identity verification (NIN & live photo checks)',
+      'Transparent platform unlock workflow via Paystack or bank transfer',
+      'In-platform messaging and calling once access is unlocked',
+    ],
+  },
+  {
+    id: 3,
+    duration: 7500,
+    indexLabel: '04',
+    route: '/dashboard',
+    category: 'Payments & Ledger',
+    title: 'Tracked Rent Payments & Wallet Clearing',
+    summary:
+      'Monitor Paystack and bank-transfer transactions through an auditable wallet ledger with a structured 14-working-day clearing window before landlord withdrawal.',
+    highlights: [
+      'Pending-clearing and cleared balance separation',
+      '14-working-day clearing period for refund review eligibility',
+      'Dedicated payment history, receipts, and wallet controls',
+    ],
+  },
+  {
+    id: 4,
+    duration: 7500,
+    indexLabel: '05',
+    route: '/tenancy-agreements',
+    category: 'Tenancy Documentation',
+    title: 'Versioned Digital Tenancy Agreements',
+    summary:
+      'Track agreements from draft through landlord and tenant review, with timestamped signature events, revision history, and cryptographic document hashing.',
+    highlights: [
+      'Structured Draft → Review → Executed status lifecycle',
+      'SHA-256 document hash and immutable signature event log',
+      'Jurisdiction metadata and amendment version tracking',
+    ],
+  },
+  {
+    id: 5,
+    duration: 7500,
+    indexLabel: '06',
+    route: '/property-protection',
+    category: 'Protection & Support',
+    title: 'Property Protection & Multi-Role Oversight',
+    summary:
+      'Register basic property records or report cases at no cost, request optional priced verification services where available, and verify dispute evidence on-platform.',
+    highlights: [
+      'Free basic property record registration and case reporting',
+      'Optional priced registry, survey, and inspection services where available',
+      'Public dispute evidence verification and dedicated role dashboards',
+    ],
+  },
 ];
+
+const TOTAL_DURATION = SCENES.reduce((acc, s) => acc + s.duration, 0);
+
+// Restrained corporate WebAudio synthesizer (silent until unmuted & playing)
+function createCorporateAudioEngine() {
+  let ctx = null;
+  let masterGain = null;
+  let intervalId = null;
+  let step = 0;
+
+  const stop = () => {
+    if (intervalId) {
+      clearInterval(intervalId);
+      intervalId = null;
+    }
+    if (masterGain && ctx) {
+      try {
+        masterGain.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.08);
+      } catch {
+        // Ignore audio context teardown error
+      }
+    }
+  };
+
+  const start = (mode = 'executive') => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      if (!ctx) {
+        ctx = new AudioCtx();
+        masterGain = ctx.createGain();
+        masterGain.gain.value = 0.0001;
+        masterGain.connect(ctx.destination);
+      }
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+      stop();
+      masterGain.gain.setTargetAtTime(0.055, ctx.currentTime, 0.25);
+
+      const chords =
+        mode === 'minimal'
+          ? [
+              [220.0, 261.63, 329.63],
+              [196.0, 246.94, 293.66],
+              [174.61, 220.0, 261.63],
+              [196.0, 246.94, 329.63],
+            ]
+          : [
+              [261.63, 329.63, 392.0, 493.88],
+              [220.0, 261.63, 329.63, 392.0],
+              [174.61, 220.0, 261.63, 329.63],
+              [196.0, 246.94, 293.66, 392.0],
+            ];
+
+      const playChord = () => {
+        if (!ctx || !masterGain) return;
+        const now = ctx.currentTime;
+        const freqs = chords[step % chords.length];
+        freqs.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const noteGain = ctx.createGain();
+          osc.type = idx === 0 ? 'triangle' : 'sine';
+          osc.frequency.setValueAtTime(freq, now);
+          noteGain.gain.setValueAtTime(0.0001, now);
+          noteGain.gain.linearRampToValueAtTime(0.18 / freqs.length, now + 0.35);
+          noteGain.gain.exponentialRampToValueAtTime(0.0001, now + 2.2);
+          osc.connect(noteGain);
+          noteGain.connect(masterGain);
+          osc.start(now);
+          osc.stop(now + 2.3);
+        });
+        step += 1;
+      };
+
+      playChord();
+      intervalId = setInterval(playChord, 2400);
+    } catch {
+      // Audio playback blocked or unavailable
+    }
+  };
+
+  const destroy = () => {
+    stop();
+    if (ctx && ctx.state !== 'closed') {
+      ctx.close().catch(() => {});
+    }
+    ctx = null;
+    masterGain = null;
+  };
+
+  return { start, stop, destroy };
+}
+
+function AuthenticScreenView({ sceneId }) {
+  if (sceneId === 0) {
+    return (
+      <div className="space-y-4">
+        {/* Search Bar modelled on Properties.jsx */}
+        <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm">
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+            <div className="flex flex-1 items-center gap-2.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+              <FaSearch className="shrink-0 text-slate-400" size={13} aria-hidden="true" />
+              <span className="truncate font-medium">Maitama, Abuja FCT · 3 Bedroom</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-medium text-slate-600">
+                36 States + FCT
+              </span>
+              <span className="rounded-lg bg-[#071A3D] px-3.5 py-2 text-xs font-semibold text-white">
+                Search
+              </span>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-slate-100 pt-2.5 text-xs text-slate-600">
+            <span className="font-medium text-slate-900">Filters:</span>
+            <span>State: Abuja FCT</span>
+            <span className="text-slate-300">|</span>
+            <span>Type: Apartment / Terrace</span>
+            <span className="text-slate-300">|</span>
+            <span>Status: Available</span>
+          </div>
+        </div>
+
+        {/* Authentic Listing Results Grid */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <article className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="relative h-32 w-full bg-slate-100">
+              <img
+                src="/hero-main.avif"
+                alt="Illustrative residential terrace in Maitama, Abuja"
+                className="h-full w-full object-cover"
+              />
+              <span className="absolute left-2.5 top-2.5 rounded bg-[#071A3D]/90 px-2 py-0.5 text-[11px] font-semibold text-white">
+                Verified Listing
+              </span>
+            </div>
+            <div className="p-3">
+              <p className="text-sm font-semibold text-slate-900">3 Bedroom Residence</p>
+              <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
+                <FaMapMarkerAlt size={10} className="text-slate-400" aria-hidden="true" />
+                Maitama, Abuja FCT
+              </p>
+              <div className="mt-2.5 flex items-baseline justify-between border-t border-slate-100 pt-2">
+                <span className="text-sm font-bold tabular-nums text-[#071A3D]">₦4,500,000</span>
+                <span className="text-[11px] text-slate-500">per year</span>
+              </div>
+            </div>
+          </article>
+
+          <article className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="relative h-32 w-full bg-slate-100">
+              <img
+                src="/login-terrace.avif"
+                alt="Illustrative duplex property in Nasarawa GRA, Kano"
+                className="h-full w-full object-cover"
+              />
+              <span className="absolute left-2.5 top-2.5 rounded bg-[#071A3D]/90 px-2 py-0.5 text-[11px] font-semibold text-white">
+                Verified Listing
+              </span>
+            </div>
+            <div className="p-3">
+              <p className="text-sm font-semibold text-slate-900">4 Bedroom Terrace</p>
+              <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
+                <FaMapMarkerAlt size={10} className="text-slate-400" aria-hidden="true" />
+                Nasarawa GRA, Kano
+              </p>
+              <div className="mt-2.5 flex items-baseline justify-between border-t border-slate-100 pt-2">
+                <span className="text-sm font-bold tabular-nums text-[#071A3D]">₦3,200,000</span>
+                <span className="text-[11px] text-slate-500">per year</span>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        {/* Property Request strip matching real Properties.jsx */}
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs">
+          <span className="text-slate-600">
+            Can&apos;t find a specific location? Submit a tenant property request for support review.
+          </span>
+          <span className="shrink-0 font-semibold text-[#0284C7]">Request Form →</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (sceneId === 1) {
+    return (
+      <div className="space-y-4">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="relative h-40 w-full bg-slate-100">
+            <img
+              src="/hero-main.avif"
+              alt="Illustrative residential property detail view"
+              className="h-full w-full object-cover"
+            />
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/75 via-slate-950/30 to-transparent p-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-white">3 Bedroom Serviced Residence</p>
+                  <p className="text-xs text-slate-200">Maitama District, Abuja FCT</p>
+                </div>
+                <span className="inline-flex items-center gap-1.5 rounded bg-white/95 px-2.5 py-1 text-[11px] font-semibold text-[#071A3D]">
+                  <FaCheckCircle className="text-emerald-600" size={11} aria-hidden="true" />
+                  Landlord Verified
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div>
+                <p className="text-xl font-bold tabular-nums text-[#071A3D]">₦4,500,000</p>
+                <p className="text-xs text-slate-500">Annual rent · illustrative example</p>
+              </div>
+              <div className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-800">
+                <FaCalculator size={11} aria-hidden="true" />
+                What&apos;s this per month &amp; move-in?
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 border-b border-slate-100 py-3 text-center">
+              <div>
+                <FaBed className="mx-auto text-slate-400" size={14} aria-hidden="true" />
+                <p className="mt-1 text-xs font-semibold text-slate-900">3 Bedrooms</p>
+              </div>
+              <div>
+                <FaBath className="mx-auto text-slate-400" size={14} aria-hidden="true" />
+                <p className="mt-1 text-xs font-semibold text-slate-900">4 Bathrooms</p>
+              </div>
+              <div>
+                <FaBuilding className="mx-auto text-slate-400" size={14} aria-hidden="true" />
+                <p className="mt-1 text-xs font-semibold text-slate-900">Gated Compound</p>
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-700">
+              <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-2.5 py-2">
+                <FaCheckCircle className="shrink-0 text-emerald-600" size={11} aria-hidden="true" />
+                <span>Structured landlord features</span>
+              </div>
+              <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-2.5 py-2">
+                <FaCheckCircle className="shrink-0 text-emerald-600" size={11} aria-hidden="true" />
+                <span>Photo &amp; video media support</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (sceneId === 2) {
+    return (
+      <div className="space-y-3.5">
+        {/* Identity Verification card */}
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#071A3D] text-white">
+                <FaUserCheck size={15} aria-hidden="true" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Account Identity Verification</p>
+                <p className="mt-0.5 text-xs text-slate-600">
+                  Tenants verify identity before unlocking full property details or initiating payments.
+                </p>
+              </div>
+            </div>
+            <span className="shrink-0 rounded bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-800 border border-emerald-200">
+              Verified
+            </span>
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-2 border-t border-slate-100 pt-3 text-xs sm:grid-cols-3">
+            <div className="rounded-lg bg-slate-50 px-2.5 py-2 text-slate-700">
+              <span className="block text-[10px] uppercase tracking-wider text-slate-400">Step 1</span>
+              <span className="font-medium text-slate-900">Email &amp; Phone Check</span>
+            </div>
+            <div className="rounded-lg bg-slate-50 px-2.5 py-2 text-slate-700">
+              <span className="block text-[10px] uppercase tracking-wider text-slate-400">Step 2</span>
+              <span className="font-medium text-slate-900">NIN &amp; Live Photo</span>
+            </div>
+            <div className="rounded-lg bg-slate-50 px-2.5 py-2 text-slate-700">
+              <span className="block text-[10px] uppercase tracking-wider text-slate-400">Step 3</span>
+              <span className="font-medium text-slate-900">Enquiry &amp; Unlock</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Property Unlock workflow matching PropertyDetail.jsx */}
+        <div className="rounded-xl border border-amber-200/80 bg-amber-50/50 p-4">
+          <div className="flex items-start gap-3">
+            <FaLock className="mt-0.5 shrink-0 text-[#9A7221]" size={14} aria-hidden="true" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-slate-900">Unlock Full Property Details</p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-700">
+                Complete the one-time property unlock or active tenant subscription via Paystack or bank transfer to reveal full address, inspection video, and direct landlord contact.
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="rounded-lg bg-[#071A3D] px-3 py-1.5 text-xs font-semibold text-white">
+                  Pay to Unlock Details
+                </span>
+                <span className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700">
+                  In-Platform Messaging &amp; Calling
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (sceneId === 3) {
+    return (
+      <div className="space-y-3.5">
+        {/* Wallet Ledger overview matching walletLedgerService.js & Dashboard.jsx */}
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#071A3D] text-white">
+                <FaWallet size={13} aria-hidden="true" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Wallet &amp; Rent Ledger</p>
+                <p className="text-[11px] text-slate-500">Illustrative dashboard balance view</p>
+              </div>
+            </div>
+            <span className="text-[11px] font-semibold text-slate-500">Paystack &amp; Bank Transfer</span>
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
+                Pending Clearing
+              </p>
+              <p className="mt-1 text-lg font-bold tabular-nums text-[#071A3D]">₦4,387,500</p>
+              <p className="mt-0.5 text-[11px] text-slate-600">
+                14-working-day clearing window for refund review
+              </p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
+                Cleared Balance
+              </p>
+              <p className="mt-1 text-lg font-bold tabular-nums text-emerald-700">₦1,850,000</p>
+              <p className="mt-0.5 text-[11px] text-slate-600">
+                Available for verified bank withdrawal
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 space-y-2 border-t border-slate-100 pt-3 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-slate-800">Rent Payment · Reference #RH-40219</span>
+              <span className="rounded bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 border border-amber-200">
+                Pending Clearing
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-slate-800">Property Unlock · Paystack Verified</span>
+              <span className="rounded bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 border border-emerald-200">
+                Recorded
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (sceneId === 4) {
+    return (
+      <div className="space-y-3.5">
+        {/* Tenancy Agreement Lifecycle matching tenancyAgreementService.js */}
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#071A3D] text-white">
+                <FaFileContract size={13} aria-hidden="true" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Residential Tenancy Agreement · v1</p>
+                <p className="text-[11px] text-slate-500">Versioned digital review &amp; signature trail</p>
+              </div>
+            </div>
+            <span className="rounded bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 border border-emerald-200">
+              Fully Executed
+            </span>
+          </div>
+
+          <ol className="mt-3.5 space-y-2.5 text-xs">
+            {[
+              { step: 'Draft Prepared', meta: 'Property terms & jurisdiction metadata attached', done: true },
+              { step: 'Landlord Review & Signature', meta: 'Consent recorded with timestamp & signature event ID', done: true },
+              { step: 'Tenant Review & Signature', meta: 'Authenticated acceptance locked to Version 1', done: true },
+            ].map((item) => (
+              <li key={item.step} className="flex items-start gap-2.5">
+                <FaCheckCircle className="mt-0.5 shrink-0 text-emerald-600" size={12} aria-hidden="true" />
+                <div>
+                  <p className="font-semibold text-slate-900">{item.step}</p>
+                  <p className="text-slate-500">{item.meta}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+
+          <div className="mt-3.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-[11px] text-slate-600">
+            Document Hash (SHA-256): 8f4c…e91a · Audit log immutable
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3.5">
+      {/* Property Protection & Ecosystem matching PropertyProtection.jsx */}
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#071A3D] text-white">
+            <FaShieldAlt size={13} aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-slate-900">Amana Property Protection &amp; Oversight</p>
+            <p className="text-[11px] text-slate-500">Property records, case reporting &amp; dispute verification</p>
+          </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2 text-xs">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="font-semibold text-slate-900">Basic Property Records</p>
+            <p className="mt-1 text-slate-600">
+              Free basic property registration and case reporting, including unlisted land and family or company capacity.
+            </p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="font-semibold text-slate-900">Optional Paid Services</p>
+            <p className="mt-1 text-slate-600">
+              Registry searches, survey reports, and physical inspections available where defined and priced.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-[#071A3D] px-3.5 py-2.5 text-xs text-white">
+          <span className="flex items-center gap-2 font-medium">
+            <FaClipboardCheck className="text-[#E2C275]" size={13} aria-hidden="true" />
+            Verify Dispute Evidence · /verify-case
+          </span>
+          <span className="text-[11px] text-slate-300">Role-based dashboards · 8 languages</span>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2.5">
+        <Link
+          to="/properties"
+          className="inline-flex items-center gap-2 rounded-lg bg-[#071A3D] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#0C244E]"
+        >
+          Browse Properties <FaArrowRight size={10} aria-hidden="true" />
+        </Link>
+        <Link
+          to="/property-protection"
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-50"
+        >
+          Explore Property Protection
+        </Link>
+      </div>
+    </div>
+  );
+}
 
 export default function ProductDemoCommercial() {
-  const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(true);
+  const prefersReducedMotion = useReducedMotion();
+  const [sceneIndex, setSceneIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(() => !prefersReducedMotion);
   const [isMuted, setIsMuted] = useState(true);
-  const [selectedPresetIndex, setSelectedPresetIndex] = useState(0);
+  const [audioMode, setAudioMode] = useState('executive');
+  const [elapsedInScene, setElapsedInScene] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
+
   const containerRef = useRef(null);
   const audioRef = useRef(null);
 
-  const TOTAL_DURATION = 64; // seconds
+  const currentScene = SCENES[sceneIndex];
 
-  // Sync soundtrack audio element with playback & preset selection
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    audio.volume = 0.35;
-    audio.muted = isMuted;
-    if (isPlaying && !isMuted) {
-      audio.play().catch(() => {});
-    } else {
-      audio.pause();
+    audioRef.current = createCorporateAudioEngine();
+    return () => {
+      audioRef.current?.destroy();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (prefersReducedMotion) {
+      setIsPlaying(false);
     }
-  }, [isPlaying, isMuted, selectedPresetIndex]);
+  }, [prefersReducedMotion]);
 
-  // Auto-advancing timeline loop
   useEffect(() => {
-    if (!isPlaying) return;
-    const interval = setInterval(() => {
-      setElapsed((prev) => {
-        const next = prev + 0.5;
-        if (next >= TOTAL_DURATION) {
+    if (isPlaying && !isMuted) {
+      audioRef.current?.start(audioMode);
+    } else {
+      audioRef.current?.stop();
+    }
+  }, [isPlaying, isMuted, audioMode]);
+
+  useEffect(() => {
+    if (!isPlaying) return undefined;
+
+    const tickMs = 100;
+    const timer = window.setInterval(() => {
+      setElapsedInScene((prev) => {
+        const next = prev + tickMs;
+        if (next >= currentScene.duration) {
+          setSceneIndex((idx) => (idx + 1) % SCENES.length);
           return 0;
         }
-        // Map elapsed time to scene
-        if (next < 8) setCurrentSceneIndex(0);
-        else if (next < 20) setCurrentSceneIndex(1);
-        else if (next < 32) setCurrentSceneIndex(2);
-        else if (next < 44) setCurrentSceneIndex(3);
-        else if (next < 54) setCurrentSceneIndex(4);
-        else setCurrentSceneIndex(5);
         return next;
       });
-    }, 500);
+    }, tickMs);
 
-    return () => clearInterval(interval);
-  }, [isPlaying]);
+    return () => window.clearInterval(timer);
+  }, [isPlaying, currentScene.duration]);
 
-  const jumpToScene = (index) => {
-    setCurrentSceneIndex(index);
-    if (index === 0) setElapsed(0);
-    else if (index === 1) setElapsed(8);
-    else if (index === 2) setElapsed(20);
-    else if (index === 3) setElapsed(32);
-    else if (index === 4) setElapsed(44);
-    else if (index === 5) setElapsed(54);
-  };
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+  }, []);
 
-  const toggleFullscreen = () => {
-    if (!containerRef.current) return;
+  const selectScene = useCallback((index) => {
+    const bounded = (index + SCENES.length) % SCENES.length;
+    setSceneIndex(bounded);
+    setElapsedInScene(0);
+  }, []);
+
+  const handleRestart = useCallback(() => {
+    setSceneIndex(0);
+    setElapsedInScene(0);
+    setIsPlaying(true);
+  }, []);
+
+  const handleToggleFullscreen = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
     if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen?.().then(() => setIsFullscreen(true)).catch(() => {});
+      el.requestFullscreen?.().catch(() => {});
     } else {
-      document.exitFullscreen?.().then(() => setIsFullscreen(false)).catch(() => {});
+      document.exitFullscreen?.().catch(() => {});
+    }
+  }, []);
+
+  const elapsedTotal =
+    SCENES.slice(0, sceneIndex).reduce((sum, s) => sum + s.duration, 0) + elapsedInScene;
+  const totalProgressPct = Math.min(100, (elapsedTotal / TOTAL_DURATION) * 100);
+
+  const handleScrub = (e) => {
+    const targetMs = (parseFloat(e.target.value) / 100) * TOTAL_DURATION;
+    let accum = 0;
+    for (let i = 0; i < SCENES.length; i += 1) {
+      if (targetMs <= accum + SCENES[i].duration || i === SCENES.length - 1) {
+        setSceneIndex(i);
+        setElapsedInScene(Math.max(0, targetMs - accum));
+        break;
+      }
+      accum += SCENES[i].duration;
     }
   };
 
-  return (
-    <div
-      ref={containerRef}
-      className={`w-full bg-slate-950 text-white rounded-3xl overflow-hidden border border-slate-800 shadow-2xl transition-all duration-300 ${
-        isFullscreen ? 'p-6 fixed inset-0 z-50 rounded-none' : 'p-4 sm:p-8'
-      }`}
-    >
-      <audio
-        ref={audioRef}
-        src={MUSIC_PRESETS[selectedPresetIndex]?.src}
-        loop
-        preload="none"
-        muted={isMuted}
-      />
+  const motionTransition = prefersReducedMotion
+    ? { duration: 0 }
+    : { duration: 0.24, ease: [0.22, 1, 0.36, 1] };
 
-      {/* Top Studio Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6 border-b border-slate-800/80">
+  return (
+    <section
+      ref={containerRef}
+      aria-label="Amana RentalHub interactive product walkthrough"
+      className="w-full overflow-hidden rounded-2xl border bg-[#071A3D] text-white shadow-xl"
+      style={{ borderColor: BRAND.slateBorder }}
+    >
+      {/* Top Executive Brand Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-5 py-4 sm:px-7">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-emerald-500 flex items-center justify-center text-slate-950 font-black shadow-lg">
-            3D
-          </div>
+          <img
+            src="/rentalhub-mark.svg"
+            alt="Amana RentalHub NG"
+            className="h-8 w-8 rounded-lg border border-white/15 bg-white/5 p-0.5"
+          />
           <div>
-            <h3 className="font-extrabold text-lg text-white flex items-center gap-2">
-              Amana RentalHub <span className="text-amber-400">Interactive 3D App Commercial</span>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                100% In-Engine
-              </span>
-            </h3>
-            <p className="text-xs text-slate-400">
-              Fluid 60fps kinetic product walkthrough: Active typing, verified listing cards, live review meters, and escrow guarantee.
+            <p
+              className="text-[11px] font-semibold uppercase tracking-[0.16em]"
+              style={{ color: BRAND.goldSoft }}
+            >
+              Amana RentalHub NG · Interactive Walkthrough
             </p>
+            <h2 className="text-base font-semibold tracking-tight text-white sm:text-lg">
+              Platform Architecture &amp; Core Workflows
+            </h2>
           </div>
         </div>
 
-        {/* Music Preset Selector */}
-        <div className="flex items-center gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800">
-          <span className="text-xs text-slate-400 pl-2 hidden md:inline">Soundtrack:</span>
-          {MUSIC_PRESETS.map((preset, idx) => (
-            <button
-              key={preset.id}
-              type="button"
-              onClick={() => {
-                setSelectedPresetIndex(idx);
-                setIsMuted(false);
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                selectedPresetIndex === idx
-                  ? 'bg-amber-500 text-slate-950 shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
+        {/* Playback & Audio Controls */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsPlaying((p) => !p)}
+            aria-label={isPlaying ? 'Pause walkthrough' : 'Play walkthrough'}
+            className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 text-xs font-semibold text-white transition-colors hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-[#C89B3C]"
+          >
+            {isPlaying ? <FaPause size={11} aria-hidden="true" /> : <FaPlay size={11} aria-hidden="true" />}
+            <span>{isPlaying ? 'Pause' : 'Play'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleRestart}
+            aria-label="Restart walkthrough"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-slate-200 transition-colors hover:bg-white/15 hover:text-white focus:outline-none focus:ring-2 focus:ring-[#C89B3C]"
+            title="Restart"
+          >
+            <FaRedo size={12} aria-hidden="true" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsMuted((m) => !m)}
+            aria-label={isMuted ? 'Enable ambient audio' : 'Mute ambient audio'}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 text-xs font-medium text-slate-200 transition-colors hover:bg-white/15 hover:text-white focus:outline-none focus:ring-2 focus:ring-[#C89B3C]"
+          >
+            {isMuted ? <FaVolumeMute size={12} aria-hidden="true" /> : <FaVolumeUp size={12} aria-hidden="true" />}
+            <span className="hidden sm:inline">{isMuted ? 'Muted' : 'Audio On'}</span>
+          </button>
+
+          {!isMuted && (
+            <select
+              aria-label="Audio score style"
+              value={audioMode}
+              onChange={(e) => setAudioMode(e.target.value)}
+              className="h-9 rounded-lg border border-white/15 bg-[#0C244E] px-2.5 text-xs font-medium text-slate-200 focus:border-[#C89B3C] focus:outline-none"
             >
-              Track 0{preset.id}
-            </button>
-          ))}
+              {AUDIO_MODES.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <button
+            type="button"
+            onClick={handleToggleFullscreen}
+            aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-slate-200 transition-colors hover:bg-white/15 hover:text-white focus:outline-none focus:ring-2 focus:ring-[#C89B3C]"
+            title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+          >
+            {isFullscreen ? <FaCompress size={12} aria-hidden="true" /> : <FaExpand size={12} aria-hidden="true" />}
+          </button>
         </div>
       </div>
 
-      {/* Main 3D Stage & Interactive Phone Frame */}
-      <div className="py-8 sm:py-12 flex flex-col lg:flex-row items-center justify-center gap-10">
-        
-        {/* Left / Center: 3D Floating Smartphone Device */}
-        <div className="relative w-full max-w-[340px] sm:max-w-[360px] perspective-[1400px]">
-          
-          {/* Subtle Dynamic Ambient Glow behind Phone */}
-          <div className="absolute -inset-4 bg-gradient-to-tr from-emerald-600/20 via-amber-500/10 to-cyan-500/20 rounded-[50px] blur-2xl pointer-events-none" />
-
-          {/* 3D Angled Phone Chassis */}
-          <motion.div
-            animate={{
-              rotateY: [ -4, 4, -4 ],
-              rotateX: [ 3, -3, 3 ],
-              y: [ -6, 6, -6 ],
-            }}
-            transition={{
-              repeat: Infinity,
-              duration: 8,
-              ease: "easeInOut"
-            }}
-            style={{ transformStyle: 'preserve-3d' }}
-            className="relative bg-slate-900 rounded-[44px] p-3.5 border-4 border-slate-700 shadow-2xl shadow-black ring-1 ring-white/10"
-          >
-            {/* Camera Island / Dynamic Notch */}
-            <div className="absolute top-5 left-1/2 -translate-x-1/2 w-24 h-4 bg-slate-950 rounded-full z-30 flex items-center justify-center">
-              <div className="w-2.5 h-2.5 rounded-full bg-slate-800 mr-2" />
-              <div className="w-8 h-1.5 rounded-full bg-slate-800" />
+      {/* Main Two-Column Executive Stage */}
+      <div className="grid grid-cols-1 lg:grid-cols-12">
+        {/* Left Editorial Column */}
+        <div className="flex flex-col justify-between border-b border-white/10 p-5 sm:p-7 lg:col-span-5 lg:border-b-0 lg:border-r">
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <span
+                className="text-xs font-semibold uppercase tracking-[0.14em]"
+                style={{ color: BRAND.goldSoft }}
+              >
+                {currentScene.indexLabel} / 0{SCENES.length} · {currentScene.category}
+              </span>
+              <span className="font-mono text-[11px] text-slate-400">{currentScene.route}</span>
             </div>
 
-            {/* Inner App Display Screen (9:16 Aspect) */}
-            <div className="relative w-full aspect-[9/16] bg-slate-950 rounded-[34px] overflow-hidden flex flex-col justify-between p-4 border border-slate-800">
-              
-              {/* App Status & Header */}
-              <div className="pt-5 pb-3 flex items-center justify-between border-b border-slate-800/80">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-emerald-600 flex items-center justify-center font-bold text-xs text-white">
-                    A
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-white leading-tight">Amana RentalHub</h4>
-                    <span className="text-[10px] text-emerald-400 block">Abuja • Kano Verified</span>
-                  </div>
-                </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
-                  <FaCheckCircle className="text-[9px]" /> Verified
+            <div className="mt-2 h-0.5 w-12" style={{ backgroundColor: BRAND.gold }} />
+
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentScene.id}
+                initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: -4 }}
+                transition={motionTransition}
+                className="mt-4"
+              >
+                <h3 className="text-2xl font-semibold leading-snug tracking-tight text-white">
+                  {currentScene.title}
+                </h3>
+                <p className="mt-3 text-sm leading-6 text-slate-300">
+                  {currentScene.summary}
+                </p>
+
+                <ul className="mt-5 space-y-2.5 border-t border-white/10 pt-4">
+                  {currentScene.highlights.map((item) => (
+                    <li key={item} className="flex items-start gap-2.5 text-xs leading-5 text-slate-200">
+                      <span
+                        className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: BRAND.gold }}
+                        aria-hidden="true"
+                      />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+          {/* Step Prev / Next & Chapter List */}
+          <div className="mt-6 space-y-3 border-t border-white/10 pt-4">
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-2">
+              {SCENES.map((scene, idx) => {
+                const active = idx === sceneIndex;
+                return (
+                  <button
+                    key={scene.id}
+                    type="button"
+                    onClick={() => selectScene(idx)}
+                    className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-[#C89B3C] ${
+                      active
+                        ? 'border-[#C89B3C]/70 bg-white/10 font-semibold text-white'
+                        : 'border-white/10 bg-transparent text-slate-300 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    <span
+                      className="font-mono text-[10px] tabular-nums"
+                      style={{ color: active ? BRAND.goldSoft : '#94A3B8' }}
+                    >
+                      {scene.indexLabel}
+                    </span>
+                    <span className="truncate">{scene.category}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
+              <button
+                type="button"
+                onClick={() => selectScene(sceneIndex - 1)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-3 py-1.5 text-xs font-medium text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                <FaChevronLeft size={10} aria-hidden="true" /> Previous
+              </button>
+              <button
+                type="button"
+                onClick={() => selectScene(sceneIndex + 1)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-3 py-1.5 text-xs font-medium text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                Next <FaChevronRight size={10} aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Application Viewport Stage */}
+        <div className="bg-[#0B224C] p-5 sm:p-7 lg:col-span-7">
+          <div className="overflow-hidden rounded-xl border border-slate-200/20 bg-slate-50 text-slate-900 shadow-lg">
+            {/* Clean Application Window Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-2.5">
+              <div className="flex items-center gap-2 min-w-0">
+                <img
+                  src="/rentalhub-mark.svg"
+                  alt=""
+                  aria-hidden="true"
+                  className="h-5 w-5 rounded"
+                />
+                <span className="truncate font-mono text-xs text-slate-600">
+                  rentalhub.com.ng{currentScene.route}
                 </span>
               </div>
-
-              {/* Dynamic Animated Scene Content inside Phone */}
-              <div className="flex-1 py-4 flex flex-col justify-center">
-                <AnimatePresence mode="wait">
-                  
-                  {/* SCENE 1: SMART SEARCH & FILTERING */}
-                  {currentSceneIndex === 0 && (
-                    <motion.div
-                      key="scene-search"
-                      initial={{ opacity: 0, y: 15 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -15 }}
-                      className="space-y-3"
-                    >
-                      <div className="text-center mb-2">
-                        <span className="text-[11px] font-semibold text-amber-400 uppercase tracking-wide">
-                          Smart Verification Search
-                        </span>
-                        <h5 className="text-sm font-bold text-white mt-0.5">Find Direct Landlord Homes</h5>
-                      </div>
-
-                      {/* Active Typing Input */}
-                      <div className="bg-slate-900 border border-amber-400/40 rounded-xl p-2.5 flex items-center gap-2 shadow-inner">
-                        <FaSearch className="text-amber-400 text-xs shrink-0" />
-                        <span className="text-xs font-mono text-white flex-1">
-                          Maitama, Abuja FCT<span className="animate-pulse">|</span>
-                        </span>
-                      </div>
-
-                      {/* Filter Chips */}
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        <span className="text-[10px] px-2 py-1 rounded-lg bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 flex items-center gap-1">
-                          <FaWater className="text-[9px]" /> Treated Borehole
-                        </span>
-                        <span className="text-[10px] px-2 py-1 rounded-lg bg-amber-950/80 border border-amber-500/40 text-amber-300 flex items-center gap-1">
-                          <FaBolt className="text-[9px]" /> 24/7 Power
-                        </span>
-                        <span className="text-[10px] px-2 py-1 rounded-lg bg-cyan-950/80 border border-cyan-500/40 text-cyan-300 flex items-center gap-1">
-                          <FaShieldAlt className="text-[9px]" /> Zero Agent Fees
-                        </span>
-                      </div>
-
-                      <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px] text-slate-300 text-center">
-                        ⚡ Matching 148 physically inspected apartments in Maitama &amp; Wuse 2
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {/* SCENE 2: VERIFIED LISTING CARDS SCROLL */}
-                  {currentSceneIndex === 1 && (
-                    <motion.div
-                      key="scene-listings"
-                      initial={{ opacity: 0, y: 25 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -25 }}
-                      className="space-y-3"
-                    >
-                      {/* Maitama Luxury Terrace Card */}
-                      <div className="bg-slate-900/90 border border-emerald-500/40 rounded-2xl p-3 shadow-lg relative overflow-hidden">
-                        <div className="flex items-center justify-between text-[10px] mb-1.5">
-                          <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-bold">
-                            ✓ 100% INSPECTED
-                          </span>
-                          <span className="text-slate-400">📍 Maitama, Abuja</span>
-                        </div>
-                        <h5 className="text-xs font-bold text-white">Luxury 3-Bed Terrace Duplex</h5>
-                        <div className="text-sm font-extrabold text-amber-400 mt-1">
-                          ₦4,500,000 <span className="text-[10px] font-normal text-slate-300">/ year</span>
-                        </div>
-                        <p className="text-[10px] text-slate-400 mt-1">
-                          Gated compound • Paved driveway • Constant water
-                        </p>
-                      </div>
-
-                      {/* Kano Nasarawa GRA Card */}
-                      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 shadow-lg">
-                        <div className="flex items-center justify-between text-[10px] mb-1.5">
-                          <span className="px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 font-bold">
-                            ✓ VETTED LANDLORD
-                          </span>
-                          <span className="text-slate-400">📍 Nasarawa GRA, Kano</span>
-                        </div>
-                        <h5 className="text-xs font-bold text-white">Modern 4-Bed Detached House</h5>
-                        <div className="text-sm font-extrabold text-amber-400 mt-1">
-                          ₦3,200,000 <span className="text-[10px] font-normal text-slate-300">/ year</span>
-                        </div>
-                        <p className="text-[10px] text-slate-400 mt-1">
-                          Dedicated transformer • Treated water • 24/7 security
-                        </p>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {/* SCENE 3: TRANSPARENT TENANT REVIEWS */}
-                  {currentSceneIndex === 2 && (
-                    <motion.div
-                      key="scene-reviews"
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      className="space-y-2.5"
-                    >
-                      <div className="text-center">
-                        <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">
-                          Real Tenant Verification
-                        </span>
-                        <h5 className="text-xs font-bold text-white mt-0.5">Never Move in Blind Again</h5>
-                      </div>
-
-                      <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5 text-[11px]">
-                        <div className="flex justify-between items-center">
-                          <span className="flex items-center gap-1 text-cyan-300 font-semibold">
-                            <FaWater className="text-[10px]" /> Water Supply
-                          </span>
-                          <span className="font-bold text-emerald-400">5.0 / 5 ★★★★★</span>
-                        </div>
-                        <p className="text-[10px] text-slate-400">"Constant borehole water with industrial treatment."</p>
-                      </div>
-
-                      <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5 text-[11px]">
-                        <div className="flex justify-between items-center">
-                          <span className="flex items-center gap-1 text-amber-300 font-semibold">
-                            <FaBolt className="text-[10px]" /> Electricity &amp; Light
-                          </span>
-                          <span className="font-bold text-emerald-400">4.9 / 5 ★★★★★</span>
-                        </div>
-                        <p className="text-[10px] text-slate-400">"Connected to priority feeder line. Steady power."</p>
-                      </div>
-
-                      <div className="p-2 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-[10px] text-emerald-300 flex items-center gap-1.5">
-                        <FaCheckCircle className="shrink-0" />
-                        <span>All reviews submitted by verified past tenants.</span>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {/* SCENE 4: ONE-TAP INSPECTION BOOKING */}
-                  {currentSceneIndex === 3 && (
-                    <motion.div
-                      key="scene-inspection"
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      className="space-y-3 text-center"
-                    >
-                      <div className="w-12 h-12 rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center mx-auto text-emerald-400 text-xl shadow-lg shadow-emerald-900/30">
-                        <FaCalendarCheck />
-                      </div>
-
-                      <div>
-                        <h5 className="text-sm font-bold text-white">Inspection Confirmed</h5>
-                        <p className="text-[11px] text-slate-300 mt-0.5">Tomorrow at 10:30 AM</p>
-                      </div>
-
-                      <div className="bg-slate-900 p-2.5 rounded-xl border border-slate-800 text-left text-[11px] space-y-1">
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Host Assigned:</span>
-                          <span className="text-white font-medium">Licensed Agent (#ABJ-412)</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Inspection Fee:</span>
-                          <span className="text-emerald-400 font-bold">₦0.00 (Zero Extortion)</span>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        className="w-full py-2 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow-md shadow-emerald-900/40"
-                      >
-                        View Appointment Pass →
-                      </button>
-                    </motion.div>
-                  )}
-
-                  {/* SCENE 5: ESCROW PAYMENT & DIGITAL LEASE */}
-                  {currentSceneIndex === 4 && (
-                    <motion.div
-                      key="scene-escrow"
-                      initial={{ opacity: 0, scale: 0.92 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.92 }}
-                      className="space-y-3 text-center"
-                    >
-                      <div className="w-12 h-12 rounded-full bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center mx-auto text-amber-400 text-xl shadow-lg shadow-amber-900/30">
-                        <FaLock />
-                      </div>
-
-                      <div>
-                        <h5 className="text-sm font-bold text-white">Protected in Escrow</h5>
-                        <p className="text-[11px] text-slate-300 mt-0.5">Total Peace of Mind for Renters</p>
-                      </div>
-
-                      <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-[10px] text-slate-300 text-left space-y-1.5">
-                        <div className="flex items-start gap-1.5">
-                          <FaCheckCircle className="text-emerald-400 mt-0.5 shrink-0" />
-                          <span>Landlord is paid ONLY after keys and handover are complete.</span>
-                        </div>
-                        <div className="flex items-start gap-1.5">
-                          <FaCheckCircle className="text-emerald-400 mt-0.5 shrink-0" />
-                          <span>Instant digital tenancy agreement legally backed under Nigerian law.</span>
-                        </div>
-                      </div>
-
-                      <div className="text-[11px] font-bold text-amber-400">
-                        🛡️ 100% Escrow Guarantee
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {/* SCENE 6: BRAND FINALE & DOWNLOAD CTA */}
-                  {currentSceneIndex === 5 && (
-                    <motion.div
-                      key="scene-cta"
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.9 }}
-                      className="space-y-3 text-center"
-                    >
-                      <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-400 to-emerald-500 flex items-center justify-center mx-auto text-slate-950 font-black text-base shadow-lg">
-                        AR
-                      </div>
-
-                      <div>
-                        <h5 className="text-sm font-extrabold text-white">Amana RentalHub NG</h5>
-                        <p className="text-[11px] text-amber-300 mt-0.5 font-semibold">Rent With Confidence</p>
-                      </div>
-
-                      {/* Store Mockup Badges */}
-                      <div className="space-y-1.5 pt-1">
-                        <div className="py-2 px-3 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-white flex items-center justify-center gap-2">
-                          <span>▶ Google Play</span>
-                          <span>•</span>
-                          <span> App Store</span>
-                        </div>
-                        <div className="py-2 px-3 rounded-xl bg-amber-500 text-slate-950 text-xs font-extrabold">
-                          rentalhub.com.ng
-                        </div>
-                      </div>
-
-                      <span className="text-[10px] text-slate-400 block">
-                        WhatsApp: +234 803 060 1238
-                      </span>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Bottom Phone Bar */}
-              <div className="pt-2 border-t border-slate-900 flex justify-center">
-                <div className="w-28 h-1 bg-slate-700 rounded-full" />
-              </div>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Right Side: Chapter Navigation, Controls & Specs */}
-        <div className="w-full lg:max-w-md space-y-5">
-          {/* Active Chapter Card */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl">
-            <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
-              Interactive Storyboard Timeline
-            </span>
-            <h4 className="text-xl font-bold text-white mt-1">
-              {SCENES[currentSceneIndex].label}
-            </h4>
-            <p className="text-xs text-slate-400 mt-1">
-              Click any chapter below to jump directly to that app walkthrough stage:
-            </p>
-
-            {/* Scene Selector Pills */}
-            <div className="grid grid-cols-2 gap-2 mt-4">
-              {SCENES.map((scene, idx) => (
-                <button
-                  key={scene.id}
-                  type="button"
-                  onClick={() => jumpToScene(idx)}
-                  className={`p-2.5 rounded-xl text-left border text-xs transition-all ${
-                    currentSceneIndex === idx
-                      ? 'bg-amber-500/10 border-amber-400 text-amber-300 shadow-md scale-102'
-                      : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
-                  }`}
-                >
-                  <span className="block font-semibold text-white">{scene.label}</span>
-                  <span className="text-[10px] text-slate-500">{scene.time}</span>
-                </button>
-              ))}
+              <span className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                Illustrative preview · not a live transaction
+              </span>
             </div>
 
-            {/* Progress Scrubber Bar */}
-            <div className="mt-5 space-y-1.5">
-              <div className="flex justify-between text-[11px] text-slate-400">
-                <span>Progress: {elapsed.toFixed(0)}s</span>
-                <span>{TOTAL_DURATION}s</span>
-              </div>
-              <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+            {/* Authentic Interface Canvas */}
+            <div className="min-h-[370px] p-4 sm:p-5">
+              <AnimatePresence mode="wait">
                 <motion.div
-                  className="h-full bg-gradient-to-r from-amber-400 to-emerald-400 rounded-full"
-                  style={{ width: `${(elapsed / TOTAL_DURATION) * 100}%` }}
-                />
-              </div>
+                  key={currentScene.id}
+                  initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: -6 }}
+                  transition={motionTransition}
+                >
+                  <AuthenticScreenView sceneId={currentScene.id} />
+                </motion.div>
+              </AnimatePresence>
             </div>
-
-            {/* Playback Controls */}
-            <div className="flex items-center justify-between pt-4 mt-4 border-t border-slate-800/80">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsPlaying(!isPlaying)}
-                  className="p-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition"
-                  aria-label={isPlaying ? 'Pause' : 'Play'}
-                >
-                  {isPlaying ? <FaPause /> : <FaPlay className="ml-0.5" />}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setElapsed(0);
-                    setCurrentSceneIndex(0);
-                    setIsPlaying(true);
-                  }}
-                  className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
-                  aria-label="Restart"
-                >
-                  <FaRedo />
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsMuted((m) => !m)}
-                  className={`p-2.5 rounded-xl transition flex items-center gap-1.5 text-xs font-semibold ${
-                    isMuted
-                      ? 'bg-slate-800 hover:bg-slate-700 text-amber-400'
-                      : 'bg-emerald-600/20 border border-emerald-500/40 text-emerald-300'
-                  }`}
-                  aria-label={isMuted ? 'Unmute Soundtrack' : 'Mute Soundtrack'}
-                >
-                  {isMuted ? <FaVolumeMute /> : <FaVolumeUp />}
-                  <span>{isMuted ? 'Sound Off' : 'Sound On'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={toggleFullscreen}
-                  className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
-                  aria-label="Fullscreen"
-                >
-                  {isFullscreen ? <FaCompress /> : <FaExpand />}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Technical Guarantee Badge */}
-          <div className="p-4 rounded-xl bg-emerald-950/20 border border-emerald-800/40 text-xs text-slate-300 space-y-1">
-            <strong className="text-emerald-400 flex items-center gap-1.5">
-              <FaShieldAlt /> 100% Code-Driven Production Guarantee
-            </strong>
-            <p>
-              Zero static picture slideshows. Fully interactive 3D physics rendering with live Abuja &amp; Kano listing data, verified review meters, and one-tap booking simulation.
-            </p>
           </div>
         </div>
       </div>
-    </div>
+
+      {/* Bottom Scrubber Bar */}
+      <div className="border-t border-white/10 bg-[#051430] px-5 py-3 sm:px-7">
+        <div className="flex items-center gap-4">
+          <span className="shrink-0 font-mono text-[11px] tabular-nums text-slate-300">
+            0:{String(Math.floor(elapsedTotal / 1000)).padStart(2, '0')} / 0:
+            {String(Math.floor(TOTAL_DURATION / 1000)).padStart(2, '0')}
+          </span>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            step="0.5"
+            value={totalProgressPct}
+            onChange={handleScrub}
+            aria-label="Walkthrough timeline progress"
+            className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-white/15 accent-[#C89B3C]"
+          />
+          <span className="hidden text-[11px] text-slate-400 sm:inline">
+            Interactive presentation · real platform workflows
+          </span>
+        </div>
+      </div>
+    </section>
   );
 }

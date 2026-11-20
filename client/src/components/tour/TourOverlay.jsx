@@ -19,9 +19,9 @@ import {
 
 const BRAND = {
   navy: '#071A3D',
-  navySoft: '#102B5C',
-  gold: '#FFC928',
-  goldSoft: '#FFE58A',
+  navySoft: '#0C244E',
+  gold: '#C89B3C',
+  goldSoft: '#E2C275',
 };
 
 const HIGHLIGHT_PADDING = 10;
@@ -298,8 +298,8 @@ const getFocusableElements = (container) => {
 const Backdrop = ({ box }) => {
   const backdropStyle = {
     position: 'fixed',
-    background: 'rgba(3, 12, 30, 0.76)',
-    backdropFilter: 'blur(1.5px)',
+    background: 'rgba(7, 20, 46, 0.58)',
+    backdropFilter: 'blur(1px)',
     pointerEvents: 'auto',
   };
 
@@ -367,13 +367,13 @@ const TooltipArrow = ({ position }) => {
 
   const style = {
     position: 'absolute',
-    width: 16,
-    height: 16,
+    width: 14,
+    height: 14,
     zIndex: -1,
     transform: 'rotate(45deg)',
     background: BRAND.navy,
-    border: `1px solid ${BRAND.gold}`,
-    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)',
+    border: '1px solid rgba(200, 155, 60, 0.48)',
+    boxShadow: '0 4px 12px rgba(7, 20, 46, 0.22)',
   };
 
   if (position.placement === 'bottom') {
@@ -788,28 +788,14 @@ const TourOverlay = ({
                 width: highlightBox.width,
                 height: highlightBox.height,
                 borderRadius: highlightBox.radius,
-                border: `3px solid ${BRAND.gold}`,
-                background: 'rgba(255, 201, 40, 0.035)',
-                boxShadow: '0 0 0 3px rgba(255, 201, 40, 0.18), 0 0 34px rgba(255, 201, 40, 0.62)',
+                border: `2px solid ${BRAND.gold}`,
+                background: 'rgba(200, 155, 60, 0.03)',
+                boxShadow: '0 0 0 4px rgba(7, 26, 61, 0.28)',
                 zIndex: LAYER_BASE + 1,
               }}
               initial={{ opacity: 0 }}
-              animate={prefersReducedMotion
-                ? { opacity: 1 }
-                : {
-                  opacity: 1,
-                  boxShadow: [
-                    '0 0 0 3px rgba(255, 201, 40, 0.16), 0 0 22px rgba(255, 201, 40, 0.42)',
-                    '0 0 0 6px rgba(255, 201, 40, 0.08), 0 0 38px rgba(255, 201, 40, 0.7)',
-                    '0 0 0 3px rgba(255, 201, 40, 0.16), 0 0 22px rgba(255, 201, 40, 0.42)',
-                  ],
-                }}
-              transition={prefersReducedMotion
-                ? { duration: 0 }
-                : {
-                  opacity: { duration: 0.2 },
-                  boxShadow: { duration: 2.2, repeat: Infinity, ease: 'easeInOut' },
-                }}
+              animate={{ opacity: 1 }}
+              transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.18 }}
             />
           )}
 
@@ -845,34 +831,31 @@ const TourOverlay = ({
             <TooltipArrow position={tooltipPosition} />
 
             <div
-              className="flex flex-col overflow-hidden rounded-[22px] border shadow-2xl"
+              className="flex flex-col overflow-hidden rounded-2xl border shadow-2xl"
               style={{
                 maxHeight: tooltipPosition.maxHeight,
-                borderColor: 'rgba(255, 201, 40, 0.72)',
-                background: `linear-gradient(155deg, ${BRAND.navy} 0%, #0A2452 58%, ${BRAND.navySoft} 100%)`,
-                boxShadow: '0 24px 70px rgba(3, 12, 30, 0.42), 0 8px 28px rgba(3, 12, 30, 0.3)',
+                borderColor: 'rgba(200, 155, 60, 0.48)',
+                backgroundColor: BRAND.navy,
+                boxShadow: '0 20px 50px rgba(7, 20, 46, 0.38)',
               }}
             >
-              <div className="relative shrink-0 overflow-hidden px-5 pb-4 pt-5 sm:px-6">
-                <div
-                  aria-hidden="true"
-                  className="absolute -right-16 -top-20 h-44 w-44 rounded-full"
-                  style={{
-                    background: 'radial-gradient(circle, rgba(255, 201, 40, 0.2), transparent 67%)',
-                  }}
-                />
-
-                <div className="relative flex items-start justify-between gap-4">
+              <div
+                className="h-0.5 w-full shrink-0"
+                style={{ backgroundColor: BRAND.gold }}
+                aria-hidden="true"
+              />
+              <div className="relative shrink-0 border-b border-white/10 px-5 pb-3.5 pt-4 sm:px-6">
+                <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <p
-                      className="mb-2 text-[11px] font-bold uppercase tracking-[0.2em]"
+                      className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.16em]"
                       style={{ color: BRAND.goldSoft }}
                     >
                       {t('tour.ui.eyebrow', 'RentalHub guided tour')}
                     </p>
                     <h2
                       id={titleId}
-                      className="pr-2 text-xl font-extrabold leading-tight text-white"
+                      className="pr-2 text-lg font-semibold leading-snug tracking-tight text-white"
                     >
                       {localizedTitle}
                     </h2>
@@ -881,15 +864,15 @@ const TourOverlay = ({
                     type="button"
                     onClick={onSkip}
                     aria-label={t('tour.ui.close_and_skip', 'Close and skip the guided tour')}
-                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-slate-200 transition-colors hover:bg-white/15 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2"
                     style={{ '--tw-ring-color': BRAND.gold, '--tw-ring-offset-color': BRAND.navy }}
                   >
-                    <FaTimes size={15} aria-hidden="true" />
+                    <FaTimes size={13} aria-hidden="true" />
                   </button>
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 sm:px-6 sm:pb-6">
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-6 sm:py-5">
                 <p
                   id={descriptionId}
                   className="text-sm leading-6 text-slate-200"
@@ -1009,8 +992,7 @@ const TourOverlay = ({
                     <motion.div
                       className="h-full rounded-full"
                       style={{
-                        background: `linear-gradient(90deg, ${BRAND.gold}, ${BRAND.goldSoft})`,
-                        boxShadow: '0 0 12px rgba(255, 201, 40, 0.65)',
+                        backgroundColor: BRAND.gold,
                       }}
                       initial={false}
                       animate={{ width: `${progress}%` }}
@@ -1026,7 +1008,7 @@ const TourOverlay = ({
                     type="button"
                     onClick={onPrevious}
                     disabled={currentStep === 0}
-                    className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-sm font-bold text-white transition-colors hover:bg-white/15 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-35"
+                    className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-white/15 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-35"
                     style={{ '--tw-ring-color': BRAND.gold }}
                   >
                     <FaChevronLeft size={12} aria-hidden="true" />
@@ -1035,11 +1017,10 @@ const TourOverlay = ({
                   <button
                     type="button"
                     onClick={onNext}
-                    className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-extrabold transition-transform hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                    className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-offset-2"
                     style={{
                       color: BRAND.navy,
-                      background: `linear-gradient(135deg, ${BRAND.goldSoft}, ${BRAND.gold})`,
-                      boxShadow: '0 8px 22px rgba(255, 201, 40, 0.24)',
+                      backgroundColor: BRAND.goldSoft,
                       '--tw-ring-color': BRAND.goldSoft,
                       '--tw-ring-offset-color': BRAND.navy,
                     }}

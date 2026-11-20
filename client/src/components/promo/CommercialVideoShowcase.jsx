@@ -1,89 +1,137 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FaPlay, FaPause, FaVolumeMute, FaVolumeUp, FaDownload, FaExpand, FaCheckCircle, FaMusic, FaClosedCaptioning, FaShieldAlt, FaStar, FaVideo } from 'react-icons/fa';
+import {
+  FaPlay,
+  FaPause,
+  FaVolumeMute,
+  FaVolumeUp,
+  FaDownload,
+  FaExpand,
+  FaCheckCircle,
+  FaFilm,
+  FaDesktop,
+  FaMobileAlt,
+} from 'react-icons/fa';
 
 const CLIPS = [
   {
-    id: 'path1_vertical',
-    title: 'App Tour Commercial (9:16 Social)',
-    subtitle: 'TikTok, Reels, Shorts & WhatsApp Status',
-    musicGenre: 'Mastered Voiceover + Track 01 (Happy)',
+    id: 'commercial_vertical',
+    title: '9:16 Vertical Commercial',
+    subtitle: 'Mobile social channels, Reels, Shorts & WhatsApp Status',
     videoSrc: '/promo/amana-app-tour-commercial.mp4',
-    description: '100% in-engine 30fps kinetic smartphone product demo showcasing smart Abuja/Kano search, verified property cards, animated water/power ratings, one-tap inspection booking, and escrow protection.',
-    duration: '48.5s',
+    downloadName: 'amana-rentalhub-commercial-9x16.mp4',
+    description:
+      'Vertical corporate commercial combining Nigerian architectural cinematography with authentic Amana RentalHub interface screens, verification workflows, tracked rent payments, and digital tenancy records.',
     aspect: '9/16',
+    resolution: '1080 × 1920',
     badge: '9:16 VERTICAL',
   },
   {
-    id: 'path1_landscape',
-    title: 'App Tour Commercial (16:9 Broadcast)',
-    subtitle: 'Homepage Hero, YouTube & Presentations',
-    musicGenre: 'Mastered Voiceover + Track 01 (Happy)',
+    id: 'commercial_landscape',
+    title: '16:9 Widescreen Commercial',
+    subtitle: 'Executive presentations, homepage hero & YouTube',
     videoSrc: '/promo/amana-app-tour-landscape.mp4',
-    description: 'Widescreen 16:9 split-stage commercial pairing our floating 3D smartphone UI walkthrough with synchronized Abuja FCT & Kano verification callouts.',
-    duration: '48.5s',
+    downloadName: 'amana-rentalhub-commercial-16x9.mp4',
+    description:
+      'Widescreen corporate presentation showcasing Amana RentalHub across property discovery, identity-verified enquiries, structured wallet clearing, versioned tenancy agreements, and property protection.',
     aspect: '16/9',
+    resolution: '1280 × 720',
     badge: '16:9 WIDESCREEN',
   },
 ];
 
-const FLAGSHIP_BREAKDOWN = [
-  { time: '0:00 - 0:07.5', title: 'Act 1: Smart Verification Search', desc: 'Character-by-character typing for Maitama, Abuja FCT, amenity filter chips, and live verification radar.' },
-  { time: '0:07.5 - 0:16', title: 'Act 2: Verified Abuja & Kano Cards', desc: 'Spring-animated Maitama (₦4.5M/yr) and Nasarawa GRA Kano (₦3.2M/yr) cards with vetted landlord badges.' },
-  { time: '0:16 - 0:24.5', title: 'Act 3: Transparent Tenant Reviews', desc: 'Live progress meters filling for Water Supply (5.0/5), Electricity (4.9/5), and Gated Security (5.0/5).' },
-  { time: '0:24.5 - 0:32.5', title: 'Act 4: One-Tap Inspection Booking', desc: 'Instant booking confirmation showing Tomorrow 10:30 AM and ₦0.00 Zero Fee Extortion.' },
-  { time: '0:32.5 - 0:40.5', title: 'Act 5: Encrypted Escrow & Lease', desc: 'Golden padlock seal locking in Handover Guarantee and Instant Legal Tenancy Agreement.' },
-  { time: '0:40.5 - 0:48.5', title: 'Act 6: Brand Finale & CTA', desc: 'Google Play, App Store, rentalhub.com.ng banner, and direct Abuja/Kano WhatsApp Concierge.' },
+const CHAPTER_BREAKDOWN = [
+  {
+    startSec: 0,
+    time: '0:00 – 0:09',
+    title: 'Property Discovery Across Nigeria',
+    desc: 'Structured search across 36 states and the FCT by location, bedroom count, and annual rent.',
+  },
+  {
+    startSec: 8.6,
+    time: '0:09 – 0:17',
+    title: 'Listing Transparency & Verification',
+    desc: 'Review property specifications, landlord verification indicators, media, and move-in cost estimates.',
+  },
+  {
+    startSec: 17.2,
+    time: '0:17 – 0:26',
+    title: 'Identity-Verified Enquiries & Access',
+    desc: 'Account identity verification before unlocking full property details and direct landlord communication.',
+  },
+  {
+    startSec: 25.8,
+    time: '0:26 – 0:34',
+    title: 'Tracked Payments & Wallet Clearing',
+    desc: 'Paystack and bank-transfer rent tracking with a 14-working-day clearing window and auditable ledger.',
+  },
+  {
+    startSec: 34.4,
+    time: '0:34 – 0:43',
+    title: 'Digital Tenancy Agreements & Protection',
+    desc: 'Versioned agreements with timestamped signature logs, SHA-256 hashing, and Property Protection records.',
+  },
+  {
+    startSec: 43.0,
+    time: '0:43 – 0:52',
+    title: 'Amana RentalHub NG Brand Finale',
+    desc: 'Official platform presentation and direct call to action at rentalhub.com.ng.',
+  },
 ];
 
 export default function CommercialVideoShowcase({ isStandalone = false }) {
   const [activeClipIndex, setActiveClipIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(10);
+  const [duration, setDuration] = useState(51.8);
   const videoRef = useRef(null);
 
   const activeClip = CLIPS[activeClipIndex];
   const isWidescreen = activeClip.aspect === '16/9';
 
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.load();
-      videoRef.current.play().then(() => {
-        setIsPlaying(true);
-      }).catch(() => {
-        if (videoRef.current) {
-          videoRef.current.muted = true;
-          setIsMuted(true);
-          videoRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-        }
-      });
-    }
+    const video = videoRef.current;
+    if (!video) return;
+    video.load();
+    setCurrentTime(0);
+    setIsPlaying(false);
   }, [activeClipIndex]);
 
   const togglePlay = () => {
-    if (!videoRef.current) return;
+    const video = videoRef.current;
+    if (!video) return;
     if (isPlaying) {
-      videoRef.current.pause();
+      video.pause();
       setIsPlaying(false);
     } else {
-      videoRef.current.play().then(() => setIsPlaying(true)).catch(console.error);
+      video
+        .play()
+        .then(() => setIsPlaying(true))
+        .catch(() => {
+          video.muted = true;
+          setIsMuted(true);
+          video
+            .play()
+            .then(() => setIsPlaying(true))
+            .catch(() => setIsPlaying(false));
+        });
     }
   };
 
   const toggleMute = () => {
-    if (!videoRef.current) return;
+    const video = videoRef.current;
+    if (!video) return;
     const nextMuted = !isMuted;
-    videoRef.current.muted = nextMuted;
+    video.muted = nextMuted;
     setIsMuted(nextMuted);
   };
 
   const handleTimeUpdate = () => {
-    if (videoRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
-      if (videoRef.current.duration) {
-        setDuration(videoRef.current.duration);
-      }
+    const video = videoRef.current;
+    if (!video) return;
+    setCurrentTime(video.currentTime);
+    if (Number.isFinite(video.duration) && video.duration > 0) {
+      setDuration(video.duration);
     }
   };
 
@@ -95,235 +143,266 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
     }
   };
 
+  const seekToChapter = (startSec) => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.currentTime = Math.min(startSec, duration || startSec);
+    setCurrentTime(startSec);
+    if (!isPlaying) {
+      video
+        .play()
+        .then(() => setIsPlaying(true))
+        .catch(() => {});
+    }
+  };
+
   const handleFullscreen = () => {
-    if (videoRef.current) {
-      if (videoRef.current.requestFullscreen) {
-        videoRef.current.requestFullscreen();
-      } else if (videoRef.current.webkitRequestFullscreen) {
-        videoRef.current.webkitRequestFullscreen();
-      }
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.requestFullscreen) {
+      video.requestFullscreen();
+    } else if (video.webkitRequestFullscreen) {
+      video.webkitRequestFullscreen();
     }
   };
 
   const formatTime = (secs) => {
-    const m = Math.floor(secs / 60);
-    const s = Math.floor(secs % 60);
+    const safe = Number.isFinite(secs) && secs >= 0 ? secs : 0;
+    const m = Math.floor(safe / 60);
+    const s = Math.floor(safe % 60);
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
+  const activeChapterIdx = CHAPTER_BREAKDOWN.reduce((found, ch, idx) => {
+    if (currentTime >= ch.startSec) return idx;
+    return found;
+  }, 0);
+
   return (
-    <section className={`w-full bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white ${isStandalone ? 'py-12' : 'py-16'}`}>
-      <div className="container mx-auto px-4 max-w-7xl">
-        {/* Header Section */}
-        <div className="text-center max-w-3xl mx-auto mb-10">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs sm:text-sm font-semibold tracking-wide uppercase mb-4 shadow-sm">
-            <FaStar className="text-amber-400" />
-            Official Rendered Video Masters
-          </div>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight mb-4">
-            Amana RentalHub <span className="bg-gradient-to-r from-amber-400 via-emerald-400 to-cyan-400 bg-clip-text text-transparent">Product Tour Commercials</span>
+    <section
+      className={`w-full bg-[#071A3D] text-white ${isStandalone ? 'py-12' : 'py-14 border-t border-white/10'}`}
+      aria-label="Official Amana RentalHub commercial videos"
+    >
+      <div className="container mx-auto max-w-7xl px-4">
+        {/* Header */}
+        <div className="mx-auto mb-9 max-w-3xl text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#E2C275]">
+            Official Brand Commercials
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl md:text-4xl">
+            Amana RentalHub NG Product Commercial
           </h2>
-          <p className="text-slate-300 text-base sm:text-lg leading-relaxed">
-            100% code-rendered kinetic UI commercials in both 9:16 mobile vertical and 16:9 widescreen formats — built exclusively around Abuja FCT and Kano verified listings.
+          <p className="mt-3 text-sm leading-6 text-slate-300 sm:text-base">
+            Available in 9:16 vertical and 16:9 widescreen masters—designed for institutional presentations, partner briefings, and digital channels.
           </p>
         </div>
 
-        {/* Clip Selection Tabs */}
-        <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mb-8">
+        {/* Format Selector */}
+        <div className="mb-8 flex flex-wrap items-center justify-center gap-3">
           {CLIPS.map((clip, index) => {
             const isActive = index === activeClipIndex;
+            const Icon = clip.aspect === '9/16' ? FaMobileAlt : FaDesktop;
             return (
               <button
                 key={clip.id}
                 type="button"
                 onClick={() => setActiveClipIndex(index)}
-                className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 border ${
+                className={`inline-flex items-center gap-2.5 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#C89B3C] ${
                   isActive
-                    ? 'bg-amber-500 text-slate-950 border-amber-300 shadow-lg shadow-amber-500/20 scale-105'
-                    : 'bg-slate-800/80 border-slate-700/80 text-slate-300 hover:bg-slate-800 hover:text-white'
+                    ? 'border-[#C89B3C] bg-white text-[#071A3D] font-semibold'
+                    : 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/10 hover:text-white'
                 }`}
               >
-                {clip.id === 'path1_vertical' ? (
-                  <FaStar className={isActive ? 'text-slate-950' : 'text-amber-400'} />
-                ) : (
-                  <FaMusic className={isActive ? 'text-slate-950' : 'text-emerald-400'} />
-                )}
+                <Icon size={13} aria-hidden="true" />
                 <span>{clip.title}</span>
-                <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
-                  isActive ? 'bg-slate-950 text-amber-300' : 'bg-slate-900 text-slate-400'
-                }`}>
-                  {clip.badge}
+                <span
+                  className={`font-mono text-[11px] ${
+                    isActive ? 'text-slate-600' : 'text-slate-400'
+                  }`}
+                >
+                  {clip.resolution}
                 </span>
               </button>
             );
           })}
         </div>
 
-        {/* Video Player Display Container */}
-        <div className="flex flex-col items-center mb-10">
-          <div className={`relative w-full ${isWidescreen ? 'max-w-4xl' : 'max-w-[360px] sm:max-w-[380px]'} bg-slate-950 p-3 sm:p-4 rounded-[36px] border-4 border-slate-700 shadow-2xl shadow-amber-950/30 ring-1 ring-white/10 transition-all duration-300`}>
-            
-            {/* Phone Notch for vertical cuts */}
-            {!isWidescreen && (
-              <div className="absolute top-5 left-1/2 -translate-x-1/2 w-24 h-4 bg-slate-900 rounded-full z-20 flex items-center justify-center">
-                <div className="w-2.5 h-2.5 rounded-full bg-slate-800 mr-2" />
-                <div className="w-8 h-1.5 rounded-full bg-slate-800" />
-              </div>
-            )}
-
-            {/* Video Frame */}
-            <div className={`relative w-full ${isWidescreen ? 'aspect-[16/9]' : 'aspect-[9/16]'} bg-black rounded-[26px] overflow-hidden group shadow-inner`}>
-              <video
-                ref={videoRef}
-                src={activeClip.videoSrc}
-                className="w-full h-full object-cover"
-                playsInline
-                onTimeUpdate={handleTimeUpdate}
-                onEnded={() => setIsPlaying(false)}
+        {/* Main Video & Editorial Grid */}
+        <div
+          className={`grid grid-cols-1 items-start gap-8 ${
+            isWidescreen ? 'lg:grid-cols-12' : 'lg:grid-cols-12'
+          }`}
+        >
+          {/* Left: Video Player Frame */}
+          <div
+            className={`flex flex-col items-center ${
+              isWidescreen ? 'lg:col-span-7' : 'lg:col-span-5'
+            }`}
+          >
+            <div
+              className={`w-full overflow-hidden rounded-xl border border-white/15 bg-black shadow-2xl ${
+                isWidescreen ? 'max-w-3xl' : 'max-w-[340px]'
+              }`}
+            >
+              <div
+                className={`relative w-full cursor-pointer bg-slate-950 ${
+                  isWidescreen ? 'aspect-video' : 'aspect-[9/16]'
+                }`}
                 onClick={togglePlay}
-              />
+              >
+                <video
+                  ref={videoRef}
+                  src={activeClip.videoSrc}
+                  className="h-full w-full object-cover"
+                  playsInline
+                  muted={isMuted}
+                  preload="metadata"
+                  onTimeUpdate={handleTimeUpdate}
+                  onLoadedMetadata={handleTimeUpdate}
+                  onEnded={() => setIsPlaying(false)}
+                />
 
-              {/* Overlaid Play Button */}
-              {!isPlaying && (
-                <button
-                  type="button"
-                  onClick={togglePlay}
-                  className="absolute inset-0 m-auto w-16 h-16 rounded-full bg-amber-500/95 text-slate-950 flex items-center justify-center shadow-xl shadow-black/60 transition-transform hover:scale-110 focus:outline-none"
-                  aria-label="Play video"
-                >
-                  <FaPlay className="text-xl ml-1" />
-                </button>
-              )}
+                {!isPlaying && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-[#071A3D]/35 transition-colors hover:bg-[#071A3D]/25">
+                    <span className="flex h-16 w-16 items-center justify-center rounded-full border border-[#E2C275]/60 bg-[#071A3D]/90 text-white shadow-lg">
+                      <FaPlay className="ml-1" size={20} aria-hidden="true" />
+                    </span>
+                  </div>
+                )}
+              </div>
 
-              {/* Bottom Quick Controls Bar */}
-              <div className="absolute bottom-3 left-3 right-3 bg-slate-950/85 backdrop-blur-md rounded-2xl p-2.5 border border-white/10 flex items-center gap-3 z-20">
-                <button
-                  type="button"
-                  onClick={togglePlay}
-                  className="p-2 text-white hover:text-amber-400 transition"
-                  aria-label={isPlaying ? 'Pause' : 'Play'}
-                >
-                  {isPlaying ? <FaPause /> : <FaPlay className="ml-0.5" />}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={toggleMute}
-                  className={`p-2 transition ${isMuted ? 'text-amber-400' : 'text-white hover:text-amber-400'}`}
-                  aria-label={isMuted ? 'Unmute' : 'Mute'}
-                >
-                  {isMuted ? <FaVolumeMute /> : <FaVolumeUp />}
-                </button>
-
-                <div className="flex-1 flex flex-col justify-center">
+              {/* Clean Video Transport Controls */}
+              <div className="border-t border-white/10 bg-[#051430] px-4 py-3">
+                <div className="mb-2.5 flex items-center gap-3">
+                  <span className="font-mono text-[11px] tabular-nums text-slate-300">
+                    {formatTime(currentTime)}
+                  </span>
                   <input
                     type="range"
                     min="0"
-                    max={duration || 10}
-                    step="0.05"
+                    max={duration || 48}
+                    step="0.1"
                     value={currentTime}
                     onChange={handleSeek}
-                    className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                    aria-label="Seek video timeline"
+                    className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-white/15 accent-[#C89B3C]"
                   />
-                  <div className="flex justify-between text-[10px] text-slate-400 mt-1">
-                    <span>{formatTime(currentTime)}</span>
-                    <span>{formatTime(duration)}</span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleFullscreen}
-                  className="p-2 text-white hover:text-amber-400 transition"
-                  aria-label="Fullscreen"
-                >
-                  <FaExpand />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Download & Spec Bar */}
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-            <a
-              href={activeClip.videoSrc}
-              download={`${activeClip.id}.mp4`}
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm shadow-md transition-all hover:scale-105"
-            >
-              <FaDownload />
-              Download {activeClip.title} ({isWidescreen ? '16:9 Landscape' : '9:16 Vertical'})
-            </a>
-            <span className="text-xs px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 border border-slate-700">
-              Format: {isWidescreen ? '1280×720 HD (16:9)' : '1080×1920 Full HD (9:16)'} • H.264 / AAC
-            </span>
-          </div>
-        </div>
-
-        {/* Detailed Breakdown Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left Column: Creative Overview */}
-          <div className="lg:col-span-6 bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl">
-            <div className="flex items-center gap-2 mb-4">
-              <FaVideo className="text-amber-400 text-xl" />
-              <h3 className="text-xl font-bold text-white">Visual Production Standards</h3>
-            </div>
-            
-            <p className="text-slate-300 text-sm leading-relaxed mb-4">
-              {activeClip.description}
-            </p>
-
-            <div className="space-y-3 pt-3 border-t border-slate-800 text-xs text-slate-300">
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-start gap-2.5">
-                <FaCheckCircle className="text-emerald-400 shrink-0 mt-0.5" />
-                <div>
-                  <strong className="text-white block">30fps Kinetic UI Animation</strong>
-                  Every frame renders crisp vector search typing, animated meter bars, tap ripples, and escrow lock motion with zero static photo slides.
-                </div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-start gap-2.5">
-                <FaCheckCircle className="text-cyan-400 shrink-0 mt-0.5" />
-                <div>
-                  <strong className="text-white block">Abuja FCT &amp; Kano Exclusive Focus</strong>
-                  Highlights Maitama, Wuse 2, Garki, Gwarinpa, and Nasarawa GRA Kano with verified inspections and zero agent extortion.
-                </div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-start gap-2.5">
-                <FaCheckCircle className="text-amber-400 shrink-0 mt-0.5" />
-                <div>
-                  <strong className="text-white block">Mastered Studio Audio Mix</strong>
-                  Full 47.2s unclipped narration paired with ducked royalty-free soundtrack presets in AAC 44.1kHz stereo.
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column: Screenplay & Shot Breakdown */}
-          <div className="lg:col-span-6 bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <FaClosedCaptioning className="text-amber-400" />
-                <h4 className="text-lg font-bold text-white">Scene-by-Scene Shot Analysis</h4>
-              </div>
-              <span className="text-xs text-slate-400">Broadcast Ready</span>
-            </div>
-
-            <div className="space-y-2.5">
-              {FLAGSHIP_BREAKDOWN.map((item, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80"
-                >
-                  <span className="shrink-0 px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-300 font-mono text-xs font-semibold">
-                    {item.time}
+                  <span className="font-mono text-[11px] tabular-nums text-slate-300">
+                    {formatTime(duration)}
                   </span>
-                  <div>
-                    <h5 className="text-xs font-semibold text-white">{item.title}</h5>
-                    <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">{item.desc}</p>
+                </div>
+
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={togglePlay}
+                      aria-label={isPlaying ? 'Pause video' : 'Play video'}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/15 bg-white/10 text-white transition-colors hover:bg-white/20"
+                    >
+                      {isPlaying ? <FaPause size={11} /> : <FaPlay size={11} className="ml-0.5" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={toggleMute}
+                      aria-label={isMuted ? 'Unmute video' : 'Mute video'}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/15 bg-white/5 text-slate-200 transition-colors hover:bg-white/15 hover:text-white"
+                    >
+                      {isMuted ? <FaVolumeMute size={12} /> : <FaVolumeUp size={12} />}
+                    </button>
+                    <span className="hidden text-xs text-slate-400 sm:inline">
+                      {isMuted ? 'Sound muted' : 'Narration & score'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={activeClip.videoSrc}
+                      download={activeClip.downloadName}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#C89B3C]/50 bg-[#C89B3C]/15 px-3 text-xs font-semibold text-[#E2C275] transition-colors hover:bg-[#C89B3C]/25"
+                    >
+                      <FaDownload size={10} aria-hidden="true" />
+                      <span>Download MP4</span>
+                    </a>
+                    <button
+                      type="button"
+                      onClick={handleFullscreen}
+                      aria-label="Fullscreen video"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/15 bg-white/5 text-slate-200 transition-colors hover:bg-white/15 hover:text-white"
+                    >
+                      <FaExpand size={11} />
+                    </button>
                   </div>
                 </div>
-              ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Overview & Synchronized Chapter Breakdown */}
+          <div className={`space-y-6 ${isWidescreen ? 'lg:col-span-5' : 'lg:col-span-7'}`}>
+            <div className="rounded-xl border border-white/10 bg-[#0C244E] p-6">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-4">
+                <div>
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#E2C275]">
+                    {activeClip.badge}
+                  </span>
+                  <h3 className="mt-1 text-xl font-semibold text-white">{activeClip.title}</h3>
+                  <p className="mt-0.5 text-xs text-slate-300">{activeClip.subtitle}</p>
+                </div>
+                <span className="inline-flex items-center gap-1.5 rounded border border-white/15 bg-white/5 px-2.5 py-1 font-mono text-xs text-slate-200">
+                  <FaFilm size={11} className="text-[#E2C275]" aria-hidden="true" />
+                  {activeClip.resolution} · MP4
+                </span>
+              </div>
+
+              <p className="mt-4 text-sm leading-6 text-slate-200">{activeClip.description}</p>
+
+              {/* Chapter Sequence */}
+              <div className="mt-5">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  Commercial Sequence (select a chapter to jump)
+                </p>
+                <div className="divide-y divide-white/10 rounded-lg border border-white/10 bg-[#071A3D]/60">
+                  {CHAPTER_BREAKDOWN.map((chapter, idx) => {
+                    const isCurrent = idx === activeChapterIdx;
+                    return (
+                      <button
+                        key={chapter.time}
+                        type="button"
+                        onClick={() => seekToChapter(chapter.startSec)}
+                        className={`flex w-full items-start gap-3 px-3.5 py-2.5 text-left transition-colors hover:bg-white/5 ${
+                          isCurrent ? 'bg-white/10' : ''
+                        }`}
+                      >
+                        <span
+                          className={`mt-0.5 shrink-0 font-mono text-[11px] tabular-nums ${
+                            isCurrent ? 'font-semibold text-[#E2C275]' : 'text-slate-400'
+                          }`}
+                        >
+                          {chapter.time}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-white">{chapter.title}</p>
+                          <p className="mt-0.5 text-xs leading-5 text-slate-300">{chapter.desc}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Platform Accuracy & Standards Note */}
+            <div className="rounded-xl border border-white/10 bg-[#051430] p-5">
+              <div className="flex items-start gap-3">
+                <FaCheckCircle className="mt-0.5 shrink-0 text-[#E2C275]" size={15} aria-hidden="true" />
+                <div className="text-xs leading-5 text-slate-300">
+                  <p className="font-semibold text-white">Accurate Platform Representation</p>
+                  <p className="mt-1">
+                    Every workflow depicted corresponds to active Amana RentalHub NG modules—property search, identity-verified enquiries, Paystack and bank-transfer wallet clearing, versioned tenancy agreements, and Property Protection records. Service availability and applicable fees are displayed transparently prior to confirmation.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

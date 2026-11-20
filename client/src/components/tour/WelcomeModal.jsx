@@ -1,27 +1,24 @@
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import {
-  FaCheck,
-  FaClock,
-  FaCompass,
-  FaTimes,
-} from 'react-icons/fa';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { FaArrowRight, FaCheck, FaTimes } from 'react-icons/fa';
 
 const BRAND = {
   navy: '#071A3D',
-  navySoft: '#102B5C',
-  gold: '#FFC928',
-  goldSoft: '#FFE58A',
+  navyHover: '#0C244E',
+  gold: '#C89B3C',
+  goldSoft: '#E2C275',
 };
 
 const getFocusableElements = (container) => {
   if (!container) return [];
-  return Array.from(container.querySelectorAll(
-    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), '
-    + 'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-  ));
+  return Array.from(
+    container.querySelectorAll(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), '
+        + 'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ),
+  ).filter((element) => element.getAttribute('aria-hidden') !== 'true');
 };
 
 const WelcomeModal = ({
@@ -46,7 +43,7 @@ const WelcomeModal = ({
 
     const focusTimer = window.setTimeout(() => {
       startButtonRef.current?.focus({ preventScroll: true });
-    }, prefersReducedMotion ? 0 : 180);
+    }, prefersReducedMotion ? 0 : 120);
 
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
@@ -79,7 +76,6 @@ const WelcomeModal = ({
       window.clearTimeout(focusTimer);
       document.removeEventListener('keydown', handleKeyDown, true);
       document.body.style.overflow = previousOverflow;
-
       const previousFocus = previousFocusRef.current;
       if (previousFocus && typeof previousFocus.focus === 'function' && previousFocus.isConnected) {
         previousFocus.focus({ preventScroll: true });
@@ -91,12 +87,12 @@ const WelcomeModal = ({
 
   const transition = prefersReducedMotion
     ? { duration: 0 }
-    : { type: 'spring', stiffness: 280, damping: 27, mass: 0.85 };
+    : { duration: 0.2, ease: [0.22, 1, 0.36, 1] };
 
   const benefits = [
     t('tour.welcome.benefit_controls', 'Highlights the real controls on your dashboard'),
-    t('tour.welcome.benefit_role', 'Personalized for your RentalHub account role'),
-    t('tour.welcome.benefit_replay', 'Available to replay whenever you need a refresher'),
+    t('tour.welcome.benefit_role', 'Tailored to your Amana RentalHub account role'),
+    t('tour.welcome.benefit_replay', 'Available to replay anytime from your profile or settings'),
   ];
 
   return createPortal(
@@ -109,14 +105,14 @@ const WelcomeModal = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.22 }}
+          transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.18 }}
         >
           <button
             type="button"
             className="absolute inset-0 h-full w-full cursor-default border-0"
             style={{
-              background: 'rgba(3, 12, 30, 0.76)',
-              backdropFilter: 'blur(7px)',
+              background: 'rgba(7, 20, 46, 0.64)',
+              backdropFilter: 'blur(3px)',
             }}
             aria-label={t('tour.welcome.close_intro', 'Close guided tour introduction')}
             onClick={onSkip}
@@ -129,149 +125,127 @@ const WelcomeModal = ({
             aria-labelledby="rentalhub-tour-welcome-title"
             aria-describedby="rentalhub-tour-welcome-description"
             tabIndex={-1}
-            className="relative my-auto w-full max-w-lg overflow-hidden rounded-[28px] border bg-white shadow-2xl outline-none"
+            className="relative my-auto w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl outline-none"
             style={{
-              borderColor: 'rgba(255, 201, 40, 0.56)',
-              boxShadow: '0 34px 90px rgba(3, 12, 30, 0.42), 0 10px 32px rgba(3, 12, 30, 0.25)',
+              boxShadow: '0 24px 60px rgba(7, 20, 46, 0.32)',
             }}
-            initial={prefersReducedMotion
-              ? { opacity: 0 }
-              : { opacity: 0, scale: 0.94, y: 22 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={prefersReducedMotion
-              ? { opacity: 0 }
-              : { opacity: 0, scale: 0.97, y: 10 }}
+            initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
             transition={transition}
           >
+            {/* Corporate Navy Header */}
             <div
-              className="relative overflow-hidden px-6 pb-8 pt-7 text-center sm:px-9 sm:pb-9 sm:pt-8"
+              className="relative px-6 pb-5 pt-6 text-white"
               style={{
-                background: `linear-gradient(145deg, ${BRAND.navy} 0%, #0B285A 62%, ${BRAND.navySoft} 100%)`,
+                backgroundColor: BRAND.navy,
+                borderBottom: `2px solid ${BRAND.gold}`,
               }}
             >
-              <div
-                aria-hidden="true"
-                className="absolute -left-20 -top-24 h-64 w-64 rounded-full"
-                style={{
-                  background: 'radial-gradient(circle, rgba(255, 201, 40, 0.2), transparent 68%)',
-                }}
-              />
-              <div
-                aria-hidden="true"
-                className="absolute -bottom-24 -right-16 h-56 w-56 rounded-full"
-                style={{
-                  background: 'radial-gradient(circle, rgba(56, 189, 248, 0.16), transparent 68%)',
-                }}
-              />
-
-              <button
-                type="button"
-                onClick={onSkip}
-                aria-label={t('tour.welcome.skip_label', 'Skip the guided tour')}
-                className="absolute right-4 top-4 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-offset-2"
-                style={{
-                  '--tw-ring-color': BRAND.gold,
-                  '--tw-ring-offset-color': BRAND.navy,
-                }}
-              >
-                <FaTimes size={16} aria-hidden="true" />
-              </button>
-
-              <div
-                className="relative mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-[24px] border p-2.5"
-                style={{
-                  borderColor: 'rgba(255, 229, 138, 0.72)',
-                  background: 'linear-gradient(145deg, rgba(255, 229, 138, 0.96), rgba(255, 201, 40, 0.76))',
-                  boxShadow: '0 16px 36px rgba(255, 201, 40, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.72)',
-                }}
-              >
-                <img
-                  src="/rentalhub-mark.svg"
-                  alt=""
-                  aria-hidden="true"
-                  className="h-full w-full rounded-[16px] object-contain"
-                />
-              </div>
-
-              <p
-                className="relative mb-2 text-[11px] font-extrabold uppercase tracking-[0.22em]"
-                style={{ color: BRAND.goldSoft }}
-              >
-                {t('tour.welcome.eyebrow', 'Your personal dashboard guide')}
-              </p>
-              <h1
-                id="rentalhub-tour-welcome-title"
-                className="relative text-2xl font-black leading-tight text-white sm:text-3xl"
-              >
-                {canResume
-                  ? t('tour.welcome.resume_title', 'Continue where you stopped')
-                  : isReturningUser
-                    ? t('tour.welcome.returning_title', 'Welcome back to RentalHub')
-                    : t('tour.welcome.new_title', 'Welcome to Amana RentalHub NG')}
-              </h1>
-              <p
-                id="rentalhub-tour-welcome-description"
-                className="relative mx-auto mt-3 max-w-md text-sm leading-6 text-slate-200 sm:text-[15px]"
-              >
-                {canResume
-                  ? t('tour.welcome.resume_description', 'Your progress is saved. Resume from the last step you viewed, or restart later from your profile.')
-                  : isReturningUser
-                    ? t('tour.welcome.returning_description', 'Take a quick refresher and rediscover the controls that matter most for your account.')
-                    : t('tour.welcome.new_description', 'Let us show you the most useful controls for your account with a short, focused walkthrough.')}
-              </p>
-            </div>
-
-            <div className="max-h-[48vh] overflow-y-auto px-6 py-6 sm:px-9 sm:py-7">
-              <div className="space-y-3">
-                {benefits.map((benefit) => (
-                  <div
-                    key={benefit}
-                    className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3"
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <img
+                    src="/rentalhub-mark.svg"
+                    alt="Amana RentalHub NG"
+                    className="h-9 w-9 shrink-0 rounded-lg border border-white/15 bg-white/5 p-0.5"
+                  />
+                  <p
+                    className="text-[11px] font-semibold uppercase tracking-[0.16em]"
+                    style={{ color: BRAND.goldSoft }}
                   >
-                    <span
-                      className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
-                      style={{ background: BRAND.gold, color: BRAND.navy }}
-                    >
-                      <FaCheck size={10} aria-hidden="true" />
-                    </span>
-                    <span className="text-sm font-medium leading-6 text-slate-700">
-                      {benefit}
-                    </span>
-                  </div>
-                ))}
-              </div>
+                    {t('tour.welcome.eyebrow', 'Dashboard orientation')}
+                  </p>
+                </div>
 
-              <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <button
                   type="button"
                   onClick={onSkip}
-                  className="order-2 inline-flex min-h-[48px] items-center justify-center rounded-xl border-2 border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 sm:order-1"
-                  style={{ '--tw-ring-color': BRAND.navySoft }}
+                  aria-label={t('tour.welcome.skip_label', 'Skip the guided tour')}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-slate-200 transition-colors hover:bg-white/15 hover:text-white focus:outline-none focus:ring-2 focus:ring-[#C89B3C]"
+                >
+                  <FaTimes size={13} aria-hidden="true" />
+                </button>
+              </div>
+
+              <h2
+                id="rentalhub-tour-welcome-title"
+                className="mt-4 text-xl font-semibold leading-snug tracking-tight text-white"
+              >
+                {canResume
+                  ? t('tour.welcome.resume_title', 'Continue your dashboard guide')
+                  : isReturningUser
+                    ? t('tour.welcome.returning_title', 'Welcome back to Amana RentalHub')
+                    : t('tour.welcome.new_title', 'Welcome to Amana RentalHub NG')}
+              </h2>
+
+              <p
+                id="rentalhub-tour-welcome-description"
+                className="mt-2 text-sm leading-6 text-slate-300"
+              >
+                {canResume
+                  ? t(
+                      'tour.welcome.resume_description',
+                      'Your progress is saved. Resume from your last step or restart anytime from settings.',
+                    )
+                  : isReturningUser
+                    ? t(
+                        'tour.welcome.returning_description',
+                        'Take a brief refresher on the primary controls available for your account.',
+                      )
+                    : t(
+                        'tour.welcome.new_description',
+                        'Review the key controls and workflows available on your dashboard in a short guided walkthrough.',
+                      )}
+              </p>
+            </div>
+
+            {/* Clean Neutral Content Body */}
+            <div className="bg-white px-6 py-5">
+              <ul className="space-y-2.5">
+                {benefits.map((benefit) => (
+                  <li
+                    key={benefit}
+                    className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700"
+                  >
+                    <span
+                      className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[10px] text-white"
+                      style={{ backgroundColor: BRAND.navy }}
+                      aria-hidden="true"
+                    >
+                      <FaCheck />
+                    </span>
+                    <span className="leading-5">{benefit}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="mt-5 flex flex-col-reverse gap-2.5 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={onSkip}
+                  className="inline-flex min-h-[42px] flex-1 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-400"
                 >
                   {t('tour.welcome.maybe_later', 'Maybe later')}
                 </button>
+
                 <button
                   ref={startButtonRef}
                   type="button"
                   onClick={onStartTour}
-                  className="order-1 inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-extrabold transition-transform hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-2 sm:order-2"
-                  style={{
-                    color: BRAND.navy,
-                    background: `linear-gradient(135deg, ${BRAND.goldSoft}, ${BRAND.gold})`,
-                    boxShadow: '0 10px 24px rgba(255, 201, 40, 0.24)',
-                    '--tw-ring-color': BRAND.gold,
-                  }}
+                  className="inline-flex min-h-[42px] flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[#C89B3C] focus:ring-offset-2"
+                  style={{ backgroundColor: BRAND.navy }}
                 >
-                  <FaCompass size={14} aria-hidden="true" />
-                  {canResume
-                    ? t('tour.welcome.resume_button', 'Resume guided tour')
-                    : t('tour.welcome.start_button', 'Start guided tour')}
+                  <span>
+                    {canResume
+                      ? t('tour.welcome.resume_button', 'Resume guided tour')
+                      : t('tour.welcome.start_button', 'Start guided tour')}
+                  </span>
+                  <FaArrowRight size={12} aria-hidden="true" />
                 </button>
               </div>
 
-              <p className="mt-5 flex items-center justify-center gap-2 text-xs font-medium text-slate-500">
-                <FaClock size={12} aria-hidden="true" />
-                {t('tour.welcome.duration', 'About 2 minutes · you remain in control')}
+              <p className="mt-3.5 text-center text-xs text-slate-500">
+                {t('tour.welcome.duration', 'Takes under 2 minutes · pause or skip anytime')}
               </p>
             </div>
           </motion.section>
