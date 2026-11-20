@@ -9,7 +9,7 @@ describe('FumigationTrackingService Unit Tests', () => {
       assigned_team_id: 10,
       assigned_team_leader: 'Ibrahim Danladi',
       assigned_team_phone: '+234 802 333 4444',
-      booking_status: 'in_progress'
+      property_state: 'Kogi', property_lga: 'Lokoja', booking_status: 'in_progress'
     };
 
     // User with matching assigned_team_id
@@ -20,7 +20,7 @@ describe('FumigationTrackingService Unit Tests', () => {
 
     // User with matching team phone
     assert.equal(
-      FumigationTrackingService.isAuthorizedTeam(booking, { id: 99, phone: '08023334444', user_type: 'service_provider' }),
+      FumigationTrackingService.isAuthorizedTeam(booking, { id: 99, phone: '08023334444', phone_verified: true, user_type: 'service_provider' }),
       true
     );
 
@@ -32,13 +32,13 @@ describe('FumigationTrackingService Unit Tests', () => {
 
     // Zonal Fumigation Admin has oversight
     assert.equal(
-      FumigationTrackingService.isAuthorizedTeam(booking, { id: 2, user_type: 'zonal_fumigation_admin' }),
+      FumigationTrackingService.isAuthorizedTeam(booking, { id: 2, user_type: 'zonal_fumigation_admin', assigned_zone: 'North Central' }),
       true
     );
 
     // State Fumigation Admin has oversight
     assert.equal(
-      FumigationTrackingService.isAuthorizedTeam(booking, { id: 3, user_type: 'state_fumigation_admin' }),
+      FumigationTrackingService.isAuthorizedTeam(booking, { id: 3, user_type: 'state_fumigation_admin', assigned_state: 'Kogi' }),
       true
     );
 

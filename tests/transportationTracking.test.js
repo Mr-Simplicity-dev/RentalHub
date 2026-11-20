@@ -20,7 +20,7 @@ describe('TransportationTrackingService Unit Tests', () => {
 
     // User with different id but matching phone
     assert.equal(
-      TransportationTrackingService.isAuthorizedDriver(booking, { id: 99, phone: '08031234567', user_type: 'tenant' }),
+      TransportationTrackingService.isAuthorizedDriver(booking, { id: 99, phone: '08031234567', phone_verified: true, user_type: 'tenant' }),
       true
     );
 

@@ -1,50 +1,12 @@
-import React, { act } from 'react';
-import { createRoot } from 'react-dom/client';
-import { fireEvent, within } from '@testing-library/dom';
-import { vi } from 'vitest';
-import TourMusicPlayer from './TourMusicPlayer';
-import api from '../../services/api';
-vi.mock('../../services/api',()=>({default:{get:vi.fn()}}));
-let root,container,play,pause;
-const track={id:9,title:'Calm music',file_url:'Video-Presets_290_Royalty_Free_Background_Music_Tracks/Mp3/Calm.mp3'};
-beforeEach(()=>{
-  globalThis.IS_REACT_ACT_ENVIRONMENT=true;
-  api.get.mockReset(); api.get.mockResolvedValue({data:new Blob(['audio'],{type:'audio/mpeg'})});
-  vi.stubGlobal('URL',Object.assign(URL,{createObjectURL:vi.fn(()=> 'blob:test-music'),revokeObjectURL:vi.fn()}));
-  play=vi.spyOn(HTMLMediaElement.prototype,'play').mockImplementation(function(){this.dispatchEvent(new Event('play'));return Promise.resolve();});
-  pause=vi.spyOn(HTMLMediaElement.prototype,'pause').mockImplementation(function(){this.dispatchEvent(new Event('pause'));});
-  container=document.createElement('div'); document.body.appendChild(container); root=createRoot(container);
-});
+import React,{act} from 'react';import{createRoot}from'react-dom/client';import{fireEvent,within}from'@testing-library/dom';import{vi}from'vitest';import TourMusicPlayer from './TourMusicPlayer';import api from '../../services/api';
+vi.mock('../../services/api',()=>({default:{defaults:{baseURL:'/api'},get:vi.fn()}}));let root,container,play,pause;
+const track={id:9,title:'Calm music',file_url:'preset.mp3'};
+beforeEach(()=>{globalThis.IS_REACT_ACT_ENVIRONMENT=true;api.get.mockReset();api.get.mockResolvedValue({data:new Blob(['audio'],{type:'audio/mpeg'})});URL.createObjectURL=vi.fn(()=> 'blob:test');URL.revokeObjectURL=vi.fn();play=vi.spyOn(HTMLMediaElement.prototype,'play').mockImplementation(function(){this.dispatchEvent(new Event('play'));return Promise.resolve();});pause=vi.spyOn(HTMLMediaElement.prototype,'pause').mockImplementation(function(){this.dispatchEvent(new Event('pause'));});container=document.createElement('div');document.body.appendChild(container);root=createRoot(container);});
 afterEach(async()=>{await act(async()=>root.unmount());container.remove();vi.restoreAllMocks();});
 const mount=async element=>act(async()=>root.render(element||<TourMusicPlayer track={track}/>));
-const click=async name=>act(async()=>fireEvent.click(within(container).getByRole('button',{name})));
-
-test('Play fetches authenticated audio; Pause and Stop control the preview without changing track settings',async()=>{
-  await mount();expect(api.get).not.toHaveBeenCalled();
-  await click('Play Calm music');
-  expect(api.get).toHaveBeenCalledWith('/super/property-tour-music/tracks/9/audio',expect.objectContaining({responseType:'blob',signal:expect.any(AbortSignal)}));
-  expect(play).toHaveBeenCalledTimes(1);
-  const audio=container.querySelector('audio');audio.currentTime=12;
-  await click('Pause Calm music');expect(pause).toHaveBeenCalled();
-  await click('Play Calm music');expect(api.get).toHaveBeenCalledTimes(1);
-  await click('Stop Calm music');expect(audio.currentTime).toBe(0);
-  expect(within(container).getByRole('button',{name:'Play Calm music'})).toBeTruthy();
-});
-test('an HTML response cannot silently pretend to be music',async()=>{
-  api.get.mockResolvedValue({data:new Blob(['<html>'],{type:'text/html'})});
-  await mount();await click('Play Calm music');expect(play).not.toHaveBeenCalled();
-  expect(within(container).getByRole('alert').textContent).toContain('Could not play');
-});
-test('Stop cancels a slow audio request and prevents late playback',async()=>{
-  let finish;api.get.mockImplementation(()=>new Promise(resolve=>{finish=resolve;}));
-  await mount();await click('Play Calm music');
-  const signal=api.get.mock.calls[0][1].signal;await click('Stop Calm music');expect(signal.aborted).toBe(true);
-  await act(async()=>finish({data:new Blob(['audio'],{type:'audio/mpeg'})}));expect(play).not.toHaveBeenCalled();
-});
-test('starting another track stops and rewinds the first one',async()=>{
-  await mount(<><TourMusicPlayer track={track}/><TourMusicPlayer track={{...track,id:10,title:'Second music'}}/></>);
-  await click('Play Calm music');container.querySelector('audio').currentTime=7;
-  await click('Play Second music');expect(container.querySelector('audio').currentTime).toBe(0);
-  expect(within(container).getByRole('button',{name:'Play Calm music'})).toBeTruthy();
-  expect(within(container).getByRole('button',{name:'Pause Second music'})).toBeTruthy();
-});
+test('one native player provides Play and Pause, with only Stop beside it',async()=>{await mount();const audio=container.querySelector('audio');expect(audio.controls).toBe(true);expect(audio.getAttribute('src')).toBe('/api/super/property-tour-music/tracks/9/audio');expect(api.get).not.toHaveBeenCalled();expect(within(container).getAllByRole('button')).toHaveLength(1);await act(async()=>fireEvent.play(audio));audio.currentTime=9;await act(async()=>fireEvent.click(within(container).getByRole('button',{name:'Stop Calm music'})));expect(audio.currentTime).toBe(0);expect(pause).toHaveBeenCalled();});
+test('a failed cookie-based load falls back to the authenticated API client',async()=>{await mount();const audio=container.querySelector('audio');await act(async()=>fireEvent.error(audio));expect(api.get).toHaveBeenCalledWith('/super/property-tour-music/tracks/9/audio',expect.objectContaining({responseType:'blob'}));expect(play).toHaveBeenCalledTimes(1);expect(audio.getAttribute('src')).toBe('blob:test');});
+test('an HTML response is never treated as audio',async()=>{api.get.mockResolvedValue({data:new Blob(['<html>'],{type:'text/html'})});await mount();await act(async()=>fireEvent.error(container.querySelector('audio')));expect(play).not.toHaveBeenCalled();expect(within(container).getByRole('alert').textContent).toContain('Could not play');});
+test('Stop cancels a slow fallback and prevents playback after its response arrives',async()=>{let finish;api.get.mockImplementation(()=>new Promise(resolve=>{finish=resolve;}));await mount();await act(async()=>fireEvent.error(container.querySelector('audio')));const signal=api.get.mock.calls[0][1].signal;await act(async()=>fireEvent.click(within(container).getByRole('button',{name:'Stop Calm music'})));expect(signal.aborted).toBe(true);await act(async()=>finish({data:new Blob(['audio'],{type:'audio/mpeg'})}));expect(play).not.toHaveBeenCalled();});
+test('playing another native player stops and rewinds the first one',async()=>{await mount(<><TourMusicPlayer track={track}/><TourMusicPlayer track={{...track,id:10,title:'Second'}}/></>);const audios=container.querySelectorAll('audio');await act(async()=>fireEvent.play(audios[0]));audios[0].currentTime=8;await act(async()=>fireEvent.play(audios[1]));expect(audios[0].currentTime).toBe(0);expect(within(container).getByRole('button',{name:'Stop Calm music'}).disabled).toBe(true);});
+test('an expired privileged check is renewed through the normal JSON API before retrying audio',async()=>{api.get.mockRejectedValueOnce({response:{status:403}}).mockResolvedValueOnce({data:{success:true}}).mockResolvedValueOnce({data:new Blob(['audio'],{type:'audio/mpeg'})});await mount();await act(async()=>fireEvent.error(container.querySelector('audio')));expect(api.get.mock.calls.map(args=>args[0])).toEqual(['/super/property-tour-music/tracks/9/audio','/super/property-tour-music/settings','/super/property-tour-music/tracks/9/audio']);expect(play).toHaveBeenCalledTimes(1);});

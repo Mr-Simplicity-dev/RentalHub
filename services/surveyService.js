@@ -317,10 +317,8 @@ exports.verifySurveyLocation = async (req, res) => {
 };
 
 // Server-side enforcement used at draft/submit time.
-const isAgentEntry = (req, body) =>
-  req.user?.user_type === 'marketing_agent' ||
-  Boolean(String(body?.agent?.name || '').trim()) ||
-  Boolean(String(body?.agent_name || '').trim());const enforceLocationGate = async (req, body) => {
+const isAgentEntry = req => req.user?.user_type === 'marketing_agent';
+const enforceLocationGate = async (req, body) => {
   const flags = require('../config/middleware/featureFlags').getFeatureFlagsMap;
   const map = await flags();
   // Gate OFF = the PUBLIC survey is closed; marketing-agent (field/paper)
@@ -1017,7 +1015,7 @@ exports.submitPublicSurvey = async (req, res) => {
     const contactStateOfOrigin = String(contact?.state_of_origin || '').trim().slice(0, 120);
     // Email is mandatory for the general public; marketing agents (who do the
     // survey face-to-face / on paper) may leave it off.
-    const emailOptionalForAgent = Boolean(agentUser) || agentMode === 'face_to_face';
+    const emailOptionalForAgent = Boolean(agentUser);
     const hasEmail = Boolean(contactEmail);
 
     if (!contactName || !contactPhone) {

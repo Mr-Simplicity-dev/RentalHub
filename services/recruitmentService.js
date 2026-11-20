@@ -28,6 +28,7 @@ const optionalRequire = (moduleName, featureName) => {
 
 const PDFDocument = optionalRequire('pdfkit', 'Recruitment PDF');
 const archiver = optionalRequire('archiver', 'Recruitment ZIP export');
+const createArchive = require('../config/utils/archiveFactory');
 
 const sendMissingDependency = (res, featureName, packageName) =>
   res.status(503).json({
@@ -1911,7 +1912,7 @@ exports.bulkDownloadDocuments = async (req, res) => {
     );
     
     // Create a zip archive
-    const archive = archiver('zip', { zlib: { level: 9 } });
+    const archive = createArchive('zip', { zlib: { level: 9 } }, archiver);
     res.attachment('recruitment_documents.zip');
     archive.pipe(res);
     
@@ -4193,10 +4194,8 @@ const streamDocumentsZip = async (res, docs, filename) => {
   }
 
   res.attachment(filename);
-  const archive = archiver('zip', { zlib: { level: 9 } });
-  archive.on('error', (error) => {
-    throw error;
-  });
+  const archive = createArchive('zip', { zlib: { level: 9 } }, archiver);
+  archive.on('error', (error) => { logger.error('Recruitment archive failed', {code:error.code || 'ARCHIVE_ERROR'}); res.destroy(error); });
   archive.pipe(res);
 
   for (const item of docs) {

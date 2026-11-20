@@ -256,7 +256,7 @@ router.get('/:id/signed-copy', safe(async (req, res) => {
   pdf.end();
   await ready;
   res.type('zip').attachment('Signed-Code-of-Conduct.zip');
-  const zip = require('archiver')('zip', {
+  const zip = require('../config/utils/archiveFactory')('zip', {
     zlib: {
       level: 9
     }

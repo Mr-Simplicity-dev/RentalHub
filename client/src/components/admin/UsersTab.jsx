@@ -181,7 +181,7 @@ const UsersTab = ({
     const { user, action, reason } = accountAction;
     const normalizedReason = reason.trim();
 
-    if ((action === "ban" || action === "delete" || action === "bulk_ban" || action === "bulk_verify" || action === "verify" || action === "promote") && !normalizedReason) {
+    if ((action === "ban" || action === "delete" || action === "bulk_ban" || action === "bulk_verify" || action === "verify" || action === "promote" || action === "bulk_promote") && !normalizedReason) {
       setAccountActionError(action === "delete" ? "Deletion reason is required." : "A decision reason is required.");
       return;
     }
@@ -200,6 +200,10 @@ const UsersTab = ({
         await unbanUser(user.id, normalizedReason);
       } else if (action === "delete") {
         await deleteUser(user.id, normalizedReason);
+      } else if(action==='bulk_promote'){
+        const completed=await bulkUsers('promote',normalizedReason);
+        if(completed===false){setAccountActionError('Promotion was not completed.');return;}
+        setSelectedUsers([]);
       } else if(action==='bulk_verify'){
         const completed=await bulkUsers('verify',normalizedReason);
         if(completed===false){setAccountActionError('Verification was not completed. Check the identity review message and try again.');return;}
@@ -245,7 +249,7 @@ const UsersTab = ({
           </button>
 
           <button
-            onClick={() => bulkUsers("promote")}
+            onClick={() => openAccountAction(null, "bulk_promote")}
             className="rounded-lg bg-blue-600 px-3 py-1 text-sm text-white transition-colors hover:bg-blue-700 max-sm:min-h-11 max-sm:min-w-11"
           >
             Make Admin
@@ -787,7 +791,7 @@ const UsersTab = ({
 
       {revalidationAction.open && (
         createPortal(<div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white shadow-xl">
+          <div role="dialog" aria-modal="true" aria-label="Credential revalidation request" className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-xl bg-white shadow-xl">
             <div className="border-b px-6 py-4 border-slate-200">
               <h3 className="text-lg font-bold text-gray-900">Request Credential Revalidation</h3>
               <p className="text-sm text-gray-500">{revalidationAction.user?.full_name} · {revalidationAction.user?.email}</p>
@@ -873,7 +877,7 @@ const UsersTab = ({
           <div role="dialog" aria-modal="true" aria-label="Account review" className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-xl">
             <div className="border-b border-soft px-6 py-4">
               <h3 className="text-lg font-semibold text-gray-900">
-                {accountAction.action === "promote" ? "Promote user to admin" : accountAction.action === "verify" ? "Review identity approval" : accountAction.action === "bulk_verify" ? "Verify selected users" : accountAction.action === "bulk_ban"
+                {accountAction.action === "bulk_promote" ? "Promote selected users to admin" : accountAction.action === "promote" ? "Promote user to admin" : accountAction.action === "verify" ? "Review identity approval" : accountAction.action === "bulk_verify" ? "Verify selected users" : accountAction.action === "bulk_ban"
                   ? "Ban selected users"
                   : accountAction.action === "ban"
                   ? "Ban user"
@@ -882,7 +886,7 @@ const UsersTab = ({
                   : "Unban user"}
               </h3>
               <p className="mt-1 text-sm text-gray-500">
-                {accountAction.action === "bulk_verify" ? `${selectedUsers.length} selected users will be checked and verified. Explain your review decision below.` : accountAction.action === "bulk_ban"
+                {accountAction.action === "bulk_promote" ? `${selectedUsers.length} selected accounts will receive admin access. Explain the approved appointment below.` : accountAction.action === "bulk_verify" ? `${selectedUsers.length} selected users will be checked and verified. Explain your review decision below.` : accountAction.action === "bulk_ban"
                   ? `${selectedUsers.length} selected user${selectedUsers.length === 1 ? "" : "s"} will be banned.`
                   : `${accountAction.user?.full_name || "This user"} (${accountAction.user?.email || "no email"})`}
               </p>
