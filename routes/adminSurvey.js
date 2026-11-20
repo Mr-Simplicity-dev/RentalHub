@@ -152,21 +152,26 @@ router.get('/export.pdf', async (req, res) => {
 router.get('/export.csv', async (req, res) => {
   try {
     const type = String(req.query.type || 'tenant').toLowerCase();
-    const { listResponses: list } = require('../services/surveyAnalysisService');
+    const { buildSurveyCsv } = require('../config/utils/surveyCsv');
 
     // Reuse analysis to get full rows? listResponses is paginated; instead
     // query directly here.
     const db = require('../config/middleware/database');
-    const rows = await db.query(
+    const result = await db.query(
       `SELECT sr.respondent_code, sr.source, sr.admin_mode, sr.admin_date,
-              s.state_name AS state, sr.lga_name,
+              s.state_name, sr.lga_name, sr.agent_user_id, sr.consent_flags,
+              u.full_name AS user_full_name, u.phone AS user_phone, u.email AS user_email,
               sr.respondent_name, sr.respondent_phone, sr.respondent_email,
               sr.respondent_location, sr.respondent_state_of_origin, sr.has_email,
-              sr.agent_name, sr.agent_phone, sr.agent_lga, sr.agent_location,
+              COALESCE(NULLIF(sr.agent_name,''),ag.full_name) AS agent_name,
+              COALESCE(NULLIF(sr.agent_phone,''),ag.phone) AS agent_phone,
+              COALESCE(NULLIF(sr.agent_lga,''),NULLIF(ag.assigned_lga,''),NULLIF(ag.assigned_city,'')) AS agent_lga, sr.agent_location,
               sr.created_at, sr.completed_at,
               sr.time_spent_seconds, sr.answers
        FROM survey_responses sr
        LEFT JOIN states s ON s.id = sr.state_id
+       LEFT JOIN users u ON u.id = sr.user_id
+       LEFT JOIN users ag ON ag.id = sr.agent_user_id
        WHERE sr.survey_type = $1 AND sr.completed_at IS NOT NULL AND sr.superseded_at IS NULL
        ORDER BY sr.created_at DESC`,
       [type]
@@ -175,48 +180,12 @@ router.get('/export.csv', async (req, res) => {
     const { getQuestions } = require('../config/survey');
     const questions = getQuestions(type);
 
-    const escape = (v) => {
-      const s = v === null || v === undefined ? '' : String(v);
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-
-    const header = [
-      'respondent_code', 'source', 'admin_mode', 'admin_date', 'state', 'lga',
-      'respondent_name', 'respondent_phone', 'respondent_email',
-      'respondent_location', 'respondent_state_of_origin',
-      'agent_name', 'agent_phone', 'agent_lga', 'agent_location',
-      'created_at', 'completed_at', 'time_spent_seconds',
-      ...questions.map((q) => q.key),
-    ];
-
-    const lines = [header.map(escape).join(',')];
-    for (const row of rows) {
-      const answers = row.answers || {};
-      lines.push(
-        [
-          row.respondent_code, row.source, row.admin_mode || '', row.admin_date || '',
-          row.state || '', row.lga_name || '',
-          row.respondent_name || '', row.respondent_phone || '',
-          row.has_email ? (row.respondent_email || '') : 'NO_EMAIL',
-          row.respondent_location || '', row.respondent_state_of_origin || '',
-          row.agent_name || '', row.agent_phone || '', row.agent_lga || '', row.agent_location || '',
-          row.created_at, row.completed_at || '',
-          row.time_spent_seconds || '',
-          ...questions.map((q) => {
-            const v = answers[q.key];
-            if (Array.isArray(v)) return escape(v.join('; '));
-            return escape(v);
-          }),
-        ].join(',')
-      );
-    }
-
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader(
       'Content-Disposition',
       `attachment; filename="survey-responses-${type}-${Date.now()}.csv"`
     );
-    return res.send('\uFEFF' + lines.join('\n'));
+    return res.send(buildSurveyCsv(result.rows, questions));
   } catch (error) {
     req.logger.error('Survey CSV export error:', error);
     return res.status(500).json({ success: false, message: 'Failed to export survey CSV' });

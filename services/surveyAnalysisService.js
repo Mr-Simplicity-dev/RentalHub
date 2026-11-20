@@ -19,7 +19,7 @@ const loadResponses = async ({ type, from, to, source, completedOnly = true }) =
 
   if (type) {
     params.push(type);
-    clauses.push(`sr.survey_type = ${params.length}`);
+    clauses.push(`sr.survey_type = $${params.length}`);
   }
   if (completedOnly) {
     clauses.push('sr.completed_at IS NOT NULL');
@@ -27,30 +27,34 @@ const loadResponses = async ({ type, from, to, source, completedOnly = true }) =
   clauses.push('sr.superseded_at IS NULL');
   if (from) {
     params.push(from);
-    clauses.push(`sr.completed_at >= ${params.length}`);
+    clauses.push(`sr.completed_at >= $${params.length}`);
   }
   if (to) {
     params.push(to);
-    clauses.push(`sr.completed_at <= ${params.length}`);
+    clauses.push(`sr.completed_at <= $${params.length}`);
   }
   if (source) {
     params.push(source);
-    clauses.push(`sr.source = ${params.length}`);
+    clauses.push(`sr.source = $${params.length}`);
   }
 
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
   const result = await db.query(
     `SELECT sr.*, u.user_type,
             s.state_name AS state_name,
-            u.email AS user_email, u.full_name AS user_full_name
+            u.email AS user_email, u.phone AS user_phone, u.full_name AS user_full_name,
+            COALESCE(NULLIF(sr.agent_name,''),ag.full_name) AS agent_name,
+            COALESCE(NULLIF(sr.agent_phone,''),ag.phone) AS agent_phone,
+            COALESCE(NULLIF(sr.agent_lga,''),NULLIF(ag.assigned_lga,''),NULLIF(ag.assigned_city,'')) AS agent_lga
      FROM survey_responses sr
      LEFT JOIN users u ON u.id = sr.user_id
+     LEFT JOIN users ag ON ag.id = sr.agent_user_id
      LEFT JOIN states s ON s.id = sr.state_id
      ${where}
      ORDER BY sr.completed_at DESC`,
     params
   );
-  return result.rows;
+  return result.rows.map(row => ({...row,...surveyResponse(row)}));
 };
 
 // ── Per-question frequencies ───────────────────────────────────────────────

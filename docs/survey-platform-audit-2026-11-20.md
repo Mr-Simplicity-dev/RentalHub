@@ -25,9 +25,9 @@ The screen was checked against its server route before the remaining changes. No
 
 ## Checks and evidence
 
-- Full backend suite: 311 passed, 0 failed. A further ZIP-directory test passed, bringing the checked backend cases to 312.
+- Full backend suite after the final export/query fixes: 316 passed, 0 failed.
 - Full web suite: 45 files, 233 passed, 0 failed.
-- Focused native parity/public-survey tests: 5 passed. Build compatibility: 2 passed.
+- Focused native parity/public-survey/build-compatibility tests: 7 passed on the server and locally on Windows.
 - Native registration, support, landlord survey progress and tour checks passed. Tour coverage: 87 steps, 8 locales and 32 roles.
 - Static contract scan: 675 production files; 1,097 backend routes; 1,611 fixed API calls; 173 native screens; 242 native navigation calls; 141 web routes; 546 web links. Zero parse errors, missing imports, unmatched fixed API paths, unmatched native navigation or unmatched web links. There are 34 dynamic calls; these need contextual review and are not proved by the static scan.
 - Production web build passed. Existing large-chunk and unused MediaPipe-runtime export warnings remain; the live-face implementation explicitly uses the tested TFJS runtime.
@@ -37,7 +37,7 @@ The screen was checked against its server route before the remaining changes. No
 
 ## Main implementation files
 
-Backend: `services/surveyService.js`, `services/surveyAnalysisService.js`, `config/utils/surveyContact.js`, `routes/adminSurvey.js`, `services/superAdmin/verificationService.js`, `services/superAdmin/schemaHelpers.js`, `services/superAdmin/userService.js`, `services/superAdmin/bulkActionService.js`, `services/adminService.js`, `config/utils/serviceTrackingAccess.js`, `config/middleware/auth.js`, `services/fumigationTrackingService.js`, `services/transportationTrackingService.js`, `routes/serviceTracking.js`, `routes/transportationDriver.js`, `routes/fumigationTeam.js`, `routes/fumigationCleaning.js`, `config/utils/archiveFactory.js`, `routes/adminConduct.js`, `services/recruitmentService.js`, `scripts/checkMobileApiContracts.js`, package manifests/locks.
+Backend: `services/surveyService.js`, `services/surveyAnalysisService.js`, `config/utils/surveyContact.js`, `config/utils/surveyCsv.js`, `routes/adminSurvey.js`, `services/superAdmin/verificationService.js`, `services/superAdmin/schemaHelpers.js`, `services/superAdmin/userService.js`, `services/superAdmin/bulkActionService.js`, `services/adminService.js`, `config/utils/serviceTrackingAccess.js`, `config/middleware/auth.js`, `services/fumigationTrackingService.js`, `services/transportationTrackingService.js`, `routes/serviceTracking.js`, `routes/transportationDriver.js`, `routes/fumigationTeam.js`, `routes/fumigationCleaning.js`, `config/utils/archiveFactory.js`, `routes/adminConduct.js`, `services/recruitmentService.js`, `scripts/checkMobileApiContracts.js`, package manifests/locks.
 
 Web: `client/src/components/admin/SurveyAdminPanel.jsx`, `client/src/components/survey/SurveyWizard.jsx`, `client/src/components/admin/TourMusicPlayer.jsx`, `client/src/components/admin/UsersTab.jsx`, `client/src/pages/SuperAdminDashboard.jsx`, `client/src/components/damage/DamageReportCard.jsx` and corresponding tests.
 
@@ -51,3 +51,9 @@ No new migration, environment variable or paid provider is required. The publish
 Web and backend fixes were deployed after tests. The server and mobile checkout were reconciled to the pushed commits. Only RentalHub processes 2 and 3 were reloaded. Public website: HTTP 200. Public API health: OK. Unsigned survey-administration access: HTTP 401. All 198 migrations are applied. A read-only live list check returned the linked respondent’s name, phone and email; uncollected origin remains marked missing. No survey rows were changed by that check. Self-completed online responses also use the Self-service label.
 
 Backup: /var/backups/rentalhub/platform-audit-20261120. The live build used its existing settings in place; no secret settings file was copied to the audit folder. The signed APK download remains unchanged.
+
+## Final analysis and export corrections
+
+The last route-to-query check found missing PostgreSQL parameter markers in analysis filters and a CSV route that iterated the query-result wrapper instead of its rows. Both were corrected. Tests now assert all four filter placeholders and execute the actual CSV route with a PostgreSQL-shaped result. CSV uses the same linked respondent and agent fields as the response table, quotes every field correctly, and neutralizes spreadsheet formulas. Completed-only export behaviour is preserved. The corrected tenant, landlord and date/source-filter queries were also run read-only against the actual database. No missing personal data was invented.
+
+Local package installation finished, all versioned patches applied, and the local parity checks passed. Both source repositories have no outstanding changes from this task.
