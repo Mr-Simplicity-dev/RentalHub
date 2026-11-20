@@ -23,7 +23,7 @@ router.get('/dashboard',
  * Get state admin transactions
  */
 router.get('/transactions',
-  requireStateAdmin,
+  requireStateDashboardAccess,
   async (req, res) => {
     try {
       const db = require('../config/middleware/database');
@@ -142,7 +142,7 @@ router.get('/transactions',
  * Get managed users
  */
 router.get('/managed-users',
-  requireStateAdmin,
+  requireStateDashboardAccess,
   async (req, res) => {
     try {
       const db = require('../config/middleware/database');
@@ -414,7 +414,7 @@ router.post('/withdraw',
  * Get withdrawal history
  */
 router.get('/withdrawals',
-  requireStateAdmin,
+  requireStateDashboardAccess,
   async (req, res) => {
     try {
       const db = require('../config/middleware/database');
