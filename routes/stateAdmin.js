@@ -3,7 +3,7 @@ const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const stateAdminController = require('../controllers/stateAdminController');
 const { authenticate } = require('../config/middleware/auth');
-const { requireStateAdmin } = require('../config/middleware/requireStateAdmin');
+const { requireStateAdmin, requireStateDashboardAccess } = require('../config/middleware/requireStateAdmin');
 const { requireWithdrawalFactor } = require('../config/utils/twoFactor');
 
 // ====================== AUTHENTICATION ======================
@@ -15,7 +15,7 @@ router.use(authenticate);
  * Get state admin dashboard
  */
 router.get('/dashboard',
-  requireStateAdmin,
+  requireStateDashboardAccess,
   stateAdminController.getStateAdminDashboard
 );
 

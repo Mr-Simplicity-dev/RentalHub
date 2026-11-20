@@ -626,7 +626,7 @@ exports.getStats = async (req, res) => {
                SELECT 1
                FROM properties sp
                JOIN states sp_st ON sp_st.id = sp.state_id
-               WHERE (sp.user_id = u.id OR sp.landlord_id = u.id)
+               WHERE sp.landlord_id = u.id
                  AND ${stateSql}${lgaSql}
              )
              OR EXISTS (
@@ -669,7 +669,7 @@ exports.getStats = async (req, res) => {
                SELECT 1
                FROM properties sp
                JOIN states sp_st ON sp_st.id = sp.state_id
-               WHERE (sp.user_id = u.id OR sp.landlord_id = u.id)
+               WHERE sp.landlord_id = u.id
                  AND ${stateSql}${lgaSql}
              )
              OR EXISTS (

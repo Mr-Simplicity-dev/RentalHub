@@ -28,7 +28,7 @@ router.get('/dashboard', async (req, res) => {
       db.query(`SELECT COUNT(*) FROM properties p JOIN states s ON s.id = p.state_id WHERE s.state_name = ANY($1)`, params),
       db.query(`SELECT COUNT(*) FROM applications a JOIN properties p ON p.id = a.property_id JOIN states s ON s.id = p.state_id WHERE s.state_name = ANY($1)`, params),
       db.query(`SELECT COUNT(DISTINCT scoped.user_id) FROM (
-          SELECT COALESCE(p.user_id, p.landlord_id) AS user_id
+          SELECT p.landlord_id AS user_id
           FROM properties p JOIN states s ON s.id = p.state_id WHERE s.state_name = ANY($1)
           UNION
           SELECT a.tenant_id AS user_id
