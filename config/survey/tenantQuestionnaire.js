@@ -43,7 +43,7 @@ const q = (key, section, part, type, prompt, options, extra = {}) => ({
   part,
   type,
   prompt: { en: prompt },
-  options: options ? options.map(([v, label]) => ({ v, en: label })) : null,
+  options: options ? options.map(option => { const [v,label] = Array.isArray(option) ? option : [String(option),String(option)]; return {v,en:label}; }) : null,
   required: extra.required !== false,
   ...extra,
 });
@@ -69,6 +69,9 @@ T.push(q('T0.3', 'T0', 'A', 'single', 'Do you voluntarily agree to participate i
 ], { endsOn: 'no', analysis: 'consent' }));
 
 // ── T1 Housing and respondent profile ─────────────────────────────────────
+T.push(q('T1.1', 'T1', 'A', 'text', "State where you currently live or are searching:", null, { analysis: 'profile' }));
+T.push(q('T1.2', 'T1', 'A', 'text', "LGA / city / town:", null, { analysis: 'profile' }));
+
 T.push(q('T1.3', 'T1', 'A', 'single', 'Area type:', [
   ['metro', 'Major city/metropolitan'],
   ['urban', 'Other urban area'],
@@ -542,6 +545,7 @@ T.push(q('T7.2', 'T7', 'B', 'single', 'Based only on the description above, how 
 });
 
 T.push(q('T7.15', 'T7', 'B', 'rank', 'Which THREE functions above would most influence you to try Amana RentalHub NG? Write the numbers:', null, {
+  minPicks: 3,
   maxPicks: 3,
   analysis: 'feature',
   rankSource: ['T7.3', 'T7.4', 'T7.5', 'T7.6', 'T7.7', 'T7.8', 'T7.9', 'T7.10', 'T7.11', 'T7.12', 'T7.13', 'T7.14'],

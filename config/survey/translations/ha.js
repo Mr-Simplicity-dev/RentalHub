@@ -1,5 +1,9 @@
 module.exports = {
   prompts: {
+    "T1.1": "Jihar da kake zama ko neman gida:",
+    "T1.2": "Karamar hukuma / birni / gari:",
+    "L1.1": "Jihar da yawancin gidajen hayarka suke:",
+    "L1.2": "Karamar hukuma / birni / gari:",
     'T0.1': 'Shin kun cika shekara 18 ko fiye?',
     'T0.2': 'Wanne daga cikin waɗannan ya fi dacewa da kai?',
     'T0.3': 'Shin da yardar kai kuna amincewa da shiga wannan binciken kasuwa wanda ba a bayyana sunayen mahalarta ba?',

@@ -1,5 +1,9 @@
 ﻿module.exports = {
   prompts: {
+    "T1.1": "Ìpínlẹ̀ tí o ń gbé tàbí tí o ti ń wá ilé:",
+    "T1.2": "Ìjọba ìbílẹ̀ / ìlú:",
+    "L1.1": "Ìpínlẹ̀ tí ọ̀pọ̀ jù lọ ilé yíyálò rẹ wà:",
+    "L1.2": "Ìjọba ìbílẹ̀ / ìlú:",
     // ── Tenant T0: Consent and eligibility ──
     'T0.1': 'Ṣé ó tẹ́ ọ lọ́dún mẹ́tàdínlógún (18) tàbí ju bẹ́ẹ̀ lọ?',
     'T0.2': 'Èwo nínú wọ̀nyí ni ó ṣàpèjúwe ọ pérépéré?',

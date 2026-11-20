@@ -1,5 +1,9 @@
 ﻿module.exports = {
   prompts: {
+    "T1.1": "Steeti ebe i bi ma ọ bụ na-achọ ụlọ:",
+    "T1.2": "Okpuru ọchịchị / obodo:",
+    "L1.1": "Steeti ebe ọtụtụ ụlọ mgbazinye gị dị:",
+    "L1.2": "Okpuru ọchịchị / obodo:",
     'T0.1': 'Ị gbara afọ iri na asatọ ma ọ bụ karịa?',
     'T0.2': 'Olee otu n’ime ndị a kacha akọwa gị?',
     'T0.3': 'Ị ji obi gị niile kweta isonye na nyocha a nke e mere maka ahịa, nke anaghị egosipụta aha onye zara ya?',

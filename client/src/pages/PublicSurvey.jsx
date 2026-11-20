@@ -866,7 +866,7 @@ const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
             {t('public_survey.title', 'Amana RentalHub NG Research Survey')}
           </h1>
           <p className="mt-2 text-sm text-gray-600">
-            {t('public_survey.subtitle', 'Help us understand how Nigerians find and pay for rental homes. Your answers are anonymous and used only for research. Estimated time: 15–20 minutes.')}
+            {t('public_survey.subtitle', 'Help us understand how Nigerians find and pay for rental homes. Your answers are confidential. Authorised RentalHub staff can see the contact details you provide. Estimated time: 15–20 minutes.')}
           </p>
 
           {hasDraft && (

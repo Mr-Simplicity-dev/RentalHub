@@ -158,7 +158,7 @@ router.get('/export.csv', async (req, res) => {
     // query directly here.
     const db = require('../config/middleware/database');
     const result = await db.query(
-      `SELECT sr.respondent_code, sr.source, sr.admin_mode, sr.admin_date,
+      `SELECT sr.survey_type, sr.respondent_code, sr.source, sr.admin_mode, sr.admin_date,
               s.state_name, sr.lga_name, sr.agent_user_id, sr.consent_flags,
               u.full_name AS user_full_name, u.phone AS user_phone, u.email AS user_email,
               sr.respondent_name, sr.respondent_phone, sr.respondent_email,

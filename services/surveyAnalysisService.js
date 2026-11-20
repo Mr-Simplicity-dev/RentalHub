@@ -616,6 +616,8 @@ exports.paperEntry = async (req, res) => {
       if (stateMatch.rows.length) resolvedStateId = stateMatch.rows[0].id;
     }
 
+    if(req.body.mark_complete){const missing=survey.getMissingQuestions(type,answers||{});if(missing.length)return res.status(400).json({success:false,code:'SURVEY_INCOMPLETE',message:'Complete all required questions before marking this response complete.',missing_fields:missing});}
+
     const insert = await db.query(
       `INSERT INTO survey_responses
          (survey_type, survey_version, respondent_code, source,

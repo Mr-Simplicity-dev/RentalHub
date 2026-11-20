@@ -1,0 +1,1834 @@
+[
+  {
+    "key": "T0.1",
+    "prompt": "Are you 18 years or older?",
+    "options": [
+      "Yes",
+      "No — end survey"
+    ]
+  },
+  {
+    "key": "T0.2",
+    "prompt": "Which best describes you?",
+    "options": [
+      "Currently renting a home",
+      "Actively looking for a rental home",
+      "Rented a home within the last 24 months",
+      "None of these — end survey"
+    ]
+  },
+  {
+    "key": "T0.3",
+    "prompt": "Do you voluntarily agree to participate in this anonymous market-research survey?",
+    "options": [
+      "Yes",
+      "No — end survey"
+    ]
+  },
+  {
+    "key": "T1.1",
+    "prompt": "State where you currently live or are searching: ______________________________",
+    "options": []
+  },
+  {
+    "key": "T1.2",
+    "prompt": "LGA / city / town: __________________________________________________________",
+    "options": []
+  },
+  {
+    "key": "T1.3",
+    "prompt": "Area type:",
+    "options": [
+      "Major city/metropolitan",
+      "Other urban area",
+      "Peri-urban",
+      "Town",
+      "Rural",
+      "Not sure"
+    ]
+  },
+  {
+    "key": "T1.4",
+    "prompt": "Age group:",
+    "options": [
+      "18–24",
+      "25–34",
+      "35–44",
+      "45–54",
+      "55+",
+      "Prefer not to say"
+    ]
+  },
+  {
+    "key": "T1.5",
+    "prompt": "Main work/income situation:",
+    "options": [
+      "Salaried employment",
+      "Self-employed/business",
+      "Student",
+      "Casual/gig work",
+      "Unemployed/job-seeking",
+      "Retired",
+      "Other",
+      "Prefer not to say"
+    ]
+  },
+  {
+    "key": "T1.6",
+    "prompt": "Approximate monthly household income:",
+    "options": [
+      "Below ₦100,000",
+      "₦100,000–₦249,999",
+      "₦250,000–₦499,999",
+      "₦500,000–₦999,999",
+      "₦1,000,000+",
+      "Irregular/varies",
+      "Prefer not to say"
+    ]
+  },
+  {
+    "key": "T1.7",
+    "prompt": "Current/most recent home type:",
+    "options": [
+      "Room/self-contained",
+      "1-bedroom",
+      "2-bedroom",
+      "3-bedroom",
+      "4+ bedroom",
+      "Shared apartment",
+      "Duplex/house",
+      "Other"
+    ]
+  },
+  {
+    "key": "T1.8",
+    "prompt": "Current/most recent annualised rent band:",
+    "options": [
+      "Below ₦300,000",
+      "₦300,000–₦599,999",
+      "₦600,000–₦999,999",
+      "₦1m–₦1.99m",
+      "₦2m–₦4.99m",
+      "₦5m+",
+      "Prefer not to say"
+    ]
+  },
+  {
+    "key": "T1.9",
+    "prompt": "How is/was the rent normally demanded?",
+    "options": [
+      "Monthly",
+      "Quarterly",
+      "6-monthly",
+      "Yearly",
+      "More than one year upfront",
+      "Other"
+    ]
+  },
+  {
+    "key": "T1.10",
+    "prompt": "How many people live in the household?",
+    "options": [
+      "1",
+      "2",
+      "3–4",
+      "5–6",
+      "7+"
+    ]
+  },
+  {
+    "key": "T1.11",
+    "prompt": "How many times have you searched for a rental property in the last five years?",
+    "options": [
+      "0",
+      "1",
+      "2",
+      "3–4",
+      "5+"
+    ]
+  },
+  {
+    "key": "T1.12",
+    "prompt": "Do you usually search personally or through someone else?",
+    "options": [
+      "Personally",
+      "Agent",
+      "Family/friend",
+      "Employer/institution",
+      "A mix of these"
+    ]
+  },
+  {
+    "key": "T2.1",
+    "prompt": "Where have you searched for rental property? Select all that apply.",
+    "options": [
+      "Estate/house agents",
+      "WhatsApp groups",
+      "Facebook/Instagram/TikTok",
+      "Property websites/apps",
+      "Signs on properties/streets",
+      "Friends/family/colleagues",
+      "Landlord directly",
+      "Community contacts",
+      "Other"
+    ]
+  },
+  {
+    "key": "T2.2",
+    "prompt": "Which ONE source do you trust most for finding a real property?",
+    "options": [
+      "Agent",
+      "Online platform/app",
+      "Friend/family",
+      "Landlord directly",
+      "Street signs",
+      "Community contact",
+      "None consistently"
+    ]
+  },
+  {
+    "key": "T2.3",
+    "prompt": "How long did your last serious property search take?",
+    "options": [
+      "Same day",
+      "2–7 days",
+      "1–4 weeks",
+      "1–3 months",
+      "More than 3 months",
+      "Still searching"
+    ]
+  },
+  {
+    "key": "T2.4",
+    "prompt": "About how many properties did you inspect before choosing one?",
+    "options": [
+      "0",
+      "1",
+      "2–3",
+      "4–6",
+      "7–10",
+      "More than 10"
+    ]
+  },
+  {
+    "key": "T2.5",
+    "prompt": "Roughly how much did you spend on transport, inspection charges, calls/data and other search costs before securing your last home?",
+    "options": [
+      "₦0–₦4,999",
+      "₦5,000–₦19,999",
+      "₦20,000–₦49,999",
+      "₦50,000–₦99,999",
+      "₦100,000+",
+      "Not sure/prefer not to say"
+    ]
+  },
+  {
+    "key": "T2.6",
+    "prompt": "I see the same property advertised by several different agents.",
+    "options": []
+  },
+  {
+    "key": "T2.7",
+    "prompt": "Agents sometimes advertise properties that are already taken or unavailable.",
+    "options": []
+  },
+  {
+    "key": "T2.8",
+    "prompt": "Property photos/descriptions often fail to match what I see at inspection.",
+    "options": []
+  },
+  {
+    "key": "T2.9",
+    "prompt": "It is difficult to know who is genuinely authorised to rent out a property.",
+    "options": []
+  },
+  {
+    "key": "T2.10",
+    "prompt": "House hunting takes too much time away from work, business, school or family.",
+    "options": []
+  },
+  {
+    "key": "T2.11",
+    "prompt": "I often have to travel long distances before learning that a property is unsuitable.",
+    "options": []
+  },
+  {
+    "key": "T2.12",
+    "prompt": "I find it difficult to compare total move-in costs across properties.",
+    "options": []
+  },
+  {
+    "key": "T3.1",
+    "prompt": "For your most recent rental, what did you have to pay before moving in? Select all that apply.",
+    "options": [
+      "Rent in advance",
+      "Agency/commission fee",
+      "Agreement/legal fee",
+      "Caution/security deposit",
+      "Service charge",
+      "Inspection fee",
+      "Application/form fee",
+      "Estate/association fee",
+      "Utility deposit",
+      "Other"
+    ]
+  },
+  {
+    "key": "T3.2",
+    "prompt": "Were all charges clearly disclosed before you committed to the property?",
+    "options": [
+      "Yes, completely",
+      "Mostly",
+      "Partly",
+      "No",
+      "Not sure"
+    ]
+  },
+  {
+    "key": "T3.3",
+    "prompt": "Have you ever been asked to pay more than one year of rent upfront?",
+    "options": [
+      "Yes",
+      "No",
+      "Prefer not to say"
+    ]
+  },
+  {
+    "key": "T3.4",
+    "prompt": "If yes, what happened?",
+    "options": [
+      "I paid it",
+      "I negotiated it down",
+      "I borrowed money to meet it",
+      "I lost the property because I could not pay",
+      "I walked away",
+      "Not applicable",
+      "Other"
+    ]
+  },
+  {
+    "key": "T3.5",
+    "prompt": "Have inspection fees ever prevented you from viewing properties you might otherwise have considered?",
+    "options": [
+      "Never",
+      "Rarely",
+      "Sometimes",
+      "Often",
+      "Very often"
+    ]
+  },
+  {
+    "key": "T3.6",
+    "prompt": "Have you ever paid inspection fees for a property that turned out to be unavailable, misleading or clearly unsuitable?",
+    "options": [
+      "Yes",
+      "No",
+      "Not sure"
+    ]
+  },
+  {
+    "key": "T3.7",
+    "prompt": "Have you ever paid agency/commission to more than one intermediary during one search?",
+    "options": [
+      "Yes",
+      "No",
+      "Not sure"
+    ]
+  },
+  {
+    "key": "T3.8",
+    "prompt": "Have you ever paid a rental-related charge without receiving a proper receipt or written record?",
+    "options": [
+      "Yes",
+      "No",
+      "Not sure"
+    ]
+  },
+  {
+    "key": "T3.9",
+    "prompt": "Raising a large annual rent payment at once is difficult for my household.",
+    "options": []
+  },
+  {
+    "key": "T3.10",
+    "prompt": "Extra charges make the real move-in cost much higher than the advertised rent.",
+    "options": []
+  },
+  {
+    "key": "T3.11",
+    "prompt": "I would prefer a clearly itemised total price before I inspect or apply.",
+    "options": []
+  },
+  {
+    "key": "T3.12",
+    "prompt": "I would prefer more flexible rent-payment options if they were legitimate and transparent.",
+    "options": []
+  },
+  {
+    "key": "T3.13",
+    "prompt": "I have delayed moving because I could not raise the full upfront amount.",
+    "options": []
+  },
+  {
+    "key": "T3.14",
+    "prompt": "I have borrowed or sold assets to meet rental costs.",
+    "options": []
+  },
+  {
+    "key": "T4.1",
+    "prompt": "Have you personally lost money to a fake rental listing, fake landlord, fake agent, duplicate payment or similar rental scam?",
+    "options": [
+      "Yes",
+      "No",
+      "Prefer not to say"
+    ]
+  },
+  {
+    "key": "T4.2",
+    "prompt": "Has someone close to you experienced such a rental scam?",
+    "options": [
+      "Yes",
+      "No",
+      "Not sure"
+    ]
+  },
+  {
+    "key": "T4.3",
+    "prompt": "Before paying for a rental, how confident are you that you can verify the landlord/agent and the property?",
+    "options": [
+      "Very confident",
+      "Somewhat confident",
+      "Neither",
+      "Not very confident",
+      "Not at all confident"
+    ]
+  },
+  {
+    "key": "T4.4",
+    "prompt": "Which checks do you normally perform before paying? Select all that apply.",
+    "options": [
+      "Visit the property",
+      "Ask neighbours/security",
+      "Request landlord ID",
+      "Request agent ID/authority",
+      "Check ownership/property documents",
+      "Use a lawyer",
+      "Search online",
+      "Ask family/friends",
+      "I do not normally verify",
+      "Other"
+    ]
+  },
+  {
+    "key": "T4.5",
+    "prompt": "Which verification matters most to you?",
+    "options": [
+      "Property is real and available",
+      "Person collecting money is authorised",
+      "Landlord/agent identity",
+      "Property/legal documents",
+      "Bank/payment recipient identity",
+      "Previous tenant/reputation information",
+      "All are equally important"
+    ]
+  },
+  {
+    "key": "T4.6",
+    "prompt": "I would be more willing to use an online rental platform if identities were verified.",
+    "options": []
+  },
+  {
+    "key": "T4.7",
+    "prompt": "A “verified” badge alone is not enough; I would want to know what was actually checked.",
+    "options": []
+  },
+  {
+    "key": "T4.8",
+    "prompt": "I worry that online rental platforms can also contain fake or stale listings.",
+    "options": []
+  },
+  {
+    "key": "T4.9",
+    "prompt": "I would prefer payments that create a traceable digital record.",
+    "options": []
+  },
+  {
+    "key": "T4.10",
+    "prompt": "I would still inspect a property physically even if it were verified online.",
+    "options": []
+  },
+  {
+    "key": "T4.11",
+    "prompt": "I would distrust a platform that does not clearly explain fees and complaint procedures.",
+    "options": []
+  },
+  {
+    "key": "T5.1",
+    "prompt": "Which problems have you experienced in a rented home? Select all that apply.",
+    "options": [
+      "Water supply problems",
+      "Electricity/wiring problems",
+      "Plumbing/leakage",
+      "Damp/flooding",
+      "Security problems",
+      "Poor waste disposal",
+      "Structural defects",
+      "Pests",
+      "Noise/neighbour issues",
+      "None",
+      "Other"
+    ]
+  },
+  {
+    "key": "T5.2",
+    "prompt": "When a serious repair is needed, who usually pays first?",
+    "options": [
+      "Landlord",
+      "Tenant",
+      "Depends on the repair",
+      "Unclear/disputed",
+      "Not applicable"
+    ]
+  },
+  {
+    "key": "T5.3",
+    "prompt": "How quickly does/did your landlord or agent respond to serious repair complaints?",
+    "options": [
+      "Same day",
+      "1–3 days",
+      "4–7 days",
+      "More than a week",
+      "Often not resolved",
+      "Not applicable"
+    ]
+  },
+  {
+    "key": "T5.4",
+    "prompt": "Have you ever paid for a repair you believed the landlord should have handled?",
+    "options": [
+      "Yes",
+      "No",
+      "Not sure"
+    ]
+  },
+  {
+    "key": "T5.5",
+    "prompt": "Have you ever had a dispute over a caution/security deposit?",
+    "options": [
+      "Yes — not refunded",
+      "Yes — deductions disputed",
+      "Yes — delayed refund",
+      "No",
+      "Not applicable"
+    ]
+  },
+  {
+    "key": "T5.6",
+    "prompt": "Have you ever received a rent increase that you considered sudden or difficult to justify?",
+    "options": [
+      "Yes",
+      "No",
+      "Not sure"
+    ]
+  },
+  {
+    "key": "T5.7",
+    "prompt": "Have you ever had a serious disagreement with a landlord/agent about notice, eviction, rent, damage, repairs or access to the property?",
+    "options": [
+      "Yes",
+      "No",
+      "Prefer not to say"
+    ]
+  },
+  {
+    "key": "T5.8",
+    "prompt": "If a serious dispute occurred, what did you do? Select all that apply.",
+    "options": [
+      "Negotiated directly",
+      "Used family/community leaders",
+      "Used an agent",
+      "Used a lawyer",
+      "Police/security involvement",
+      "Court/tribunal",
+      "Moved out",
+      "Did nothing",
+      "Not applicable",
+      "Other"
+    ]
+  },
+  {
+    "key": "T5.9",
+    "prompt": "Written records of complaints and responses would help reduce disputes.",
+    "options": []
+  },
+  {
+    "key": "T5.10",
+    "prompt": "Digital rent receipts and payment history would be useful to me.",
+    "options": []
+  },
+  {
+    "key": "T5.11",
+    "prompt": "Photo/video evidence with dates would help in damage or repair disputes.",
+    "options": []
+  },
+  {
+    "key": "T5.12",
+    "prompt": "I would value access to verified legal professionals when a dispute becomes serious.",
+    "options": []
+  },
+  {
+    "key": "T5.13",
+    "prompt": "I am confident I understand my tenancy agreement before signing it.",
+    "options": []
+  },
+  {
+    "key": "T5.14",
+    "prompt": "I normally receive and keep a copy of my tenancy agreement.",
+    "options": []
+  },
+  {
+    "key": "T6.1",
+    "prompt": "Which device do you mainly use to access the internet?",
+    "options": [
+      "Android phone",
+      "iPhone",
+      "Laptop/desktop",
+      "Shared device",
+      "Rarely use internet"
+    ]
+  },
+  {
+    "key": "T6.2",
+    "prompt": "How reliable is your mobile data/internet for important transactions?",
+    "options": [
+      "Very reliable",
+      "Mostly reliable",
+      "Mixed",
+      "Often unreliable",
+      "Very unreliable"
+    ]
+  },
+  {
+    "key": "T6.3",
+    "prompt": "Which rental payment method do you prefer?",
+    "options": [
+      "Bank transfer",
+      "Cash",
+      "POS",
+      "USSD",
+      "Card/online payment",
+      "Direct debit/standing instruction",
+      "No preference",
+      "Other"
+    ]
+  },
+  {
+    "key": "T6.4",
+    "prompt": "Would you complete identity verification on a rental platform if it reduced fraud and was handled securely?",
+    "options": [
+      "Definitely yes",
+      "Probably yes",
+      "Unsure",
+      "Probably no",
+      "Definitely no"
+    ]
+  },
+  {
+    "key": "T6.5",
+    "prompt": "What would make you refuse online identity verification? Select all that apply.",
+    "options": [
+      "Privacy concerns",
+      "Fear of data leaks",
+      "Do not trust the company",
+      "Too much effort",
+      "No acceptable ID",
+      "Cost",
+      "Poor internet",
+      "I would not refuse if well explained",
+      "Other"
+    ]
+  },
+  {
+    "key": "T6.6",
+    "prompt": "Would you upload property-related documents/evidence to an online platform during a dispute?",
+    "options": [
+      "Yes",
+      "Maybe",
+      "No"
+    ]
+  },
+  {
+    "key": "T6.7",
+    "prompt": "How comfortable are you making a high-value rental payment through a platform rather than paying directly to a landlord/agent?",
+    "options": [
+      "Very comfortable",
+      "Somewhat comfortable",
+      "Unsure",
+      "Uncomfortable",
+      "Very uncomfortable"
+    ]
+  },
+  {
+    "key": "T6.8",
+    "prompt": "What would you need before making such a payment?",
+    "options": [
+      "Clear recipient details",
+      "Receipt/reference",
+      "Refund/dispute procedure",
+      "Verified landlord/property",
+      "Strong security information",
+      "Customer support",
+      "All of these",
+      "I would still pay directly"
+    ]
+  },
+  {
+    "key": "T7.1",
+    "prompt": "Before today, had you heard of RentalHub NG with the website rentalhub.com.ng?",
+    "options": [
+      "Yes",
+      "No",
+      "Not sure"
+    ]
+  },
+  {
+    "key": "T7.2",
+    "prompt": "Based only on the description above, how useful does the overall idea seem for your own rental needs?",
+    "options": [
+      "Very useful",
+      "Useful",
+      "Neither",
+      "Not very useful",
+      "Not useful at all"
+    ]
+  },
+  {
+    "key": "T7.3",
+    "prompt": "Verified property/landlord/agent information with an explanation of what was verified.",
+    "options": []
+  },
+  {
+    "key": "T7.4",
+    "prompt": "Searchable rental listings with clear photos, location and total costs.",
+    "options": []
+  },
+  {
+    "key": "T7.5",
+    "prompt": "Ability to request the type/location/budget of property you need.",
+    "options": []
+  },
+  {
+    "key": "T7.6",
+    "prompt": "Digital rental application and status tracking.",
+    "options": []
+  },
+  {
+    "key": "T7.7",
+    "prompt": "In-platform messaging and documented communication.",
+    "options": []
+  },
+  {
+    "key": "T7.8",
+    "prompt": "Digital payment history, receipts and references.",
+    "options": []
+  },
+  {
+    "key": "T7.9",
+    "prompt": "Rent Savings tools for gradually preparing for future rent obligations.",
+    "options": []
+  },
+  {
+    "key": "T7.10",
+    "prompt": "Evidence/document storage for rental disputes.",
+    "options": []
+  },
+  {
+    "key": "T7.11",
+    "prompt": "Access to legal-support/lawyer options when needed.",
+    "options": []
+  },
+  {
+    "key": "T7.12",
+    "prompt": "Transportation/moving support connected to a rental move.",
+    "options": []
+  },
+  {
+    "key": "T7.13",
+    "prompt": "Fumigation/cleaning booking connected to a property.",
+    "options": []
+  },
+  {
+    "key": "T7.14",
+    "prompt": "Saved properties and alerts for relevant listings.",
+    "options": []
+  },
+  {
+    "key": "T7.15",
+    "prompt": "Which THREE functions above would most influence you to try RentalHub NG? Write the numbers: ________  ________  ________",
+    "options": []
+  },
+  {
+    "key": "T7.16",
+    "prompt": "Which functions would you probably never use?",
+    "options": []
+  },
+  {
+    "key": "T7.17",
+    "prompt": "What important rental problem is missing from the concept?",
+    "options": []
+  },
+  {
+    "key": "T8.1",
+    "prompt": "If RentalHub NG had suitable verified listings in your area today, how likely would you be to create an account?",
+    "options": [
+      "Definitely would",
+      "Probably would",
+      "Not sure",
+      "Probably would not",
+      "Definitely would not"
+    ]
+  },
+  {
+    "key": "T8.2",
+    "prompt": "How likely would you be to use RentalHub NG as your FIRST place to search for your next home?",
+    "options": [
+      "Very likely",
+      "Likely",
+      "Unsure",
+      "Unlikely",
+      "Very unlikely"
+    ]
+  },
+  {
+    "key": "T8.3",
+    "prompt": "Would you still use agents outside RentalHub NG?",
+    "options": [
+      "Yes, definitely",
+      "Probably",
+      "Only if I cannot find a property",
+      "Probably not",
+      "No"
+    ]
+  },
+  {
+    "key": "T8.4",
+    "prompt": "Would you invite a landlord/agent to use RentalHub NG if the property you wanted was not listed there?",
+    "options": [
+      "Yes",
+      "Maybe",
+      "No"
+    ]
+  },
+  {
+    "key": "T8.5",
+    "prompt": "What would stop you from using RentalHub NG? Select all that apply.",
+    "options": [
+      "Too few listings",
+      "I trust offline agents more",
+      "Verification feels intrusive",
+      "Fees are too high",
+      "Poor customer support",
+      "Fear of scams/data loss",
+      "App/site is difficult to use",
+      "I prefer cash/direct payment",
+      "Poor internet/data cost",
+      "No presence in my area",
+      "Nothing if it works well",
+      "Other"
+    ]
+  },
+  {
+    "key": "T8.6",
+    "prompt": "Which charging model would you find most acceptable for tenant-facing services?",
+    "options": [
+      "Free search; pay only for optional premium services",
+      "Small fixed service fee",
+      "Percentage of completed transaction",
+      "Subscription",
+      "Advertising-supported/free",
+      "I would not pay RentalHub",
+      "Not sure"
+    ]
+  },
+  {
+    "key": "T8.7",
+    "prompt": "What is the maximum one-off platform/service fee you would personally consider reasonable for a successful rental transaction, excluding rent and legitimate third-party charges?",
+    "options": [
+      "₦0",
+      "Below ₦2,000",
+      "₦2,000–₦4,999",
+      "₦5,000–₦9,999",
+      "₦10,000–₦24,999",
+      "₦25,000+",
+      "Only if it replaces other fees",
+      "Not sure"
+    ]
+  },
+  {
+    "key": "T8.8",
+    "prompt": "Would you pay for a clearly disclosed verification or legal-support service if optional?",
+    "options": [
+      "Yes",
+      "Maybe",
+      "No",
+      "Depends on amount"
+    ]
+  },
+  {
+    "key": "T8.9",
+    "prompt": "How likely are you to recommend RentalHub to another renter IF it consistently solved the problems you rated most important?  (0 = not at all likely; 10 = extremely likely)",
+    "options": [
+      "0",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "10"
+    ]
+  },
+  {
+    "key": "T8.10",
+    "prompt": "What single failure would make you stop trusting RentalHub immediately?",
+    "options": []
+  },
+  {
+    "key": "T9.1",
+    "prompt": "Tell us about the worst rental-search experience you have had in Nigeria.",
+    "options": []
+  },
+  {
+    "key": "T9.2",
+    "prompt": "What is the most unfair or wasteful cost you have faced while renting?",
+    "options": []
+  },
+  {
+    "key": "T9.3",
+    "prompt": "What is one thing agents do that you most want changed?",
+    "options": []
+  },
+  {
+    "key": "T9.4",
+    "prompt": "What is one thing landlords do that you most want changed?",
+    "options": []
+  },
+  {
+    "key": "T9.5",
+    "prompt": "What should a rental platform do to earn your trust before you pay anyone through it?",
+    "options": []
+  },
+  {
+    "key": "T9.6",
+    "prompt": "What should RentalHub NG NEVER do?",
+    "options": []
+  },
+  {
+    "key": "T9.7",
+    "prompt": "If you could redesign renting in Nigeria, what would you change first?",
+    "options": []
+  },
+  {
+    "key": "T9.8",
+    "prompt": "Any other comment you want the RentalHub NG team to hear?",
+    "options": []
+  },
+  {
+    "key": "L0.1",
+    "prompt": "Are you 18 years or older?",
+    "options": [
+      "Yes",
+      "No — end survey"
+    ]
+  },
+  {
+    "key": "L0.2",
+    "prompt": "Do you currently own residential property that is rented out, available for rent, or has been rented within the last 24 months?",
+    "options": [
+      "Yes",
+      "No — end survey"
+    ]
+  },
+  {
+    "key": "L0.3",
+    "prompt": "Do you voluntarily agree to participate in this anonymous market-research survey?",
+    "options": [
+      "Yes",
+      "No — end survey"
+    ]
+  },
+  {
+    "key": "L1.1",
+    "prompt": "State where most of your rental property is located: ______________________________",
+    "options": []
+  },
+  {
+    "key": "L1.2",
+    "prompt": "LGA / city / town: ______________________________________________________________",
+    "options": []
+  },
+  {
+    "key": "L1.3",
+    "prompt": "How many residential rental units do you own?",
+    "options": [
+      "1",
+      "2–3",
+      "4–10",
+      "11–25",
+      "26+"
+    ]
+  },
+  {
+    "key": "L1.4",
+    "prompt": "How long have you been a landlord?",
+    "options": [
+      "Under 1 year",
+      "1–3 years",
+      "4–7 years",
+      "8–15 years",
+      "16+ years"
+    ]
+  },
+  {
+    "key": "L1.5",
+    "prompt": "Main type of rental property:",
+    "options": [
+      "Rooms/self-contained",
+      "Flats/apartments",
+      "Duplexes/houses",
+      "Shared/student housing",
+      "Mixed portfolio",
+      "Other"
+    ]
+  },
+  {
+    "key": "L1.6",
+    "prompt": "Typical annual rent per unit:",
+    "options": [
+      "Below ₦300,000",
+      "₦300,000–₦599,999",
+      "₦600,000–₦999,999",
+      "₦1m–₦1.99m",
+      "₦2m–₦4.99m",
+      "₦5m+",
+      "Prefer not to say"
+    ]
+  },
+  {
+    "key": "L1.7",
+    "prompt": "How do you mainly manage tenants?",
+    "options": [
+      "Directly myself",
+      "Family/staff",
+      "Estate/house agent",
+      "Professional property manager",
+      "Combination"
+    ]
+  },
+  {
+    "key": "L1.8",
+    "prompt": "How do you mainly find new tenants?",
+    "options": [
+      "Agent",
+      "Referrals",
+      "WhatsApp/social media",
+      "Property website/app",
+      "Signboard/offline advertising",
+      "Existing tenants",
+      "Other"
+    ]
+  },
+  {
+    "key": "L1.9",
+    "prompt": "What rent-payment period do you usually request?",
+    "options": [
+      "Monthly",
+      "Quarterly",
+      "6-monthly",
+      "Yearly",
+      "More than one year upfront",
+      "Varies by tenant/property"
+    ]
+  },
+  {
+    "key": "L1.10",
+    "prompt": "Do you normally use a written tenancy agreement?",
+    "options": [
+      "Always",
+      "Usually",
+      "Sometimes",
+      "Rarely",
+      "Never"
+    ]
+  },
+  {
+    "key": "L1.11",
+    "prompt": "Do you issue receipts/payment records?",
+    "options": [
+      "Always",
+      "Usually",
+      "Sometimes",
+      "Rarely",
+      "Never"
+    ]
+  },
+  {
+    "key": "L1.12",
+    "prompt": "Approximate current vacancy in your portfolio:",
+    "options": [
+      "0%",
+      "1–10%",
+      "11–25%",
+      "26–50%",
+      "More than 50%",
+      "Not sure"
+    ]
+  },
+  {
+    "key": "L2.1",
+    "prompt": "How long does it normally take to fill a vacant unit?",
+    "options": [
+      "Under 1 week",
+      "1–4 weeks",
+      "1–3 months",
+      "More than 3 months",
+      "Varies greatly"
+    ]
+  },
+  {
+    "key": "L2.2",
+    "prompt": "What is your biggest cost when a property stays vacant?",
+    "options": [
+      "Lost rent",
+      "Security",
+      "Cleaning/maintenance",
+      "Utilities/service charge",
+      "Agent/advertising cost",
+      "Risk of damage/vandalism",
+      "Other"
+    ]
+  },
+  {
+    "key": "L2.3",
+    "prompt": "Have agents ever advertised your property without your permission or after it was no longer available?",
+    "options": [
+      "Yes",
+      "No",
+      "Not sure"
+    ]
+  },
+  {
+    "key": "L2.4",
+    "prompt": "Have different agents ever advertised your property at different rents or fees?",
+    "options": [
+      "Yes",
+      "No",
+      "Not sure"
+    ]
+  },
+  {
+    "key": "L2.5",
+    "prompt": "Have you ever had a dispute with an agent over commission, tenant money, misrepresentation or communication?",
+    "options": [
+      "Yes",
+      "No",
+      "Prefer not to say"
+    ]
+  },
+  {
+    "key": "L2.6",
+    "prompt": "I find it difficult to know which agent has actually brought a serious tenant.",
+    "options": []
+  },
+  {
+    "key": "L2.7",
+    "prompt": "Unprofessional agents can damage a landlord’s reputation with prospective tenants.",
+    "options": []
+  },
+  {
+    "key": "L2.8",
+    "prompt": "Repeated inspections by unserious prospects waste time and resources.",
+    "options": []
+  },
+  {
+    "key": "L2.9",
+    "prompt": "I would prefer a transparent record of who introduced each applicant.",
+    "options": []
+  },
+  {
+    "key": "L2.10",
+    "prompt": "I would prefer to see applicant information before scheduling an inspection.",
+    "options": []
+  },
+  {
+    "key": "L2.11",
+    "prompt": "Vacancy is a major enough problem that I would try a new platform if it produced serious applicants.",
+    "options": []
+  },
+  {
+    "key": "L2.12",
+    "prompt": "I worry that online property platforms attract many unserious or fraudulent enquiries.",
+    "options": []
+  },
+  {
+    "key": "L3.1",
+    "prompt": "What do you currently check before accepting a tenant? Select all that apply.",
+    "options": [
+      "Government ID",
+      "Employment/income",
+      "Guarantor",
+      "Previous landlord reference",
+      "Workplace/business",
+      "Bank/payment evidence",
+      "Family/community reference",
+      "Social media",
+      "Agent recommendation",
+      "I do little/no formal screening",
+      "Other"
+    ]
+  },
+  {
+    "key": "L3.2",
+    "prompt": "Have you ever accepted a tenant who later turned out to have provided false or misleading information?",
+    "options": [
+      "Yes",
+      "No",
+      "Not sure"
+    ]
+  },
+  {
+    "key": "L3.3",
+    "prompt": "Have you ever rejected a good applicant because you could not verify them adequately?",
+    "options": [
+      "Yes",
+      "No",
+      "Not sure"
+    ]
+  },
+  {
+    "key": "L3.4",
+    "prompt": "Which tenant risk concerns you most?",
+    "options": [
+      "Non-payment/late rent",
+      "Property damage",
+      "Illegal activity",
+      "Unauthorised occupants/subletting",
+      "Conflict with neighbours",
+      "Refusal to leave",
+      "False identity/information",
+      "Other"
+    ]
+  },
+  {
+    "key": "L3.5",
+    "prompt": "Reliable identity verification would make me more willing to accept an applicant found online.",
+    "options": []
+  },
+  {
+    "key": "L3.6",
+    "prompt": "Income/employment information is useful, but I would not rely on it alone.",
+    "options": []
+  },
+  {
+    "key": "L3.7",
+    "prompt": "A previous landlord reference would materially affect my decision.",
+    "options": []
+  },
+  {
+    "key": "L3.8",
+    "prompt": "I would want the applicant’s consent before viewing sensitive verification information.",
+    "options": []
+  },
+  {
+    "key": "L3.9",
+    "prompt": "I would distrust a platform that gives a “verified tenant” badge without explaining the basis.",
+    "options": []
+  },
+  {
+    "key": "L3.10",
+    "prompt": "I would value a structured application that lets me compare applicants consistently.",
+    "options": []
+  },
+  {
+    "key": "L4.1",
+    "prompt": "How often do tenants pay later than agreed?",
+    "options": [
+      "Never",
+      "Rarely",
+      "Sometimes",
+      "Often",
+      "Very often"
+    ]
+  },
+  {
+    "key": "L4.2",
+    "prompt": "Have you had a tenant owe substantial rent arrears in the last five years?",
+    "options": [
+      "Yes",
+      "No",
+      "Prefer not to say"
+    ]
+  },
+  {
+    "key": "L4.3",
+    "prompt": "What do you usually do first when rent is late?",
+    "options": [
+      "Call/message tenant",
+      "Visit property",
+      "Contact guarantor",
+      "Use agent",
+      "Send written notice",
+      "Use lawyer",
+      "Other"
+    ]
+  },
+  {
+    "key": "L4.4",
+    "prompt": "How do you mainly keep rent records?",
+    "options": [
+      "Notebook/paper",
+      "WhatsApp messages",
+      "Bank statements",
+      "Spreadsheet",
+      "Property-management software",
+      "Memory/no formal system",
+      "Other"
+    ]
+  },
+  {
+    "key": "L4.5",
+    "prompt": "Have you ever disagreed with a tenant about whether/how much rent was paid?",
+    "options": [
+      "Yes",
+      "No",
+      "Not sure"
+    ]
+  },
+  {
+    "key": "L4.6",
+    "prompt": "Automatic digital receipts would reduce payment disputes.",
+    "options": []
+  },
+  {
+    "key": "L4.7",
+    "prompt": "A clear tenant payment history would be useful to me.",
+    "options": []
+  },
+  {
+    "key": "L4.8",
+    "prompt": "I would value automatic reminders before rent due dates.",
+    "options": []
+  },
+  {
+    "key": "L4.9",
+    "prompt": "I would consider more flexible payment schedules for a verified/reliable tenant if collection risk were controlled.",
+    "options": []
+  },
+  {
+    "key": "L4.10",
+    "prompt": "I would not route rent through a platform unless settlement timing, fees and accountability were very clear.",
+    "options": []
+  },
+  {
+    "key": "L5.1",
+    "prompt": "How often do tenant-related repairs or damage create significant unexpected costs?",
+    "options": [
+      "Never",
+      "Rarely",
+      "Sometimes",
+      "Often",
+      "Very often"
+    ]
+  },
+  {
+    "key": "L5.2",
+    "prompt": "Have you had a serious disagreement with a tenant over whether damage was normal wear or tenant-caused?",
+    "options": [
+      "Yes",
+      "No",
+      "Not sure"
+    ]
+  },
+  {
+    "key": "L5.3",
+    "prompt": "How do you document property condition at move-in?",
+    "options": [
+      "Photos/videos",
+      "Written inventory/checklist",
+      "Agent report",
+      "Professional inspection",
+      "Nothing formal",
+      "Other"
+    ]
+  },
+  {
+    "key": "L5.4",
+    "prompt": "How do tenants usually report repairs?",
+    "options": [
+      "Phone call",
+      "WhatsApp/SMS",
+      "Agent",
+      "Email",
+      "Written letter",
+      "Property-management system",
+      "Other"
+    ]
+  },
+  {
+    "key": "L5.5",
+    "prompt": "What most delays repairs?",
+    "options": [
+      "Cost",
+      "Finding trusted artisans",
+      "Tenant access/availability",
+      "Landlord approval",
+      "Disagreement over responsibility",
+      "Parts/materials",
+      "Other"
+    ]
+  },
+  {
+    "key": "L5.6",
+    "prompt": "Dated move-in/move-out photos would reduce deposit and damage disputes.",
+    "options": []
+  },
+  {
+    "key": "L5.7",
+    "prompt": "A documented maintenance request system would help me prioritise repairs.",
+    "options": []
+  },
+  {
+    "key": "L5.8",
+    "prompt": "I would value access to vetted cleaning/fumigation or maintenance providers.",
+    "options": []
+  },
+  {
+    "key": "L5.9",
+    "prompt": "I worry about allowing third-party service providers into my property.",
+    "options": []
+  },
+  {
+    "key": "L5.10",
+    "prompt": "I would want to see provider identity, rating and job record before booking.",
+    "options": []
+  },
+  {
+    "key": "L6.1",
+    "prompt": "Do you normally collect a caution/security deposit?",
+    "options": [
+      "Always",
+      "Usually",
+      "Sometimes",
+      "Rarely",
+      "Never"
+    ]
+  },
+  {
+    "key": "L6.2",
+    "prompt": "Have you had a serious dispute about refunding or deducting from a caution/security deposit?",
+    "options": [
+      "Yes",
+      "No",
+      "Not applicable"
+    ]
+  },
+  {
+    "key": "L6.3",
+    "prompt": "Do you conduct periodic property inspections during a tenancy?",
+    "options": [
+      "On a fixed schedule",
+      "Only when there is a problem",
+      "Rarely",
+      "Never"
+    ]
+  },
+  {
+    "key": "L6.4",
+    "prompt": "Have you ever needed a lawyer or formal dispute-resolution process for a tenancy matter?",
+    "options": [
+      "Yes",
+      "No",
+      "Prefer not to say"
+    ]
+  },
+  {
+    "key": "L6.5",
+    "prompt": "Which disputes concern you most?",
+    "options": [
+      "Rent arrears",
+      "Damage/deposit",
+      "Eviction/recovery of premises",
+      "Repairs",
+      "Unauthorised occupants/subletting",
+      "Utilities/service charges",
+      "Neighbour complaints",
+      "Other"
+    ]
+  },
+  {
+    "key": "L6.6",
+    "prompt": "A documented communication trail could reduce “he said/she said” disputes.",
+    "options": []
+  },
+  {
+    "key": "L6.7",
+    "prompt": "I would value access to verified legal professionals for serious tenancy matters.",
+    "options": []
+  },
+  {
+    "key": "L6.8",
+    "prompt": "A platform should not take sides automatically; evidence and due process matter.",
+    "options": []
+  },
+  {
+    "key": "L7.1",
+    "prompt": "Which device do you mainly use for property-related communication?",
+    "options": [
+      "Android phone",
+      "iPhone",
+      "Laptop/desktop",
+      "Basic phone",
+      "Other"
+    ]
+  },
+  {
+    "key": "L7.2",
+    "prompt": "How comfortable are you uploading property photos and documents to a secure online platform?",
+    "options": [
+      "Very comfortable",
+      "Comfortable",
+      "Unsure",
+      "Uncomfortable",
+      "Very uncomfortable"
+    ]
+  },
+  {
+    "key": "L7.3",
+    "prompt": "Would you complete landlord identity verification to receive a verified profile/listing status?",
+    "options": [
+      "Definitely yes",
+      "Probably yes",
+      "Unsure",
+      "Probably no",
+      "Definitely no"
+    ]
+  },
+  {
+    "key": "L7.4",
+    "prompt": "What would make you refuse verification? Select all that apply.",
+    "options": [
+      "Privacy concerns",
+      "Data-security concerns",
+      "Too much effort",
+      "Do not trust the company",
+      "No acceptable document",
+      "Cost",
+      "Poor internet",
+      "I would not refuse if well explained",
+      "Other"
+    ]
+  },
+  {
+    "key": "L7.5",
+    "prompt": "Would you accept rental applications from people you first encountered online?",
+    "options": [
+      "Yes",
+      "Maybe, after verification",
+      "No"
+    ]
+  },
+  {
+    "key": "L7.6",
+    "prompt": "Would you communicate with applicants inside a platform if it created a searchable record?",
+    "options": [
+      "Yes",
+      "Maybe",
+      "No — I prefer phone/WhatsApp"
+    ]
+  },
+  {
+    "key": "L7.7",
+    "prompt": "How comfortable are you receiving rent through a platform that then settles to your bank account?",
+    "options": [
+      "Very comfortable",
+      "Somewhat comfortable",
+      "Unsure",
+      "Uncomfortable",
+      "Very uncomfortable"
+    ]
+  },
+  {
+    "key": "L7.8",
+    "prompt": "What would you require before trusting platform-based rent collection?",
+    "options": [
+      "Fast settlement",
+      "Low/clear fees",
+      "Detailed statement/receipt",
+      "Strong security",
+      "Dispute support",
+      "Reliable customer support",
+      "Regulatory/company credibility",
+      "All of these",
+      "I would still prefer direct payment"
+    ]
+  },
+  {
+    "key": "L8.1",
+    "prompt": "Before today, had you heard of RentalHub NG?",
+    "options": [
+      "Yes",
+      "No",
+      "Not sure"
+    ]
+  },
+  {
+    "key": "L8.2",
+    "prompt": "Based only on the description above, how useful does the overall idea seem for your rental business?",
+    "options": [
+      "Very useful",
+      "Useful",
+      "Neither",
+      "Not very useful",
+      "Not useful at all"
+    ]
+  },
+  {
+    "key": "L8.3",
+    "prompt": "Verified landlord/property profiles that clearly explain what was checked.",
+    "options": []
+  },
+  {
+    "key": "L8.4",
+    "prompt": "Property listing with structured price, fees, location, photos and availability status.",
+    "options": []
+  },
+  {
+    "key": "L8.5",
+    "prompt": "Structured tenant applications and applicant comparison.",
+    "options": []
+  },
+  {
+    "key": "L8.6",
+    "prompt": "Tenant identity/verification information with appropriate consent.",
+    "options": []
+  },
+  {
+    "key": "L8.7",
+    "prompt": "Inspection scheduling and applicant tracking.",
+    "options": []
+  },
+  {
+    "key": "L8.8",
+    "prompt": "In-platform messages and communication records.",
+    "options": []
+  },
+  {
+    "key": "L8.9",
+    "prompt": "Digital rent-payment records and receipts.",
+    "options": []
+  },
+  {
+    "key": "L8.10",
+    "prompt": "Rent due reminders and payment-history view.",
+    "options": []
+  },
+  {
+    "key": "L8.11",
+    "prompt": "Move-in/move-out condition evidence and dispute documentation.",
+    "options": []
+  },
+  {
+    "key": "L8.12",
+    "prompt": "Legal-support/lawyer access for serious disputes.",
+    "options": []
+  },
+  {
+    "key": "L8.13",
+    "prompt": "Fumigation/cleaning service booking.",
+    "options": []
+  },
+  {
+    "key": "L8.14",
+    "prompt": "Transportation/moving services for incoming/outgoing tenants.",
+    "options": []
+  },
+  {
+    "key": "L8.15",
+    "prompt": "Property-performance and vacancy/activity analytics.",
+    "options": []
+  },
+  {
+    "key": "L8.16",
+    "prompt": "Which THREE functions above would most influence you to try RentalHub NG? Write the numbers: ________  ________  ________",
+    "options": []
+  },
+  {
+    "key": "L8.17",
+    "prompt": "Which functions would you probably never use?",
+    "options": []
+  },
+  {
+    "key": "L8.18",
+    "prompt": "What important landlord problem is missing from the concept?",
+    "options": []
+  },
+  {
+    "key": "L9.1",
+    "prompt": "If RentalHub NG had active renters in your area today, how likely would you be to list one property?",
+    "options": [
+      "Definitely would",
+      "Probably would",
+      "Not sure",
+      "Probably would not",
+      "Definitely would not"
+    ]
+  },
+  {
+    "key": "L9.2",
+    "prompt": "Would you give RentalHub NG an exclusive listing?",
+    "options": [
+      "Yes",
+      "Maybe for a limited period",
+      "No — I would list on multiple channels",
+      "Not sure"
+    ]
+  },
+  {
+    "key": "L9.3",
+    "prompt": "Would you continue using offline agents alongside RentalHub NG?",
+    "options": [
+      "Yes, definitely",
+      "Probably",
+      "Only when needed",
+      "Probably not",
+      "No"
+    ]
+  },
+  {
+    "key": "L9.4",
+    "prompt": "What would stop you from listing on RentalHub NG? Select all that apply.",
+    "options": [
+      "Too few serious tenants",
+      "Fees too high",
+      "Verification burden",
+      "Privacy/security concern",
+      "Fear of fraud",
+      "I prefer my current agents",
+      "Slow payments/settlement",
+      "Poor support",
+      "Platform difficult to use",
+      "No presence in my area",
+      "Nothing if it produces good tenants",
+      "Other"
+    ]
+  },
+  {
+    "key": "L9.5",
+    "prompt": "Which charging model would you consider most acceptable?",
+    "options": [
+      "Free basic listing + optional paid services",
+      "Fixed fee per successful tenancy",
+      "Percentage commission on successful tenancy",
+      "Monthly/annual landlord subscription",
+      "Pay for promoted/featured listings",
+      "Advertising-supported/free",
+      "I would not pay RentalHub",
+      "Not sure"
+    ]
+  },
+  {
+    "key": "L9.6",
+    "prompt": "If RentalHub NG successfully introduced a tenant who completed a tenancy, what maximum platform fee would you consider before preferring your existing method?",
+    "options": [
+      "₦0",
+      "Below ₦5,000",
+      "₦5,000–₦19,999",
+      "₦20,000–₦49,999",
+      "₦50,000+",
+      "A small percentage of rent",
+      "Only if it replaces an agent fee",
+      "Depends on property value",
+      "Not sure"
+    ]
+  },
+  {
+    "key": "L9.7",
+    "prompt": "Would you pay separately for optional tenant verification, legal support, property promotion or maintenance services?",
+    "options": [
+      "Yes",
+      "Maybe",
+      "No",
+      "Depends on price/value"
+    ]
+  },
+  {
+    "key": "L9.8",
+    "prompt": "Would you recommend RentalHub NG to another landlord IF it consistently brought serious verified applicants and reduced disputes?  (0 = not at all likely; 10 = extremely likely)",
+    "options": [
+      "0",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "10"
+    ]
+  },
+  {
+    "key": "L9.9",
+    "prompt": "What single failure would make you remove all your properties from RentalHub NG?",
+    "options": []
+  },
+  {
+    "key": "L9.10",
+    "prompt": "What proof would you need before trusting RentalHub NG with important rental transactions?",
+    "options": []
+  },
+  {
+    "key": "L10.1",
+    "prompt": "Tell us about the worst tenant-related problem you have experienced.",
+    "options": []
+  },
+  {
+    "key": "L10.2",
+    "prompt": "Tell us about the worst agent-related problem you have experienced.",
+    "options": []
+  },
+  {
+    "key": "L10.3",
+    "prompt": "What currently wastes the most time or money when you are trying to rent out a property?",
+    "options": []
+  },
+  {
+    "key": "L10.4",
+    "prompt": "What information about a prospective tenant would be genuinely useful — and what would be unnecessary or intrusive?",
+    "options": []
+  },
+  {
+    "key": "L10.5",
+    "prompt": "What would make you choose an online platform over your present agent/referral method?",
+    "options": []
+  },
+  {
+    "key": "L10.6",
+    "prompt": "What should RentalHub NEVER do to landlords or tenants?",
+    "options": []
+  },
+  {
+    "key": "L10.7",
+    "prompt": "If you could change one thing about the Nigerian rental market, what would it be?",
+    "options": []
+  },
+  {
+    "key": "L10.8",
+    "prompt": "Any other comment you want the RentalHub team to hear?",
+    "options": []
+  }
+]

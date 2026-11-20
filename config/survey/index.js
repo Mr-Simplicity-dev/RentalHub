@@ -10,7 +10,8 @@ const ha = require('./translations/ha');
 const yo = require('./translations/yo');
 const ig = require('./translations/ig');
 
-const SURVEY_VERSION = 2;
+const SURVEY_VERSION = 3;
+const context = require('./context');
 
 const LANGUAGES = ['en', 'ha', 'yo', 'ig'];
 
@@ -29,6 +30,8 @@ const applyTranslations = (question) => {
       ig: ig.options?.[question.key]?.[option.v] || option.ig,
     }));
   }
+
+  if (question.key==='T0.3'||question.key==='L0.3') for(const lang of LANGUAGES) prompt[lang]=context[lang].consent;
 
   // Likert scale labels (e.g. Strongly disagree … Strongly agree, and the
   // importance scale for feature questions).
@@ -80,29 +83,17 @@ const getQuestionByKey = (type, key) =>
 
 const PART_A_KEYS = { tenant: ['T0', 'T1'], landlord: ['L0', 'L1'] };
 
-const isPartAComplete = (type, answers, consentFlags) => {
-  // Consent gate: if any consent answer ends the survey, Part A is satisfied
-  // (the respondent was legitimately screened out).
-  const consentQuestions = getPartAQuestions(type).filter((q) => q.analysis === 'consent');
-  for (const cq of consentQuestions) {
-    const value = answers[cq.key];
-    if (value && cq.endsOn && value === cq.endsOn) {
-      return true;
-    }
-  }
-
-  for (const question of getPartAQuestions(type)) {
-    if (!question.required) continue;
-    if (question.type === 'likert') {
-      if (answers[question.key] === undefined || answers[question.key] === null || answers[question.key] === '') {
-        return false;
-      }
-    } else if (answers[question.key] === undefined || answers[question.key] === null || answers[question.key] === '') {
-      return false;
-    }
-  }
-  return true;
+const isScreenedOut = (type,answers={}) => getPartAQuestions(type).some(q=>q.endsOn&&String(answers[q.key])===String(q.endsOn));
+const isAnswerValid = (question,answer) => {
+ const empty=answer===undefined||answer===null||answer===''||(Array.isArray(answer)&&answer.length===0);
+ if(empty)return question.required===false;
+ if(question.type==='text')return typeof answer==='string'&&answer.trim().length>0&&answer.length<=5000;
+ const choices=question.rankSource||(question.options||[]).map(option=>String(option.v));
+ if(question.type==='multi'||question.type==='rank')return Array.isArray(answer)&&answer.length>=(question.minPicks||1)&&answer.length<=(question.maxPicks||choices.length)&&new Set(answer.map(String)).size===answer.length&&answer.every(value=>choices.includes(String(value)));
+ return !Array.isArray(answer)&&['string','number'].includes(typeof answer)&&choices.includes(String(answer));
 };
+const getMissingQuestions = (type,answers={},partOnly=false) => isScreenedOut(type,answers)?[]:(partOnly?getPartAQuestions(type):getQuestions(type)).filter(q=>!isAnswerValid(q,answers[q.key])).map(q=>q.key);
+const isPartAComplete = (type,answers={}) => getMissingQuestions(type,answers,true).length===0;
 
 module.exports = {
   SURVEY_VERSION,
@@ -115,4 +106,7 @@ module.exports = {
   getQuestionByKey,
   PART_A_KEYS,
   isPartAComplete,
+  getMissingQuestions,
+  isAnswerValid,
+  isScreenedOut,
 };

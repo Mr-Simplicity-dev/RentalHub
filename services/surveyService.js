@@ -115,7 +115,7 @@ const findRecentCompletedRespondent = async (type, phone, name, stateOfOrigin, d
        AND LOWER(COALESCE(respondent_name, '')) = LOWER(COALESCE($3, ''))
        AND respondent_state_of_origin IS NOT DISTINCT FROM NULLIF($4, '')
        AND completed_at IS NOT NULL
-       AND superseded_at IS NULL
+       AND superseded_at IS NULL AND survey_version = ${survey.SURVEY_VERSION}
        AND completed_at >= CURRENT_TIMESTAMP - ($5::int * INTERVAL '1 day')
      ORDER BY completed_at DESC
      LIMIT 1`,
@@ -416,7 +416,7 @@ exports.linkFieldCaptureToNewUser = async ({ newUserId, userType, phone, email }
          FROM survey_responses
         WHERE survey_type = $1
           AND completed_at IS NOT NULL
-          AND superseded_at IS NULL
+          AND superseded_at IS NULL AND survey_version = ${survey.SURVEY_VERSION}
           AND user_id IS NULL
           AND respondent_phone = $2
           AND completed_at >= CURRENT_TIMESTAMP - ($3::int * INTERVAL '1 day')
@@ -431,7 +431,7 @@ exports.linkFieldCaptureToNewUser = async ({ newUserId, userType, phone, email }
            FROM survey_responses
           WHERE survey_type = $1
             AND completed_at IS NOT NULL
-            AND superseded_at IS NULL
+            AND superseded_at IS NULL AND survey_version = ${survey.SURVEY_VERSION}
             AND user_id IS NULL
             AND LOWER(respondent_email) = LOWER($2)
             AND completed_at >= CURRENT_TIMESTAMP - ($3::int * INTERVAL '1 day')
@@ -477,7 +477,7 @@ exports.getMySurveyStatus = async (req, res) => {
 
     const existing = await db.query(
       `SELECT id, survey_type, source, part_a_completed_at, completed_at
-       FROM survey_responses WHERE user_id = $1 ORDER BY id DESC LIMIT 1`,
+       FROM survey_responses WHERE user_id = $1 AND superseded_at IS NULL AND survey_version = ${survey.SURVEY_VERSION} ORDER BY id DESC LIMIT 1`,
       [req.user.id]
     );
 
@@ -522,7 +522,7 @@ exports.startSurvey = async (req, res) => {
 
     const existing = await db.query(
       `SELECT * FROM survey_responses
-       WHERE user_id = $1 AND superseded_at IS NULL
+       WHERE user_id = $1 AND superseded_at IS NULL AND survey_version = ${survey.SURVEY_VERSION}
        ORDER BY id DESC LIMIT 1`,
       [req.user.id]
     );
@@ -590,9 +590,9 @@ exports.savePublicDraft = async (req, res) => {
       stateId = state.rows[0]?.id || null;
     }
     const lgaName = String(req.body.lga_name || '').trim().slice(0,120);
-    const existing = await db.query('SELECT id,survey_type,completed_at,superseded_at,user_id FROM survey_responses WHERE resume_token=$1', [token]);
+    const existing = await db.query('SELECT id,survey_type,survey_version,completed_at,superseded_at,user_id FROM survey_responses WHERE resume_token=$1', [token]);
     const row = existing.rows[0];
-    if (row && (row.completed_at || row.superseded_at || row.survey_type!==type)) return res.status(409).json({success:false,message:'This survey draft can no longer be changed.'});
+    if (row && (row.completed_at || row.superseded_at || row.survey_version!==survey.SURVEY_VERSION || row.survey_type!==type)) return res.status(409).json({success:false,message:'This survey draft can no longer be changed.'});
     if (row?.user_id && Number(row.user_id)!==Number(req.user?.id)) return res.status(403).json({success:false,message:'Sign in to continue this linked survey.'});
     if (row) {
       await db.query(
@@ -603,7 +603,7 @@ exports.savePublicDraft = async (req, res) => {
          respondent_email=CASE WHEN $12::boolean=FALSE THEN NULL ELSE COALESCE(NULLIF($11,''),respondent_email) END,
          has_email=COALESCE($12::boolean,has_email),respondent_location=COALESCE(NULLIF($13,''),respondent_location),
          respondent_state_of_origin=COALESCE(NULLIF($14,''),respondent_state_of_origin),state_id=COALESCE($15,state_id),lga_name=COALESCE(NULLIF($16,''),lga_name),updated_at=CURRENT_TIMESTAMP
-         WHERE id=$1 AND completed_at IS NULL AND superseded_at IS NULL`,
+         WHERE id=$1 AND completed_at IS NULL AND superseded_at IS NULL AND survey_version = ${survey.SURVEY_VERSION}`,
         [row.id,JSON.stringify(safeAnswers),JSON.stringify(flags),agentUser?.id||null,agentName,agentPhone,agentLga,agentLocation,person.name,person.phone,person.email,person.hasEmail,person.location,person.origin,stateId,lgaName]);
       return res.json({success:true,data:{resume_token:token,draft:true}});
     }
@@ -664,7 +664,7 @@ exports.resumeSurvey = async (req, res) => {
       [token]
     );
 
-    if (result.rows.length === 0 || result.rows[0].superseded_at) {
+    if (result.rows.length === 0 || result.rows[0].superseded_at || result.rows[0].survey_version!==survey.SURVEY_VERSION) {
       return res.status(404).json({ success: false, message: 'Draft not found or expired' });
     }
 
@@ -674,6 +674,7 @@ exports.resumeSurvey = async (req, res) => {
       data: {
         response_id: row.id,
         survey_type: row.survey_type,
+        survey_version: row.survey_version,
         contact: {name:row.respondent_name || "",phone:row.respondent_phone || "",email:row.respondent_email || "",location:row.respondent_location || "",state_of_origin:row.respondent_state_of_origin || "",no_email:row.has_email===false},
         answers: row.answers || {},
         consent_flags: row.consent_flags || {},
@@ -700,7 +701,7 @@ exports.claimSurveyDraft = async (req, res) => {
            source = CASE WHEN source = 'public_link' THEN 'online' ELSE source END
        WHERE resume_token = $2
          AND user_id IS NULL
-         AND superseded_at IS NULL
+         AND superseded_at IS NULL AND survey_version = ${survey.SURVEY_VERSION}
        RETURNING id, survey_type, part_a_completed_at, completed_at, answers, consent_flags`,
       [req.user.id, token]
     );
@@ -747,7 +748,7 @@ exports.restartSurvey = async (req, res) => {
     const { response_id } = req.body;
 
     const ownership = await db.query(
-      `SELECT * FROM survey_responses WHERE id = $1 AND user_id = $2`,
+      `SELECT * FROM survey_responses WHERE id = $1 AND user_id = $2 AND superseded_at IS NULL AND survey_version = ${survey.SURVEY_VERSION}`,
       [response_id, req.user.id]
     );
     if (ownership.rows.length === 0) {
@@ -802,7 +803,7 @@ exports.saveSurvey = async (req, res) => {
     }
 
     const ownership = await db.query(
-      `SELECT id FROM survey_responses WHERE id = $1 AND user_id = $2`,
+      `SELECT id FROM survey_responses WHERE id = $1 AND user_id = $2 AND superseded_at IS NULL AND survey_version = ${survey.SURVEY_VERSION}`,
       [response_id, req.user.id]
     );
     if (ownership.rows.length === 0) {
@@ -831,7 +832,7 @@ exports.completePartA = async (req, res) => {
     const { response_id } = req.body;
 
     const ownership = await db.query(
-      `SELECT * FROM survey_responses WHERE id = $1 AND user_id = $2`,
+      `SELECT * FROM survey_responses WHERE id = $1 AND user_id = $2 AND superseded_at IS NULL AND survey_version = ${survey.SURVEY_VERSION}`,
       [response_id, req.user.id]
     );
     if (ownership.rows.length === 0) {
@@ -853,15 +854,16 @@ exports.completePartA = async (req, res) => {
       });
     }
 
+    const screenedOut=survey.isScreenedOut(response.survey_type,response.answers||{});
     await db.query(
       `UPDATE survey_responses
-       SET part_a_completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       SET part_a_completed_at = CURRENT_TIMESTAMP, completed_at=CASE WHEN $2 THEN CURRENT_TIMESTAMP ELSE completed_at END, updated_at = CURRENT_TIMESTAMP
        WHERE id = $1`,
-      [response_id]
+      [response_id,screenedOut]
     );
     await db.query(
-      `UPDATE users SET survey_part_a_completed_at = CURRENT_TIMESTAMP WHERE id = $1`,
-      [req.user.id]
+      `UPDATE users SET survey_part_a_completed_at = CURRENT_TIMESTAMP, survey_completed_at=CASE WHEN $2 THEN CURRENT_TIMESTAMP ELSE survey_completed_at END WHERE id = $1`,
+      [req.user.id,screenedOut]
     );
 
     return res.json({ success: true, message: 'Survey part A completed' });
@@ -876,7 +878,7 @@ exports.completeSurvey = async (req, res) => {
     const { response_id, time_spent_seconds } = req.body;
 
     const ownership = await db.query(
-      `SELECT * FROM survey_responses WHERE id = $1 AND user_id = $2`,
+      `SELECT * FROM survey_responses WHERE id = $1 AND user_id = $2 AND superseded_at IS NULL AND survey_version = ${survey.SURVEY_VERSION}`,
       [response_id, req.user.id]
     );
     if (ownership.rows.length === 0) {
@@ -900,6 +902,9 @@ exports.completeSurvey = async (req, res) => {
         message: 'Please answer the required questions to continue',
       });
     }
+
+    const missing = survey.getMissingQuestions(response.survey_type,response.answers||{});
+    if(missing.length) return res.status(400).json({success:false,code:'SURVEY_INCOMPLETE',message:'Please answer all required questions, including three features where requested.',missing_fields:missing});
 
     await db.query(
       `UPDATE survey_responses
@@ -948,14 +953,15 @@ exports.getSurveyDefinition = async (req, res) => {
       required: question.required !== false,
       minSeconds: question.minSeconds || 0,
       endsOn: question.endsOn || null,
+      minPicks: question.minPicks || null,
       maxPicks: question.maxPicks || null,
       rankSource: question.rankSource || null,
       analysis: question.analysis || null,
-      prompt: localize(question.prompt),
-      options: question.options
+      prompt: ['T7.1','L8.1'].includes(question.key) ? (require('../config/survey/context')[lang] || require('../config/survey/context').en)[type]+'\n\n'+localize(question.prompt) : localize(question.prompt),
+      options: question.type==='rank' ? question.rankSource.map(key=>({v:key,label:key+'. '+localize(survey.getQuestionByKey(type,key).prompt)})) : question.options
         ? question.options.map((option) => ({
             v: option.v,
-            label: localize(option),
+            label: question.labels?.[option.v] ? localize(question.labels[option.v]) : localize(option),
           }))
         : null,
       labels: question.labels
@@ -974,6 +980,7 @@ exports.getSurveyDefinition = async (req, res) => {
         type,
         survey_type_label: type === 'landlord' ? 'Landlord' : 'Tenant',
         version: survey.SURVEY_VERSION,
+        notice: (require('../config/survey/context')[lang] || require('../config/survey/context').en).notice,
         part_a_sections: survey.PART_A_KEYS[type],
         sections: questionnaire.sections,
         questions,
@@ -1048,7 +1055,7 @@ exports.submitPublicSurvey = async (req, res) => {
     if (clientRequestId) {
       const sent = await db.query(
         `SELECT id, respondent_code FROM survey_responses
-         WHERE client_request_id = $1 AND superseded_at IS NULL
+         WHERE client_request_id = $1 AND superseded_at IS NULL AND survey_version = ${survey.SURVEY_VERSION}
          LIMIT 1`,
         [clientRequestId]
       );
@@ -1088,13 +1095,17 @@ exports.submitPublicSurvey = async (req, res) => {
       });
     }
 
+    const missing = survey.getMissingQuestions(type,safeAnswers);
+    if(missing.length) return res.status(400).json({success:false,code:'SURVEY_INCOMPLETE',message:'Please answer all required questions, including three features where requested.',missing_fields:missing});
+
     // Resume-token submission completes the existing draft instead of duplicating.
     const token = String(resume_token || '').trim();
     if (token) {
       const draft = await db.query(
-        `SELECT id FROM survey_responses WHERE resume_token = $1 AND completed_at IS NULL`,
+        `SELECT id FROM survey_responses WHERE resume_token = $1 AND completed_at IS NULL AND superseded_at IS NULL AND survey_version = ${survey.SURVEY_VERSION}`,
         [token]
       );
+      if (!draft.rows.length) return res.status(409).json({success:false,code:'SURVEY_RESTART_REQUIRED',message:'This survey round has changed. Reload and start a new response.'});
       if (draft.rows.length) {
         await db.query(
           `UPDATE survey_responses
@@ -1192,4 +1203,3 @@ exports.submitPublicSurvey = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to submit survey' });
   }
 };
-

@@ -67,8 +67,8 @@ export default function SurveyWizard({
   const [startedAt] = useState(Date.now());
 
   const anonymousMode = publicMode || paperMode;
-  const questionEnteredAt = useRef(Date.now());
-  const RESUME_KEY = 'rentalhub_survey_resume';
+  const [questionReady,setQuestionReady]=useState(false);
+  const RESUME_KEY = 'rentalhub_survey_resume_v3_'+surveyType;
 
   const sections = useMemo(() => {
     if (!definition) return [];
@@ -84,6 +84,7 @@ export default function SurveyWizard({
 
   const currentSection = sections[sectionIndex] || null;
   const currentQuestion = currentSection?.questions[questionIndex] || null;
+  useEffect(()=>{setQuestionReady(false);if(!currentQuestion)return;const timer=setTimeout(()=>setQuestionReady(true),(currentQuestion.minSeconds||3)*1000);return()=>clearTimeout(timer);},[currentQuestion?.key,currentQuestion?.minSeconds]);
 
   const loadDefinition = useCallback(async () => {
     try {
@@ -211,8 +212,8 @@ export default function SurveyWizard({
   const setAnswer = (value) => {
     if (!currentQuestion) return;
     setAnswers((prev) => ({ ...prev, [currentQuestion.key]: value }));
-    if (currentQuestion.analysis === 'consent' && currentQuestion.endsOn && value === currentQuestion.endsOn) {
-      setScreenedOut(true);
+    if (currentQuestion.analysis === 'consent' && currentQuestion.endsOn) {
+      setScreenedOut(definition.questions.some(question=>question.endsOn&&String(question.key===currentQuestion.key?value:answers[question.key])===String(question.endsOn)));
     }
   };
 
@@ -228,12 +229,12 @@ export default function SurveyWizard({
 
   const canGoNext = (() => {
     if (!currentQuestion) return false;
-    const elapsed = Date.now() - questionEnteredAt.current;
-    if (elapsed < (currentQuestion.minSeconds || 3) * 1000) return false;
+    if (!questionReady) return false;
     const v = answers[currentQuestion.key];
     if (!currentQuestion.required) return true;
     if (v === undefined || v === null || v === '') return false;
-    if (currentQuestion.type === 'multi' && currentQuestion.maxPicks && Array.isArray(v) && v.length > currentQuestion.maxPicks) return false;
+    if (['multi','rank'].includes(currentQuestion.type) && (!Array.isArray(v) || v.length < (currentQuestion.minPicks || 1) || (currentQuestion.maxPicks && v.length > currentQuestion.maxPicks))) return false;
+    if (typeof v==='string'&&!v.trim()) return false;
     return true;
   })();
 
@@ -325,7 +326,6 @@ export default function SurveyWizard({
       setSectionIndex((s) => s + 1);
       setQuestionIndex(0);
     }
-    questionEnteredAt.current = Date.now();
   };
 
   const handleBack = () => {
@@ -335,7 +335,6 @@ export default function SurveyWizard({
       setSectionIndex((s) => s - 1);
       setQuestionIndex((sections[sectionIndex - 1]?.questions.length || 1) - 1);
     }
-    questionEnteredAt.current = Date.now();
   };
 
   const handleRestart = async () => {
@@ -464,7 +463,6 @@ export default function SurveyWizard({
             }
             setError('');
             setAgentSessionDone(true);
-            questionEnteredAt.current = Date.now();
           }}
           disabled={!canContinue}
           className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
@@ -578,7 +576,6 @@ export default function SurveyWizard({
             }
             setError('');
             setContactDone(true);
-            questionEnteredAt.current = Date.now();
           }}
           disabled={!canSubmitContact}
           className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
@@ -598,7 +595,7 @@ export default function SurveyWizard({
 
     if (q.type === 'likert') {
       return (
-        <div className="mt-6 grid grid-cols-5 gap-2">
+        <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-5">
           {(q.options || ['1', '2', '3', '4', '5'].map((x) => [x, x])).map((opt) => {
             const v = typeof opt === 'string' ? opt : opt.v;
             const label = typeof opt === 'string' ? labels[opt] || opt : opt.label;
@@ -748,6 +745,7 @@ export default function SurveyWizard({
           </p>
         </div>
       )}
+      {definition?.notice && <p className="mb-4 text-sm leading-6 text-gray-600">{definition.notice}</p>}
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-gray-900">{exitLabel}</h2>

@@ -34,7 +34,7 @@ const q = (key, section, part, type, prompt, options, extra = {}) => ({
   part,
   type,
   prompt: { en: prompt },
-  options: options ? options.map(([v, label]) => ({ v, en: label })) : null,
+  options: options ? options.map(option => { const [v,label] = Array.isArray(option) ? option : [String(option),String(option)]; return {v,en:label}; }) : null,
   required: extra.required !== false,
   ...extra,
 });
@@ -58,6 +58,9 @@ L.push(q('L0.3', 'L0', 'A', 'single', 'Do you voluntarily agree to participate i
 ], { endsOn: 'no', analysis: 'consent' }));
 
 // ── L1 Landlord and property portfolio profile ────────────────────────────
+L.push(q('L1.1', 'L1', 'A', 'text', "State where most of your rental property is located:", null, { analysis: 'profile' }));
+L.push(q('L1.2', 'L1', 'A', 'text', "LGA / city / town:", null, { analysis: 'profile' }));
+
 L.push(q('L1.3', 'L1', 'A', 'single', 'How many residential rental units do you own?', [
   ['1', '1'],
   ['2_3', '2–3'],
@@ -498,6 +501,7 @@ L.push(q('L8.2', 'L8', 'B', 'single', 'Based only on the description above, how 
 });
 
 L.push(q('L8.16', 'L8', 'B', 'rank', 'Which THREE functions above would most influence you to try Amana RentalHub NG? Write the numbers:', null, {
+  minPicks: 3,
   maxPicks: 3,
   analysis: 'feature',
   rankSource: ['L8.3', 'L8.4', 'L8.5', 'L8.6', 'L8.7', 'L8.8', 'L8.9', 'L8.10', 'L8.11', 'L8.12', 'L8.13', 'L8.14', 'L8.15'],
