@@ -36,7 +36,7 @@
     'T3.1': 'Fún ilé tó o yá gbẹ̀yìn, kí ni o san kí o tó kó lọ? Yan gbogbo àwọn tó wúlò.',
     'T3.2': 'Ṣé wọ́n sọ gbogbo owó kedere fún ọ kí o tó fi ilé náà lóyà?',
     'T3.3': 'Ṣé wọ́n ti béèrè lọ́wọ́ rẹ rí láti san owó yíyá ju ọdún kan lọ níwájú?',
-    'T3.4': 'Bí ó bá jẹ́ bẹ́ẹ̀, kí ló ṣẹlẹ̀?',
+    "T3.4": "Bí wọ́n bá ti ní kí o san owó ilé tó ju ọdún kan lọ ṣáájú, kí ló ṣẹlẹ̀?",
     'T3.5': 'Ṣé owó àbẹ̀wò ti ń dí ọ lọ́wọ́ rí láti wo àwọn ilé tó o lè ti gbé yẹ̀wò?',
     'T3.6': 'Ṣé o ti san owó àbẹ̀wò fún ilé tó wá di ọ̀ràn pé kò sí mọ́, ó tan-i-èyin-jẹ tàbí kò yẹ rárá?',
     'T3.7': 'Ṣé o ti san owó agẹ́ǹtì/ẹ̀gún fún alárinà ju ẹnìkan lọ nígbà wíwá ilé kan?',
@@ -85,7 +85,7 @@
     'T6.8': 'Kí ni ìwọ yóò nilò kí o tó san irú owó bẹ́ẹ̀?',
     // ── Tenant T7: Concept test ──
     'T7.1': 'Ṣáájú òní, ṣé o ti gbọ́ nípa Amana RentalHub NG pẹ̀lú wẹ́ẹ̀bù rentalhub.com.ng?',
-    'T7.2': 'Pẹ̀lú àpèjúwe tó wà lókè nìkan, báwo ni èrò náà ṣe wúlò tó fún àìní yíyá ilé rẹ?',
+    "T7.2": "Báwo ni èrò pẹpẹ ilé yíyálò yìí ṣe wúlò fún àìní ilé rẹ?",
     'T7.3': 'Ìròyìn ilé/onílé/agẹ́ǹtì tí a fi rí i dájú pẹ̀lú àlàyé ohun tí wọ́n ṣàyẹ̀wò.',
     'T7.4': 'Àwọn ìkéde ilé tí a lè wá, pẹ̀lú àwòrán kedere, ipo àti gbogbo owó.',
     'T7.5': 'Àǹfààní láti béèrè irú ilé/agbègbè/búdẹ́ẹ̀tì tó o nílò.',
@@ -98,7 +98,7 @@
     'T7.12': 'Ìrànlọ́wọ́ ọkọ̀/kíkó ilé tí ó so mọ́ yíyá ilé.',
     'T7.13': 'Ìfọ̀wé-àṣẹ́ fún fumigation/ìfọ̀wẹ́ ilé tó so mọ́ ilé.',
     'T7.14': 'Àwọn ilé tí o fi pamọ́ àti ìfúnnilétí nípa ìkéde tó bá ọ mu.',
-    'T7.15': 'Àwọn iṣẹ́ MẸ́TA lókè èwo ni yóò fà ọ́ sókè jù láti gbìyànjú Amana RentalHub NG? Kọ àwọn nọ́mbà:',
+    "T7.15": "Yan iṣẹ́ MẸ́TA tí yóò mú kí o fẹ́ dán Amana RentalHub NG wò jù lọ.",
     'T7.16': 'Àwọn iṣẹ́ èwo ni o ṣeé ṣe pé o kì yóò lò rí?',
     'T7.17': 'Ìṣòrò yíyá ilé pàtàkì èwo ni kò sí nínú èrò náà?',
     // ── Tenant T8: Adoption, trust and willingness to pay ──
@@ -202,7 +202,7 @@
     'L7.8': 'Kí ni ìwọ yóò béèrè kí o tó gbẹ́kẹ̀lé gbígba owó yíyá nípasẹ̀ platform?',
     // ── Landlord L8: Concept test ──
     'L8.1': 'Ṣáájú òní, ṣé o ti gbọ́ nípa Amana RentalHub NG?',
-    'L8.2': 'Pẹ̀lú àpèjúwe tó wà lókè nìkan, báwo ni èrò náà ṣe wúlò tó fún òwò yíyá ilé rẹ?',
+    "L8.2": "Báwo ni èrò pẹpẹ ilé yíyálò yìí ṣe wúlò fún iṣẹ́ ilé yíyálò rẹ?",
     'L8.3': 'Àwọn profile onílé/ilé tí a fi rí i dájú tí ó ṣàlàyé ohun tí wọ́n ṣàyẹ̀wò kedere.',
     'L8.4': 'Ìkéde ilé pẹ̀lú owó, àwọn owó mìíràn, ipo, àwòrán àti ipò wíwà tí a tò lẹ́sẹẹsẹ.',
     'L8.5': 'Àwọn ìgbéwọlé ayá tí a tò lẹ́sẹẹsẹ àti wíwé-ọ̀nà àwọn olùbéèrè.',
@@ -216,7 +216,7 @@
     'L8.13': 'Ìfọ̀wé-àṣẹ́ iṣẹ́ fumigation/ìfọ̀wẹ́.',
     'L8.14': 'Iṣẹ́ ọkọ̀/kíkó ilé fún àwọn ayá tó ń wọlé/tó ń jáde.',
     'L8.15': 'Àfọwọ́kọ iṣẹ́ ilé àti ìṣirò ìṣe/vacancy.',
-    'L8.16': 'Àwọn iṣẹ́ MẸ́TA lókè èwo ni yóò fà ọ́ sókè jù láti gbìyànjú Amana RentalHub NG? Kọ àwọn nọ́mbà:',
+    "L8.16": "Yan iṣẹ́ MẸ́TA tí yóò mú kí o fẹ́ dán Amana RentalHub NG wò jù lọ.",
     'L8.17': 'Àwọn iṣẹ́ èwo ni o ṣeé ṣe pé o kì yóò lò rí?',
     'L8.18': 'Ìṣòrò onílé pàtàkì èwo ni kò sí nínú èrò náà?',
     // ── Landlord L9: Adoption and willingness to pay ──

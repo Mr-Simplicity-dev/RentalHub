@@ -474,7 +474,7 @@ L.push(q('L8.1', 'L8', 'B', 'single', 'Before today, had you heard of Amana Rent
   ['not_sure', 'Not sure'],
 ], { analysis: 'awareness' }));
 
-L.push(q('L8.2', 'L8', 'B', 'single', 'Based only on the description above, how useful does the overall idea seem for your rental business?', [
+L.push(q('L8.2', 'L8', 'B', 'single', "How useful does this rental-platform concept seem for your rental business?", [
   ['very', 'Very useful'],
   ['useful', 'Useful'],
   ['neither', 'Neither'],
@@ -500,7 +500,7 @@ L.push(q('L8.2', 'L8', 'B', 'single', 'Based only on the description above, how 
   L.push(q(key, 'L8', 'B', 'likert', text, SCALE_1_5, { ...LIKERT_IMPORTANCE, analysis: 'feature' }));
 });
 
-L.push(q('L8.16', 'L8', 'B', 'rank', 'Which THREE functions above would most influence you to try Amana RentalHub NG? Write the numbers:', null, {
+L.push(q('L8.16', 'L8', 'B', 'rank', "Select THREE functions that would most influence you to try Amana RentalHub NG.", null, {
   minPicks: 3,
   maxPicks: 3,
   analysis: 'feature',

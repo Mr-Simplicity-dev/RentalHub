@@ -255,7 +255,7 @@ T.push(q('T3.3', 'T3', 'B', 'single', 'Have you ever been asked to pay more than
   ['prefer_not', 'Prefer not to say'],
 ], { analysis: 'cost' }));
 
-T.push(q('T3.4', 'T3', 'B', 'single', 'If yes, what happened?', [
+T.push(q('T3.4', 'T3', 'B', 'single', "If you were asked to pay more than one year of rent upfront, what happened?", [
   ['paid', 'I paid it'],
   ['negotiated', 'I negotiated it down'],
   ['borrowed', 'I borrowed money to meet it'],
@@ -519,7 +519,7 @@ T.push(q('T7.1', 'T7', 'B', 'single', 'Before today, had you heard of Amana Rent
   ['not_sure', 'Not sure'],
 ], { analysis: 'awareness' }));
 
-T.push(q('T7.2', 'T7', 'B', 'single', 'Based only on the description above, how useful does the overall idea seem for your own rental needs?', [
+T.push(q('T7.2', 'T7', 'B', 'single', "How useful does this rental-platform concept seem for your own rental needs?", [
   ['very', 'Very useful'],
   ['useful', 'Useful'],
   ['neither', 'Neither'],
@@ -544,7 +544,7 @@ T.push(q('T7.2', 'T7', 'B', 'single', 'Based only on the description above, how 
   T.push(q(key, 'T7', 'B', 'likert', text, SCALE_1_5, { ...LIKERT_IMPORTANCE, analysis: 'feature' }));
 });
 
-T.push(q('T7.15', 'T7', 'B', 'rank', 'Which THREE functions above would most influence you to try Amana RentalHub NG? Write the numbers:', null, {
+T.push(q('T7.15', 'T7', 'B', 'rank', "Select THREE functions that would most influence you to try Amana RentalHub NG.", null, {
   minPicks: 3,
   maxPicks: 3,
   analysis: 'feature',

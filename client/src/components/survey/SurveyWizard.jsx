@@ -485,7 +485,7 @@ export default function SurveyWizard({
     return (
       <div className="mt-6 space-y-4">
         <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
-          {t('survey.contact_intro', 'Tell us how to reach you (optional for the survey itself, but very helpful). We only use these details to contact you about Amana RentalHub NG — never for anything else.')}
+          {t('survey.contact_intro', 'Confidential and voluntary. Authorised RentalHub staff can see the contact details you provide.')}
         </div>
         <label className="block text-sm">
           <span className="mb-1 block font-medium text-gray-700">{t('survey.contact_name', 'Full name *')}</span>
@@ -900,7 +900,7 @@ export default function SurveyWizard({
 
       <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-[11px] text-gray-400">
         <FaShieldAlt className="text-gray-400" />
-        {t('survey.privacy_note', 'Anonymous Surveyresearch. Your personal details are never linked to your answers.')}
+        {t('survey.privacy_note', 'Confidential and voluntary. Authorised RentalHub staff can see the contact details you provide.')}
       </p>
     </div>
   );

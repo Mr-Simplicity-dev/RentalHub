@@ -933,7 +933,7 @@ const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
           )}
 
           <p className="mt-6 text-xs text-gray-400">
-            {t('public_survey.privacy', 'Anonymous · Voluntary · Your identity is never linked to your answers')}
+            {t('public_survey.privacy', 'Confidential and voluntary. Authorised RentalHub staff can see the contact details you provide.')}
           </p>
         </div>
       </div>

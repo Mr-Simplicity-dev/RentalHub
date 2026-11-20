@@ -945,6 +945,16 @@ exports.getSurveyDefinition = async (req, res) => {
       return obj[lang] || obj.en || '';
     };
 
+    const copy = require('../config/survey/context')[lang] || require('../config/survey/context').en;
+    const featureKeys=questionnaire.questions.find(q=>q.type==='rank').rankSource;
+    const featureList=featureKeys.map((key,index)=>(index+1)+'. '+localize(survey.getQuestionByKey(type,key).prompt)).join('\n');
+    const questionPrompt=question=>{
+      const prompt=localize(question.prompt);
+      if(question.type==='likert')return (question.analysis==='feature'?copy.importance:copy.agreement)+'\n\n'+prompt;
+      if(['T7.1','T7.2','T7.17','L8.1','L8.2','L8.18'].includes(question.key))return copy[type]+'\n\n'+prompt;
+      if(['T7.16','L8.17'].includes(question.key))return prompt+'\n\n'+featureList;
+      return prompt;
+    };
     const questions = questionnaire.questions.map((question) => ({
       key: question.key,
       section: question.section,
@@ -957,8 +967,8 @@ exports.getSurveyDefinition = async (req, res) => {
       maxPicks: question.maxPicks || null,
       rankSource: question.rankSource || null,
       analysis: question.analysis || null,
-      prompt: ['T7.1','L8.1'].includes(question.key) ? (require('../config/survey/context')[lang] || require('../config/survey/context').en)[type]+'\n\n'+localize(question.prompt) : localize(question.prompt),
-      options: question.type==='rank' ? question.rankSource.map(key=>({v:key,label:key+'. '+localize(survey.getQuestionByKey(type,key).prompt)})) : question.options
+      prompt: questionPrompt(question),
+      options: question.type==='rank' ? question.rankSource.map(key=>({v:key,label:localize(survey.getQuestionByKey(type,key).prompt)})) : question.options
         ? question.options.map((option) => ({
             v: option.v,
             label: question.labels?.[option.v] ? localize(question.labels[option.v]) : localize(option),

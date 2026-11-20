@@ -21,7 +21,7 @@ for(const type of ['tenant','landlord'])test(type+' can answer every paper quest
    if(question.type==='text')await act(async()=>fireEvent.change(page.getByRole('textbox'),{target:{value:'Provided response'}}));
    else{
     const options=question.type==='rank'?question.options.slice(0,3):question.type==='single'&&question.analysis==='nps'?question.options.slice(-1):question.options.slice(0,1);
-    for(const option of options){const name=question.type==='likert'?option.v+' '+option.label:option.label;await act(async()=>fireEvent.click(page.getByRole('button',{name,exact:true})));}
+    for(const option of options){const name=question.type==='likert'?option.v+option.label:option.label;await act(async()=>fireEvent.click(page.getByRole('button',{name,exact:true})));}
    }
    const button=page.getByRole('button',{name:/^(Next|Finish)$/});
    if(question===data.questions[0])expect(button.disabled).toBe(true);
