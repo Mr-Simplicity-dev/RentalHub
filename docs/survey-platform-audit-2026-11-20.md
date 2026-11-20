@@ -46,3 +46,8 @@ Native: `src/screens/shared/PublicSurveyScreen.js`, `src/services/surveyDraftSto
 ## Release boundaries
 
 No new migration, environment variable or paid provider is required. The published APK remains v1.0.67/build 78 until a separate signed mobile release is built and published. iOS source shares these corrections, but a production IPA needs the signing/Xcode environment. Static checks and passing tests are evidence for the paths covered, not a promise that every possible project bug has been found.
+## Live deployment verification
+
+Web and backend fixes were deployed after tests. The server and mobile checkout were reconciled to the pushed commits. Only RentalHub processes 2 and 3 were reloaded. Public website: HTTP 200. Public API health: OK. Unsigned survey-administration access: HTTP 401. All 198 migrations are applied. A read-only live list check returned the linked respondent’s name, phone and email; uncollected origin remains marked missing. No survey rows were changed by that check. Self-completed online responses also use the Self-service label.
+
+Backup: /var/backups/rentalhub/platform-audit-20261120. The live build used its existing settings in place; no secret settings file was copied to the audit folder. The signed APK download remains unchanged.
