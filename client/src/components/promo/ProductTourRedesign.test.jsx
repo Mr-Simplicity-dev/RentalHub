@@ -117,13 +117,14 @@ describe('CommercialVideoShowcase redesign', () => {
 
     const view = within(container);
     const downloadLink = container.querySelector('a[download]');
-    expect(downloadLink?.getAttribute('href')).toBe('/promo/amana-app-tour-commercial.mp4');
+    expect(downloadLink?.getAttribute('href')).toBe('/promo-videos/amana-app-tour-commercial.mp4');
+    expect(container.querySelector('video')?.getAttribute('poster')).toBe('/promo-videos/posters/flagship-9x16.jpg');
 
     const widescreenBtn = view.getByRole('button', { name: /16:9 Widescreen Commercial/i });
     act(() => fireEvent.click(widescreenBtn));
 
     expect(container.querySelector('a[download]')?.getAttribute('href')).toBe(
-      '/promo/amana-app-tour-landscape.mp4'
+      '/promo-videos/amana-app-tour-landscape.mp4'
     );
 
     expect(view.queryByRole('button', { name: /Tenant Edition/i })).toBeNull();
@@ -134,18 +135,18 @@ describe('CommercialVideoShowcase redesign', () => {
     const editionsToCheck = [
       {
         btnPattern: /Tenant Edition/i,
-        landscapeHref: '/promo/amana-tenant-commercial-16x9.mp4',
-        verticalHref: '/promo/amana-tenant-commercial-9x16.mp4',
+        landscapeHref: '/promo-videos/amana-tenant-commercial-16x9.mp4',
+        verticalHref: '/promo-videos/amana-tenant-commercial-9x16.mp4',
       },
       {
         btnPattern: /Landlord & Agent Edition/i,
-        landscapeHref: '/promo/amana-landlord-commercial-16x9.mp4',
-        verticalHref: '/promo/amana-landlord-commercial-9x16.mp4',
+        landscapeHref: '/promo-videos/amana-landlord-commercial-16x9.mp4',
+        verticalHref: '/promo-videos/amana-landlord-commercial-9x16.mp4',
       },
       {
         btnPattern: /Property Protection Edition/i,
-        landscapeHref: '/promo/amana-protection-commercial-16x9.mp4',
-        verticalHref: '/promo/amana-protection-commercial-9x16.mp4',
+        landscapeHref: '/promo-videos/amana-protection-commercial-16x9.mp4',
+        verticalHref: '/promo-videos/amana-protection-commercial-9x16.mp4',
       },
     ];
 
@@ -161,7 +162,7 @@ describe('CommercialVideoShowcase redesign', () => {
 
     act(() => fireEvent.click(view.getByRole('button', { name: /9:16 Vertical Commercial/i })));
     expect(container.querySelector('a[download]')?.getAttribute('href')).toBe(
-      '/promo/amana-protection-commercial-9x16.mp4'
+      '/promo-videos/amana-protection-commercial-9x16.mp4'
     );
   });
 
@@ -192,7 +193,7 @@ describe('CommercialVideoShowcase redesign', () => {
     });
 
     expect(mockFetch).toHaveBeenCalledWith(
-      '/promo/amana-app-tour-commercial.mp4',
+      '/promo-videos/amana-app-tour-commercial.mp4',
       expect.objectContaining({ cache: 'force-cache' })
     );
     expect(mockCreateObjectURL).toHaveBeenCalledTimes(1);

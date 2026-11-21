@@ -7,23 +7,23 @@ import { FaChevronDown, FaChevronUp, FaDownload, FaFileAlt, FaFilm, FaShieldAlt 
 const ADDITIONAL_DOWNLOADS = [
   {
     edition: 'Tenant Edition — Discovery to Escrow Protection',
-    verticalHref: '/promo/amana-tenant-commercial-9x16.mp4',
+    verticalHref: '/promo-videos/amana-tenant-commercial-9x16.mp4',
     verticalName: 'amana-tenant-edition-9x16.mp4',
-    landscapeHref: '/promo/amana-tenant-commercial-16x9.mp4',
+    landscapeHref: '/promo-videos/amana-tenant-commercial-16x9.mp4',
     landscapeName: 'amana-tenant-edition-16x9.mp4',
   },
   {
     edition: 'Landlord & Accredited Agent Edition — Portfolio Command',
-    verticalHref: '/promo/amana-landlord-commercial-9x16.mp4',
+    verticalHref: '/promo-videos/amana-landlord-commercial-9x16.mp4',
     verticalName: 'amana-landlord-agent-9x16.mp4',
-    landscapeHref: '/promo/amana-landlord-commercial-16x9.mp4',
+    landscapeHref: '/promo-videos/amana-landlord-commercial-16x9.mp4',
     landscapeName: 'amana-landlord-agent-16x9.mp4',
   },
   {
     edition: 'Property Protection & Case Verification Edition',
-    verticalHref: '/promo/amana-protection-commercial-9x16.mp4',
+    verticalHref: '/promo-videos/amana-protection-commercial-9x16.mp4',
     verticalName: 'amana-property-protection-9x16.mp4',
-    landscapeHref: '/promo/amana-protection-commercial-16x9.mp4',
+    landscapeHref: '/promo-videos/amana-protection-commercial-16x9.mp4',
     landscapeName: 'amana-property-protection-16x9.mp4',
   },
 ];
@@ -124,7 +124,7 @@ export default function PromoPage() {
               </h3>
               <div className="flex flex-col gap-2.5">
                 <a
-                  href="/promo/amana-app-tour-commercial.mp4"
+                  href="/promo-videos/amana-app-tour-commercial.mp4"
                   download="amana-app-tour-9x16.mp4"
                   className="flex items-center justify-between rounded-lg border border-white/15 bg-[#071A3D] px-3.5 py-2.5 text-xs font-medium text-slate-100 transition-colors hover:border-[#C89B3C]/60 hover:bg-white/10"
                 >
@@ -132,7 +132,7 @@ export default function PromoPage() {
                   <span className="font-mono text-[#E2C275]">MP4</span>
                 </a>
                 <a
-                  href="/promo/amana-app-tour-landscape.mp4"
+                  href="/promo-videos/amana-app-tour-landscape.mp4"
                   download="amana-app-tour-16x9.mp4"
                   className="flex items-center justify-between rounded-lg border border-white/15 bg-[#071A3D] px-3.5 py-2.5 text-xs font-medium text-slate-100 transition-colors hover:border-[#C89B3C]/60 hover:bg-white/10"
                 >

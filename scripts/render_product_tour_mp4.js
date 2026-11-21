@@ -28,8 +28,8 @@ const { execSync } = require('child_process');
 const sharp = require('sharp');
 
 const ROOT_DIR = path.join(__dirname, '..');
-const PROMO_DIR = path.join(ROOT_DIR, 'client', 'public', 'promo');
-const BUILD_PROMO_DIR = path.join(ROOT_DIR, 'client', 'build', 'promo');
+const PROMO_DIR = path.join(ROOT_DIR, 'client', 'public', 'promo-videos');
+const BUILD_PROMO_DIR = path.join(ROOT_DIR, 'client', 'build', 'promo-videos');
 const ASSETS_DIR = path.join(ROOT_DIR, 'social-ads', 'assets');
 const MUSIC_DIR = path.join(
   ROOT_DIR,

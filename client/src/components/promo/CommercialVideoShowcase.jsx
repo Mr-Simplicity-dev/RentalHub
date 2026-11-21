@@ -23,6 +23,7 @@ const EDITIONS = [
     badge: 'Flagship Edition · Corporate Navy Banner',
     designStyle: 'Executive Navy Top Banner & Gold Editorial Lower-Third',
     soundtrack: 'Corporate Inspiring (fade-in/out & narration ducking)',
+    cardPoster: '/promo-videos/posters/flagship-16x9.jpg',
     summary:
       'Complete institutional overview spanning nationwide property search, verified listing details, identity-checked enquiries, 14-working-day escrow clearing, versioned tenancy agreements, and Property Protection.',
     formats: {
@@ -31,7 +32,8 @@ const EDITIONS = [
         subtitle: 'Mobile, Instagram Reels, TikTok & WhatsApp Status',
         resolution: '1080 × 1920',
         aspect: '9/16',
-        videoSrc: '/promo/amana-app-tour-commercial.mp4',
+        videoSrc: '/promo-videos/amana-app-tour-commercial.mp4',
+        posterSrc: '/promo-videos/posters/flagship-9x16.jpg',
         downloadName: 'amana-app-tour-9x16.mp4',
       },
       landscape: {
@@ -39,7 +41,8 @@ const EDITIONS = [
         subtitle: 'Partner Briefings, Presentations & Desktop Channels',
         resolution: '1280 × 720',
         aspect: '16/9',
-        videoSrc: '/promo/amana-app-tour-landscape.mp4',
+        videoSrc: '/promo-videos/amana-app-tour-landscape.mp4',
+        posterSrc: '/promo-videos/posters/flagship-16x9.jpg',
         downloadName: 'amana-app-tour-16x9.mp4',
       },
     },
@@ -90,6 +93,7 @@ const EDITIONS = [
     badge: 'Edition 02 · Daylight Editorial Magazine',
     designStyle: 'Architectural Split-Canvas Ivory & Navy Editorial',
     soundtrack: 'Acoustic Corporate (fade-in/out & narration ducking)',
+    cardPoster: '/promo-videos/posters/tenant-16x9.jpg',
     summary:
       'Designed for Nigerian renters—demonstrating transparent search filters, structured property specs, identity-verified access unlock, 14-working-day escrow clearing, and versioned digital leases.',
     formats: {
@@ -98,7 +102,8 @@ const EDITIONS = [
         subtitle: 'Tenant Mobile & Social Distribution',
         resolution: '1080 × 1920',
         aspect: '9/16',
-        videoSrc: '/promo/amana-tenant-commercial-9x16.mp4',
+        videoSrc: '/promo-videos/amana-tenant-commercial-9x16.mp4',
+        posterSrc: '/promo-videos/posters/tenant-9x16.jpg',
         downloadName: 'amana-tenant-edition-9x16.mp4',
       },
       landscape: {
@@ -106,39 +111,40 @@ const EDITIONS = [
         subtitle: 'Desktop, Web & Tenant Orientation Screens',
         resolution: '1280 × 720',
         aspect: '16/9',
-        videoSrc: '/promo/amana-tenant-commercial-16x9.mp4',
+        videoSrc: '/promo-videos/amana-tenant-commercial-16x9.mp4',
+        posterSrc: '/promo-videos/posters/tenant-16x9.jpg',
         downloadName: 'amana-tenant-edition-16x9.mp4',
       },
     },
-    defaultDuration: 50,
+    defaultDuration: 42,
     chapters: [
       {
         startSec: 0,
-        time: '0:00 – 0:10',
+        time: '0:00 – 0:08',
         title: 'Nationwide Residential Search',
         desc: 'Filter homes across all 36 states and FCT by city, budget, bedrooms, and verification status.',
       },
       {
-        startSec: 10,
-        time: '0:10 – 0:20',
+        startSec: 8,
+        time: '0:08 – 0:17',
         title: 'Structured Listing Specifications',
         desc: 'Review verified indicators, inspection media availability, and annual rent upfront.',
       },
       {
-        startSec: 20,
-        time: '0:20 – 0:30',
+        startSec: 17,
+        time: '0:17 – 0:25',
         title: 'Identity Checks & Direct Access',
         desc: 'Complete account verification and unlock full address details and in-platform communication.',
       },
       {
-        startSec: 30,
-        time: '0:30 – 0:40',
+        startSec: 25,
+        time: '0:25 – 0:34',
         title: 'Escrow-Tracked Rent Clearing',
         desc: 'Rent payments pass through a structured 14-working-day escrow clearing window with refund review eligibility.',
       },
       {
-        startSec: 40,
-        time: '0:40 – 0:50',
+        startSec: 34,
+        time: '0:34 – 0:42',
         title: 'Digital Lease & Move-In Tools',
         desc: 'Review and sign versioned agreements online and access optional relocation and fumigation bookings.',
       },
@@ -151,6 +157,7 @@ const EDITIONS = [
     badge: 'Edition 03 · Institutional Command Showcase',
     designStyle: 'Obsidian Navy Gold-Framed Portfolio Dashboard',
     soundtrack: 'An Inspiring Corporate (fade-in/out & narration ducking)',
+    cardPoster: '/promo-videos/posters/landlord-16x9.jpg',
     summary:
       'Built for property owners and accredited agents—highlighting multi-property portfolio publishing, screened enquiries, scoped agent delegation, escrow clearing to bank withdrawals, and versioned leases.',
     formats: {
@@ -159,7 +166,8 @@ const EDITIONS = [
         subtitle: 'Landlord & Accredited Agent Mobile Channels',
         resolution: '1080 × 1920',
         aspect: '9/16',
-        videoSrc: '/promo/amana-landlord-commercial-9x16.mp4',
+        videoSrc: '/promo-videos/amana-landlord-commercial-9x16.mp4',
+        posterSrc: '/promo-videos/posters/landlord-9x16.jpg',
         downloadName: 'amana-landlord-agent-9x16.mp4',
       },
       landscape: {
@@ -167,39 +175,40 @@ const EDITIONS = [
         subtitle: 'Owner Briefings, Estate Meetings & Widescreen Displays',
         resolution: '1280 × 720',
         aspect: '16/9',
-        videoSrc: '/promo/amana-landlord-commercial-16x9.mp4',
+        videoSrc: '/promo-videos/amana-landlord-commercial-16x9.mp4',
+        posterSrc: '/promo-videos/posters/landlord-16x9.jpg',
         downloadName: 'amana-landlord-agent-16x9.mp4',
       },
     },
-    defaultDuration: 46,
+    defaultDuration: 42,
     chapters: [
       {
         startSec: 0,
-        time: '0:00 – 0:09',
+        time: '0:00 – 0:08',
         title: 'Institutional Property Presentation',
         desc: 'Publish structured specifications, inspection media, and verified owner profiles in one workspace.',
       },
       {
-        startSec: 9,
-        time: '0:09 – 0:18',
+        startSec: 8,
+        time: '0:08 – 0:17',
         title: 'Identity-Checked Tenant Enquiries',
         desc: 'Protect full property addresses until prospective tenants complete verification and unlock access.',
       },
       {
-        startSec: 18,
-        time: '0:18 – 0:27',
+        startSec: 17,
+        time: '0:17 – 0:25',
         title: 'Accredited Agent Delegation',
         desc: 'Assign scoped operational permissions to accredited agents while maintaining full landlord visibility.',
       },
       {
-        startSec: 27,
-        time: '0:27 – 0:36',
+        startSec: 25,
+        time: '0:25 – 0:34',
         title: 'Escrow Ledger & Verified Payouts',
         desc: 'Monitor 14-working-day escrow clearing into cleared balances ready for verified bank withdrawal.',
       },
       {
-        startSec: 36,
-        time: '0:36 – 0:46',
+        startSec: 34,
+        time: '0:34 – 0:42',
         title: 'Versioned Agreements & Portfolio Governance',
         desc: 'Issue versioned digital tenancy agreements with SHA-256 document integrity records.',
       },
@@ -212,6 +221,7 @@ const EDITIONS = [
     badge: 'Edition 04 · Property Registry Dossier',
     designStyle: 'Deep Forest-Navy & Emerald Registry Dossier Aesthetic',
     soundtrack: 'Corporate Strings (fade-in/out & narration ducking)',
+    cardPoster: '/promo-videos/posters/protection-16x9.jpg',
     summary:
       'Focused on landowners, families, corporate teams, and diaspora stakeholders—covering free basic property records, unlisted land support, optional priced registry and survey workflows, and public case verification.',
     formats: {
@@ -220,7 +230,8 @@ const EDITIONS = [
         subtitle: 'Property Protection Mobile & Stakeholder Sharing',
         resolution: '1080 × 1920',
         aspect: '9/16',
-        videoSrc: '/promo/amana-protection-commercial-9x16.mp4',
+        videoSrc: '/promo-videos/amana-protection-commercial-9x16.mp4',
+        posterSrc: '/promo-videos/posters/protection-9x16.jpg',
         downloadName: 'amana-property-protection-9x16.mp4',
       },
       landscape: {
@@ -228,7 +239,8 @@ const EDITIONS = [
         subtitle: 'Corporate, Diaspora & Institutional Briefings',
         resolution: '1280 × 720',
         aspect: '16/9',
-        videoSrc: '/promo/amana-protection-commercial-16x9.mp4',
+        videoSrc: '/promo-videos/amana-protection-commercial-16x9.mp4',
+        posterSrc: '/promo-videos/posters/protection-16x9.jpg',
         downloadName: 'amana-property-protection-16x9.mp4',
       },
     },
@@ -282,10 +294,12 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
 
   const [loadState, setLoadState] = useState('idle');
   const [loadProgress, setLoadProgress] = useState(0);
+  const [loadedBytesLabel, setLoadedBytesLabel] = useState('');
   const [loadedBlobUrl, setLoadedBlobUrl] = useState(null);
   const [loadError, setLoadError] = useState('');
 
   const videoRef = useRef(null);
+  const playerFrameRef = useRef(null);
   const blobCacheRef = useRef(new Map());
   const abortControllerRef = useRef(null);
 
@@ -323,6 +337,7 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
     setLoadedBlobUrl(cachedUrl);
     setLoadState(cachedUrl ? 'ready' : 'idle');
     setLoadProgress(cachedUrl ? 100 : 0);
+    setLoadedBytesLabel('');
     setLoadError('');
     setCurrentTime(0);
     setDuration(activeEdition.defaultDuration);
@@ -335,6 +350,13 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
       video.load();
     }
   }, [currentVideoSrc, activeEdition.defaultDuration]);
+
+  const handleSelectEdition = (editionId) => {
+    setActiveEditionId(editionId);
+    if (playerFrameRef.current && typeof playerFrameRef.current.scrollIntoView === 'function') {
+      playerFrameRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
 
   const startPlaybackOnVideo = async (video, seekSec = null) => {
     if (!video) return;
@@ -424,6 +446,7 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
 
     setLoadState('loading');
     setLoadProgress(0);
+    setLoadedBytesLabel('');
     setLoadError('');
 
     try {
@@ -451,9 +474,14 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
           if (value) {
             chunks.push(value);
             receivedBytes += value.byteLength;
+            const recMb = (receivedBytes / (1024 * 1024)).toFixed(1);
             if (totalBytes > 0) {
+              const totMb = (totalBytes / (1024 * 1024)).toFixed(1);
               const pct = Math.min(99, Math.round((receivedBytes / totalBytes) * 100));
               setLoadProgress(pct);
+              setLoadedBytesLabel(`${recMb} / ${totMb} MB`);
+            } else {
+              setLoadedBytesLabel(`${recMb} MB buffered`);
             }
           }
         }
@@ -504,6 +532,7 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
     }
     setLoadState('idle');
     setLoadProgress(0);
+    setLoadedBytesLabel('');
     setLoadError('');
   };
 
@@ -646,51 +675,67 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
           </button>
         </div>
 
+        {/* Unveiled Commercial Editions Gallery with Visual Thumbnails */}
         {showMoreEditions && (
           <div
-            className="mb-8 rounded-xl border border-white/12 bg-[#051430]/90 p-4 sm:p-5"
+            className="mb-8 rounded-xl border border-white/15 bg-[#051430]/95 p-4 sm:p-5"
             aria-label="Additional commercial editions"
           >
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#E2C275]">
-                Select Commercial Edition (Each Edition Includes 9:16 &amp; 16:9 Masters)
+                Select a Commercial Edition to Preview &amp; Watch (9:16 &amp; 16:9 Available)
               </p>
               <span className="text-[11px] text-slate-400">
                 4 distinct visual layouts &amp; curated corporate scores
               </span>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
               {EDITIONS.map((edition, idx) => {
                 const isSelected = edition.id === activeEditionId;
                 return (
                   <button
                     key={edition.id}
                     type="button"
-                    onClick={() => setActiveEditionId(edition.id)}
+                    onClick={() => handleSelectEdition(edition.id)}
                     aria-pressed={isSelected}
-                    className={`flex flex-col items-start rounded-lg border p-3.5 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-[#C89B3C] ${
+                    className={`group flex flex-col overflow-hidden rounded-lg border text-left transition-colors focus:outline-none focus:ring-2 focus:ring-[#C89B3C] ${
                       isSelected
-                        ? 'border-[#C89B3C] bg-[#0C244E] text-white shadow-md'
-                        : 'border-white/10 bg-[#071A3D]/70 text-slate-200 hover:border-white/25 hover:bg-[#0C244E]/70'
+                        ? 'border-[#C89B3C] bg-[#0C244E] text-white shadow-lg ring-1 ring-[#C89B3C]/40'
+                        : 'border-white/10 bg-[#071A3D]/80 text-slate-200 hover:border-[#C89B3C]/60 hover:bg-[#0C244E]/80'
                     }`}
                   >
-                    <div className="flex w-full items-center justify-between gap-2">
-                      <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-[#E2C275]">
-                        0{idx + 1} · {edition.shortLabel}
+                    <div className="relative aspect-video w-full overflow-hidden bg-slate-950">
+                      <img
+                        src={edition.cardPoster}
+                        alt={`${edition.shortLabel} visual preview`}
+                        loading="lazy"
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#051430]/80 via-transparent to-transparent" />
+                      <span className="absolute bottom-2 left-2 rounded bg-[#051430]/90 px-2 py-0.5 font-mono text-[10px] font-semibold text-[#E2C275]">
+                        0{idx + 1} · {formatTime(edition.defaultDuration)}
                       </span>
-                      {isSelected && (
-                        <span className="rounded bg-[#C89B3C]/20 px-1.5 py-0.5 text-[10px] font-semibold text-[#F3D899]">
-                          Active
-                        </span>
-                      )}
+                      <span className="absolute bottom-2 right-2 flex h-7 w-7 items-center justify-center rounded-full border border-[#E2C275]/70 bg-[#071A3D]/90 text-white">
+                        <FaPlay size={9} className="ml-0.5" aria-hidden="true" />
+                      </span>
                     </div>
-                    <p className="mt-1.5 text-xs font-semibold leading-snug text-white">
-                      {edition.designStyle}
-                    </p>
-                    <p className="mt-1 text-[11px] leading-4 text-slate-400">
-                      9:16 &amp; 16:9 · Full-buffer playback
-                    </p>
+
+                    <div className="flex flex-1 flex-col p-3">
+                      <div className="flex w-full items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-white">
+                          {edition.shortLabel}
+                        </span>
+                        {isSelected && (
+                          <span className="rounded bg-[#C89B3C]/20 px-1.5 py-0.5 text-[10px] font-semibold text-[#F3D899]">
+                            Selected
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-[11px] leading-4 text-slate-300">
+                        {edition.designStyle}
+                      </p>
+                    </div>
                   </button>
                 );
               })}
@@ -698,7 +743,7 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
           </div>
         )}
 
-        <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-12">
+        <div ref={playerFrameRef} className="grid grid-cols-1 items-start gap-8 lg:grid-cols-12">
           <div
             className={`flex flex-col items-center ${
               isWidescreen ? 'lg:col-span-7' : 'lg:col-span-5'
@@ -716,8 +761,10 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
                 onClick={togglePlay}
               >
                 <video
+                  key={currentVideoSrc}
                   ref={videoRef}
                   src={loadedBlobUrl || currentVideoSrc}
+                  poster={activeClip.posterSrc}
                   className="h-full w-full object-cover"
                   playsInline
                   muted={isMuted}
@@ -729,7 +776,7 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
 
                 {loadState === 'loading' && (
                   <div
-                    className="absolute inset-0 flex flex-col items-center justify-center bg-[#051430]/90 px-6 text-center backdrop-blur-[2px]"
+                    className="absolute inset-0 flex flex-col items-center justify-center bg-[#051430]/88 px-6 text-center backdrop-blur-[2px]"
                     role="status"
                     aria-live="polite"
                     onClick={(e) => e.stopPropagation()}
@@ -740,10 +787,15 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
                     <p className="mt-2 text-2xl font-semibold tabular-nums text-white">
                       {loadProgress > 0 ? `${loadProgress}%` : 'Loading…'}
                     </p>
+                    {loadedBytesLabel && (
+                      <p className="mt-0.5 font-mono text-[11px] text-slate-300">
+                        {loadedBytesLabel}
+                      </p>
+                    )}
                     <div className="mt-3 h-1.5 w-full max-w-[220px] overflow-hidden rounded-full bg-white/15">
                       <div
                         className="h-full rounded-full bg-[#C89B3C] transition-[width] duration-150"
-                        style={{ width: `${Math.max(loadProgress, 6)}%` }}
+                        style={{ width: `${Math.max(loadProgress, 8)}%` }}
                       />
                     </div>
                     <p className="mt-2.5 max-w-[240px] text-[11px] leading-4 text-slate-300">
@@ -777,14 +829,14 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
                 )}
 
                 {!isPlaying && loadState !== 'loading' && loadState !== 'error' && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#071A3D]/35 transition-colors hover:bg-[#071A3D]/25">
-                    <span className="flex h-16 w-16 items-center justify-center rounded-full border border-[#E2C275]/70 bg-[#071A3D]/90 text-white shadow-lg">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#071A3D]/25 transition-colors hover:bg-[#071A3D]/15">
+                    <span className="flex h-16 w-16 items-center justify-center rounded-full border border-[#E2C275]/80 bg-[#071A3D]/90 text-white shadow-xl">
                       <FaPlay className="ml-1" size={20} aria-hidden="true" />
                     </span>
-                    <span className="mt-3 rounded-md border border-white/15 bg-[#051430]/85 px-3 py-1 text-[11px] font-medium text-slate-100">
+                    <span className="mt-3 rounded-md border border-white/20 bg-[#051430]/90 px-3 py-1 text-[11px] font-medium text-slate-100 shadow">
                       {loadState === 'ready'
-                        ? 'Buffered · Instant Playback'
-                        : 'Play · Buffers Fully Before Starting'}
+                        ? `Play ${activeEdition.shortLabel} · Buffered`
+                        : `Play ${activeEdition.shortLabel} · Buffers Fully`}
                     </span>
                   </div>
                 )}
