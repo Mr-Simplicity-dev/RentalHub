@@ -117,8 +117,9 @@ const getSimilarProperties = async (propertyId, limit = 5) => {
 
     const result = await db.query(
       `SELECT
-         p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
+         p.id, p.title, p.property_type, p.bedrooms, p.bathrooms, p.parking_spaces,
          p.rent_amount, p.payment_frequency, p.city, p.area,
+         p.amenities, p.structured_features,
          s.state_name,
          (SELECT photo_url
           FROM property_photos
@@ -151,8 +152,9 @@ const getSimilarProperties = async (propertyId, limit = 5) => {
     if (result.rows.length === 0) {
       const fallbackResult = await db.query(
         `SELECT
-           p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
+           p.id, p.title, p.property_type, p.bedrooms, p.bathrooms, p.parking_spaces,
            p.rent_amount, p.payment_frequency, p.city, p.area,
+           p.amenities, p.structured_features,
            s.state_name,
            (SELECT photo_url
             FROM property_photos
@@ -214,8 +216,9 @@ const getRecommendations = async (userId, limit = 10) => {
     if (!savedProperties.rows.length) {
       const fallback = await db.query(
         `SELECT
-           p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
+           p.id, p.title, p.property_type, p.bedrooms, p.bathrooms, p.parking_spaces,
            p.rent_amount, p.payment_frequency, p.city, p.area,
+           p.amenities, p.structured_features,
            s.state_name,
            (SELECT photo_url
             FROM property_photos
@@ -251,8 +254,9 @@ const getRecommendations = async (userId, limit = 10) => {
 
     const result = await db.query(
       `SELECT
-         p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
+         p.id, p.title, p.property_type, p.bedrooms, p.bathrooms, p.parking_spaces,
          p.rent_amount, p.payment_frequency, p.city, p.area,
+         p.amenities, p.structured_features,
          s.state_name,
          (SELECT photo_url
           FROM property_photos
@@ -280,8 +284,9 @@ const getRecommendations = async (userId, limit = 10) => {
     if (!result.rows.length) {
       const fallback = await db.query(
         `SELECT
-           p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
+           p.id, p.title, p.property_type, p.bedrooms, p.bathrooms, p.parking_spaces,
            p.rent_amount, p.payment_frequency, p.city, p.area,
+           p.amenities, p.structured_features,
            s.state_name,
            (SELECT photo_url
             FROM property_photos

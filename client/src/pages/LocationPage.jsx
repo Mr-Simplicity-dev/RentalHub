@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { FaBed, FaBath, FaCar } from 'react-icons/fa';
+import { getParkingSummary } from '../utils/propertyParking';
 
 export default function LocationPage() {
   const { t } = useTranslation();
@@ -36,6 +38,17 @@ export default function LocationPage() {
         <p className="text-sm text-gray-600">
           {[property.area, property.city, property.state_name].filter(Boolean).join(', ')}
         </p>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+          <span className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-1">
+            <FaBed className="text-primary-500" /> {Number(property.bedrooms || 0)} {t('property_card.bed_short', 'Bed')}
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-1">
+            <FaBath className="text-primary-500" /> {Number(property.bathrooms || 0)} {t('property_card.bath_short', 'Bath')}
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-1">
+            <FaCar className="text-primary-500" /> {getParkingSummary(property).label} {t('property_card.park_short', 'Park')}
+          </span>
+        </div>
         <p className="text-lg font-bold text-gray-900">{currency(property.rent_amount)}</p>
       </div>
     </Link>

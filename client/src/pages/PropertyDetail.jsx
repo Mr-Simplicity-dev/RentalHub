@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { propertyService } from '../services/propertyService';
+import { getParkingSummary } from '../utils/propertyParking';
 import { applicationService } from '../services/applicationService';
 import { paymentService } from '../services/paymentService';
 import { useAuth } from '../hooks/useAuth';
@@ -17,6 +18,7 @@ import OnlineStatusBadge from '../components/calls/OnlineStatusBadge';
 import {
   FaBed,
   FaBath,
+  FaCar,
   FaMapMarkerAlt,
   FaHeart,
   FaRegHeart,
@@ -502,7 +504,7 @@ const PropertyDetail = () => {
             </div>
 
             {/* Features */}
-            <div className="mb-6 grid grid-cols-1 gap-4 border-b pb-6 sm:grid-cols-3">
+            <div className="mb-6 grid grid-cols-2 gap-4 border-b pb-6 sm:grid-cols-4">
               <div className="text-center">
                 <FaBed className="text-2xl text-gray-600 mx-auto mb-2" />
                 <div className="font-semibold">{property.bedrooms}</div>
@@ -512,6 +514,11 @@ const PropertyDetail = () => {
                 <FaBath className="text-2xl text-gray-600 mx-auto mb-2" />
                 <div className="font-semibold">{property.bathrooms}</div>
                 <div className="text-sm text-gray-600">{t('property_detail.bathrooms')}</div>
+              </div>
+              <div className="text-center">
+                <FaCar className="text-2xl text-gray-600 mx-auto mb-2" />
+                <div className="font-semibold">{getParkingSummary(property).label}</div>
+                <div className="text-sm text-gray-600">{t('property_detail.parking', 'Parking')}</div>
               </div>
               <div className="text-center">
                 <FaStar className="text-2xl text-yellow-500 mx-auto mb-2" />

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { FaBed, FaBath, FaMapMarkerAlt, FaHeart, FaRegHeart, FaStar } from 'react-icons/fa';
+import { FaBed, FaBath, FaCar, FaMapMarkerAlt, FaHeart, FaRegHeart, FaStar } from 'react-icons/fa';
+import { getParkingSummary } from '../../utils/propertyParking';
 import { formatCurrency } from '../../utils/helpers';
 import PropertyShareButton from './PropertyShareButton';
 import { useTranslation } from 'react-i18next';
@@ -129,6 +130,7 @@ const PropertyCard = ({
   const { t } = useTranslation();
   const detailLink = `/properties/${property.id}`;
   const resolvedApplyLink = applyLink || `${detailLink}?apply=1`;
+  const parking = getParkingSummary(property);
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl hover:border-gray-200 transition-all duration-500 transform hover:-translate-y-1.5 group">
@@ -190,13 +192,17 @@ const PropertyCard = ({
 
         {/* Features */}
         <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-gray-500">
-          <div className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-lg">
+          <div className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-lg" title={t('property_card.bedrooms', 'Bedrooms')}>
             <FaBed className="text-primary-500" />
-            <span className="font-medium">{property.bedrooms}</span>
+            <span className="font-medium">{Number(property.bedrooms || 0)} {t('property_card.bed_short', 'Bed')}</span>
           </div>
-          <div className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-lg">
+          <div className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-lg" title={t('property_card.bathrooms', 'Bathrooms')}>
             <FaBath className="text-primary-500" />
-            <span className="font-medium">{property.bathrooms}</span>
+            <span className="font-medium">{Number(property.bathrooms || 0)} {t('property_card.bath_short', 'Bath')}</span>
+          </div>
+          <div className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-lg" title={t('property_card.parking', 'Parking spaces')}>
+            <FaCar className="text-primary-500" />
+            <span className="font-medium">{parking.label} {t('property_card.park_short', 'Park')}</span>
           </div>
           {property.avg_rating && (
             <div className="flex items-center gap-1.5 bg-yellow-50 px-2.5 py-1 rounded-lg">

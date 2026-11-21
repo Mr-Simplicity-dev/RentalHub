@@ -24,7 +24,7 @@ const AddProperty = () => {
   const [createdPropertyId, setCreatedPropertyId] = useState(null);
   const [form, setForm] = useState({
     title: '', description: '', state: '', state_id: '', lga_name: '', city: '', area: '', property_type: '',
-    rent_amount: '', payment_frequency: 'yearly', bedrooms: '', bathrooms: '',
+    rent_amount: '', payment_frequency: 'yearly', bedrooms: '', bathrooms: '', parking_spaces: '',
     amenities: '', is_available: true, latitude: '', longitude: '',
   });
   const [locationOptions, setLocationOptions] = useState([]);
@@ -220,9 +220,10 @@ const AddProperty = () => {
             <input type="number" name="rent_amount" value={form.rent_amount} onChange={handleChange} className="input" placeholder={t('add_property.form.rent')} />
             <select name="payment_frequency" value={form.payment_frequency} onChange={handleChange} className="input"><option value="yearly">{t('add_property.form.yearly')}</option><option value="monthly">{t('add_property.form.monthly')}</option></select>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <input type="number" name="bedrooms" value={form.bedrooms} onChange={handleChange} className="input" placeholder={t('add_property.form.bedrooms')} />
-            <input type="number" name="bathrooms" value={form.bathrooms} onChange={handleChange} className="input" placeholder={t('add_property.form.bathrooms')} />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <input type="number" min="0" name="bedrooms" value={form.bedrooms} onChange={handleChange} className="input" placeholder={t('add_property.form.bedrooms')} />
+            <input type="number" min="0" name="bathrooms" value={form.bathrooms} onChange={handleChange} className="input" placeholder={t('add_property.form.bathrooms')} />
+            <input type="number" min="0" name="parking_spaces" value={form.parking_spaces} onChange={handleChange} className="input" placeholder={t('add_property.form.parking_spaces', 'Parking spaces')} />
           </div>
           <input name="amenities" value={form.amenities} onChange={handleChange} className="input" placeholder={t('add_property.form.amenities')} />
           <PropertyFeaturesForm value={structuredFeatures} onChange={setStructuredFeatures} />

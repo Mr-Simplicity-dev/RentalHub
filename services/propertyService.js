@@ -12,6 +12,7 @@ const { resolveLocationSelection } = require('../config/utils/locationDirectory'
 const { resolveTenantPropertyLocationAccess } = require('../config/utils/tenantLocationAccess');
 const { statesMatch } = require('../config/utils/stateScope');
 const { validateStructuredFeatures } = require('../config/utils/propertyFeatureSchema');
+const { resolveParkingSpaces, syncStructuredParking } = require('../config/utils/parkingInfo');
 let propertySchemaReady = false;
 
 const PROPERTY_IMAGE_CAPTURE_TTL_MS =
@@ -145,6 +146,7 @@ const ensurePropertySchema = async () => {
     ADD COLUMN IF NOT EXISTS lga_name VARCHAR(120),
     ADD COLUMN IF NOT EXISTS latitude DECIMAL(10, 8),
     ADD COLUMN IF NOT EXISTS longitude DECIMAL(11, 8),
+    ADD COLUMN IF NOT EXISTS parking_spaces INTEGER NOT NULL DEFAULT 0,
     ADD COLUMN IF NOT EXISTS structured_features JSONB NOT NULL DEFAULT '{}'::jsonb,
     ADD COLUMN IF NOT EXISTS video_variants JSONB NOT NULL DEFAULT '[]'::jsonb;
 
@@ -465,9 +467,9 @@ exports.browseProperties = async (req, res) => {
 
     const result = await db.query(
       `SELECT 
-        p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
+        p.id, p.title, p.property_type, p.bedrooms, p.bathrooms, p.parking_spaces,
         p.rent_amount, p.payment_frequency, p.city, p.area, p.lga_name,
-        p.structured_features, p.featured, p.created_at,
+        p.amenities, p.structured_features, p.featured, p.created_at,
         s.state_name, s.state_code,
         (SELECT photo_url FROM property_photos 
          WHERE property_id = p.id AND is_primary = TRUE LIMIT 1) AS primary_photo,
@@ -543,9 +545,9 @@ exports.getFeaturedProperties = async (req, res) => {
 
     const result = await db.query(
       `SELECT 
-        p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
+        p.id, p.title, p.property_type, p.bedrooms, p.bathrooms, p.parking_spaces,
         p.rent_amount, p.payment_frequency, p.city, p.area,
-        p.created_at,
+        p.amenities, p.structured_features, p.featured, p.created_at,
         s.state_name, s.state_code,
         (SELECT photo_url FROM property_photos 
          WHERE property_id = p.id AND is_primary = TRUE LIMIT 1) AS primary_photo,
@@ -564,9 +566,9 @@ exports.getFeaturedProperties = async (req, res) => {
       const fallbackConditions = whereConditions.filter((c) => c !== 'p.featured = TRUE');
       const fallbackResult = await db.query(
         `SELECT 
-          p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
+          p.id, p.title, p.property_type, p.bedrooms, p.bathrooms, p.parking_spaces,
           p.rent_amount, p.payment_frequency, p.city, p.area,
-          p.created_at,
+          p.amenities, p.structured_features, p.featured, p.created_at,
           s.state_name, s.state_code,
           (SELECT photo_url FROM property_photos 
            WHERE property_id = p.id AND is_primary = TRUE LIMIT 1) AS primary_photo,
@@ -774,7 +776,7 @@ exports.searchProperties = async (req, res) => {
 
     const query = `
       SELECT 
-        p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
+        p.id, p.title, p.property_type, p.bedrooms, p.bathrooms, p.parking_spaces,
         p.rent_amount, p.payment_frequency, p.city, p.area, p.lga_name,
         p.amenities, p.structured_features, p.featured, p.created_at,
         s.state_name, s.state_code,
@@ -833,9 +835,9 @@ exports.getPropertyById = async (req, res) => {
 
     const result = await db.query(
       `SELECT 
-        p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
+        p.id, p.title, p.property_type, p.bedrooms, p.bathrooms, p.parking_spaces,
         p.rent_amount, p.payment_frequency, p.city, p.area,
-        p.featured, p.created_at,
+        p.amenities, p.structured_features, p.featured, p.created_at,
         s.state_name, s.state_code,
         (SELECT AVG(rating) FROM reviews WHERE property_id = p.id) AS avg_rating,
         (SELECT COUNT(*) FROM reviews WHERE property_id = p.id) AS review_count
@@ -1029,9 +1031,9 @@ exports.getSavedProperties = async (req, res) => {
 
     const result = await db.query(
       `SELECT 
-        p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
+        p.id, p.title, p.property_type, p.bedrooms, p.bathrooms, p.parking_spaces,
         p.rent_amount, p.payment_frequency, p.city, p.area,
-        p.featured, p.created_at, sp.created_at AS saved_at,
+        p.amenities, p.structured_features, p.featured, p.created_at, sp.created_at AS saved_at,
         s.state_name, s.state_code,
         (SELECT photo_url FROM property_photos 
          WHERE property_id = p.id AND is_primary = TRUE LIMIT 1) AS primary_photo,
@@ -1331,6 +1333,7 @@ exports.createProperty = async (req, res) => {
       property_type,
       bedrooms,
       bathrooms,
+      parking_spaces,
       rent_amount,
       payment_frequency,
       title,
@@ -1499,16 +1502,28 @@ exports.createProperty = async (req, res) => {
     client = await db.connect();
     await client.query('BEGIN');
 
+    const hasExplicitParking = parking_spaces !== undefined && parking_spaces !== null && parking_spaces !== '';
+    const resolvedParkingSpaces = resolveParkingSpaces({
+      parking_spaces,
+      structured_features: parsedStructuredFeatures,
+      amenities: parsedAmenities,
+    });
+    const syncedStructuredFeatures = syncStructuredParking(
+      parsedStructuredFeatures,
+      resolvedParkingSpaces,
+      hasExplicitParking
+    );
+
     const result = await client.query(
       `INSERT INTO properties (
          landlord_id, user_id, state, state_id, lga_name, city, area, full_address,
          latitude, longitude,
-         property_type, bedrooms, bathrooms,
+         property_type, bedrooms, bathrooms, parking_spaces,
          price, rent_amount, payment_frequency,
          title, description, amenities, structured_features, is_available, is_verified, status, video_url
        )
        VALUES (
-         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24
+         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25
        )
       RETURNING *`,
       [
@@ -1525,13 +1540,14 @@ exports.createProperty = async (req, res) => {
         property_type,
         Number(bedrooms) || 0,
         Number(bathrooms) || 0,
+        resolvedParkingSpaces,
         rent_amount,
         rent_amount,
         payment_frequency || 'yearly',
         title,
         description,
         JSON.stringify(parsedAmenities),
-        JSON.stringify(parsedStructuredFeatures),
+        JSON.stringify(syncedStructuredFeatures),
         is_available === false || is_available === 'false' ? false : true,
         false,
         'pending',

@@ -88,8 +88,9 @@ exports.getPropertiesByState = async (req, res) => {
     
     const query = `
       SELECT 
-        p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
+        p.id, p.title, p.property_type, p.bedrooms, p.bathrooms, p.parking_spaces,
         p.rent_amount, p.payment_frequency, p.city, p.area,
+        p.amenities, p.structured_features,
         s.state_name AS state, p.featured, p.created_at,
         u.full_name as landlord_name,
         (SELECT photo_url FROM property_photos 
