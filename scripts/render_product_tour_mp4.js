@@ -559,14 +559,29 @@ async function synthesizeVoiceover(editionId, text) {
   }
 }
 
+const OFFICIAL_MARK_PNG = path.join(ROOT_DIR, 'assets', 'rentalhub-mark.png');
+const OFFICIAL_MARK_DATA_URI = fs.existsSync(OFFICIAL_MARK_PNG)
+  ? `data:image/png;base64,${fs.readFileSync(OFFICIAL_MARK_PNG).toString('base64')}`
+  : null;
+
 function buildBrandMarkSvg(x, y, size, bgFill = '#0C244E', accent = BRAND.gold) {
+  if (OFFICIAL_MARK_DATA_URI) {
+    const r = Math.round(size * 0.22);
+    const clipId = `markClip_${Math.round(x)}_${Math.round(y)}_${Math.round(size)}`;
+    return `
+      <defs>
+        <clipPath id="${clipId}">
+          <rect x="${x}" y="${y}" width="${size}" height="${size}" rx="${r}" ry="${r}"/>
+        </clipPath>
+      </defs>
+      <image href="${OFFICIAL_MARK_DATA_URI}" x="${x}" y="${y}" width="${size}" height="${size}" preserveAspectRatio="xMidYMid meet" clip-path="url(#${clipId})"/>
+      <rect x="${x}" y="${y}" width="${size}" height="${size}" rx="${r}" ry="${r}" fill="none" stroke="${accent}" stroke-opacity="0.65" stroke-width="1.5"/>
+    `;
+  }
   const s = size / 48;
   return `
     <g transform="translate(${x}, ${y}) scale(${s})">
       <rect x="0" y="0" width="48" height="48" rx="10" fill="${bgFill}" stroke="${accent}" stroke-width="2"/>
-      <path d="M12 24 L24 13 L36 24" fill="none" stroke="${accent}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M16 23 V35 H32 V23" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linejoin="round"/>
-      <rect x="21.5" y="27" width="5" height="8" rx="1" fill="${accent}"/>
     </g>
   `;
 }
@@ -1336,10 +1351,10 @@ async function renderFormatForEdition(edition, formatKey, actDurationSec, voFile
   //    + sidechaincompress dynamic ducking under narration (650ms entrance delay)
   if (voFile && musicFile) {
     const audioFilter = [
-      `[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=0.38,afade=t=in:st=0:d=2.2,afade=t=out:st=${fadeOutStart}:d=2.8[mus]`,
+      `[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=0.50,afade=t=in:st=0:d=2.2,afade=t=out:st=${fadeOutStart}:d=2.8[mus]`,
       `[2:a]aformat=sample_rates=48000:channel_layouts=stereo,adelay=650|650,apad,asplit=2[vo_sc][vo_mix]`,
       `[mus][vo_sc]sidechaincompress=threshold=0.04:ratio=4.5:attack=45:release=320:makeup=1[mus_duck]`,
-      `[mus_duck][vo_mix]amix=inputs=2:duration=first:dropout_transition=2:normalize=0,alimiter=limit=0.92[aout]`,
+      `[mus_duck][vo_mix]amix=inputs=2:duration=first:dropout_transition=2:normalize=0,volume=1.42,alimiter=limit=0.95[aout]`,
     ].join(';');
 
     execSync(
@@ -1349,7 +1364,7 @@ async function renderFormatForEdition(edition, formatKey, actDurationSec, voFile
       { stdio: 'pipe' }
     );
   } else if (musicFile) {
-    const audioFilter = `[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=0.42,afade=t=in:st=0:d=2.2,afade=t=out:st=${fadeOutStart}:d=2.8,alimiter=limit=0.92[aout]`;
+    const audioFilter = `[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=0.58,afade=t=in:st=0:d=2.2,afade=t=out:st=${fadeOutStart}:d=2.8,alimiter=limit=0.95[aout]`;
     execSync(
       `ffmpeg -y -i "${visualMaster}" -stream_loop -1 -i "${musicFile}" ` +
         `-filter_complex "${audioFilter}" -map 0:v:0 -map "[aout]" -t ${totalDur.toFixed(3)} ` +
@@ -1363,6 +1378,15 @@ async function renderFormatForEdition(edition, formatKey, actDurationSec, voFile
   if (fs.existsSync(BUILD_PROMO_DIR)) {
     fs.copyFileSync(finalOut, path.join(BUILD_PROMO_DIR, outName));
   }
+
+  const postersDir = path.join(PROMO_DIR, 'posters');
+  fs.mkdirSync(postersDir, { recursive: true });
+  const posterFile = path.join(postersDir, `${edition.id}-${isVertical ? '9x16' : '16x9'}.jpg`);
+  const posterScale = isVertical ? '540:-2' : '800:-2';
+  execSync(
+    `ffmpeg -y -ss 5.5 -i "${finalOut}" -vf "scale=${posterScale}" -frames:v 1 -q:v 4 "${posterFile}"`,
+    { stdio: 'pipe' }
+  );
 
   const sizeMb = (fs.statSync(finalOut).size / (1024 * 1024)).toFixed(2);
   console.log(`   Published ${outName} (${sizeMb} MB)`);

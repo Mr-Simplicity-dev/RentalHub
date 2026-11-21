@@ -100,6 +100,14 @@ describe('ProductDemoCommercial redesign', () => {
       act(() => fireEvent.click(nextBtn));
     }
 
+    // Volume up & down controls for walkthrough audio
+    expect(view.getByRole('button', { name: /Decrease walkthrough volume/i })).toBeTruthy();
+    expect(view.getByRole('button', { name: /Increase walkthrough volume/i })).toBeTruthy();
+    expect(view.getByRole('slider', { name: /Walkthrough volume/i })).toBeTruthy();
+
+    // Real Amana RentalHub icon rendered
+    expect(container.querySelector('img[src="/rentalhub-mark.svg"]')).toBeTruthy();
+
     const pauseOrPlay = view.getByRole('button', { name: /Pause walkthrough|Play walkthrough/i });
     const initialLabel = pauseOrPlay.getAttribute('aria-label');
     act(() => fireEvent.click(pauseOrPlay));
@@ -200,6 +208,16 @@ describe('CommercialVideoShowcase redesign', () => {
     const videoEl = container.querySelector('video');
     expect(videoEl?.getAttribute('src')).toBe('blob:https://rentalhub.test/buffered-clip');
     expect(window.HTMLMediaElement.prototype.play).toHaveBeenCalled();
+
+    // Video player volume down / slider / volume up controls & real brand icon
+    expect(container.querySelector('img[src="/rentalhub-mark.svg"]')).toBeTruthy();
+    const volDown = view.getByRole('button', { name: /Decrease video volume/i });
+    const volUp = view.getByRole('button', { name: /Increase video volume/i });
+    const volSlider = view.getByRole('slider', { name: /Video volume/i });
+    act(() => fireEvent.click(volDown));
+    expect(parseFloat(volSlider.value)).toBeCloseTo(0.8, 1);
+    act(() => fireEvent.click(volUp));
+    expect(parseFloat(volSlider.value)).toBeCloseTo(0.9, 1);
   });
 });
 

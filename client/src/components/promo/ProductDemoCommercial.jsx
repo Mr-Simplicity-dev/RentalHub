@@ -6,6 +6,7 @@ import {
   FaPause,
   FaRedo,
   FaVolumeUp,
+  FaVolumeDown,
   FaVolumeMute,
   FaExpand,
   FaCompress,
@@ -135,95 +136,121 @@ const SCENES = [
 
 const TOTAL_DURATION = SCENES.reduce((acc, s) => acc + s.duration, 0);
 
-// Restrained corporate WebAudio synthesizer (silent until unmuted & playing)
-function createCorporateAudioEngine() {
-  let ctx = null;
-  let masterGain = null;
-  let intervalId = null;
-  let step = 0;
+const PRESET_AUDIO_TRACKS = {
+  executive: '/promo-videos/audio/executive-corporate.mp3',
+  minimal: '/promo-videos/audio/acoustic-corporate.mp3',
+};
 
-  const stop = () => {
-    if (intervalId) {
-      clearInterval(intervalId);
-      intervalId = null;
+// Studio preset corporate audio player with smooth fade-in, fade-out, and live volume control
+function createCorporateAudioEngine() {
+  let audioEl = null;
+  let fadeTimer = null;
+  let currentMode = null;
+  let targetVolume = 0.85;
+
+  const clearFade = () => {
+    if (fadeTimer) {
+      clearInterval(fadeTimer);
+      fadeTimer = null;
     }
-    if (masterGain && ctx) {
+  };
+
+  const clampVol = (v) => Math.max(0, Math.min(1, Number.isFinite(v) ? v : 0.85));
+
+  const fadeTo = (goal, durationMs = 600, onDone = null) => {
+    if (!audioEl) {
+      if (onDone) onDone();
+      return;
+    }
+    clearFade();
+    const startVol = audioEl.volume;
+    const steps = Math.max(1, Math.round(durationMs / 40));
+    let step = 0;
+    fadeTimer = setInterval(() => {
+      step += 1;
+      const ratio = Math.min(1, step / steps);
       try {
-        masterGain.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.08);
+        audioEl.volume = clampVol(startVol + (goal - startVol) * ratio);
       } catch {
-        // Ignore audio context teardown error
+        // Ignore volume assignment errors in headless environments
+      }
+      if (ratio >= 1) {
+        clearFade();
+        if (onDone) onDone();
+      }
+    }, 40);
+  };
+
+  const setVolume = (vol) => {
+    targetVolume = clampVol(vol);
+    if (audioEl && !audioEl.paused) {
+      clearFade();
+      try {
+        audioEl.volume = targetVolume;
+      } catch {
+        // Ignore
       }
     }
   };
 
-  const start = (mode = 'executive') => {
+  const stop = () => {
+    if (!audioEl) return;
+    fadeTo(0, 350, () => {
+      try {
+        audioEl.pause();
+      } catch {
+        // Ignore
+      }
+    });
+  };
+
+  const start = (mode = 'executive', volume = targetVolume) => {
+    targetVolume = clampVol(volume);
     try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
-      if (!ctx) {
-        ctx = new AudioCtx();
-        masterGain = ctx.createGain();
-        masterGain.gain.value = 0.0001;
-        masterGain.connect(ctx.destination);
+      if (typeof Audio === 'undefined') return;
+      const src = PRESET_AUDIO_TRACKS[mode] || PRESET_AUDIO_TRACKS.executive;
+      if (!audioEl || currentMode !== mode) {
+        if (audioEl) {
+          clearFade();
+          try {
+            audioEl.pause();
+          } catch {
+            // Ignore
+          }
+        }
+        audioEl = new Audio(src);
+        audioEl.loop = true;
+        audioEl.preload = 'auto';
+        audioEl.volume = 0.02;
+        currentMode = mode;
       }
-      if (ctx.state === 'suspended') {
-        ctx.resume();
+      const playPromise = audioEl.play();
+      if (playPromise && typeof playPromise.then === 'function') {
+        playPromise
+          .then(() => fadeTo(targetVolume, 900))
+          .catch(() => {});
+      } else {
+        fadeTo(targetVolume, 900);
       }
-      stop();
-      masterGain.gain.setTargetAtTime(0.055, ctx.currentTime, 0.25);
-
-      const chords =
-        mode === 'minimal'
-          ? [
-              [220.0, 261.63, 329.63],
-              [196.0, 246.94, 293.66],
-              [174.61, 220.0, 261.63],
-              [196.0, 246.94, 329.63],
-            ]
-          : [
-              [261.63, 329.63, 392.0, 493.88],
-              [220.0, 261.63, 329.63, 392.0],
-              [174.61, 220.0, 261.63, 329.63],
-              [196.0, 246.94, 293.66, 392.0],
-            ];
-
-      const playChord = () => {
-        if (!ctx || !masterGain) return;
-        const now = ctx.currentTime;
-        const freqs = chords[step % chords.length];
-        freqs.forEach((freq, idx) => {
-          const osc = ctx.createOscillator();
-          const noteGain = ctx.createGain();
-          osc.type = idx === 0 ? 'triangle' : 'sine';
-          osc.frequency.setValueAtTime(freq, now);
-          noteGain.gain.setValueAtTime(0.0001, now);
-          noteGain.gain.linearRampToValueAtTime(0.18 / freqs.length, now + 0.35);
-          noteGain.gain.exponentialRampToValueAtTime(0.0001, now + 2.2);
-          osc.connect(noteGain);
-          noteGain.connect(masterGain);
-          osc.start(now);
-          osc.stop(now + 2.3);
-        });
-        step += 1;
-      };
-
-      playChord();
-      intervalId = setInterval(playChord, 2400);
     } catch {
       // Audio playback blocked or unavailable
     }
   };
 
   const destroy = () => {
-    stop();
-    if (ctx && ctx.state !== 'closed') {
-      ctx.close().catch(() => {});
+    clearFade();
+    if (audioEl) {
+      try {
+        audioEl.pause();
+        audioEl.src = '';
+      } catch {
+        // Ignore
+      }
+      audioEl = null;
     }
-    ctx = null;
-    masterGain = null;
   };
 
-  return { start, stop, destroy };
+  return { start, stop, setVolume, destroy };
 }
 
 function AuthenticScreenView({ sceneId }) {
@@ -609,6 +636,7 @@ export default function ProductDemoCommercial() {
   const [sceneIndex, setSceneIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(() => !prefersReducedMotion);
   const [isMuted, setIsMuted] = useState(true);
+  const [volume, setVolume] = useState(0.85);
   const [audioMode, setAudioMode] = useState('executive');
   const [elapsedInScene, setElapsedInScene] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -633,11 +661,15 @@ export default function ProductDemoCommercial() {
 
   useEffect(() => {
     if (isPlaying && !isMuted) {
-      audioRef.current?.start(audioMode);
+      audioRef.current?.start(audioMode, volume);
     } else {
       audioRef.current?.stop();
     }
   }, [isPlaying, isMuted, audioMode]);
+
+  useEffect(() => {
+    audioRef.current?.setVolume(volume);
+  }, [volume]);
 
   useEffect(() => {
     if (!isPlaying) return undefined;
@@ -767,6 +799,52 @@ export default function ProductDemoCommercial() {
             {isMuted ? <FaVolumeMute size={12} aria-hidden="true" /> : <FaVolumeUp size={12} aria-hidden="true" />}
             <span className="hidden sm:inline">{isMuted ? 'Muted' : 'Audio On'}</span>
           </button>
+
+          <div className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2">
+            <button
+              type="button"
+              onClick={() => {
+                const next = Math.max(0, Math.round((volume - 0.1) * 10) / 10);
+                setVolume(next);
+                if (next === 0) setIsMuted(true);
+              }}
+              aria-label="Decrease walkthrough volume"
+              title="Volume down"
+              className="inline-flex h-6 w-6 items-center justify-center rounded text-slate-200 transition-colors hover:bg-white/15 hover:text-white"
+            >
+              <FaVolumeDown size={11} aria-hidden="true" />
+            </button>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={isMuted ? 0 : volume}
+              onChange={(e) => {
+                const next = parseFloat(e.target.value);
+                setVolume(next);
+                setIsMuted(next <= 0);
+              }}
+              aria-label="Walkthrough volume"
+              className="h-1 w-16 cursor-pointer appearance-none rounded-full bg-white/20 accent-[#C89B3C]"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const next = Math.min(1, Math.round((volume + 0.1) * 10) / 10);
+                setVolume(next);
+                if (isMuted && next > 0) setIsMuted(false);
+              }}
+              aria-label="Increase walkthrough volume"
+              title="Volume up"
+              className="inline-flex h-6 w-6 items-center justify-center rounded text-slate-200 transition-colors hover:bg-white/15 hover:text-white"
+            >
+              <FaVolumeUp size={11} aria-hidden="true" />
+            </button>
+            <span className="w-8 text-right font-mono text-[10px] tabular-nums text-slate-300">
+              {isMuted ? '0%' : `${Math.round(volume * 100)}%`}
+            </span>
+          </div>
 
           {!isMuted && (
             <select

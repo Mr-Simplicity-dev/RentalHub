@@ -847,12 +847,19 @@ const TourOverlay = ({
               <div className="relative shrink-0 border-b border-white/10 px-5 pb-3.5 pt-4 sm:px-6">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <p
-                      className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.16em]"
-                      style={{ color: BRAND.goldSoft }}
-                    >
-                      {t('tour.ui.eyebrow', 'RentalHub guided tour')}
-                    </p>
+                    <div className="mb-1.5 flex items-center gap-2">
+                      <img
+                        src="/rentalhub-mark.svg"
+                        alt="Amana RentalHub NG"
+                        className="h-5 w-5 rounded border border-white/20 bg-white/10 p-0.5"
+                      />
+                      <p
+                        className="text-[11px] font-semibold uppercase tracking-[0.16em]"
+                        style={{ color: BRAND.goldSoft }}
+                      >
+                        {t('tour.ui.eyebrow', 'RentalHub guided tour')}
+                      </p>
+                    </div>
                     <h2
                       id={titleId}
                       className="pr-2 text-lg font-semibold leading-snug tracking-tight text-white"

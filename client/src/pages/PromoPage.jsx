@@ -46,9 +46,16 @@ export default function PromoPage() {
         <div className="container mx-auto max-w-6xl px-4">
           <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#E2C275]">
-                Amana RentalHub NG · Corporate Presentation
-              </p>
+              <div className="flex items-center gap-2.5">
+                <img
+                  src="/rentalhub-mark.svg"
+                  alt="Amana RentalHub NG"
+                  className="h-9 w-9 rounded-lg border border-[#C89B3C]/40 bg-[#071A3D] p-0.5 shadow-sm"
+                />
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#E2C275]">
+                  Amana RentalHub NG · Corporate Presentation
+                </p>
+              </div>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
                 Product Walkthrough &amp; Media Assets
               </h1>

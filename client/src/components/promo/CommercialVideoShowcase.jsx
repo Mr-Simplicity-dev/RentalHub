@@ -11,6 +11,7 @@ import {
   FaPause,
   FaPlay,
   FaRedo,
+  FaVolumeDown,
   FaVolumeMute,
   FaVolumeUp,
 } from 'react-icons/fa';
@@ -289,6 +290,7 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [volume, setVolume] = useState(0.9);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(EDITIONS[0].defaultDuration);
 
@@ -371,6 +373,7 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
     }
 
     video.muted = isMuted;
+    video.volume = volume;
     try {
       await video.play();
       setIsPlaying(true);
@@ -553,7 +556,22 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
     if (!video) return;
     const nextMuted = !isMuted;
     video.muted = nextMuted;
+    if (!nextMuted && volume === 0) {
+      setVolume(0.8);
+      video.volume = 0.8;
+    }
     setIsMuted(nextMuted);
+  };
+
+  const updateVolume = (nextRaw) => {
+    const next = Math.max(0, Math.min(1, Math.round(nextRaw * 20) / 20));
+    setVolume(next);
+    const video = videoRef.current;
+    if (video) {
+      video.volume = next;
+      video.muted = next <= 0;
+    }
+    setIsMuted(next <= 0);
   };
 
   const handleTimeUpdate = () => {
@@ -617,9 +635,16 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
     >
       <div className="container mx-auto max-w-7xl px-4">
         <div className="mx-auto mb-8 max-w-3xl text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#E2C275]">
-            Official Brand Commercials
-          </p>
+          <div className="mb-2 inline-flex items-center justify-center gap-2.5">
+            <img
+              src="/rentalhub-mark.svg"
+              alt="Amana RentalHub NG"
+              className="h-8 w-8 rounded-lg border border-[#C89B3C]/40 bg-[#051430] p-0.5 shadow-sm"
+            />
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#E2C275]">
+              Official Brand Commercials
+            </p>
+          </div>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl md:text-4xl">
             Amana RentalHub NG Product Commercials
           </h2>
@@ -881,6 +906,39 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
                     >
                       {isMuted ? <FaVolumeMute size={12} /> : <FaVolumeUp size={12} />}
                     </button>
+                    <div className="inline-flex h-8 items-center gap-1 rounded-md border border-white/15 bg-white/5 px-1.5">
+                      <button
+                        type="button"
+                        onClick={() => updateVolume(volume - 0.1)}
+                        aria-label="Decrease video volume"
+                        title="Volume down"
+                        className="inline-flex h-6 w-6 items-center justify-center rounded text-slate-200 transition-colors hover:bg-white/15 hover:text-white"
+                      >
+                        <FaVolumeDown size={11} aria-hidden="true" />
+                      </button>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={isMuted ? 0 : volume}
+                        onChange={(e) => updateVolume(parseFloat(e.target.value))}
+                        aria-label="Video volume"
+                        className="h-1 w-14 cursor-pointer appearance-none rounded-full bg-white/20 accent-[#C89B3C] sm:w-20"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => updateVolume(volume + 0.1)}
+                        aria-label="Increase video volume"
+                        title="Volume up"
+                        className="inline-flex h-6 w-6 items-center justify-center rounded text-slate-200 transition-colors hover:bg-white/15 hover:text-white"
+                      >
+                        <FaVolumeUp size={11} aria-hidden="true" />
+                      </button>
+                      <span className="hidden w-8 text-right font-mono text-[10px] tabular-nums text-slate-300 sm:inline">
+                        {isMuted ? '0%' : `${Math.round(volume * 100)}%`}
+                      </span>
+                    </div>
                     <span className="hidden text-xs text-slate-400 sm:inline">
                       {loadState === 'loading'
                         ? `Buffering ${loadProgress}%`
