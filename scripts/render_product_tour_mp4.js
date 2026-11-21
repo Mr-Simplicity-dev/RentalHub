@@ -26,6 +26,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const sharp = require('sharp');
+const { getCommercialNarration } = require('../services/commercialNarrationService');
 
 const ROOT_DIR = path.join(__dirname, '..');
 const PROMO_DIR = path.join(ROOT_DIR, 'client', 'public', 'promo-videos');
@@ -37,10 +38,9 @@ const MUSIC_DIR = path.join(
   'Mp3',
   'Business & Corporate'
 );
-const TMP_DIR = path.join('/tmp', 'amana_commercial_suite');
+const TMP_DIR = path.join(require('os').tmpdir(), 'amana_commercial_suite');
 
-fs.mkdirSync(PROMO_DIR, { recursive: true });
-fs.mkdirSync(TMP_DIR, { recursive: true });
+
 
 const FPS = 24;
 const XFADE_SEC = 0.45;
@@ -492,6 +492,12 @@ function getMediaDuration(filePath) {
   return parseFloat(out);
 }
 
+function canReuseAct(file, expectedDuration) {
+  try {
+    return fs.statSync(file).size > 20000 && Math.abs(getMediaDuration(file) - expectedDuration) <= (2 / FPS);
+  } catch { return false; }
+}
+
 function resolveMusicTrack(preferredName) {
   const candidates = [
     path.join(MUSIC_DIR, preferredName),
@@ -505,56 +511,13 @@ function resolveMusicTrack(preferredName) {
   return null;
 }
 
-async function synthesizeVoiceover(editionId, text) {
-  const outFile = path.join(TMP_DIR, `vo_${editionId}_master.mp3`);
-  if (fs.existsSync(outFile) && !process.argv.includes('--regen-vo')) {
-    console.log(`   [${editionId}] Using cached voiceover: ${outFile}`);
-    return outFile;
-  }
-
-  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
-  const chunkFiles = [];
-
+async function synthesizeVoiceover(editionId, text, { narrationService = getCommercialNarration, logger = console, force = process.argv.includes('--regen-vo'), cacheDir = TMP_DIR } = {}) {
   try {
-    for (let i = 0; i < sentences.length; i += 1) {
-      const chunkText = sentences[i].trim();
-      if (!chunkText) continue;
-      const url =
-        'https://translate.google.com/translate_tts?ie=UTF-8&q=' +
-        encodeURIComponent(chunkText) +
-        '&tl=en-GB&client=tw-ob';
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
-      const res = await fetch(url, {
-        headers: { 'User-Agent': 'Mozilla/5.0' },
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-      if (!res.ok) throw new Error(`TTS HTTP ${res.status}`);
-      const buf = Buffer.from(await res.arrayBuffer());
-      if (buf.length < 512) throw new Error('Empty TTS buffer');
-      const chunkFile = path.join(TMP_DIR, `vo_${editionId}_${i}.mp3`);
-      fs.writeFileSync(chunkFile, buf);
-      chunkFiles.push(chunkFile);
-      await new Promise((r) => setTimeout(r, 80));
-    }
-
-    const concatList = path.join(TMP_DIR, `vo_${editionId}_concat.txt`);
-    fs.writeFileSync(concatList, chunkFiles.map((f) => `file '${f}'`).join('\n'));
-    const rawFile = path.join(TMP_DIR, `vo_${editionId}_raw.mp3`);
-    execSync(`ffmpeg -y -f concat -safe 0 -i "${concatList}" -c copy "${rawFile}"`, {
-      stdio: 'pipe',
-    });
-
-    // Crisp broadcast voiceover mastering (1.05x pacing, warmth EQ, gentle compression)
-    execSync(
-      `ffmpeg -y -i "${rawFile}" -af "atempo=1.05,highpass=f=90,equalizer=f=3000:t=q:w=1.2:g=2.4,acompressor=threshold=-18dB:ratio=2.8:attack=6:release=60,volume=1.32" "${outFile}"`,
-      { stdio: 'pipe' }
-    );
-    console.log(`   [${editionId}] Synthesized studio voiceover: ${outFile}`);
-    return outFile;
-  } catch (err) {
-    console.warn(`   [${editionId}] Voiceover unavailable (${err.message}); rendering instrumental master.`);
+    const result = await narrationService({ editionId, text, cacheDir, force });
+    logger.log(`   [${editionId}] ${result.cached ? 'Using cached' : 'Generated'} Azure narration (${result.profile}): ${result.file}`);
+    return result.file;
+  } catch (error) {
+    logger.warn(`   [${editionId}] Azure narration unavailable (${error.message}); rendered without generated narration, using the existing instrumental/silent fallback.`);
     return null;
   }
 }
@@ -1267,7 +1230,7 @@ async function renderFormatForEdition(edition, formatKey, actDurationSec, voFile
   for (let i = 0; i < edition.scenes.length; i += 1) {
     const scene = edition.scenes[i];
     const actMp4 = path.join(workDir, `act_${scene.index}.mp4`);
-    if (resumeMode && fs.existsSync(actMp4) && fs.statSync(actMp4).size > 20000) {
+    if (resumeMode && canReuseAct(actMp4, actDurationSec)) {
       console.log(`     Act ${scene.index}/0${edition.scenes.length}: [cached] ${scene.kicker}`);
       actClips.push(actMp4);
       continue;
@@ -1354,7 +1317,7 @@ async function renderFormatForEdition(edition, formatKey, actDurationSec, voFile
       `[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=0.50,afade=t=in:st=0:d=2.2,afade=t=out:st=${fadeOutStart}:d=2.8[mus]`,
       `[2:a]aformat=sample_rates=48000:channel_layouts=stereo,adelay=650|650,apad,asplit=2[vo_sc][vo_mix]`,
       `[mus][vo_sc]sidechaincompress=threshold=0.04:ratio=4.5:attack=45:release=320:makeup=1[mus_duck]`,
-      `[mus_duck][vo_mix]amix=inputs=2:duration=first:dropout_transition=2:normalize=0,volume=1.42,alimiter=limit=0.95[aout]`,
+      `[mus_duck][vo_mix]amix=inputs=2:duration=first:dropout_transition=2:normalize=0,alimiter=limit=0.95:level=0[aout]`,
     ].join(';');
 
     execSync(
@@ -1363,8 +1326,14 @@ async function renderFormatForEdition(edition, formatKey, actDurationSec, voFile
         `-c:v copy -c:a aac -b:a 128k -ar 48000 -movflags +faststart "${finalOut}"`,
       { stdio: 'pipe' }
     );
+  } else if (voFile) {
+    const voiceFilter = '[1:a]aformat=sample_rates=48000:channel_layouts=stereo,adelay=650|650,apad,alimiter=limit=0.95:level=0[aout]';
+    execSync(
+      `ffmpeg -y -i "${visualMaster}" -i "${voFile}" -filter_complex "${voiceFilter}" -map 0:v:0 -map "[aout]" -t ${totalDur.toFixed(3)} -c:v copy -c:a aac -b:a 128k -ar 48000 -movflags +faststart "${finalOut}"`,
+      { stdio: 'pipe' }
+    );
   } else if (musicFile) {
-    const audioFilter = `[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=0.58,afade=t=in:st=0:d=2.2,afade=t=out:st=${fadeOutStart}:d=2.8,alimiter=limit=0.95[aout]`;
+    const audioFilter = `[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=0.58,afade=t=in:st=0:d=2.2,afade=t=out:st=${fadeOutStart}:d=2.8,alimiter=limit=0.95:level=0[aout]`;
     execSync(
       `ffmpeg -y -i "${visualMaster}" -stream_loop -1 -i "${musicFile}" ` +
         `-filter_complex "${audioFilter}" -map 0:v:0 -map "[aout]" -t ${totalDur.toFixed(3)} ` +
@@ -1417,9 +1386,13 @@ async function renderEdition(edition) {
   if (!verticalOnly) {
     await renderFormatForEdition(edition, 'landscape_16x9', actDurationSec, voFile, musicFile);
   }
+  return { editionId: edition.id, narrated: Boolean(voFile) };
 }
 
 async function main() {
+  fs.mkdirSync(PROMO_DIR, { recursive: true });
+  fs.mkdirSync(TMP_DIR, { recursive: true });
+  const results = [];
   const clipArg = process.argv.find((a) => a.startsWith('--clip='));
   const target = clipArg ? clipArg.split('=')[1].trim().toLowerCase() : 'all';
 
@@ -1428,12 +1401,18 @@ async function main() {
     if (!EDITIONS[key]) {
       throw new Error(`Unknown --clip="${key}". Expected one of: ${Object.keys(EDITIONS).join(', ')}, all`);
     }
-    await renderEdition(EDITIONS[key]);
+    results.push(await renderEdition(EDITIONS[key]));
   }
-  console.log('\nAll requested Amana RentalHub NG commercial masters rendered cleanly.');
+  const missing = results.filter(result => !result.narrated).map(result => result.editionId);
+  console.log(missing.length ? `Commercial rendering complete. WITHOUT generated narration: ${missing.join(', ')}.` : 'Commercial rendering complete. All requested editions include Azure narration.');
 }
 
-main().catch((err) => {
-  console.error('Commercial render failed:', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  require('dotenv').config({ path: path.join(ROOT_DIR, '.env'), quiet: true });
+  main().catch((error) => {
+    console.error('Commercial render failed:', error.message);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = { EDITIONS, synthesizeVoiceover, canReuseAct, main };
