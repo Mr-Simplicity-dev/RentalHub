@@ -104,6 +104,7 @@ scripts/tour-preview/
 # Keep audio and private release staging out of source commits
 *.wav
 *.mp3
+!client/public/promo-videos/audio/*.mp3
 *.m4a
 *.aac
 *.ogg
