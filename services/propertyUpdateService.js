@@ -4,7 +4,7 @@ const { validateStructuredFeatures } = require('../config/utils/propertyFeatureS
 const { isDeepStrictEqual } = require('util');
 const activity = require('./activityLogger');
 const fail = (statusCode, message) => Object.assign(new Error(message), { statusCode });
-const fields = ['state_id','lga_name','city','area','full_address','latitude','longitude','property_type','bedrooms','bathrooms','rent_amount','payment_frequency','caution_deposit','title','description','amenities','structured_features'];
+const fields = ['state_id','lga_name','city','area','full_address','latitude','longitude','property_type','bedrooms','bathrooms','parking_spaces','rent_amount','payment_frequency','caution_deposit','title','description','amenities','structured_features'];
 const snapshot = row => Object.fromEntries(fields.map(key => [key, row[key] ?? null]));
 const normalize = body => {
   const values = {};
@@ -15,10 +15,10 @@ const normalize = body => {
       const max = key === 'description' ? 10000 : key === 'full_address' ? 1000 : 255;
       if (typeof value !== 'string' || !value.trim() || value.length > max) throw fail(400, `Enter a valid ${key.replaceAll('_',' ')}.`);
       value = value.trim();
-    } else if (['state_id','latitude','longitude','bedrooms','bathrooms','rent_amount','caution_deposit'].includes(key)) {
+    } else if (['state_id','latitude','longitude','bedrooms','bathrooms','parking_spaces','rent_amount','caution_deposit'].includes(key)) {
       if (value === '' || value === null || typeof value === 'boolean' || !Number.isFinite(Number(value))) throw fail(400, `Invalid ${key}.`);
       value = Number(value);
-      if (['state_id','bedrooms','bathrooms'].includes(key) && !Number.isInteger(value)) throw fail(400, `Invalid ${key}.`);
+      if (['state_id','bedrooms','bathrooms','parking_spaces'].includes(key) && !Number.isInteger(value)) throw fail(400, `Invalid ${key}.`);
       const min = key === 'latitude' ? -90 : key === 'longitude' ? -180 : key === 'state_id' ? 1 : 0;
       const max = key === 'latitude' ? 90 : key === 'longitude' ? 180 : 1e12;
       if (value < min || value > max) throw fail(400, `Invalid ${key}.`);

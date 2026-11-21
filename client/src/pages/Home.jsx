@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import { propertyService } from '../services/propertyService';
 import PropertyCard from '../components/properties/PropertyCard';
 import Loader from '../components/common/Loader';
@@ -35,6 +36,8 @@ const DEFAULT_POPULAR_LOCATIONS = [
 const Home = () => {
   const { t, i18n } = useTranslation();
   const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const [savedPropertyIds, setSavedPropertyIds] = useState([]);
 
   const [featuredProperties, setFeaturedProperties] = useState([]);
   const [popularLocations, setPopularLocations] = useState(DEFAULT_POPULAR_LOCATIONS);
@@ -82,6 +85,47 @@ const Home = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setSavedPropertyIds([]);
+      return undefined;
+    }
+    let active = true;
+    propertyService
+      .getSavedProperties({ limit: 100 })
+      .then((res) => {
+        if (!active) return;
+        const rows = Array.isArray(res?.data) ? res.data : [];
+        setSavedPropertyIds(rows.map((item) => item.id));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [isAuthenticated]);
+
+  const handleToggleSaveProperty = async (propertyId) => {
+    if (!isAuthenticated) {
+      toast.info(t('properties.login_to_save', 'Please log in to save properties'));
+      navigate('/login');
+      return;
+    }
+    const alreadySaved = savedPropertyIds.includes(propertyId);
+    try {
+      if (alreadySaved) {
+        await propertyService.unsaveProperty(propertyId);
+        setSavedPropertyIds((prev) => prev.filter((id) => id !== propertyId));
+        toast.success(t('properties.removed_favorite', 'Removed from saved properties'));
+      } else {
+        await propertyService.saveProperty(propertyId);
+        setSavedPropertyIds((prev) => (prev.includes(propertyId) ? prev : [...prev, propertyId]));
+        toast.success(t('properties.saved_favorite', 'Property saved to favorites'));
+      }
+    } catch (error) {
+      toast.error(t('properties.save_failed', 'Could not update saved property'));
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -523,7 +567,9 @@ const Home = () => {
                 >
                   <PropertyCard
                     property={property}
-                    showSaveButton={false}
+                    showSaveButton={true}
+                    isSaved={savedPropertyIds.includes(property.id)}
+                    onSave={handleToggleSaveProperty}
                   />
                 </div>
               ))}

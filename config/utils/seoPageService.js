@@ -35,7 +35,7 @@ const fetchInventory = async scope => {
  MIN(p.rent_amount) FILTER(WHERE p.payment_frequency='yearly' AND p.rent_amount>0) AS min_rent,
  MAX(p.rent_amount) FILTER(WHERE p.payment_frequency='yearly' AND p.rent_amount>0) AS max_rent,
  MAX(p.updated_at) AS updated_at FROM properties p JOIN states s ON s.id=p.state_id WHERE ${where}`,args)).rows[0] || {};
-  const rows = (await query(`SELECT p.id,p.title,p.property_type,p.rent_amount,p.payment_frequency,p.city,p.area,p.bedrooms,p.bathrooms,s.state_name,
+  const rows = (await query(`SELECT p.id,p.title,p.property_type,p.rent_amount,p.payment_frequency,p.city,p.area,p.bedrooms,p.bathrooms,p.parking_spaces,p.amenities,p.structured_features,s.state_name,
  (SELECT photo_url FROM property_photos ph WHERE ph.property_id=p.id ORDER BY ph.is_primary DESC,ph.upload_order,ph.id LIMIT 1) AS primary_photo
  FROM properties p JOIN states s ON s.id=p.state_id WHERE ${where} ORDER BY p.created_at DESC LIMIT 12`,args)).rows;
   return { stats: { ...stats, price_basis: 'yearly', methodology: 'Unweighted mean of positive yearly asking rents on currently available, verified listings. Asking prices are not completed rents.', top_property_types: [...new Set(rows.map(p => p.property_type).filter(Boolean))] }, properties: rows.map(p => ({...p,url:`/properties/${p.id}`})) };

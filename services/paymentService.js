@@ -1838,6 +1838,9 @@ exports.getMyUnlockedProperties = async (req, res) => {
          p.property_type,
          p.bedrooms,
          p.bathrooms,
+        p.parking_spaces,
+        p.amenities,
+        p.structured_features,
          p.rent_amount,
          p.payment_frequency,
          p.full_address,
@@ -1845,7 +1848,8 @@ exports.getMyUnlockedProperties = async (req, res) => {
          s.state_name,
          (SELECT photo_url FROM property_photos
           WHERE property_id = p.id AND is_primary = TRUE LIMIT 1) AS primary_photo,
-         (SELECT COUNT(*) FROM property_photos WHERE property_id = p.id) AS photo_count
+         (SELECT COUNT(*) FROM property_photos WHERE property_id = p.id) AS photo_count,
+        (SELECT AVG(rating) FROM reviews WHERE property_id = p.id) AS avg_rating
        FROM tenant_property_unlocks tu
        JOIN properties p ON p.id = tu.property_id
        LEFT JOIN states s ON s.id = p.state_id
