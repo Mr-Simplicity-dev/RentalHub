@@ -1,15 +1,25 @@
 /**
- * Amana RentalHub NG — Executive PropTech Commercial Renderer
+ * Amana RentalHub NG — Multi-Edition PropTech Commercial Suite Renderer
  *
- * Renders broadcast-grade 9:16 vertical (1080x1920) and 16:9 widescreen (1280x720)
- * commercials pairing architectural cinematography (native FFmpeg Ken Burns motion +
- * cross-dissolve transitions) with authentic RentalHub NG application interfaces.
+ * Renders 4 visually distinct corporate commercial editions in BOTH 9:16 vertical
+ * (1080x1920) and 16:9 widescreen (1280x720) @ 24fps cinematic H.264 High + AAC Stereo:
+ *
+ *   - flagship   : Executive Corporate Navy Banner & Gold Lower-Third (6 acts)
+ *   - tenant     : Daylight Architectural Split-Canvas Editorial Magazine (5 acts)
+ *   - landlord   : Obsidian Navy Institutional Command Showcase (5 acts)
+ *   - protection : Deep Forest-Navy Property Registry Dossier (5 acts)
+ *
+ * Audio engineering:
+ *   - Curated preset corporate soundtrack per edition
+ *   - Rich audible bed (0.38 base), smooth 2.2s fade-in and 2.8s fade-out
+ *   - 650ms narration entrance delay + FFmpeg sidechaincompress ducking under voiceover
  *
  * Usage:
- *   node scripts/render_product_tour_mp4.js
- *   node scripts/render_product_tour_mp4.js --vertical-only
- *   node scripts/render_product_tour_mp4.js --landscape-only
- *   node scripts/render_product_tour_mp4.js --regen-vo
+ *   node scripts/render_product_tour_mp4.js --clip=flagship
+ *   node scripts/render_product_tour_mp4.js --clip=tenant --regen-vo
+ *   node scripts/render_product_tour_mp4.js --clip=landlord --vertical-only
+ *   node scripts/render_product_tour_mp4.js --clip=protection --landscape-only
+ *   node scripts/render_product_tour_mp4.js --clip=all --resume
  */
 
 const fs = require('fs');
@@ -21,139 +31,44 @@ const ROOT_DIR = path.join(__dirname, '..');
 const PROMO_DIR = path.join(ROOT_DIR, 'client', 'public', 'promo');
 const BUILD_PROMO_DIR = path.join(ROOT_DIR, 'client', 'build', 'promo');
 const ASSETS_DIR = path.join(ROOT_DIR, 'social-ads', 'assets');
-const PUBLIC_DIR = path.join(ROOT_DIR, 'client', 'public');
-const TMP_DIR = path.join('/tmp', 'amana_commercial_render');
+const MUSIC_DIR = path.join(
+  ROOT_DIR,
+  'Video-Presets_290_Royalty_Free_Background_Music_Tracks',
+  'Mp3',
+  'Business & Corporate'
+);
+const TMP_DIR = path.join('/tmp', 'amana_commercial_suite');
 
 fs.mkdirSync(PROMO_DIR, { recursive: true });
 fs.mkdirSync(TMP_DIR, { recursive: true });
 
-const FPS = 30;
+const FPS = 24;
 const XFADE_SEC = 0.45;
 
 const BRAND = {
   navy: '#071A3D',
   navyDark: '#041129',
   navyCard: '#0B224C',
+  obsidian: '#060D1E',
+  obsidianCard: '#0E1A35',
+  forest: '#062022',
+  forestDark: '#041416',
+  forestCard: '#0C2D30',
+  ivory: '#F8F6F1',
+  ivoryBorder: '#E5DFD3',
   gold: '#C89B3C',
   goldSoft: '#E2C275',
-  white: '#FFFFFF',
-  slateLight: '#CBD5E1',
-  slateMuted: '#94A3B8',
   emerald: '#059669',
+  emeraldSoft: '#34D399',
+  white: '#FFFFFF',
+  slateDark: '#1E293B',
+  slateText: '#334155',
+  slateMuted: '#64748B',
+  slateLight: '#CBD5E1',
 };
 
-const SCENES = [
-  {
-    id: 1,
-    index: '01',
-    kicker: 'PROPERTY DISCOVERY',
-    headline1: 'Structured Property Search',
-    headline2: 'Across 36 States & the FCT',
-    caption: 'Filter by state, LGA, bedrooms, and annual budget nationwide.',
-    route: 'rentalhub.com.ng/properties',
-    photo: path.join(ASSETS_DIR, 'hero-terrace.avif'),
-    zoomMode: 'in',
-    bullets: [
-      'Nationwide coverage across all 36 states and Abuja FCT',
-      'Structured filters for state, LGA, property type, and budget',
-      'Built-in tenant property request workflow',
-    ],
-  },
-  {
-    id: 2,
-    index: '02',
-    kicker: 'LISTING TRANSPARENCY',
-    headline1: 'Clear Property Profiles',
-    headline2: 'Before You Commit',
-    caption: 'Review specs, verification status, and move-in estimates.',
-    route: 'rentalhub.com.ng/properties/1042',
-    photo: path.join(ASSETS_DIR, 'photo-1761347604157-3d667ff62778.avif'),
-    zoomMode: 'out',
-    bullets: [
-      'Visible listing and landlord verification indicators',
-      'Integrated monthly and move-in rent calculator',
-      'Structured property features and media previews',
-    ],
-  },
-  {
-    id: 3,
-    index: '03',
-    kicker: 'IDENTITY & ACCESS',
-    headline1: 'Identity-Verified Enquiries',
-    headline2: 'Transparent Detail Unlock',
-    caption: 'Identity verification supports accountable enquiries & access.',
-    route: 'rentalhub.com.ng/verify-identity',
-    photo: path.join(ASSETS_DIR, 'photo-1778166166324-550d324133ea.avif'),
-    zoomMode: 'in',
-    bullets: [
-      'Account verification with NIN and live photo checks',
-      'Transparent Paystack or bank-transfer unlock flow',
-      'In-platform messaging and calling once unlocked',
-    ],
-  },
-  {
-    id: 4,
-    index: '04',
-    kicker: 'PAYMENTS & LEDGER',
-    headline1: 'Tracked Rent Payments',
-    headline2: 'Structured Wallet Clearing',
-    caption: 'Paystack & bank-transfer ledger with 14-working-day clearing.',
-    route: 'rentalhub.com.ng/dashboard',
-    photo: path.join(ASSETS_DIR, 'photo-1767894862472-99a8667aaad0.avif'),
-    zoomMode: 'out',
-    bullets: [
-      'Separated Pending Clearing and Cleared wallet balances',
-      '14-working-day hold for structured refund review eligibility',
-      'Dedicated payment history and downloadable receipts',
-    ],
-  },
-  {
-    id: 5,
-    index: '05',
-    kicker: 'TENANCY & PROTECTION',
-    headline1: 'Digital Tenancy Agreements',
-    headline2: '& Property Protection',
-    caption: 'Versioned agreements, SHA-256 hashes & Property Protection.',
-    route: 'rentalhub.com.ng/tenancy-agreements',
-    photo: path.join(ASSETS_DIR, 'photo-1595243643203-06ba168495ea.avif'),
-    zoomMode: 'in',
-    bullets: [
-      'Draft → Landlord Sign → Tenant Sign → Executed lifecycle',
-      'SHA-256 document hash and immutable signature event log',
-      'Free basic Property Protection records & optional services',
-    ],
-  },
-  {
-    id: 6,
-    index: '06',
-    kicker: 'AMANA RENTALHUB NG',
-    headline1: 'Structured Property Rentals',
-    headline2: 'Built for Trust & Clarity',
-    caption: 'Built for tenants, landlords, agents, and institutions.',
-    route: 'rentalhub.com.ng',
-    photo: path.join(PUBLIC_DIR, 'hero-main.avif'),
-    zoomMode: 'out',
-    bullets: [
-      'Dedicated dashboards for tenants, landlords, and agents',
-      'Available in 8 languages across web and mobile',
-      'Visit rentalhub.com.ng to get started',
-    ],
-  },
-];
-
-// Tight, executive ~44-47 second factual narration script
-const NARRATION_SCRIPT =
-  'Renting property in Nigeria deserves structure and clarity. ' +
-  'Meet Amana RentalHub NG. ' +
-  'Search residential listings across all thirty-six states and Abuja by location, bedrooms, and annual budget. ' +
-  'Review property specifications, landlord verification indicators, and move-in cost estimates in one view. ' +
-  'Account identity verification supports accountable enquiries before unlocking full property details and direct messaging. ' +
-  'Track Paystack and bank-transfer rent payments through an auditable wallet ledger with a fourteen-working-day clearing window. ' +
-  'Manage versioned digital tenancy agreements with timestamped signature logs, plus Property Protection records. ' +
-  'Visit rentalhub dot com dot n g today.';
-
-function escapeXml(str) {
-  return String(str || '')
+function esc(str) {
+  return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -161,29 +76,427 @@ function escapeXml(str) {
     .replace(/'/g, '&apos;');
 }
 
-function findCorporateMusicTrack() {
+const EDITIONS = {
+  flagship: {
+    id: 'flagship',
+    layout: 'flagship_banner',
+    verticalFile: 'amana-app-tour-commercial.mp4',
+    landscapeFile: 'amana-app-tour-landscape.mp4',
+    musicTrack: 'Corporate Inspiring.mp3',
+    narration:
+      'Finding a reliable home in Nigeria deserves structure, clarity, and accountability. ' +
+      'Welcome to Amana RentalHub N G. ' +
+      'Search residential listings across all thirty-six states and the F C T using structured location and budget filters. ' +
+      'Inspect clear property specifications, verification indicators, and estimated move-in costs upfront. ' +
+      'Complete identity verification to initiate accountable enquiries and transparent detail unlocks. ' +
+      'Track rent payments through escrow clearing and bank transfers with a fourteen-working-day escrow clearing window and auditable wallet ledger. ' +
+      'Finalize versioned digital tenancy agreements and access Amana Property Protection records in one unified platform. ' +
+      'Discover structured Nigerian property rentals at rentalhub dot com dot n g.',
+    scenes: [
+      {
+        index: '01',
+        kicker: 'PROPERTY DISCOVERY',
+        headline1: 'Structured Property Search',
+        headline2: 'Across 36 States & the FCT',
+        caption: 'Filter listings by state, LGA, bedrooms, and annual budget.',
+        route: 'rentalhub.com.ng/properties',
+        photo: 'hero-terrace.avif',
+        zoomMode: 'in',
+        uiType: 'flagship_search',
+        bullets: [
+          'Nationwide coverage across all 36 states and Abuja FCT',
+          'Structured filters for state, LGA, property type, and budget',
+          'Built-in tenant property request workflow',
+        ],
+      },
+      {
+        index: '02',
+        kicker: 'LISTING TRANSPARENCY',
+        headline1: 'Clear Property Profiles',
+        headline2: 'Before You Commit',
+        caption: 'Review specs, verification status, and move-in estimates.',
+        route: 'rentalhub.com.ng/properties/1042',
+        photo: 'photo-1761347604157-3d667ff62778.avif',
+        zoomMode: 'out',
+        uiType: 'flagship_detail',
+        bullets: [
+          'Visible listing and landlord verification indicators',
+          'Integrated monthly and move-in rent calculator',
+          'Structured property features and media previews',
+        ],
+      },
+      {
+        index: '03',
+        kicker: 'IDENTITY & ACCESS',
+        headline1: 'Identity-Verified Enquiries',
+        headline2: 'Transparent Detail Unlock',
+        caption: 'Account verification supports accountable enquiries & access.',
+        route: 'rentalhub.com.ng/verify-identity',
+        photo: 'photo-1778166166324-550d324133ea.avif',
+        zoomMode: 'in',
+        uiType: 'flagship_identity',
+        bullets: [
+          'Account verification with NIN and live photo checks',
+          'Transparent escrow checkout or bank-transfer unlock flow',
+          'In-platform messaging and calling after unlock',
+        ],
+      },
+      {
+        index: '04',
+        kicker: 'ESCROW & LEDGER',
+        headline1: 'Escrow-Tracked Payments',
+        headline2: '14-Working-Day Clearing',
+        caption: 'Auditable wallet ledger separating pending and cleared rent.',
+        route: 'rentalhub.com.ng/dashboard',
+        photo: 'photo-1746458258536-b9ee5db20a73.avif',
+        zoomMode: 'out',
+        uiType: 'flagship_escrow',
+        bullets: [
+          'Pending escrow clearing and cleared balance separation',
+          '14-working-day clearing window before landlord withdrawal',
+          'Structured receipts and transaction audit history',
+        ],
+      },
+      {
+        index: '05',
+        kicker: 'AGREEMENTS & PROTECTION',
+        headline1: 'Digital Tenancy Leases',
+        headline2: '& Property Protection',
+        caption: 'Versioned digital agreements alongside property record tools.',
+        route: 'rentalhub.com.ng/tenancy-agreements',
+        photo: 'photo-1707043697463-e0d8f81d06f3.avif',
+        zoomMode: 'in',
+        uiType: 'flagship_agreements',
+        bullets: [
+          'Versioned lease review, signing, and SHA-256 document hash',
+          'Free basic Property Protection records and case reporting',
+          'Optional priced registry, survey, and inspection workflows',
+        ],
+      },
+      {
+        index: '06',
+        kicker: 'AMANA RENTALHUB NG',
+        headline1: 'Structured Rentals',
+        headline2: 'Built for Nigeria',
+        caption: 'Explore verified workflows today at rentalhub.com.ng.',
+        route: 'rentalhub.com.ng',
+        photo: 'photo-1760067537204-fe9b55b2f1b0.avif',
+        zoomMode: 'out',
+        uiType: 'flagship_finale',
+        bullets: [
+          'Built for tenants, landlords, accredited agents, and partners',
+          'Escrow-tracked rent clearing & transparent workflows',
+          'Visit rentalhub.com.ng to get started',
+        ],
+      },
+    ],
+  },
+
+  tenant: {
+    id: 'tenant',
+    layout: 'tenant_magazine',
+    verticalFile: 'amana-tenant-commercial-9x16.mp4',
+    landscapeFile: 'amana-tenant-commercial-16x9.mp4',
+    musicTrack: 'Acoustic Corporate.mp3',
+    narration:
+      'Searching for a home in Nigeria should feel transparent from the very first click. ' +
+      'With Amana RentalHub N G, filter residential properties across all thirty-six states and Abuja by city, budget, and verification status. ' +
+      'Review room specs, inspection media availability, and annual move-in estimates clearly before booking. ' +
+      'Complete identity verification to unlock exact addresses and message landlords directly inside the platform. ' +
+      'Pay rent through escrow-tracked clearing with a fourteen-working-day clearing window for refund review eligibility, then sign your versioned digital tenancy agreement online. ' +
+      'Start your next home search at rentalhub dot com dot n g.',
+    scenes: [
+      {
+        index: '01',
+        kicker: 'TENANT EDITION · SEARCH',
+        headline1: 'Find the Right Home',
+        headline2: 'With Real Filters',
+        caption: 'Compare homes across 36 states & FCT by budget and specs.',
+        route: 'rentalhub.com.ng/properties',
+        photo: 'photo-1622015663084-307d19eabbbf.avif',
+        zoomMode: 'in',
+        uiType: 'flagship_search',
+        bullets: [
+          'Search verified residential listings across Nigeria',
+          'Filter by state, LGA, bedrooms, and annual rent',
+          'Submit a structured property request if you need a match',
+        ],
+      },
+      {
+        index: '02',
+        kicker: 'TENANT EDITION · PLANNING',
+        headline1: 'Transparent Specs &',
+        headline2: 'Move-In Calculator',
+        caption: 'Review annual rent, fees, and property verification badges.',
+        route: 'rentalhub.com.ng/properties/1042',
+        photo: 'photo-1595243643203-06ba168495ea.avif',
+        zoomMode: 'out',
+        uiType: 'flagship_detail',
+        bullets: [
+          'Clear listing and landlord verification status indicators',
+          'Built-in rent calculator for realistic budgeting',
+          'Inspection media previews before travelling to view',
+        ],
+      },
+      {
+        index: '03',
+        kicker: 'TENANT EDITION · ACCESS',
+        headline1: 'Identity Checked,',
+        headline2: 'Direct Communication',
+        caption: 'Verify your account and unlock full addresses safely.',
+        route: 'rentalhub.com.ng/verify-identity',
+        photo: 'photo-1704457031803-2c39a23e9faa.avif',
+        zoomMode: 'in',
+        uiType: 'flagship_identity',
+        bullets: [
+          'NIN and live photo verification for accountable enquiries',
+          'Clear one-time unlock or tenant plan via escrow checkout',
+          'Direct in-platform messaging and recorded calling',
+        ],
+      },
+      {
+        index: '04',
+        kicker: 'TENANT EDITION · ESCROW',
+        headline1: 'Escrow Rent Clearing',
+        headline2: '14-Working-Day Window',
+        caption: 'Rent enters escrow clearing with refund review eligibility.',
+        route: 'rentalhub.com.ng/dashboard',
+        photo: 'premium_photo-1724659216000-5d5557f23318.avif',
+        zoomMode: 'out',
+        uiType: 'flagship_escrow',
+        bullets: [
+          'Track escrow payments and bank transfers with receipts',
+          '14-working-day clearing window before landlord withdrawal',
+          'Structured dispute and refund review support if needed',
+        ],
+      },
+      {
+        index: '05',
+        kicker: 'TENANT EDITION · AGREEMENTS',
+        headline1: 'Sign Digitally &',
+        headline2: 'Move In With Clarity',
+        caption: 'Versioned digital tenancy agreements at rentalhub.com.ng.',
+        route: 'rentalhub.com.ng/tenancy-agreements',
+        photo: 'premium_photo-1747326386378-e8325dd4b981.avif',
+        zoomMode: 'in',
+        uiType: 'tenant_finale',
+        bullets: [
+          'Review and execute versioned leases with timestamped logs',
+          'Access optional relocation and fumigation booking tools',
+          'Explore homes today at rentalhub.com.ng',
+        ],
+      },
+    ],
+  },
+
+  landlord: {
+    id: 'landlord',
+    layout: 'landlord_command',
+    verticalFile: 'amana-landlord-commercial-9x16.mp4',
+    landscapeFile: 'amana-landlord-commercial-16x9.mp4',
+    musicTrack: 'An Inspiring Corporate.mp3',
+    narration:
+      'Professional landlords and accredited agents need dependable property operations. ' +
+      'Amana RentalHub N G gives you a structured portfolio workspace from listing to lease execution. ' +
+      'Publish detailed residential listings with verification indicators and receive identity-checked tenant enquiries. ' +
+      'Delegate specific operational permissions to accredited agents while keeping full owner visibility. ' +
+      'Monitor escrow rent clearing, cleared balances, and verified bank withdrawals in one auditable ledger, backed by versioned digital tenancy agreements. ' +
+      'Manage your portfolio at rentalhub dot com dot n g.',
+    scenes: [
+      {
+        index: '01',
+        kicker: 'LANDLORD & AGENT EDITION',
+        headline1: 'Present Properties',
+        headline2: 'With Institutional Polish',
+        caption: 'Publish structured specs, media, and verified owner profiles.',
+        route: 'rentalhub.com.ng/dashboard',
+        photo: 'photo-1782392230060-be8a3984a58c.avif',
+        zoomMode: 'in',
+        uiType: 'landlord_portfolio',
+        bullets: [
+          'Structured multi-property listing and availability controls',
+          'Highlight verified landlord status and structured amenities',
+          'Track applications and enquiries in one portfolio view',
+        ],
+      },
+      {
+        index: '02',
+        kicker: 'VERIFIED ENQUIRIES',
+        headline1: 'Screen Enquiries',
+        headline2: 'Before Opening Access',
+        caption: 'Tenants complete identity checks before unlocking contact.',
+        route: 'rentalhub.com.ng/messages',
+        photo: 'photo-1719887805632-de5be825f72b.avif',
+        zoomMode: 'out',
+        uiType: 'landlord_enquiries',
+        bullets: [
+          'Identity-verified tenant enquiries reduce unvetted noise',
+          'Full addresses stay protected until access is unlocked',
+          'Communicate cleanly through recorded in-platform threads',
+        ],
+      },
+      {
+        index: '03',
+        kicker: 'AGENT DELEGATION',
+        headline1: 'Accredited Agents',
+        headline2: 'Scoped Permissions',
+        caption: 'Delegate property tasks while retaining owner oversight.',
+        route: 'rentalhub.com.ng/agent/dashboard',
+        photo: 'photo-1776762893034-c437e452f1be.avif',
+        zoomMode: 'in',
+        uiType: 'landlord_delegation',
+        bullets: [
+          'Assign accredited agents with explicit permission scopes',
+          'Separate controls for listings, inspections, and dossiers',
+          'Audit every update under your landlord dashboard',
+        ],
+      },
+      {
+        index: '04',
+        kicker: 'ESCROW & WITHDRAWALS',
+        headline1: 'Auditable Rent Ledger',
+        headline2: 'Verified Bank Payouts',
+        caption: 'Track 14-working-day escrow clearing to cleared withdrawals.',
+        route: 'rentalhub.com.ng/dashboard',
+        photo: 'premium_photo-1748265769172-62e9e2bba756.avif',
+        zoomMode: 'out',
+        uiType: 'flagship_escrow',
+        bullets: [
+          'Clear separation of pending escrow and cleared funds',
+          'Transparent 14-working-day clearing schedule',
+          'Initiate bank withdrawals directly from cleared balance',
+        ],
+      },
+      {
+        index: '05',
+        kicker: 'PORTFOLIO GOVERNANCE',
+        headline1: 'Digital Leases & Oversight',
+        headline2: 'Built for Property Owners',
+        caption: 'Versioned tenancy agreements & owner tools at rentalhub.com.ng.',
+        route: 'rentalhub.com.ng',
+        photo: 'photo-1767894862472-99a8667aaad0.avif',
+        zoomMode: 'in',
+        uiType: 'landlord_finale',
+        bullets: [
+          'Issue versioned agreements with SHA-256 integrity records',
+          'Centralized activity log across applications and payouts',
+          'List your properties at rentalhub.com.ng',
+        ],
+      },
+    ],
+  },
+
+  protection: {
+    id: 'protection',
+    layout: 'protection_dossier',
+    verticalFile: 'amana-protection-commercial-9x16.mp4',
+    landscapeFile: 'amana-protection-commercial-16x9.mp4',
+    musicTrack: 'Corporate strings.mp3',
+    narration:
+      'Property ownership and tenancy disputes require clear documentation, not guesswork. ' +
+      'Introducing Amana Property Protection. ' +
+      'Create basic property records and submit basic case reports at no cost, including unlisted land and family or company holdings. ' +
+      'Where defined and available, request optional priced registry searches, survey reports, and physical inspections. ' +
+      'Preserve structured dispute records and verify case evidence publicly through our verification portal. ' +
+      'Explore Amana Property Protection at rentalhub dot com dot n g.',
+    scenes: [
+      {
+        index: '01',
+        kicker: 'AMANA PROPERTY PROTECTION',
+        headline1: 'Document Your Property',
+        headline2: 'With Structured Records',
+        caption: 'Free basic property records and case reporting on-platform.',
+        route: 'rentalhub.com.ng/property-protection',
+        photo: 'photo-1777516027356-d43488256f2b.avif',
+        zoomMode: 'in',
+        uiType: 'protection_records',
+        bullets: [
+          'Register basic property records at zero cost',
+          'Maintain structured documentation in one vault',
+          'Clear disclosure: platform checks do not replace land registries',
+        ],
+      },
+      {
+        index: '02',
+        kicker: 'BROAD COVERAGE CAPACITY',
+        headline1: 'Unlisted Land, Family',
+        headline2: '& Corporate Holdings',
+        caption: 'Record individual, family, or company-held properties.',
+        route: 'rentalhub.com.ng/property-protection',
+        photo: 'premium_photo-1748283985954-c611c2b25b3e.avif',
+        zoomMode: 'out',
+        uiType: 'protection_capacity',
+        bullets: [
+          'Supports unlisted land as well as rental buildings',
+          'Register under individual, family, or company capacity',
+          'Designed for resident owners and diaspora stakeholders',
+        ],
+      },
+      {
+        index: '03',
+        kicker: 'OPTIONAL PAID SERVICES',
+        headline1: 'Registry, Survey &',
+        headline2: 'Inspection Workflows',
+        caption: 'Request priced verification services where available.',
+        route: 'rentalhub.com.ng/property-protection',
+        photo: 'premium_photo-1748729621216-573f9867e6ab.avif',
+        zoomMode: 'in',
+        uiType: 'protection_services',
+        bullets: [
+          'Optional priced registry searches and survey reports',
+          'Physical inspection and restricted review requests',
+          'Time-limited monitoring with explicit renewal only',
+        ],
+      },
+      {
+        index: '04',
+        kicker: 'EVIDENCE & CASE SUPPORT',
+        headline1: 'Case Reporting &',
+        headline2: 'Evidence Verification',
+        caption: 'Verify dispute evidence integrity at /verify-case.',
+        route: 'rentalhub.com.ng/verify-case',
+        photo: 'photo-1766603636671-484c4911a84b.avif',
+        zoomMode: 'out',
+        uiType: 'protection_verify',
+        bullets: [
+          'Structured dispute case reporting and private threads',
+          'Cryptographic evidence hashing and public /verify-case check',
+          'Anonymized resolved case summaries published at /cases',
+        ],
+      },
+      {
+        index: '05',
+        kicker: 'INSTITUTIONAL OVERSIGHT',
+        headline1: 'Clarity for Owners,',
+        headline2: 'Families & Partners',
+        caption: 'Explore Amana Property Protection at rentalhub.com.ng.',
+        route: 'rentalhub.com.ng/property-protection',
+        photo: 'hero-terrace.avif',
+        zoomMode: 'in',
+        uiType: 'protection_finale',
+        bullets: [
+          'Free basic records · transparent optional paid services',
+          'Built for landowners, corporate teams, and institutions',
+          'Get started at rentalhub.com.ng/property-protection',
+        ],
+      },
+    ],
+  },
+};
+
+function getMediaDuration(filePath) {
+  const out = execSync(
+    `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`,
+    { encoding: 'utf8' }
+  ).trim();
+  return parseFloat(out);
+}
+
+function resolveMusicTrack(preferredName) {
   const candidates = [
-    path.join(
-      ROOT_DIR,
-      'Video-Presets_290_Royalty_Free_Background_Music_Tracks',
-      'Mp3',
-      'Business & Corporate',
-      'Corporate Inspiring.mp3'
-    ),
-    path.join(
-      ROOT_DIR,
-      'Video-Presets_290_Royalty_Free_Background_Music_Tracks',
-      'Mp3',
-      'Business & Corporate',
-      'Corporate.mp3'
-    ),
-    path.join(
-      ROOT_DIR,
-      'Video-Presets_290_Royalty_Free_Background_Music_Tracks',
-      'Mp3',
-      'Business & Corporate',
-      'An Inspiring Corporate.mp3'
-    ),
+    path.join(MUSIC_DIR, preferredName),
+    path.join(MUSIC_DIR, 'Corporate Inspiring.mp3'),
+    path.join(MUSIC_DIR, 'Corporate.mp3'),
     path.join(ROOT_DIR, 'video-ads', 'public', 'audio', 'music.wav'),
   ];
   for (const c of candidates) {
@@ -192,9 +505,10 @@ function findCorporateMusicTrack() {
   return null;
 }
 
-async function synthesizeVoiceover(text, outFile) {
+async function synthesizeVoiceover(editionId, text) {
+  const outFile = path.join(TMP_DIR, `vo_${editionId}_master.mp3`);
   if (fs.existsSync(outFile) && !process.argv.includes('--regen-vo')) {
-    console.log('   Using cached narration audio:', outFile);
+    console.log(`   [${editionId}] Using cached voiceover: ${outFile}`);
     return outFile;
   }
 
@@ -210,7 +524,7 @@ async function synthesizeVoiceover(text, outFile) {
         encodeURIComponent(chunkText) +
         '&tl=en-GB&client=tw-ob';
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
+      const timeout = setTimeout(() => controller.abort(), 10000);
       const res = await fetch(url, {
         headers: { 'User-Agent': 'Mozilla/5.0' },
         signal: controller.signal,
@@ -218,540 +532,884 @@ async function synthesizeVoiceover(text, outFile) {
       clearTimeout(timeout);
       if (!res.ok) throw new Error(`TTS HTTP ${res.status}`);
       const buf = Buffer.from(await res.arrayBuffer());
-      if (buf.length < 512) throw new Error('TTS returned empty audio');
-      const chunkFile = path.join(TMP_DIR, `vo_tight_${i}.mp3`);
+      if (buf.length < 512) throw new Error('Empty TTS buffer');
+      const chunkFile = path.join(TMP_DIR, `vo_${editionId}_${i}.mp3`);
       fs.writeFileSync(chunkFile, buf);
       chunkFiles.push(chunkFile);
       await new Promise((r) => setTimeout(r, 80));
     }
 
-    const concatList = path.join(TMP_DIR, 'vo_tight_concat.txt');
+    const concatList = path.join(TMP_DIR, `vo_${editionId}_concat.txt`);
     fs.writeFileSync(concatList, chunkFiles.map((f) => `file '${f}'`).join('\n'));
-    const rawFile = path.join(TMP_DIR, 'vo_tight_raw.mp3');
+    const rawFile = path.join(TMP_DIR, `vo_${editionId}_raw.mp3`);
     execSync(`ffmpeg -y -f concat -safe 0 -i "${concatList}" -c copy "${rawFile}"`, {
       stdio: 'pipe',
     });
-    // Slightly crisper broadcast pacing (1.06x) + warm studio EQ
+
+    // Crisp broadcast voiceover mastering (1.05x pacing, warmth EQ, gentle compression)
     execSync(
-      `ffmpeg -y -i "${rawFile}" -af "atempo=1.06,highpass=f=90,equalizer=f=3000:t=q:w=1.2:g=2.2,acompressor=threshold=-18dB:ratio=2.8:attack=6:release=60,volume=1.28" "${outFile}"`,
+      `ffmpeg -y -i "${rawFile}" -af "atempo=1.05,highpass=f=90,equalizer=f=3000:t=q:w=1.2:g=2.4,acompressor=threshold=-18dB:ratio=2.8:attack=6:release=60,volume=1.32" "${outFile}"`,
       { stdio: 'pipe' }
     );
-    console.log('   Synthesized executive voiceover:', outFile);
+    console.log(`   [${editionId}] Synthesized studio voiceover: ${outFile}`);
     return outFile;
   } catch (err) {
-    console.warn(`   Voiceover unavailable (${err.message}); using corporate instrumental master.`);
+    console.warn(`   [${editionId}] Voiceover unavailable (${err.message}); rendering instrumental master.`);
     return null;
   }
 }
 
-function buildBrandMarkSvg(x, y, size) {
+function buildBrandMarkSvg(x, y, size, bgFill = '#0C244E', accent = BRAND.gold) {
   const s = size / 48;
   return `
     <g transform="translate(${x}, ${y}) scale(${s})">
-      <rect x="0" y="0" width="48" height="48" rx="10" fill="#0C244E" stroke="${BRAND.gold}" stroke-width="2"/>
-      <path d="M24 10 L38 22 L34.5 22 L34.5 36 L13.5 36 L13.5 22 L10 22 Z" fill="none" stroke="${BRAND.white}" stroke-width="2.4" stroke-linejoin="round"/>
-      <rect x="20.5" y="25" width="7" height="11" rx="1.2" fill="${BRAND.gold}"/>
+      <rect x="0" y="0" width="48" height="48" rx="10" fill="${bgFill}" stroke="${accent}" stroke-width="2"/>
+      <path d="M12 24 L24 13 L36 24" fill="none" stroke="${accent}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M16 23 V35 H32 V23" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linejoin="round"/>
+      <rect x="21.5" y="27" width="5" height="8" rx="1" fill="${accent}"/>
     </g>
-  `;
-}
-
-function buildAuthenticUiCardSvg(sceneId, cardWidth, cardHeight) {
-  const scale = Math.min(cardWidth / 640, cardHeight / 440);
-  let body = '';
-
-  if (sceneId === 1) {
-    body = `
-      <rect x="24" y="64" width="592" height="46" rx="8" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.2"/>
-      <circle cx="46" cy="87" r="7" fill="none" stroke="#64748B" stroke-width="2"/>
-      <line x1="51" y1="92" x2="56" y2="97" stroke="#64748B" stroke-width="2" stroke-linecap="round"/>
-      <text x="68" y="92" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="600" fill="#0F172A">Maitama, Abuja FCT  ·  3 Bedroom</text>
-      <rect x="498" y="71" width="108" height="32" rx="6" fill="${BRAND.navy}"/>
-      <text x="552" y="92" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#FFFFFF" text-anchor="middle">Search</text>
-
-      <text x="24" y="132" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569">Coverage: 36 States + FCT   |   Type: Apartment / Terrace   |   Status: Available</text>
-
-      <rect x="24" y="150" width="286" height="202" rx="10" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-      <rect x="24" y="150" width="286" height="86" rx="10" fill="#0C244E"/>
-      <rect x="24" y="220" width="286" height="16" fill="#0C244E"/>
-      <rect x="38" y="164" width="112" height="24" rx="4" fill="${BRAND.navy}" stroke="${BRAND.gold}" stroke-width="1"/>
-      <text x="94" y="180" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="${BRAND.goldSoft}" text-anchor="middle">VERIFIED LISTING</text>
-      <text x="38" y="216" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#CBD5E1">Maitama District, Abuja FCT</text>
-      <text x="38" y="262" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="700" fill="#0F172A">3 Bedroom Residence</text>
-      <text x="38" y="284" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#64748B">3 Beds · 4 Baths · Gated Compound</text>
-      <line x1="38" y1="302" x2="296" y2="302" stroke="#F1F5F9" stroke-width="1"/>
-      <text x="38" y="330" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="700" fill="${BRAND.navy}">₦4,500,000</text>
-      <text x="296" y="330" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#64748B" text-anchor="end">per year</text>
-
-      <rect x="330" y="150" width="286" height="202" rx="10" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-      <rect x="330" y="150" width="286" height="86" rx="10" fill="#102B5C"/>
-      <rect x="330" y="220" width="286" height="16" fill="#102B5C"/>
-      <rect x="344" y="164" width="112" height="24" rx="4" fill="${BRAND.navy}" stroke="${BRAND.gold}" stroke-width="1"/>
-      <text x="400" y="180" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="${BRAND.goldSoft}" text-anchor="middle">VERIFIED LISTING</text>
-      <text x="344" y="216" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#CBD5E1">Nasarawa GRA, Kano</text>
-      <text x="344" y="262" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="700" fill="#0F172A">4 Bedroom Terrace</text>
-      <text x="344" y="284" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#64748B">4 Beds · 5 Baths · Borehole Water</text>
-      <line x1="344" y1="302" x2="602" y2="302" stroke="#F1F5F9" stroke-width="1"/>
-      <text x="344" y="330" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="700" fill="${BRAND.navy}">₦3,200,000</text>
-      <text x="602" y="330" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#64748B" text-anchor="end">per year</text>
-
-      <rect x="24" y="368" width="592" height="44" rx="8" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1"/>
-      <text x="40" y="395" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#475569">Need a specific neighbourhood? Submit a guided tenant property request.</text>
-      <text x="600" y="395" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#0284C7" text-anchor="end">Request →</text>
-    `;
-  } else if (sceneId === 2) {
-    body = `
-      <rect x="24" y="64" width="592" height="96" rx="10" fill="${BRAND.navy}"/>
-      <text x="44" y="100" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700" fill="#FFFFFF">3 Bedroom Serviced Residence</text>
-      <text x="44" y="124" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#CBD5E1">Maitama District, Abuja FCT  ·  Illustrative Listing Preview</text>
-      <rect x="446" y="84" width="150" height="30" rx="5" fill="#FFFFFF"/>
-      <text x="521" y="104" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700" fill="${BRAND.navy}" text-anchor="middle">Landlord Verified</text>
-
-      <rect x="24" y="176" width="592" height="84" rx="10" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-      <text x="44" y="212" font-family="DejaVu Sans, Arial, sans-serif" font-size="26" font-weight="700" fill="${BRAND.navy}">₦4,500,000</text>
-      <text x="44" y="236" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#64748B">Annual rent  ·  transparent pricing breakdown</text>
-      <rect x="348" y="198" width="248" height="38" rx="7" fill="#F0F9FF" stroke="#BAE6FD" stroke-width="1.2"/>
-      <text x="472" y="222" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700" fill="#0369A1" text-anchor="middle">Calculate Monthly &amp; Move-In Costs</text>
-
-      <rect x="24" y="276" width="186" height="66" rx="8" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1"/>
-      <text x="117" y="306" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="700" fill="#0F172A" text-anchor="middle">3 Bedrooms</text>
-      <text x="117" y="326" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#64748B" text-anchor="middle">En-suite Layout</text>
-
-      <rect x="227" y="276" width="186" height="66" rx="8" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1"/>
-      <text x="320" y="306" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="700" fill="#0F172A" text-anchor="middle">4 Bathrooms</text>
-      <text x="320" y="326" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#64748B" text-anchor="middle">Structured Specs</text>
-
-      <rect x="430" y="276" width="186" height="66" rx="8" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1"/>
-      <text x="523" y="306" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="700" fill="#0F172A" text-anchor="middle">Photo &amp; Video</text>
-      <text x="523" y="326" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#64748B" text-anchor="middle">Media Supported</text>
-
-      <rect x="24" y="358" width="592" height="54" rx="8" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1"/>
-      <text x="44" y="390" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="600" fill="#334155">Structured landlord amenities &amp; verified review summaries where available.</text>
-    `;
-  } else if (sceneId === 3) {
-    body = `
-      <rect x="24" y="64" width="592" height="154" rx="10" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-      <rect x="44" y="84" width="38" height="38" rx="8" fill="${BRAND.navy}"/>
-      <text x="63" y="109" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="700" fill="${BRAND.goldSoft}" text-anchor="middle">ID</text>
-      <text x="96" y="100" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="700" fill="#0F172A">Account Identity Verification</text>
-      <text x="96" y="120" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#64748B">Required prior to unlocking full address details or initiating rent payments</text>
-      <rect x="514" y="86" width="82" height="26" rx="5" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1"/>
-      <text x="555" y="103" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#065F46" text-anchor="middle">VERIFIED</text>
-
-      <rect x="44" y="142" width="172" height="56" rx="7" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1"/>
-      <text x="58" y="164" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" font-weight="700" fill="#64748B">STEP 01</text>
-      <text x="58" y="184" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="600" fill="#0F172A">Email &amp; Phone Check</text>
-
-      <rect x="234" y="142" width="172" height="56" rx="7" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1"/>
-      <text x="248" y="164" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" font-weight="700" fill="#64748B">STEP 02</text>
-      <text x="248" y="184" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="600" fill="#0F172A">NIN &amp; Live Photo</text>
-
-      <rect x="424" y="142" width="172" height="56" rx="7" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1"/>
-      <text x="438" y="164" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" font-weight="700" fill="#64748B">STEP 03</text>
-      <text x="438" y="184" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="600" fill="#0F172A">Accountable Enquiry</text>
-
-      <rect x="24" y="236" width="592" height="176" rx="10" fill="#FFFBEB" stroke="#FDE68A" stroke-width="1.2"/>
-      <text x="44" y="270" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="700" fill="#0F172A">Unlock Full Property Details</text>
-      <text x="44" y="296" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#475569">Complete the transparent platform unlock or active tenant subscription via</text>
-      <text x="44" y="316" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#475569">Paystack or bank transfer to access full address, video, and landlord contact.</text>
-      <rect x="44" y="342" width="210" height="44" rx="7" fill="${BRAND.navy}"/>
-      <text x="149" y="369" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#FFFFFF" text-anchor="middle">Pay to Unlock Details</text>
-      <rect x="270" y="342" width="236" height="44" rx="7" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.2"/>
-      <text x="388" y="369" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="600" fill="#334155" text-anchor="middle">In-Platform Messaging &amp; Calls</text>
-    `;
-  } else if (sceneId === 4) {
-    body = `
-      <rect x="24" y="64" width="592" height="348" rx="10" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-      <text x="44" y="98" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="700" fill="#0F172A">Wallet &amp; Rent Payment Ledger</text>
-      <text x="596" y="98" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="600" fill="#64748B" text-anchor="end">Paystack &amp; Bank Transfer</text>
-      <line x1="44" y1="114" x2="596" y2="114" stroke="#F1F5F9" stroke-width="1.2"/>
-
-      <rect x="44" y="132" width="266" height="108" rx="8" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.2"/>
-      <text x="60" y="158" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#64748B">PENDING CLEARING</text>
-      <text x="60" y="192" font-family="DejaVu Sans, Arial, sans-serif" font-size="24" font-weight="700" fill="${BRAND.navy}">₦4,387,500</text>
-      <text x="60" y="218" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" fill="#475569">14-working-day refund review window</text>
-
-      <rect x="330" y="132" width="266" height="108" rx="8" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.2"/>
-      <text x="346" y="158" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#64748B">CLEARED BALANCE</text>
-      <text x="346" y="192" font-family="DejaVu Sans, Arial, sans-serif" font-size="24" font-weight="700" fill="#047857">₦1,850,000</text>
-      <text x="346" y="218" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" fill="#475569">Eligible for verified bank withdrawal</text>
-
-      <text x="44" y="274" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700" fill="#475569">RECENT LEDGER ACTIVITY (ILLUSTRATIVE)</text>
-
-      <rect x="44" y="288" width="552" height="46" rx="7" fill="#F8FAFC"/>
-      <text x="60" y="316" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="600" fill="#0F172A">Rent Payment  ·  Ref #RH-40219</text>
-      <rect x="466" y="299" width="116" height="24" rx="4" fill="#FEF3C7"/>
-      <text x="524" y="315" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#92400E" text-anchor="middle">PENDING CLEAR</text>
-
-      <rect x="44" y="346" width="552" height="46" rx="7" fill="#F8FAFC"/>
-      <text x="60" y="374" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="600" fill="#0F172A">Property Detail Unlock  ·  Paystack Verified</text>
-      <rect x="486" y="357" width="96" height="24" rx="4" fill="#ECFDF5"/>
-      <text x="534" y="373" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#065F46" text-anchor="middle">RECORDED</text>
-    `;
-  } else if (sceneId === 5) {
-    body = `
-      <rect x="24" y="64" width="592" height="214" rx="10" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-      <text x="44" y="96" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="700" fill="#0F172A">Residential Tenancy Agreement  ·  Version 1</text>
-      <rect x="476" y="77" width="120" height="26" rx="5" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1"/>
-      <text x="536" y="94" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#065F46" text-anchor="middle">FULLY EXECUTED</text>
-      <line x1="44" y1="114" x2="596" y2="114" stroke="#F1F5F9" stroke-width="1.2"/>
-
-      <circle cx="54" cy="140" r="6" fill="${BRAND.emerald}"/>
-      <text x="72" y="144" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="600" fill="#0F172A">Draft Prepared &amp; Jurisdiction Metadata Attached</text>
-
-      <circle cx="54" cy="172" r="6" fill="${BRAND.emerald}"/>
-      <text x="72" y="176" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="600" fill="#0F172A">Landlord Review &amp; Timestamped Signature Logged</text>
-
-      <circle cx="54" cy="204" r="6" fill="${BRAND.emerald}"/>
-      <text x="72" y="208" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="600" fill="#0F172A">Tenant Review &amp; Authenticated Acceptance Recorded</text>
-
-      <rect x="44" y="226" width="552" height="36" rx="6" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1"/>
-      <text x="58" y="249" font-family="DejaVu Sans Mono, monospace" font-size="11" fill="#475569">SHA-256 Document Hash: 8f4c92a1…e91a  ·  Audit Trail Locked</text>
-
-      <rect x="24" y="294" width="592" height="118" rx="10" fill="${BRAND.navy}"/>
-      <text x="44" y="326" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700" fill="#FFFFFF">Amana Property Protection  ·  /property-protection</text>
-      <text x="44" y="352" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#CBD5E1">Free basic property records and case reporting (including unlisted land).</text>
-      <text x="44" y="374" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#CBD5E1">Optional priced registry searches, survey reports &amp; physical inspections where available.</text>
-      <text x="44" y="396" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="600" fill="${BRAND.goldSoft}">Public Dispute Evidence Verification  ·  /verify-case</text>
-    `;
-  } else {
-    body = `
-      <rect x="24" y="64" width="592" height="348" rx="12" fill="${BRAND.navy}"/>
-      <rect x="24" y="64" width="592" height="4" fill="${BRAND.gold}"/>
-      ${buildBrandMarkSvg(296, 102, 56)}
-      <text x="320" y="196" font-family="DejaVu Sans, Arial, sans-serif" font-size="28" font-weight="700" fill="#FFFFFF" text-anchor="middle" letter-spacing="1">AMANA RENTALHUB NG</text>
-      <text x="320" y="226" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="600" fill="${BRAND.goldSoft}" text-anchor="middle" letter-spacing="2">STRUCTURED PROPERTY RENTALS IN NIGERIA</text>
-      <line x1="120" y1="252" x2="520" y2="252" stroke="#FFFFFF" stroke-opacity="0.16" stroke-width="1"/>
-      <text x="320" y="286" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#CBD5E1" text-anchor="middle">Property Search  ·  Identity Verification  ·  Wallet Clearing</text>
-      <text x="320" y="310" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#CBD5E1" text-anchor="middle">Digital Tenancy Agreements  ·  Property Protection</text>
-      <rect x="190" y="338" width="260" height="46" rx="8" fill="${BRAND.gold}"/>
-      <text x="320" y="367" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="700" fill="${BRAND.navy}" text-anchor="middle">rentalhub.com.ng</text>
-    `;
-  }
-
-  return `
-    <g transform="scale(${scale.toFixed(4)})">
-      <rect x="0" y="0" width="640" height="440" rx="14" fill="#F1F5F9" stroke="#CBD5E1" stroke-opacity="0.7" stroke-width="1.5"/>
-      <rect x="0" y="0" width="640" height="44" rx="14" fill="#FFFFFF"/>
-      <rect x="0" y="30" width="640" height="14" fill="#FFFFFF"/>
-      <line x1="0" y1="44" x2="640" y2="44" stroke="#E2E8F0" stroke-width="1"/>
-      <circle cx="22" cy="22" r="5" fill="#CBD5E1"/>
-      <circle cx="38" cy="22" r="5" fill="#CBD5E1"/>
-      <circle cx="54" cy="22" r="5" fill="#CBD5E1"/>
-      <text x="74" y="26" font-family="DejaVu Sans Mono, monospace" font-size="12" fill="#475569">${escapeXml(SCENES[sceneId - 1].route)}</text>
-      <rect x="478" y="11" width="144" height="22" rx="4" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1"/>
-      <text x="550" y="26" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" font-weight="600" fill="#64748B" text-anchor="middle">Illustrative UI Preview</text>
-      ${body}
-    </g>
-  `;
-}
-
-function buildVerticalChromeSvg(scene) {
-  return `
-  <svg width="1080" height="1920" viewBox="0 0 1080 1920" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="topScrimV" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#041129" stop-opacity="0.52"/>
-        <stop offset="40%" stop-color="#041129" stop-opacity="0.18"/>
-        <stop offset="70%" stop-color="#041129" stop-opacity="0.68"/>
-        <stop offset="100%" stop-color="#041129" stop-opacity="0.95"/>
-      </linearGradient>
-    </defs>
-    <rect x="0" y="300" width="1080" height="1620" fill="url(#topScrimV)"/>
-    <rect x="0" y="0" width="1080" height="300" fill="${BRAND.navy}"/>
-    <rect x="0" y="296" width="1080" height="4" fill="${BRAND.gold}"/>
-    ${buildBrandMarkSvg(508, 42, 64)}
-    <text x="540" y="148" font-family="DejaVu Sans, Arial, sans-serif" font-weight="700" font-size="38" fill="${BRAND.goldSoft}" text-anchor="middle" letter-spacing="4">AMANA RENTALHUB</text>
-    <text x="540" y="194" font-family="DejaVu Sans, Arial, sans-serif" font-weight="600" font-size="24" fill="#FFFFFF" text-anchor="middle" letter-spacing="2.2">NIGERIA'S STRUCTURED RENTAL PLATFORM</text>
-    <text x="540" y="242" font-family="DejaVu Sans, Arial, sans-serif" font-weight="600" font-size="20" fill="#94A3B8" text-anchor="middle" letter-spacing="3">RENTALHUB.COM.NG</text>
-
-    <g transform="translate(72, 1516)">
-      <rect x="0" y="6" width="6" height="236" fill="${BRAND.gold}"/>
-      <text x="30" y="32" font-family="DejaVu Sans, Arial, sans-serif" font-weight="700" font-size="22" fill="${BRAND.goldSoft}" letter-spacing="3.2">${escapeXml(scene.index)}  ·  ${escapeXml(scene.kicker)}</text>
-      <text x="30" y="96" font-family="DejaVu Sans, Arial, sans-serif" font-weight="700" font-size="52" fill="#FFFFFF">${escapeXml(scene.headline1)}</text>
-      <text x="30" y="156" font-family="DejaVu Sans, Arial, sans-serif" font-weight="700" font-size="46" fill="${BRAND.goldSoft}">${escapeXml(scene.headline2)}</text>
-      <text x="30" y="216" font-family="DejaVu Sans, Arial, sans-serif" font-weight="400" font-size="22" fill="#E2E8F0">${escapeXml(scene.caption)}</text>
-    </g>
-  </svg>
-  `;
-}
-
-function buildVerticalUiLayerSvg(scene) {
-  return `
-  <svg width="1080" height="1920" viewBox="0 0 1080 1920" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <filter id="cardShadowV" x="-10%" y="-10%" width="120%" height="125%">
-        <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#020817" flood-opacity="0.45"/>
-      </filter>
-    </defs>
-    <g transform="translate(90, 610)" filter="url(#cardShadowV)">
-      ${buildAuthenticUiCardSvg(scene.id, 900, 620)}
-    </g>
-  </svg>
-  `;
-}
-
-function buildLandscapeChromeSvg(scene) {
-  const bulletsSvg = scene.bullets
-    .map(
-      (b, idx) => `
-      <g transform="translate(0, ${idx * 42})">
-        <rect x="0" y="9" width="8" height="8" rx="2" fill="${BRAND.gold}"/>
-        <text x="20" y="18" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" fill="#E2E8F0">${escapeXml(b)}</text>
-      </g>
-    `
-    )
-    .join('');
-
-  return `
-  <svg width="1280" height="720" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="leftScrimL" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0%" stop-color="#041129" stop-opacity="0.93"/>
-        <stop offset="48%" stop-color="#071A3D" stop-opacity="0.80"/>
-        <stop offset="100%" stop-color="#041129" stop-opacity="0.54"/>
-      </linearGradient>
-    </defs>
-    <rect x="0" y="0" width="1280" height="720" fill="url(#leftScrimL)"/>
-    <rect x="0" y="0" width="1280" height="78" fill="${BRAND.navy}" fill-opacity="0.96"/>
-    <rect x="0" y="76" width="1280" height="2" fill="${BRAND.gold}"/>
-    ${buildBrandMarkSvg(48, 17, 42)}
-    <text x="104" y="38" font-family="DejaVu Sans, Arial, sans-serif" font-weight="700" font-size="18" fill="#FFFFFF" letter-spacing="1.5">AMANA RENTALHUB NG</text>
-    <text x="104" y="58" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="${BRAND.goldSoft}" letter-spacing="1.2">STRUCTURED PROPERTY RENTALS IN NIGERIA</text>
-    <text x="1232" y="45" font-family="DejaVu Sans, Arial, sans-serif" font-weight="600" font-size="15" fill="#CBD5E1" text-anchor="end" letter-spacing="1">rentalhub.com.ng</text>
-
-    <g transform="translate(52, 146)">
-      <rect x="0" y="4" width="4" height="162" fill="${BRAND.gold}"/>
-      <text x="22" y="22" font-family="DejaVu Sans, Arial, sans-serif" font-weight="700" font-size="14" fill="${BRAND.goldSoft}" letter-spacing="2.4">${escapeXml(scene.index)}  ·  ${escapeXml(scene.kicker)}</text>
-      <text x="22" y="68" font-family="DejaVu Sans, Arial, sans-serif" font-weight="700" font-size="30" fill="#FFFFFF">${escapeXml(scene.headline1)}</text>
-      <text x="22" y="106" font-family="DejaVu Sans, Arial, sans-serif" font-weight="700" font-size="24" fill="${BRAND.goldSoft}">${escapeXml(scene.headline2)}</text>
-      <text x="22" y="146" font-family="DejaVu Sans, Arial, sans-serif" font-size="14.5" fill="#CBD5E1">${escapeXml(scene.caption)}</text>
-      <line x1="0" y1="204" x2="520" y2="204" stroke="#FFFFFF" stroke-opacity="0.16" stroke-width="1"/>
-      <g transform="translate(0, 232)">
-        ${bulletsSvg}
-      </g>
-    </g>
-  </svg>
-  `;
-}
-
-function buildLandscapeUiLayerSvg(scene) {
-  return `
-  <svg width="1280" height="720" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <filter id="cardShadowL" x="-10%" y="-10%" width="120%" height="125%">
-        <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#020817" flood-opacity="0.48"/>
-      </filter>
-    </defs>
-    <g transform="translate(612, 144)" filter="url(#cardShadowL)">
-      ${buildAuthenticUiCardSvg(scene.id, 616, 424)}
-    </g>
-  </svg>
   `;
 }
 
 /**
- * Renders a complete format (9:16 or 16:9) natively in FFmpeg:
- * - High-resolution upscaled architectural stills with smooth Ken Burns zoompan
- * - Clean transparent PNG chrome & lower-third overlay
- * - Delayed smooth fade-in of the authentic RentalHub UI card after establishing shot
- * - Silky xfade cross-dissolves across all 6 scenes
+ * Authentic RentalHub NG UI screen cards (660 x 430 logical coordinate system)
+ * All text strictly factual, Escrow-aligned, and NBA-compliant (zero prohibited terms).
  */
-async function renderFormatVideo(formatKey, width, height, sceneDurSec, outVisualMp4) {
-  const isVertical = width < height;
-  const workDir = path.join(TMP_DIR, formatKey);
+function buildUiCardInner(uiType, route) {
+  const chromeBg = uiType.startsWith('landlord_')
+    ? '#0A152C'
+    : uiType.startsWith('protection_')
+      ? '#082426'
+      : '#0B224C';
+  const bodyBg = uiType.startsWith('landlord_') ? '#0F1D3A' : '#F8FAFC';
+
+  const chrome = `
+    <rect x="0" y="0" width="660" height="430" rx="18" fill="${bodyBg}" stroke="${BRAND.gold}" stroke-opacity="0.45" stroke-width="1.5"/>
+    <rect x="0" y="0" width="660" height="44" rx="18" fill="${chromeBg}"/>
+    <rect x="0" y="24" width="660" height="20" fill="${chromeBg}"/>
+    <circle cx="22" cy="22" r="5" fill="#475569"/>
+    <circle cx="38" cy="22" r="5" fill="#475569"/>
+    <circle cx="54" cy="22" r="5" fill="#475569"/>
+    <rect x="120" y="10" width="380" height="24" rx="6" fill="#071A3D" stroke="#334155" stroke-width="1"/>
+    <text x="310" y="26" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="11.5" fill="#CBD5E1">${esc(route)}</text>
+    <rect x="524" y="12" width="118" height="20" rx="5" fill="${BRAND.gold}" fill-opacity="0.18"/>
+    <text x="583" y="25.5" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="9.5" font-weight="700" fill="${BRAND.goldSoft}">PLATFORM PREVIEW</text>
+  `;
+
+  if (uiType === 'flagship_search') {
+    return `${chrome}
+      <rect x="24" y="62" width="612" height="56" rx="10" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
+      <text x="42" y="84" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" font-weight="700" fill="#64748B">STATE / CITY</text>
+      <text x="42" y="103" font-family="DejaVu Sans, Arial, sans-serif" font-size="13.5" font-weight="700" fill="${BRAND.navy}">Lagos · Lekki Phase 1</text>
+      <line x1="230" y1="72" x2="230" y2="108" stroke="#E2E8F0"/>
+      <text x="248" y="84" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" font-weight="700" fill="#64748B">PROPERTY TYPE</text>
+      <text x="248" y="103" font-family="DejaVu Sans, Arial, sans-serif" font-size="13.5" font-weight="700" fill="${BRAND.navy}">3-Bed Terrace</text>
+      <line x1="415" y1="72" x2="415" y2="108" stroke="#E2E8F0"/>
+      <rect x="434" y="74" width="186" height="32" rx="7" fill="${BRAND.navy}"/>
+      <text x="527" y="94.5" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700" fill="#FFFFFF">Search 36 States + FCT</text>
+
+      <rect x="24" y="136" width="296" height="270" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
+      <rect x="24" y="136" width="296" height="106" rx="12" fill="#0F2A5A"/>
+      <rect x="24" y="218" width="296" height="24" fill="#0F2A5A"/>
+      <rect x="40" y="152" width="126" height="24" rx="5" fill="#065F46"/>
+      <text x="103" y="168" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#ECFDF5">VERIFIED LISTING</text>
+      <text x="40" y="226" font-family="DejaVu Sans, Arial, sans-serif" font-size="11.5" fill="#CBD5E1">Lekki Phase 1, Lagos</text>
+      <text x="40" y="268" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700" fill="${BRAND.navy}">3-Bed Contemporary Terrace</text>
+      <text x="40" y="294" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="700" fill="${BRAND.navy}">₦4,500,000 / yr</text>
+      <text x="40" y="320" font-family="DejaVu Sans, Arial, sans-serif" font-size="11.5" fill="#475569">3 Beds · 4 Baths · Serviced Estate</text>
+      <rect x="40" y="346" width="264" height="42" rx="8" fill="#F1F5F9" stroke="#CBD5E1"/>
+      <text x="172" y="371" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700" fill="${BRAND.navy}">View Structured Property Profile</text>
+
+      <rect x="340" y="136" width="296" height="270" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
+      <rect x="340" y="136" width="296" height="106" rx="12" fill="#173873"/>
+      <rect x="340" y="218" width="296" height="24" fill="#173873"/>
+      <rect x="356" y="152" width="144" height="24" rx="5" fill="${BRAND.navy}" stroke="${BRAND.gold}"/>
+      <text x="428" y="168" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="10.5" font-weight="700" fill="${BRAND.goldSoft}">VERIFIED LANDLORD</text>
+      <text x="356" y="226" font-family="DejaVu Sans, Arial, sans-serif" font-size="11.5" fill="#CBD5E1">Wuse II, Abuja FCT</text>
+      <text x="356" y="268" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700" fill="${BRAND.navy}">2-Bed Executive Apartment</text>
+      <text x="356" y="294" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="700" fill="${BRAND.navy}">₦3,800,000 / yr</text>
+      <text x="356" y="320" font-family="DejaVu Sans, Arial, sans-serif" font-size="11.5" fill="#475569">2 Beds · 3 Baths · 24/7 Power Backup</text>
+      <rect x="356" y="346" width="264" height="42" rx="8" fill="${BRAND.navy}"/>
+      <text x="488" y="371" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700" fill="#FFFFFF">Compare &amp; Estimate Move-In</text>
+    `;
+  }
+
+  if (uiType === 'flagship_detail') {
+    return `${chrome}
+      <rect x="24" y="62" width="612" height="344" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
+      <text x="46" y="96" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="700" fill="${BRAND.navy}">3-Bedroom Terrace · Lekki Phase 1, Lagos</text>
+      <rect x="46" y="108" width="136" height="24" rx="5" fill="#ECFDF5" stroke="#A7F3D0"/>
+      <text x="114" y="124" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#065F46">Platform Verified</text>
+      <rect x="192" y="108" width="150" height="24" rx="5" fill="#FEF3C7" stroke="#FDE68A"/>
+      <text x="267" y="124" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#92400E">Verified Landlord ID</text>
+
+      <rect x="46" y="150" width="176" height="72" rx="9" fill="#F8FAFC" stroke="#E2E8F0"/>
+      <text x="62" y="176" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" font-weight="700" fill="#64748B">ANNUAL RENT</text>
+      <text x="62" y="204" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="700" fill="${BRAND.navy}">₦4,500,000</text>
+
+      <rect x="238" y="150" width="180" height="72" rx="9" fill="#F8FAFC" stroke="#E2E8F0"/>
+      <text x="254" y="176" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" font-weight="700" fill="#64748B">MONTHLY ESTIMATE</text>
+      <text x="254" y="204" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="700" fill="${BRAND.navy}">₦375,000 / mo</text>
+
+      <rect x="434" y="150" width="180" height="72" rx="9" fill="#F8FAFC" stroke="#E2E8F0"/>
+      <text x="450" y="176" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" font-weight="700" fill="#64748B">INSPECTION MEDIA</text>
+      <text x="450" y="204" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="700" fill="#065F46">Video &amp; Photos Ready</text>
+
+      <rect x="46" y="242" width="568" height="142" rx="10" fill="#071A3D"/>
+      <text x="68" y="274" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700" fill="${BRAND.goldSoft}">RENT CALCULATOR &amp; MOVE-IN BREAKDOWN</text>
+      <text x="68" y="302" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#E2E8F0">• Annual Rent, Service Charge &amp; Applicable Platform Fees Shown Upfront</text>
+      <text x="68" y="328" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#E2E8F0">• Clear Landlord Profile, Property Specifications &amp; Availability Status</text>
+      <text x="68" y="354" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#CBD5E1">• Full Street Address &amp; Direct Contact Unlocked After Identity Verification</text>
+    `;
+  }
+
+  if (uiType === 'flagship_identity') {
+    return `${chrome}
+      <rect x="24" y="62" width="612" height="162" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
+      <text x="48" y="96" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="700" fill="${BRAND.navy}">Identity Verification &amp; Account Readiness</text>
+      <rect x="48" y="116" width="174" height="84" rx="9" fill="#ECFDF5" stroke="#A7F3D0"/>
+      <text x="64" y="146" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#065F46">STEP 01 · COMPLETE</text>
+      <text x="64" y="172" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="700" fill="${BRAND.navy}">NIN Verification</text>
+      <rect x="242" y="116" width="174" height="84" rx="9" fill="#ECFDF5" stroke="#A7F3D0"/>
+      <text x="258" y="146" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#065F46">STEP 02 · COMPLETE</text>
+      <text x="258" y="172" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="700" fill="${BRAND.navy}">Live Photo Check</text>
+      <rect x="436" y="116" width="176" height="84" rx="9" fill="#FEF3C7" stroke="#FDE68A"/>
+      <text x="452" y="146" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#92400E">STEP 03 · READY</text>
+      <text x="452" y="172" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="700" fill="${BRAND.navy}">Detail Unlock</text>
+
+      <rect x="24" y="242" width="612" height="164" rx="12" fill="#FFFBEB" stroke="#FDE68A" stroke-width="1.5"/>
+      <text x="48" y="276" font-family="DejaVu Sans, Arial, sans-serif" font-size="15.5" font-weight="700" fill="${BRAND.navy}">Transparent Property Detail Unlock</text>
+      <text x="48" y="304" font-family="DejaVu Sans, Arial, sans-serif" font-size="12.5" fill="#334155">Complete the one-time property unlock or active tenant plan via escrow checkout</text>
+      <text x="48" y="325" font-family="DejaVu Sans, Arial, sans-serif" font-size="12.5" fill="#334155">or bank transfer to reveal the full street address, video, and direct landlord line.</text>
+      <rect x="48" y="346" width="236" height="40" rx="8" fill="${BRAND.navy}"/>
+      <text x="166" y="370" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700" fill="#FFFFFF">Proceed via Escrow Checkout</text>
+      <rect x="298" y="346" width="248" height="40" rx="8" fill="#FFFFFF" stroke="#CBD5E1"/>
+      <text x="422" y="370" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700" fill="${BRAND.navy}">In-Platform Messaging &amp; Calling</text>
+    `;
+  }
+
+  if (uiType === 'flagship_escrow') {
+    return `${chrome}
+      <rect x="24" y="62" width="612" height="344" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
+      <text x="46" y="96" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="700" fill="${BRAND.navy}">Wallet &amp; Escrow Rent Ledger</text>
+      <rect x="444" y="76" width="170" height="26" rx="6" fill="#071A3D"/>
+      <text x="529" y="93" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="10.5" font-weight="700" fill="${BRAND.goldSoft}">ESCROW &amp; BANK TRANSFER</text>
+
+      <rect x="46" y="118" width="274" height="104" rx="10" fill="#FEF3C7" stroke="#FDE68A"/>
+      <text x="64" y="144" font-family="DejaVu Sans, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#92400E">PENDING ESCROW CLEARING</text>
+      <text x="64" y="180" font-family="DejaVu Sans, Arial, sans-serif" font-size="24" font-weight="700" fill="${BRAND.navy}">₦4,387,500</text>
+      <text x="64" y="204" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" fill="#78350F">14-working-day escrow clearing window</text>
+
+      <rect x="340" y="118" width="274" height="104" rx="10" fill="#ECFDF5" stroke="#A7F3D0"/>
+      <text x="358" y="144" font-family="DejaVu Sans, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#065F46">CLEARED BALANCE</text>
+      <text x="358" y="180" font-family="DejaVu Sans, Arial, sans-serif" font-size="24" font-weight="700" fill="#065F46">₦1,850,000</text>
+      <text x="358" y="204" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" fill="#047857">Ready for verified bank withdrawal</text>
+
+      <line x1="46" y1="244" x2="614" y2="244" stroke="#E2E8F0"/>
+      <text x="46" y="272" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#64748B">RECENT AUDITABLE LEDGER ENTRIES</text>
+
+      <rect x="46" y="286" width="568" height="44" rx="8" fill="#F8FAFC" stroke="#E2E8F0"/>
+      <text x="64" y="313" font-family="DejaVu Sans, Arial, sans-serif" font-size="12.5" font-weight="700" fill="${BRAND.navy}">Rent Escrow · Ref #RH-40219</text>
+      <rect x="444" y="296" width="154" height="24" rx="5" fill="#FEF3C7" stroke="#FDE68A"/>
+      <text x="521" y="312" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#92400E">Escrow Clearing (14d)</text>
+
+      <rect x="46" y="340" width="568" height="44" rx="8" fill="#F8FAFC" stroke="#E2E8F0"/>
+      <text x="64" y="367" font-family="DejaVu Sans, Arial, sans-serif" font-size="12.5" font-weight="700" fill="${BRAND.navy}">Property Unlock · Escrow Recorded</text>
+      <rect x="480" y="350" width="118" height="24" rx="5" fill="#ECFDF5" stroke="#A7F3D0"/>
+      <text x="539" y="366" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#065F46">Receipt Issued</text>
+    `;
+  }
+
+  if (uiType === 'flagship_agreements' || uiType === 'tenant_finale') {
+    return `${chrome}
+      <rect x="24" y="62" width="612" height="196" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
+      <text x="48" y="96" font-family="DejaVu Sans, Arial, sans-serif" font-size="16.5" font-weight="700" fill="${BRAND.navy}">Versioned Digital Tenancy Agreement</text>
+      <rect x="466" y="76" width="146" height="26" rx="6" fill="#071A3D"/>
+      <text x="539" y="93" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="10.5" font-weight="700" fill="${BRAND.goldSoft}">SHA-256 INTEGRITY</text>
+      <text x="48" y="128" font-family="DejaVu Sans, Arial, sans-serif" font-size="12.5" fill="#334155">• Draft → Tenant Review → Landlord &amp; Tenant Counter-Execution → Active Lease</text>
+      <text x="48" y="156" font-family="DejaVu Sans, Arial, sans-serif" font-size="12.5" fill="#334155">• Version history, signed PDF archival, and timestamped audit trail</text>
+      <rect x="48" y="178" width="268" height="58" rx="9" fill="#ECFDF5" stroke="#A7F3D0"/>
+      <text x="64" y="202" font-family="DejaVu Sans, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#065F46">TENANT SIGNATURE</text>
+      <text x="64" y="223" font-family="DejaVu Sans, Arial, sans-serif" font-size="12.5" font-weight="700" fill="${BRAND.navy}">Recorded · Timestamped</text>
+      <rect x="334" y="178" width="278" height="58" rx="9" fill="#ECFDF5" stroke="#A7F3D0"/>
+      <text x="350" y="202" font-family="DejaVu Sans, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#065F46">LANDLORD COUNTER-SIGN</text>
+      <text x="350" y="223" font-family="DejaVu Sans, Arial, sans-serif" font-size="12.5" font-weight="700" fill="${BRAND.navy}">Archived · Version 1.0</text>
+
+      <rect x="24" y="276" width="612" height="130" rx="12" fill="#071A3D"/>
+      <text x="48" y="308" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700" fill="${BRAND.goldSoft}">${uiType === 'tenant_finale' ? 'MOVE-IN &amp; TENANT SERVICES' : 'AMANA PROPERTY PROTECTION MODULE'}</text>
+      <text x="48" y="338" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#E2E8F0">${uiType === 'tenant_finale' ? '• Optional relocation transport &amp; move-in fumigation bookings on-platform' : '• Free basic property records &amp; case reporting (including unlisted land)'}</text>
+      <text x="48" y="366" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#CBD5E1">${uiType === 'tenant_finale' ? '• Start your verified home search today at rentalhub.com.ng' : '• Optional priced registry, survey &amp; physical inspection requests'}</text>
+    `;
+  }
+
+  if (uiType === 'landlord_portfolio' || uiType === 'landlord_enquiries') {
+    const isEnq = uiType === 'landlord_enquiries';
+    return `${chrome}
+      <rect x="24" y="62" width="612" height="344" rx="12" fill="#132447" stroke="${BRAND.gold}" stroke-opacity="0.35" stroke-width="1.2"/>
+      <text x="48" y="98" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">${isEnq ? 'Identity-Screened Tenant Enquiries' : 'Landlord &amp; Agent Portfolio Workspace'}</text>
+      <rect x="454" y="76" width="160" height="26" rx="6" fill="${BRAND.gold}" fill-opacity="0.2" stroke="${BRAND.gold}"/>
+      <text x="534" y="93" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="10.5" font-weight="700" fill="${BRAND.goldSoft}">${isEnq ? 'VERIFIED ENQUIRIES' : 'PORTFOLIO ACTIVE'}</text>
+
+      <rect x="48" y="122" width="176" height="84" rx="9" fill="#0B1730" stroke="#334155"/>
+      <text x="64" y="148" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" font-weight="700" fill="#94A3B8">ACTIVE LISTINGS</text>
+      <text x="64" y="182" font-family="DejaVu Sans, Arial, sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">14 Units</text>
+
+      <rect x="242" y="122" width="176" height="84" rx="9" fill="#0B1730" stroke="#334155"/>
+      <text x="258" y="148" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" font-weight="700" fill="#94A3B8">VERIFIED ENQUIRIES</text>
+      <text x="258" y="182" font-family="DejaVu Sans, Arial, sans-serif" font-size="24" font-weight="700" fill="${BRAND.goldSoft}">28 Checked</text>
+
+      <rect x="436" y="122" width="176" height="84" rx="9" fill="#0B1730" stroke="#334155"/>
+      <text x="452" y="148" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" font-weight="700" fill="#94A3B8">ESCROW CLEARED</text>
+      <text x="452" y="182" font-family="DejaVu Sans, Arial, sans-serif" font-size="22" font-weight="700" fill="${BRAND.emeraldSoft}">₦6.23M</text>
+
+      <rect x="48" y="226" width="564" height="68" rx="9" fill="#0B1730" stroke="#1E3A5F"/>
+      <text x="66" y="254" font-family="DejaVu Sans, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#FFFFFF">${isEnq ? 'Enquiry · Verified Tenant ID #NG-8841' : 'Lekki Phase 1 Terrace · 3-Bed · Published'}</text>
+      <text x="66" y="278" font-family="DejaVu Sans, Arial, sans-serif" font-size="11.5" fill="#CBD5E1">${isEnq ? 'NIN &amp; Live Photo Verified · Address Protected Until Unlock' : 'Availability: Active · Inspection Media Attached · ₦4.5M/yr'}</text>
+
+      <rect x="48" y="308" width="564" height="68" rx="9" fill="#0B1730" stroke="#1E3A5F"/>
+      <text x="66" y="336" font-family="DejaVu Sans, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#FFFFFF">${isEnq ? 'In-Platform Thread · Scheduled Inspection Request' : 'Wuse II Executive Flat · 2-Bed · Published'}</text>
+      <text x="66" y="360" font-family="DejaVu Sans, Arial, sans-serif" font-size="11.5" fill="#CBD5E1">${isEnq ? 'All messages &amp; call logs recorded inside your owner workspace' : 'Accredited Agent Assigned · Escrow Clearing Enabled'}</text>
+    `;
+  }
+
+  if (uiType === 'landlord_delegation' || uiType === 'landlord_finale') {
+    return `${chrome}
+      <rect x="24" y="62" width="612" height="344" rx="12" fill="#132447" stroke="${BRAND.gold}" stroke-opacity="0.35" stroke-width="1.2"/>
+      <text x="48" y="98" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">Accredited Agent Permissions &amp; Owner Audit</text>
+      <text x="48" y="124" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#CBD5E1">Grant explicit operational scopes while retaining full landlord ownership &amp; payout control.</text>
+
+      <rect x="48" y="146" width="272" height="106" rx="10" fill="#0B1730" stroke="#334155"/>
+      <text x="66" y="176" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="${BRAND.goldSoft}">SCOPED PERMISSIONS</text>
+      <text x="66" y="204" font-family="DejaVu Sans, Arial, sans-serif" font-size="12.5" fill="#FFFFFF">✓ Listing &amp; Media Updates</text>
+      <text x="66" y="230" font-family="DejaVu Sans, Arial, sans-serif" font-size="12.5" fill="#FFFFFF">✓ Inspection Coordination</text>
+
+      <rect x="340" y="146" width="272" height="106" rx="10" fill="#0B1730" stroke="#334155"/>
+      <text x="358" y="176" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="${BRAND.emeraldSoft}">OWNER CONTROLS</text>
+      <text x="358" y="204" font-family="DejaVu Sans, Arial, sans-serif" font-size="12.5" fill="#FFFFFF">✓ Direct Bank Payout Approval</text>
+      <text x="358" y="230" font-family="DejaVu Sans, Arial, sans-serif" font-size="12.5" fill="#FFFFFF">✓ Final Lease Counter-Sign</text>
+
+      <rect x="48" y="272" width="564" height="108" rx="10" fill="#081327" stroke="${BRAND.gold}" stroke-opacity="0.4"/>
+      <text x="66" y="302" font-family="DejaVu Sans, Arial, sans-serif" font-size="11.5" font-weight="700" fill="${BRAND.goldSoft}">CENTRALIZED ACTIVITY LOG</text>
+      <text x="66" y="328" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#CBD5E1">Every delegated task—listing edits, condition updates, and dossier</text>
+      <text x="66" y="350" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#CBD5E1">records—remains visible under your verified landlord dashboard.</text>
+    `;
+  }
+
+  if (uiType === 'protection_records' || uiType === 'protection_capacity') {
+    const isCap = uiType === 'protection_capacity';
+    return `${chrome}
+      <rect x="24" y="62" width="612" height="344" rx="12" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="1.2"/>
+      <text x="48" y="98" font-family="DejaVu Sans, Arial, sans-serif" font-size="16.5" font-weight="700" fill="${BRAND.navy}">${isCap ? 'Property Capacity &amp; Holding Types' : 'Basic Property Record Vault'}</text>
+      <rect x="448" y="76" width="164" height="26" rx="6" fill="#065F46"/>
+      <text x="530" y="93" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#ECFDF5">FREE BASIC RECORDS</text>
+
+      <rect x="48" y="124" width="272" height="114" rx="10" fill="#F8FAFC" stroke="#CBD5E1"/>
+      <text x="64" y="156" font-family="DejaVu Sans, Arial, sans-serif" font-size="13.5" font-weight="700" fill="${BRAND.navy}">${isCap ? 'Unlisted Land &amp; Estates' : 'Structured Asset Profile'}</text>
+      <text x="64" y="182" font-family="DejaVu Sans, Arial, sans-serif" font-size="11.5" fill="#475569">${isCap ? 'Register land parcels &amp; residential plots' : 'Document location, title refs &amp; photos'}</text>
+      <text x="64" y="204" font-family="DejaVu Sans, Arial, sans-serif" font-size="11.5" fill="#475569">${isCap ? 'Not required to be listed for rent' : 'Zero-cost onboarding for property owners'}</text>
+
+      <rect x="336" y="124" width="276" height="114" rx="10" fill="#F8FAFC" stroke="#CBD5E1"/>
+      <text x="352" y="156" font-family="DejaVu Sans, Arial, sans-serif" font-size="13.5" font-weight="700" fill="${BRAND.navy}">${isCap ? 'Family &amp; Company Capacity' : 'Basic Case Reporting'}</text>
+      <text x="352" y="182" font-family="DejaVu Sans, Arial, sans-serif" font-size="11.5" fill="#475569">${isCap ? 'Individual, family, or corporate holdings' : 'Log dispute timelines &amp; supporting files'}</text>
+      <text x="352" y="204" font-family="DejaVu Sans, Arial, sans-serif" font-size="11.5" fill="#475569">${isCap ? 'Built for local &amp; diaspora owners' : 'Private threads with structured tracking'}</text>
+
+      <rect x="48" y="258" width="564" height="122" rx="10" fill="${BRAND.forest}"/>
+      <text x="66" y="290" font-family="DejaVu Sans, Arial, sans-serif" font-size="11.5" font-weight="700" fill="${BRAND.goldSoft}">TRANSPARENT PLATFORM DISCLOSURE</text>
+      <text x="66" y="318" font-family="DejaVu Sans, Arial, sans-serif" font-size="12.5" fill="#E2E8F0">• Basic property records and basic case reports are free on-platform.</text>
+      <text x="66" y="344" font-family="DejaVu Sans, Arial, sans-serif" font-size="12.5" fill="#CBD5E1">• Platform documentation assists clarity and does not replace land registries.</text>
+    `;
+  }
+
+  if (uiType === 'protection_services' || uiType === 'protection_verify' || uiType === 'protection_finale') {
+    const isVerify = uiType === 'protection_verify';
+    return `${chrome}
+      <rect x="24" y="62" width="612" height="344" rx="12" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="1.2"/>
+      <text x="48" y="98" font-family="DejaVu Sans, Arial, sans-serif" font-size="16.5" font-weight="700" fill="${BRAND.navy}">${isVerify ? 'Public Case &amp; Evidence Verification Portal' : 'Optional Priced Verification Workflows'}</text>
+      <rect x="444" y="76" width="168" height="26" rx="6" fill="${BRAND.forest}"/>
+      <text x="528" y="93" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="10.5" font-weight="700" fill="${BRAND.goldSoft}">${isVerify ? 'PORTAL · /verify-case' : 'OPTIONAL · PRICED'}</text>
+
+      <rect x="48" y="124" width="564" height="118" rx="10" fill="#F8FAFC" stroke="#CBD5E1"/>
+      <text x="66" y="156" font-family="DejaVu Sans, Arial, sans-serif" font-size="13.5" font-weight="700" fill="${BRAND.navy}">${isVerify ? 'Case Integrity Check · Reference #PP-2026-041' : 'Registry Search, Survey &amp; Physical Inspection'}</text>
+      <text x="66" y="184" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#334155">${isVerify ? 'SHA-256 Evidence Hash: 8f4c...91d2 · Timestamp Verified' : '• Request priced registry searches or survey reports where defined'}</text>
+      <text x="66" y="210" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#334155">${isVerify ? 'Anonymized resolved summaries published transparently at /cases' : '• Time-limited monitoring periods with explicit renewal only'}</text>
+
+      <rect x="48" y="262" width="564" height="118" rx="10" fill="${BRAND.forest}"/>
+      <text x="66" y="294" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700" fill="${BRAND.goldSoft}">AMANA PROPERTY PROTECTION · RENTALHUB.COM.NG</text>
+      <text x="66" y="324" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#FFFFFF">Built for Nigerian landowners, families, corporate teams &amp; partners.</text>
+      <text x="66" y="352" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#CBD5E1">Service availability and applicable fees are displayed clearly before confirmation.</text>
+    `;
+  }
+
+  // Flagship / general finale card
+  return `${chrome}
+    <rect x="24" y="62" width="612" height="344" rx="12" fill="${BRAND.navy}"/>
+    ${buildBrandMarkSvg(294, 96, 72)}
+    <text x="330" y="206" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">Amana RentalHub NG</text>
+    <text x="330" y="236" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="${BRAND.goldSoft}">STRUCTURED NIGERIAN PROPTECH PLATFORM</text>
+    <line x1="170" y1="258" x2="490" y2="258" stroke="${BRAND.gold}" stroke-opacity="0.5"/>
+    <text x="330" y="290" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#E2E8F0">Search · Identity Verification · Escrow Clearing · Digital Leases · Protection</text>
+    <rect x="200" y="318" width="260" height="46" rx="9" fill="${BRAND.gold}"/>
+    <text x="330" y="346" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700" fill="${BRAND.navy}">rentalhub.com.ng</text>
+  `;
+}
+
+/**
+ * 4 GENUINELY DISTINCT STATIC OVERLAY FRAME LAYOUTS
+ * (Separates chrome/typography PNG from delayed fade-in UI card PNG)
+ */
+function buildFrameChromeSvg(layout, scene, totalScenes, width, height) {
+  const isVertical = height > width;
+  const progressRatio = (parseInt(scene.index, 10) || 1) / totalScenes;
+
+  // =========================================================================
+  // LAYOUT 1: FLAGSHIP BANNER (Corporate Navy Top Banner + Gold Lower-Third)
+  // =========================================================================
+  if (layout === 'flagship_banner') {
+    if (isVertical) {
+      return `
+      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="topGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#041129" stop-opacity="0.96"/>
+            <stop offset="68%" stop-color="#071A3D" stop-opacity="0.72"/>
+            <stop offset="100%" stop-color="#071A3D" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="botGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#041129" stop-opacity="0"/>
+            <stop offset="35%" stop-color="#041129" stop-opacity="0.88"/>
+            <stop offset="100%" stop-color="#041129" stop-opacity="0.98"/>
+          </linearGradient>
+        </defs>
+        <rect x="0" y="0" width="${width}" height="430" fill="url(#topGrad)"/>
+        <rect x="0" y="1380" width="${width}" height="540" fill="url(#botGrad)"/>
+
+        <!-- Top Corporate Header Bar -->
+        <rect x="0" y="0" width="${width}" height="122" fill="#051430" fill-opacity="0.92"/>
+        <line x1="0" y1="122" x2="${width}" y2="122" stroke="${BRAND.gold}" stroke-opacity="0.5" stroke-width="2"/>
+        ${buildBrandMarkSvg(56, 36, 52)}
+        <text x="126" y="61" font-family="DejaVu Sans, Arial, sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">AMANA RENTALHUB NG</text>
+        <text x="126" y="87" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" letter-spacing="2.2" fill="${BRAND.goldSoft}">CORPORATE PROPTECH PLATFORM</text>
+        <text x="${width - 56}" y="72" text-anchor="end" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="700" fill="${BRAND.goldSoft}">${esc(scene.index)} / 0${totalScenes}</text>
+
+        <!-- Headline Block -->
+        <text x="64" y="198" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="700" letter-spacing="3" fill="${BRAND.goldSoft}">${esc(scene.kicker)}</text>
+        <text x="64" y="264" font-family="DejaVu Sans, Arial, sans-serif" font-size="52" font-weight="700" fill="#FFFFFF">${esc(scene.headline1)}</text>
+        <text x="64" y="324" font-family="DejaVu Sans, Arial, sans-serif" font-size="48" font-weight="700" fill="${BRAND.goldSoft}">${esc(scene.headline2)}</text>
+
+        <!-- Bottom Left-Gold-Bar Lower-Third Caption -->
+        <rect x="64" y="1596" width="8" height="170" rx="4" fill="${BRAND.gold}"/>
+        <text x="92" y="1632" font-family="DejaVu Sans, Arial, sans-serif" font-size="25" font-weight="700" fill="#FFFFFF">${esc(scene.caption)}</text>
+        <text x="92" y="1674" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" fill="#CBD5E1">• ${esc(scene.bullets[0])}</text>
+        <text x="92" y="1708" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" fill="#CBD5E1">• ${esc(scene.bullets[1])}</text>
+        <text x="92" y="1742" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" fill="#CBD5E1">• ${esc(scene.bullets[2])}</text>
+
+        <!-- Subtle Progress Bar & Domain -->
+        <rect x="64" y="1828" width="${width - 128}" height="5" rx="2.5" fill="#FFFFFF" fill-opacity="0.18"/>
+        <rect x="64" y="1828" width="${Math.round((width - 128) * progressRatio)}" height="5" rx="2.5" fill="${BRAND.gold}"/>
+        <text x="64" y="1872" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="700" fill="#E2E8F0">rentalhub.com.ng</text>
+        <text x="${width - 64}" y="1872" text-anchor="end" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" fill="#94A3B8">36 States &amp; FCT · Escrow-Tracked Workflows</text>
+      </svg>`;
+    }
+
+    // 16:9 Flagship
+    return `
+    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="leftScrim" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#041129" stop-opacity="0.96"/>
+          <stop offset="52%" stop-color="#071A3D" stop-opacity="0.86"/>
+          <stop offset="100%" stop-color="#071A3D" stop-opacity="0.28"/>
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="${width}" height="${height}" fill="url(#leftScrim)"/>
+      <rect x="0" y="0" width="${width}" height="64" fill="#051430" fill-opacity="0.94"/>
+      <line x1="0" y1="64" x2="${width}" y2="64" stroke="${BRAND.gold}" stroke-opacity="0.45" stroke-width="1.5"/>
+      ${buildBrandMarkSvg(36, 12, 40)}
+      <text x="90" y="34" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">AMANA RENTALHUB NG</text>
+      <text x="90" y="51" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" letter-spacing="1.8" fill="${BRAND.goldSoft}">FLAGSHIP OVERVIEW · NIGERIAN PROPTECH</text>
+      <text x="${width - 36}" y="38" text-anchor="end" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="700" fill="${BRAND.goldSoft}">CHAPTER ${esc(scene.index)} / 0${totalScenes}</text>
+
+      <!-- Left Editorial Column (width 520px, safe spacing from right UI card at x=575) -->
+      <text x="44" y="138" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" letter-spacing="2.4" fill="${BRAND.goldSoft}">${esc(scene.kicker)}</text>
+      <text x="44" y="188" font-family="DejaVu Sans, Arial, sans-serif" font-size="34" font-weight="700" fill="#FFFFFF">${esc(scene.headline1)}</text>
+      <text x="44" y="232" font-family="DejaVu Sans, Arial, sans-serif" font-size="31" font-weight="700" fill="${BRAND.goldSoft}">${esc(scene.headline2)}</text>
+
+      <rect x="44" y="262" width="5" height="190" rx="2.5" fill="${BRAND.gold}"/>
+      <text x="64" y="294" font-family="DejaVu Sans, Arial, sans-serif" font-size="15.5" font-weight="700" fill="#FFFFFF">${esc(scene.caption)}</text>
+      <text x="64" y="336" font-family="DejaVu Sans, Arial, sans-serif" font-size="13.5" fill="#CBD5E1">• ${esc(scene.bullets[0])}</text>
+      <text x="64" y="370" font-family="DejaVu Sans, Arial, sans-serif" font-size="13.5" fill="#CBD5E1">• ${esc(scene.bullets[1])}</text>
+      <text x="64" y="404" font-family="DejaVu Sans, Arial, sans-serif" font-size="13.5" fill="#CBD5E1">• ${esc(scene.bullets[2])}</text>
+
+      <rect x="44" y="652" width="${width - 88}" height="4" rx="2" fill="#FFFFFF" fill-opacity="0.18"/>
+      <rect x="44" y="652" width="${Math.round((width - 88) * progressRatio)}" height="4" rx="2" fill="${BRAND.gold}"/>
+      <text x="44" y="688" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="700" fill="#FFFFFF">rentalhub.com.ng</text>
+      <text x="${width - 44}" y="688" text-anchor="end" font-family="DejaVu Sans, Arial, sans-serif" font-size="12.5" fill="#CBD5E1">36 States &amp; FCT · Escrow-Tracked Workflows</text>
+    </svg>`;
+  }
+
+  // =========================================================================
+  // LAYOUT 2: TENANT EDITORIAL MAGAZINE (Daylight Split-Canvas Ivory + Navy)
+  // =========================================================================
+  if (layout === 'tenant_magazine') {
+    if (isVertical) {
+      return `
+      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="magTop" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#071A3D" stop-opacity="0.72"/>
+            <stop offset="100%" stop-color="#071A3D" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <!-- Top light scrim over warm daylight architectural photo (top 760px visible) -->
+        <rect x="0" y="0" width="${width}" height="210" fill="url(#magTop)"/>
+        ${buildBrandMarkSvg(52, 40, 48)}
+        <text x="116" y="62" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="700" fill="#FFFFFF">AMANA RENTALHUB NG</text>
+        <text x="116" y="84" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" letter-spacing="2" fill="${BRAND.goldSoft}">TENANT EDITORIAL EDITION</text>
+        <rect x="${width - 156}" y="44" width="104" height="36" rx="6" fill="#F8F6F1" fill-opacity="0.94"/>
+        <text x="${width - 104}" y="68" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700" fill="${BRAND.navy}">${esc(scene.index)} / 0${totalScenes}</text>
+
+        <!-- Warm Ivory Editorial Magazine Sheet (Lower Split Canvas) -->
+        <path d="M 0 760 Q 540 732 1080 760 L 1080 1920 L 0 1920 Z" fill="${BRAND.ivory}"/>
+        <line x1="64" y1="816" x2="176" y2="816" stroke="${BRAND.gold}" stroke-width="5"/>
+        <text x="196" y="822" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="700" letter-spacing="2.4" fill="${BRAND.navy}">${esc(scene.kicker)}</text>
+
+        <text x="64" y="886" font-family="DejaVu Sans, Arial, sans-serif" font-size="48" font-weight="700" fill="${BRAND.navy}">${esc(scene.headline1)}</text>
+        <text x="64" y="942" font-family="DejaVu Sans, Arial, sans-serif" font-size="46" font-weight="700" fill="#8C6214">${esc(scene.headline2)}</text>
+
+        <text x="64" y="1682" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" fill="${BRAND.navy}">${esc(scene.caption)}</text>
+        <text x="64" y="1724" font-family="DejaVu Sans, Arial, sans-serif" font-size="19.5" fill="${BRAND.slateText}">• ${esc(scene.bullets[0])}</text>
+        <text x="64" y="1758" font-family="DejaVu Sans, Arial, sans-serif" font-size="19.5" fill="${BRAND.slateText}">• ${esc(scene.bullets[1])}</text>
+
+        <rect x="64" y="1822" width="${width - 128}" height="5" rx="2.5" fill="#CBD5E1"/>
+        <rect x="64" y="1822" width="${Math.round((width - 128) * progressRatio)}" height="5" rx="2.5" fill="${BRAND.navy}"/>
+        <text x="64" y="1868" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="700" fill="${BRAND.navy}">rentalhub.com.ng</text>
+        <text x="${width - 64}" y="1868" text-anchor="end" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" fill="${BRAND.slateMuted}">Tenant Edition · Escrow-Tracked Rentals</text>
+      </svg>`;
+    }
+
+    // 16:9 Tenant Split-Canvas (Left 44% Photo visible, Right 56% Crisp Ivory Editorial Panel)
+    return `
+    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="magPhotoTop" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#071A3D" stop-opacity="0.78"/>
+          <stop offset="100%" stop-color="#071A3D" stop-opacity="0"/>
+        </linearGradient>
+        <linearGradient id="magPhotoBot" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#071A3D" stop-opacity="0"/>
+          <stop offset="100%" stop-color="#071A3D" stop-opacity="0.88"/>
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="540" height="160" fill="url(#magPhotoTop)"/>
+      <rect x="0" y="540" width="540" height="180" fill="url(#magPhotoBot)"/>
+      ${buildBrandMarkSvg(32, 26, 40)}
+      <text x="84" y="45" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="700" fill="#FFFFFF">AMANA RENTALHUB NG</text>
+      <text x="84" y="62" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" letter-spacing="1.8" fill="${BRAND.goldSoft}">TENANT EDITION</text>
+      <text x="32" y="660" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="700" fill="#FFFFFF">rentalhub.com.ng</text>
+      <text x="32" y="684" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#CBD5E1">Transparent Nigerian Home Search</text>
+
+      <!-- Right Crisp Ivory Magazine Editorial Panel -->
+      <rect x="520" y="0" width="760" height="720" fill="${BRAND.ivory}"/>
+      <line x1="520" y1="0" x2="520" y2="720" stroke="${BRAND.gold}" stroke-width="4"/>
+      <text x="560" y="50" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700" letter-spacing="2.2" fill="#8C6214">${esc(scene.kicker)}</text>
+      <text x="1240" y="50" text-anchor="end" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="${BRAND.navy}">${esc(scene.index)} / 0${totalScenes}</text>
+
+      <text x="560" y="96" font-family="DejaVu Sans, Arial, sans-serif" font-size="31" font-weight="700" fill="${BRAND.navy}">${esc(scene.headline1)} — ${esc(scene.headline2)}</text>
+      <text x="560" y="128" font-family="DejaVu Sans, Arial, sans-serif" font-size="14.5" fill="${BRAND.slateText}">${esc(scene.caption)}</text>
+
+      <text x="560" y="626" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="${BRAND.slateText}">• ${esc(scene.bullets[0])}   • ${esc(scene.bullets[1])}</text>
+      <rect x="560" y="656" width="680" height="5" rx="2.5" fill="#CBD5E1"/>
+      <rect x="560" y="656" width="${Math.round(680 * progressRatio)}" height="5" rx="2.5" fill="${BRAND.navy}"/>
+    </svg>`;
+  }
+
+  // =========================================================================
+  // LAYOUT 3: LANDLORD COMMAND SHOWCASE (Obsidian Navy Gold-Framed Institutional)
+  // =========================================================================
+  if (layout === 'landlord_command') {
+    if (isVertical) {
+      return `
+      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="obsGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#060D1E" stop-opacity="0.96"/>
+            <stop offset="28%" stop-color="#060D1E" stop-opacity="0.30"/>
+            <stop offset="56%" stop-color="#060D1E" stop-opacity="0.84"/>
+            <stop offset="100%" stop-color="#060D1E" stop-opacity="0.99"/>
+          </linearGradient>
+        </defs>
+        <rect x="0" y="0" width="${width}" height="${height}" fill="url(#obsGrad)"/>
+
+        <!-- Crisp Gold Institutional Perimeter Frame -->
+        <rect x="28" y="28" width="${width - 56}" height="${height - 56}" rx="14" fill="none" stroke="${BRAND.gold}" stroke-opacity="0.62" stroke-width="2"/>
+        <rect x="40" y="40" width="${width - 80}" height="82" rx="10" fill="#0A142B" stroke="#1E3A5F"/>
+        ${buildBrandMarkSvg(58, 57, 46, '#060D1E')}
+        <text x="120" y="78" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700" fill="#FFFFFF">AMANA RENTALHUB NG</text>
+        <text x="120" y="102" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" letter-spacing="2.2" fill="${BRAND.goldSoft}">LANDLORD &amp; ACCREDITED AGENT COMMAND</text>
+        <text x="${width - 66}" y="88" text-anchor="end" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="700" fill="${BRAND.goldSoft}">0${parseInt(scene.index, 10)} / 0${totalScenes}</text>
+
+        <!-- Centered Institutional Title Block above Photo Window -->
+        <rect x="64" y="152" width="320" height="32" rx="6" fill="${BRAND.gold}" fill-opacity="0.18" stroke="${BRAND.gold}"/>
+        <text x="224" y="173" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="13.5" font-weight="700" letter-spacing="2" fill="${BRAND.goldSoft}">${esc(scene.kicker)}</text>
+        <text x="64" y="242" font-family="DejaVu Sans, Arial, sans-serif" font-size="50" font-weight="700" fill="#FFFFFF">${esc(scene.headline1)}</text>
+        <text x="64" y="300" font-family="DejaVu Sans, Arial, sans-serif" font-size="46" font-weight="700" fill="${BRAND.goldSoft}">${esc(scene.headline2)}</text>
+
+        <!-- Bottom Dark Institutional Spec Strip -->
+        <rect x="60" y="1590" width="${width - 120}" height="184" rx="12" fill="#0B162F" stroke="${BRAND.gold}" stroke-opacity="0.45"/>
+        <text x="88" y="1632" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" fill="#FFFFFF">${esc(scene.caption)}</text>
+        <text x="88" y="1674" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" fill="#CBD5E1">▪ ${esc(scene.bullets[0])}</text>
+        <text x="88" y="1708" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" fill="#CBD5E1">▪ ${esc(scene.bullets[1])}</text>
+        <text x="88" y="1742" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" fill="#CBD5E1">▪ ${esc(scene.bullets[2])}</text>
+
+        <rect x="64" y="1814" width="${width - 128}" height="4" rx="2" fill="#FFFFFF" fill-opacity="0.15"/>
+        <rect x="64" y="1814" width="${Math.round((width - 128) * progressRatio)}" height="4" rx="2" fill="${BRAND.gold}"/>
+        <text x="64" y="1858" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="700" fill="${BRAND.goldSoft}">rentalhub.com.ng</text>
+        <text x="${width - 64}" y="1858" text-anchor="end" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" fill="#94A3B8">Landlord &amp; Accredited Agent Portfolio Suite</text>
+      </svg>`;
+    }
+
+    // 16:9 Landlord Command
+    return `
+    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="obsWide" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#060D1E" stop-opacity="0.97"/>
+          <stop offset="50%" stop-color="#060D1E" stop-opacity="0.84"/>
+          <stop offset="100%" stop-color="#060D1E" stop-opacity="0.45"/>
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="${width}" height="${height}" fill="url(#obsWide)"/>
+      <rect x="16" y="16" width="${width - 32}" height="${height - 32}" rx="10" fill="none" stroke="${BRAND.gold}" stroke-opacity="0.6" stroke-width="1.8"/>
+
+      ${buildBrandMarkSvg(40, 34, 38, '#060D1E')}
+      <text x="90" y="52" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="700" fill="#FFFFFF">AMANA RENTALHUB NG</text>
+      <text x="90" y="68" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" letter-spacing="1.8" fill="${BRAND.goldSoft}">LANDLORD &amp; ACCREDITED AGENT EDITION</text>
+      <text x="${width - 42}" y="56" text-anchor="end" font-family="DejaVu Sans, Arial, sans-serif" font-size="13.5" font-weight="700" fill="${BRAND.goldSoft}">MODULE ${esc(scene.index)} / 0${totalScenes}</text>
+
+      <rect x="44" y="114" width="248" height="26" rx="5" fill="${BRAND.gold}" fill-opacity="0.16" stroke="${BRAND.gold}"/>
+      <text x="168" y="131" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1.8" fill="${BRAND.goldSoft}">${esc(scene.kicker)}</text>
+
+      <text x="44" y="186" font-family="DejaVu Sans, Arial, sans-serif" font-size="33" font-weight="700" fill="#FFFFFF">${esc(scene.headline1)}</text>
+      <text x="44" y="228" font-family="DejaVu Sans, Arial, sans-serif" font-size="30" font-weight="700" fill="${BRAND.goldSoft}">${esc(scene.headline2)}</text>
+
+      <rect x="44" y="256" width="496" height="210" rx="10" fill="#0B162F" fill-opacity="0.92" stroke="#1E3A5F"/>
+      <text x="64" y="292" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700" fill="#FFFFFF">${esc(scene.caption)}</text>
+      <text x="64" y="334" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#CBD5E1">▪ ${esc(scene.bullets[0])}</text>
+      <text x="64" y="368" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#CBD5E1">▪ ${esc(scene.bullets[1])}</text>
+      <text x="64" y="402" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#CBD5E1">▪ ${esc(scene.bullets[2])}</text>
+
+      <rect x="44" y="644" width="${width - 88}" height="4" rx="2" fill="#FFFFFF" fill-opacity="0.16"/>
+      <rect x="44" y="644" width="${Math.round((width - 88) * progressRatio)}" height="4" rx="2" fill="${BRAND.gold}"/>
+      <text x="44" y="678" font-family="DejaVu Sans, Arial, sans-serif" font-size="13.5" font-weight="700" fill="${BRAND.goldSoft}">rentalhub.com.ng</text>
+      <text x="${width - 44}" y="678" text-anchor="end" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#CBD5E1">Institutional Portfolio Management · Escrow Payouts</text>
+    </svg>`;
+  }
+
+  // =========================================================================
+  // LAYOUT 4: PROTECTION DOSSIER (Deep Forest-Navy Property Protection Registry)
+  // =========================================================================
+  if (isVertical) {
+    return `
+    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="forTop" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#041416" stop-opacity="0.96"/>
+          <stop offset="72%" stop-color="#062022" stop-opacity="0.72"/>
+          <stop offset="100%" stop-color="#062022" stop-opacity="0"/>
+        </linearGradient>
+        <linearGradient id="forBot" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#041416" stop-opacity="0"/>
+          <stop offset="30%" stop-color="#041416" stop-opacity="0.92"/>
+          <stop offset="100%" stop-color="#041416" stop-opacity="0.99"/>
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="${width}" height="460" fill="url(#forTop)"/>
+      <rect x="0" y="1360" width="${width}" height="560" fill="url(#forBot)"/>
+
+      <!-- Top Property Protection Registry Status Strip -->
+      <rect x="0" y="0" width="${width}" height="118" fill="#041416" fill-opacity="0.95"/>
+      <line x1="0" y1="118" x2="${width}" y2="118" stroke="${BRAND.emeraldSoft}" stroke-opacity="0.5" stroke-width="2"/>
+      ${buildBrandMarkSvg(56, 34, 50, '#0C2D30', BRAND.emeraldSoft)}
+      <text x="124" y="58" font-family="DejaVu Sans, Arial, sans-serif" font-size="22" font-weight="700" fill="#FFFFFF">AMANA PROPERTY PROTECTION</text>
+      <text x="124" y="84" font-family="DejaVu Sans, Arial, sans-serif" font-size="12.5" letter-spacing="2" fill="${BRAND.emeraldSoft}">PROPERTY RECORDS &amp; CASE VERIFICATION DOSSIER</text>
+      <rect x="${width - 150}" y="38" width="96" height="40" rx="6" fill="#0C2D30" stroke="${BRAND.emeraldSoft}"/>
+      <text x="${width - 102}" y="64" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="700" fill="#ECFDF5">${esc(scene.index)} / 0${totalScenes}</text>
+
+      <!-- Left Vertical Emerald Registry Rail -->
+      <rect x="44" y="164" width="6" height="170" rx="3" fill="${BRAND.emeraldSoft}"/>
+      <text x="70" y="196" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="700" letter-spacing="2.6" fill="${BRAND.emeraldSoft}">${esc(scene.kicker)}</text>
+      <text x="70" y="256" font-family="DejaVu Sans, Arial, sans-serif" font-size="50" font-weight="700" fill="#FFFFFF">${esc(scene.headline1)}</text>
+      <text x="70" y="314" font-family="DejaVu Sans, Arial, sans-serif" font-size="46" font-weight="700" fill="${BRAND.goldSoft}">${esc(scene.headline2)}</text>
+
+      <!-- Dossier Footer Card -->
+      <rect x="56" y="1592" width="${width - 112}" height="186" rx="12" fill="#082426" stroke="${BRAND.emeraldSoft}" stroke-opacity="0.45"/>
+      <text x="84" y="1634" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" fill="#FFFFFF">${esc(scene.caption)}</text>
+      <text x="84" y="1676" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" fill="#D1FAE5">✓ ${esc(scene.bullets[0])}</text>
+      <text x="84" y="1710" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" fill="#D1FAE5">✓ ${esc(scene.bullets[1])}</text>
+      <text x="84" y="1744" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" fill="#CBD5E1">✓ ${esc(scene.bullets[2])}</text>
+
+      <rect x="56" y="1824" width="${width - 112}" height="5" rx="2.5" fill="#FFFFFF" fill-opacity="0.18"/>
+      <rect x="56" y="1824" width="${Math.round((width - 112) * progressRatio)}" height="5" rx="2.5" fill="${BRAND.emeraldSoft}"/>
+      <text x="56" y="1868" font-family="DejaVu Sans, Arial, sans-serif" font-size="17.5" font-weight="700" fill="#ECFDF5">rentalhub.com.ng/property-protection</text>
+      <text x="${width - 56}" y="1868" text-anchor="end" font-family="DejaVu Sans, Arial, sans-serif" font-size="15.5" fill="#94A3B8">Verify Evidence · /verify-case</text>
+    </svg>`;
+  }
+
+  // 16:9 Protection Dossier
+  return `
+  <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="forWide" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#041416" stop-opacity="0.97"/>
+        <stop offset="52%" stop-color="#062022" stop-opacity="0.88"/>
+        <stop offset="100%" stop-color="#062022" stop-opacity="0.35"/>
+      </linearGradient>
+    </defs>
+    <rect x="0" y="0" width="${width}" height="${height}" fill="url(#forWide)"/>
+    <rect x="0" y="0" width="${width}" height="64" fill="#041416" fill-opacity="0.95"/>
+    <line x1="0" y1="64" x2="${width}" y2="64" stroke="${BRAND.emeraldSoft}" stroke-opacity="0.5" stroke-width="1.5"/>
+    ${buildBrandMarkSvg(34, 12, 40, '#0C2D30', BRAND.emeraldSoft)}
+    <text x="88" y="34" font-family="DejaVu Sans, Arial, sans-serif" font-size="16.5" font-weight="700" fill="#FFFFFF">AMANA PROPERTY PROTECTION</text>
+    <text x="88" y="51" font-family="DejaVu Sans, Arial, sans-serif" font-size="10" letter-spacing="1.8" fill="${BRAND.emeraldSoft}">STRUCTURED RECORDS &amp; EVIDENCE VERIFICATION</text>
+    <text x="${width - 36}" y="39" text-anchor="end" font-family="DejaVu Sans, Arial, sans-serif" font-size="13.5" font-weight="700" fill="${BRAND.emeraldSoft}">DOSSIER ${esc(scene.index)} / 0${totalScenes}</text>
+
+    <rect x="40" y="114" width="5" height="330" rx="2.5" fill="${BRAND.emeraldSoft}"/>
+    <text x="60" y="138" font-family="DejaVu Sans, Arial, sans-serif" font-size="12.5" font-weight="700" letter-spacing="2.2" fill="${BRAND.emeraldSoft}">${esc(scene.kicker)}</text>
+    <text x="60" y="186" font-family="DejaVu Sans, Arial, sans-serif" font-size="33" font-weight="700" fill="#FFFFFF">${esc(scene.headline1)}</text>
+    <text x="60" y="228" font-family="DejaVu Sans, Arial, sans-serif" font-size="30" font-weight="700" fill="${BRAND.goldSoft}">${esc(scene.headline2)}</text>
+
+    <text x="60" y="274" font-family="DejaVu Sans, Arial, sans-serif" font-size="15.5" font-weight="700" fill="#FFFFFF">${esc(scene.caption)}</text>
+    <text x="60" y="318" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#D1FAE5">✓ ${esc(scene.bullets[0])}</text>
+    <text x="60" y="352" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#D1FAE5">✓ ${esc(scene.bullets[1])}</text>
+    <text x="60" y="386" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" fill="#CBD5E1">✓ ${esc(scene.bullets[2])}</text>
+
+    <rect x="40" y="652" width="${width - 80}" height="4" rx="2" fill="#FFFFFF" fill-opacity="0.18"/>
+    <rect x="40" y="652" width="${Math.round((width - 80) * progressRatio)}" height="4" rx="2" fill="${BRAND.emeraldSoft}"/>
+    <text x="40" y="688" font-family="DejaVu Sans, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#ECFDF5">rentalhub.com.ng/property-protection</text>
+    <text x="${width - 40}" y="688" text-anchor="end" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" fill="#CBD5E1">Free Basic Records · Optional Priced Services · /verify-case</text>
+  </svg>`;
+}
+
+function buildUiOverlaySvg(layout, scene, width, height) {
+  const isVertical = height > width;
+  let tx;
+  let ty;
+  let scale;
+
+  if (isVertical) {
+    scale = 1.44;
+    tx = Math.round((width - 660 * scale) / 2);
+    if (layout === 'tenant_magazine') {
+      ty = 986;
+    } else {
+      ty = 918;
+    }
+  } else {
+    if (layout === 'tenant_magazine') {
+      scale = 1.03;
+      tx = 560;
+      ty = 152;
+    } else {
+      scale = 1.01;
+      tx = 576;
+      ty = 136;
+    }
+  }
+
+  return `
+  <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="125%">
+        <feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#020817" flood-opacity="0.48"/>
+      </filter>
+    </defs>
+    <g transform="translate(${tx}, ${ty}) scale(${scale})" filter="url(#cardShadow)">
+      ${buildUiCardInner(scene.uiType, scene.route)}
+    </g>
+  </svg>`;
+}
+
+async function renderFormatForEdition(edition, formatKey, actDurationSec, voFile, musicFile) {
+  const isVertical = formatKey === 'vertical_9x16';
+  const width = isVertical ? 1080 : 1280;
+  const height = isVertical ? 1920 : 720;
+  const maxrate = isVertical ? '1450k' : '1200k';
+  const bufsize = isVertical ? '2900k' : '2400k';
+  const outName = isVertical ? edition.verticalFile : edition.landscapeFile;
+  const finalOut = path.join(PROMO_DIR, outName);
+
+  const workDir = path.join(TMP_DIR, edition.id, formatKey);
   fs.mkdirSync(workDir, { recursive: true });
 
-  console.log(`\n3. Rendering ${formatKey} (${width}x${height} @ ${FPS}fps, ${sceneDurSec.toFixed(2)}s/act)...`);
+  console.log(
+    `   Rendering ${edition.id} [${formatKey}] (${width}x${height} @ ${FPS}fps, ${actDurationSec.toFixed(2)}s/act)...`
+  );
 
-  const sceneClipPaths = [];
-  const totalFramesPerScene = Math.round(sceneDurSec * FPS);
+  const resumeMode = process.argv.includes('--resume');
+  const actClips = [];
+  const framesPerAct = Math.round(actDurationSec * FPS);
 
-  for (let i = 0; i < SCENES.length; i += 1) {
-    const scene = SCENES[i];
-    const photoPath = fs.existsSync(scene.photo)
-      ? scene.photo
-      : path.join(PUBLIC_DIR, 'hero-main.avif');
-
-    const bgPng = path.join(workDir, `bg_${scene.id}.png`);
-    const chromePng = path.join(workDir, `chrome_${scene.id}.png`);
-    const uiPng = path.join(workDir, `ui_${scene.id}.png`);
-    const clipMp4 = path.join(workDir, `scene_${scene.id}.mp4`);
-    if (process.argv.includes("--resume") && fs.existsSync(clipMp4) && fs.statSync(clipMp4).size > 50000) {
-      sceneClipPaths.push(clipMp4);
-      console.log(`   [${formatKey}] Reusing rendered Act ${scene.index}/0${SCENES.length}: ${scene.kicker}`);
+  for (let i = 0; i < edition.scenes.length; i += 1) {
+    const scene = edition.scenes[i];
+    const actMp4 = path.join(workDir, `act_${scene.index}.mp4`);
+    if (resumeMode && fs.existsSync(actMp4) && fs.statSync(actMp4).size > 20000) {
+      console.log(`     Act ${scene.index}/0${edition.scenes.length}: [cached] ${scene.kicker}`);
+      actClips.push(actMp4);
       continue;
     }
 
-    // 1. Upscale architectural photo cleanly with Lanczos3 + architectural sharpening
-    await sharp(photoPath)
-      .resize(Math.round(width * 1.15), Math.round(height * 1.15), {
+    console.log(`     Act ${scene.index}/0${edition.scenes.length}: ${scene.kicker}`);
+
+    const photoSrc = path.join(ASSETS_DIR, scene.photo);
+    const bgPng = path.join(workDir, `bg_${scene.index}.png`);
+    const chromePng = path.join(workDir, `chrome_${scene.index}.png`);
+    const uiPng = path.join(workDir, `ui_${scene.index}.png`);
+
+    // 1. High-res architectural backdrop cropped cleanly to target aspect ratio
+    await sharp(photoSrc)
+      .resize(Math.round(width * 1.12), Math.round(height * 1.12), {
         fit: 'cover',
-        position: 'centre',
-        kernel: 'lanczos3',
+        position: 'center',
       })
-      .sharpen({ sigma: 0.85, m1: 0.75, m2: 1.3 })
-      .modulate({ brightness: 0.94, saturation: 0.92 })
+      .modulate({ brightness: edition.layout === 'tenant_magazine' ? 1.02 : 0.88, saturation: 1.04 })
       .png()
       .toFile(bgPng);
 
-    // 2. Rasterize chrome + lower-third caption PNG
-    const chromeSvg = isVertical ? buildVerticalChromeSvg(scene) : buildLandscapeChromeSvg(scene);
-    await sharp(Buffer.from(chromeSvg)).png().toFile(chromePng);
+    // 2. Rasterize static corporate chrome overlay + delayed-reveal authentic UI card
+    await sharp(Buffer.from(buildFrameChromeSvg(edition.layout, scene, edition.scenes.length, width, height)))
+      .png()
+      .toFile(chromePng);
 
-    // 3. Rasterize authentic UI card PNG
-    const uiSvg = isVertical ? buildVerticalUiLayerSvg(scene) : buildLandscapeUiLayerSvg(scene);
-    await sharp(Buffer.from(uiSvg)).png().toFile(uiPng);
+    await sharp(Buffer.from(buildUiOverlaySvg(edition.layout, scene, width, height)))
+      .png()
+      .toFile(uiPng);
 
-    // 4. Native FFmpeg smooth Ken Burns + delayed UI card fade-in
+    // 3. Smooth native FFmpeg Ken Burns zoompan + clean delayed UI card fade-in
     const zoomExpr =
       scene.zoomMode === 'in'
-        ? `1.00+0.08*on/${totalFramesPerScene}`
-        : `1.08-0.08*on/${totalFramesPerScene}`;
-
-    const uiFadeInStart = scene.id === 6 ? 0.35 : 0.95;
-    const uiFadeOutStart = Math.max(uiFadeInStart + 1.0, sceneDurSec - 0.45);
+        ? `min(zoom+0.00055,1.09)`
+        : `if(eq(on,1),1.09,max(zoom-0.00055,1.00))`;
 
     const filterComplex = [
-      `[0:v]zoompan=z='${zoomExpr}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${totalFramesPerScene}:s=${width}x${height}:fps=${FPS},format=rgba[bg]`,
+      `[0:v]zoompan=z='${zoomExpr}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${framesPerAct}:s=${width}x${height}:fps=${FPS},format=rgba[bg]`,
       `[1:v]format=rgba[chrome]`,
-      `[2:v]format=rgba,fade=t=in:st=${uiFadeInStart.toFixed(2)}:d=0.55:alpha=1,fade=t=out:st=${uiFadeOutStart.toFixed(2)}:d=0.35:alpha=1[ui]`,
-      `[bg][chrome]overlay=0:0:shortest=1[s1]`,
-      `[s1][ui]overlay=0:0:shortest=1,format=yuv420p[outv]`,
+      `[2:v]format=rgba,fade=t=in:st=0.45:d=0.55:alpha=1[ui]`,
+      `[bg][chrome]overlay=0:0:shortest=1[step1]`,
+      `[step1][ui]overlay=0:0:shortest=1,format=yuv420p[vout]`,
     ].join(';');
 
     execSync(
-      `ffmpeg -y -loop 1 -i "${bgPng}" -loop 1 -t ${sceneDurSec.toFixed(2)} -i "${chromePng}" -loop 1 -t ${sceneDurSec.toFixed(2)} -i "${uiPng}" ` +
-        `-filter_complex "${filterComplex}" -map "[outv]" -t ${sceneDurSec.toFixed(2)} -r ${FPS} ` +
-        `-c:v libx264 -preset ultrafast -crf 18 -pix_fmt yuv420p "${clipMp4}"`,
+      `ffmpeg -y -loop 1 -i "${bgPng}" -loop 1 -i "${chromePng}" -loop 1 -i "${uiPng}" ` +
+        `-filter_complex "${filterComplex}" -map "[vout]" -t ${actDurationSec.toFixed(3)} ` +
+        `-c:v libx264 -preset veryfast -crf 22 -pix_fmt yuv420p -r ${FPS} "${actMp4}"`,
       { stdio: 'pipe' }
     );
 
-    sceneClipPaths.push(clipMp4);
-    console.log(`   [${formatKey}] Rendered Act ${scene.index}/0${SCENES.length}: ${scene.kicker}`);
+    actClips.push(actMp4);
   }
 
-  // 5. Chain silky cross-dissolves (xfade) across all 6 clips
-  const inputsArg = sceneClipPaths.map((p) => `-i "${p}"`).join(' ');
+  // 4. Chain all acts with restrained corporate xfade cross-dissolves
+  const visualMaster = path.join(TMP_DIR, `${edition.id}_${formatKey}_visual.mp4`);
+  const inputsArg = actClips.map((c) => `-i "${c}"`).join(' ');
   const xfadeSteps = [];
   let prevLabel = '[0:v]';
-  let currentOffset = sceneDurSec - XFADE_SEC;
-
-  for (let i = 1; i < sceneClipPaths.length; i += 1) {
-    const outLabel = i === sceneClipPaths.length - 1 ? '[merged]' : `[xf${i}]`;
+  for (let i = 1; i < actClips.length; i += 1) {
+    const offset = (i * (actDurationSec - XFADE_SEC)).toFixed(3);
+    const outLabel = i === actClips.length - 1 ? '[vfinal]' : `[vx${i}]`;
     xfadeSteps.push(
-      `${prevLabel}[${i}:v]xfade=transition=fade:duration=${XFADE_SEC}:offset=${currentOffset.toFixed(2)}${outLabel}`
+      `${prevLabel}[${i}:v]xfade=transition=fade:duration=${XFADE_SEC}:offset=${offset}${outLabel}`
     );
     prevLabel = outLabel;
-    currentOffset += sceneDurSec - XFADE_SEC;
   }
 
   execSync(
-    `ffmpeg -y ${inputsArg} -filter_complex "${xfadeSteps.join(';')}" -map "[merged]" ` +
-      `-c:v libx264 -preset fast -profile:v high -crf 20 -pix_fmt yuv420p "${outVisualMp4}"`,
+    `ffmpeg -y ${inputsArg} -filter_complex "${xfadeSteps.join(';')}" ` +
+      `-map "[vfinal]" -c:v libx264 -profile:v high -level 4.1 -preset medium -crf 23 ` +
+      `-maxrate ${maxrate} -bufsize ${bufsize} -pix_fmt yuv420p -r ${FPS} "${visualMaster}"`,
     { stdio: 'pipe' }
   );
 
-  console.log(`   Encoded ${formatKey} visual master: ${outVisualMp4}`);
-}
+  const totalDur = getMediaDuration(visualMaster);
+  const fadeOutStart = Math.max(0, totalDur - 2.8).toFixed(2);
 
-function muxAudioAndPublish(visualMp4, bgMusic, voAudio, totalDuration, finalPublicOut, finalBuildOut) {
-  const fadeOutStart = Math.max(1, totalDuration - 2.0).toFixed(2);
-  let cmd;
+  // 5. Master Audio Mix: Preset corporate score (0.38 base, 2.2s fade-in, 2.8s fade-out)
+  //    + sidechaincompress dynamic ducking under narration (650ms entrance delay)
+  if (voFile && musicFile) {
+    const audioFilter = [
+      `[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=0.38,afade=t=in:st=0:d=2.2,afade=t=out:st=${fadeOutStart}:d=2.8[mus]`,
+      `[2:a]aformat=sample_rates=48000:channel_layouts=stereo,adelay=650|650,apad,asplit=2[vo_sc][vo_mix]`,
+      `[mus][vo_sc]sidechaincompress=threshold=0.04:ratio=4.5:attack=45:release=320:makeup=1[mus_duck]`,
+      `[mus_duck][vo_mix]amix=inputs=2:duration=first:dropout_transition=2:normalize=0,alimiter=limit=0.92[aout]`,
+    ].join(';');
 
-  if (bgMusic && voAudio) {
-    const audioFilter =
-      `[1:a]aloop=loop=-1:size=2e+09,volume=0.14,afade=t=in:st=0:d=1.2,afade=t=out:st=${fadeOutStart}:d=2[bg];` +
-      `[2:a]volume=1.25[vox];` +
-      `[bg][vox]amix=inputs=2:duration=first:dropout_transition=2[aout]`;
-    cmd =
-      `ffmpeg -y -i "${visualMp4}" -i "${bgMusic}" -i "${voAudio}" ` +
-      `-filter_complex "${audioFilter}" -map 0:v -map "[aout]" ` +
-      `-c:v copy -c:a aac -b:a 192k -t ${totalDuration.toFixed(2)} -movflags +faststart "${finalPublicOut}"`;
-  } else if (bgMusic) {
-    const audioFilter =
-      `[1:a]aloop=loop=-1:size=2e+09,volume=0.32,afade=t=in:st=0:d=1.2,afade=t=out:st=${fadeOutStart}:d=2[aout]`;
-    cmd =
-      `ffmpeg -y -i "${visualMp4}" -i "${bgMusic}" ` +
-      `-filter_complex "${audioFilter}" -map 0:v -map "[aout]" ` +
-      `-c:v copy -c:a aac -b:a 192k -t ${totalDuration.toFixed(2)} -movflags +faststart "${finalPublicOut}"`;
+    execSync(
+      `ffmpeg -y -i "${visualMaster}" -stream_loop -1 -i "${musicFile}" -i "${voFile}" ` +
+        `-filter_complex "${audioFilter}" -map 0:v:0 -map "[aout]" -t ${totalDur.toFixed(3)} ` +
+        `-c:v copy -c:a aac -b:a 128k -ar 48000 -movflags +faststart "${finalOut}"`,
+      { stdio: 'pipe' }
+    );
+  } else if (musicFile) {
+    const audioFilter = `[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=0.42,afade=t=in:st=0:d=2.2,afade=t=out:st=${fadeOutStart}:d=2.8,alimiter=limit=0.92[aout]`;
+    execSync(
+      `ffmpeg -y -i "${visualMaster}" -stream_loop -1 -i "${musicFile}" ` +
+        `-filter_complex "${audioFilter}" -map 0:v:0 -map "[aout]" -t ${totalDur.toFixed(3)} ` +
+        `-c:v copy -c:a aac -b:a 128k -ar 48000 -movflags +faststart "${finalOut}"`,
+      { stdio: 'pipe' }
+    );
   } else {
-    cmd = `ffmpeg -y -i "${visualMp4}" -c:v copy -movflags +faststart "${finalPublicOut}"`;
+    fs.copyFileSync(visualMaster, finalOut);
   }
 
-  execSync(cmd, { stdio: 'pipe' });
-  if (fs.existsSync(path.dirname(finalBuildOut))) {
-    fs.copyFileSync(finalPublicOut, finalBuildOut);
+  if (fs.existsSync(BUILD_PROMO_DIR)) {
+    fs.copyFileSync(finalOut, path.join(BUILD_PROMO_DIR, outName));
   }
-  console.log(`   Published final MP4: ${finalPublicOut}`);
+
+  const sizeMb = (fs.statSync(finalOut).size / (1024 * 1024)).toFixed(2);
+  console.log(`   Published ${outName} (${sizeMb} MB)`);
 }
 
-async function renderCommercials() {
-  console.log('1. Preparing Executive Narration & Corporate Score...');
-  const voOut = path.join(TMP_DIR, 'amana_executive_vo_v2.mp3');
-  const voAudio = await synthesizeVoiceover(NARRATION_SCRIPT, voOut);
-  const bgMusic = findCorporateMusicTrack();
-  console.log('   Corporate score:', bgMusic || 'none');
+async function renderEdition(edition) {
+  console.log(`\n=== EDITION: ${edition.id.toUpperCase()} (${edition.layout}) ===`);
+  const voFile = await synthesizeVoiceover(edition.id, edition.narration);
+  const musicFile = resolveMusicTrack(edition.musicTrack);
+  console.log(`   Preset score: ${musicFile ? path.basename(musicFile) : 'none'}`);
 
-  let targetDuration = 48.0;
-  if (voAudio && fs.existsSync(voAudio)) {
-    const voDuration = parseFloat(
-      execSync(
-        `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${voAudio}"`
-      )
-        .toString()
-        .trim()
-    );
-    if (Number.isFinite(voDuration) && voDuration > 20) {
-      targetDuration = Math.max(46.0, Math.ceil((voDuration + 1.8) * 10) / 10);
-    }
-  }
+  const voDur = voFile ? getMediaDuration(voFile) : edition.scenes.length * 7.8;
+  // Smooth music intro (0.65s) + full voiceover + 2.8s branded music outro tail
+  const targetTotalSec = Math.max(edition.scenes.length * 7.5, voDur + 3.8);
+  const actDurationSec =
+    (targetTotalSec + (edition.scenes.length - 1) * XFADE_SEC) / edition.scenes.length;
 
-  // With 6 clips joined by 5 xfade overlaps of XFADE_SEC:
-  // total = 6 * sceneDur - 5 * XFADE_SEC  =>  sceneDur = (total + 5 * XFADE_SEC) / 6
-  const sceneDurSec = (targetDuration + (SCENES.length - 1) * XFADE_SEC) / SCENES.length;
-  console.log(`2. Timeline calibrated: target ${targetDuration.toFixed(1)}s (${sceneDurSec.toFixed(2)}s per act)`);
+  console.log(
+    `   Calibrated duration: ${targetTotalSec.toFixed(1)}s (${actDurationSec.toFixed(2)}s per act)`
+  );
 
-  const landscapeOnly = process.argv.includes('--landscape-only');
   const verticalOnly = process.argv.includes('--vertical-only');
-
-  const verticalVisual = path.join(TMP_DIR, 'amana_vertical_master.mp4');
-  const landscapeVisual = path.join(TMP_DIR, 'amana_landscape_master.mp4');
+  const landscapeOnly = process.argv.includes('--landscape-only');
 
   if (!landscapeOnly) {
-    await renderFormatVideo('vertical_9x16', 1080, 1920, sceneDurSec, verticalVisual);
+    await renderFormatForEdition(edition, 'vertical_9x16', actDurationSec, voFile, musicFile);
   }
-
   if (!verticalOnly) {
-    await renderFormatVideo('landscape_16x9', 1280, 720, sceneDurSec, landscapeVisual);
+    await renderFormatForEdition(edition, 'landscape_16x9', actDurationSec, voFile, musicFile);
   }
-
-  console.log('\n4. Multiplexing Narration + Ducked Corporate Score...');
-  if (!landscapeOnly) {
-    muxAudioAndPublish(
-      verticalVisual,
-      bgMusic,
-      voAudio,
-      targetDuration,
-      path.join(PROMO_DIR, 'amana-app-tour-commercial.mp4'),
-      path.join(BUILD_PROMO_DIR, 'amana-app-tour-commercial.mp4')
-    );
-  }
-
-  if (!verticalOnly) {
-    muxAudioAndPublish(
-      landscapeVisual,
-      bgMusic,
-      voAudio,
-      targetDuration,
-      path.join(PROMO_DIR, 'amana-app-tour-landscape.mp4'),
-      path.join(BUILD_PROMO_DIR, 'amana-app-tour-landscape.mp4')
-    );
-  }
-
-  console.log('\nCompleted Amana RentalHub NG 9:16 & 16:9 commercials!');
 }
 
-renderCommercials().catch((err) => {
+async function main() {
+  const clipArg = process.argv.find((a) => a.startsWith('--clip='));
+  const target = clipArg ? clipArg.split('=')[1].trim().toLowerCase() : 'all';
+
+  const keys = target === 'all' ? Object.keys(EDITIONS) : [target];
+  for (const key of keys) {
+    if (!EDITIONS[key]) {
+      throw new Error(`Unknown --clip="${key}". Expected one of: ${Object.keys(EDITIONS).join(', ')}, all`);
+    }
+    await renderEdition(EDITIONS[key]);
+  }
+  console.log('\nAll requested Amana RentalHub NG commercial masters rendered cleanly.');
+}
+
+main().catch((err) => {
   console.error('Commercial render failed:', err);
   process.exit(1);
 });

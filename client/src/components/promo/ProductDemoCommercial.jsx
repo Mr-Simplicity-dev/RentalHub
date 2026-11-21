@@ -82,7 +82,7 @@ const SCENES = [
       'Account identity verification helps establish accountable enquiries before unlocking full addresses, property videos, and direct landlord communication.',
     highlights: [
       'Account identity verification (NIN & live photo checks)',
-      'Transparent platform unlock workflow via Paystack or bank transfer',
+      'Transparent platform unlock workflow via escrow checkout or bank transfer',
       'In-platform messaging and calling once access is unlocked',
     ],
   },
@@ -94,7 +94,7 @@ const SCENES = [
     category: 'Payments & Ledger',
     title: 'Tracked Rent Payments & Wallet Clearing',
     summary:
-      'Monitor Paystack and bank-transfer transactions through an auditable wallet ledger with a structured 14-working-day clearing window before landlord withdrawal.',
+      'Monitor escrow-tracked rent payments and bank-transfer transactions through an auditable wallet ledger with a structured 14-working-day escrow clearing window before landlord withdrawal.',
     highlights: [
       'Pending-clearing and cleared balance separation',
       '14-working-day clearing period for refund review eligibility',
@@ -429,7 +429,7 @@ function AuthenticScreenView({ sceneId }) {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-slate-900">Unlock Full Property Details</p>
               <p className="mt-1 text-xs leading-relaxed text-slate-700">
-                Complete the one-time property unlock or active tenant subscription via Paystack or bank transfer to reveal full address, inspection video, and direct landlord contact.
+                Complete the one-time property unlock or active tenant subscription via escrow checkout or bank transfer to reveal full address, inspection video, and direct landlord contact.
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <span className="rounded-lg bg-[#071A3D] px-3 py-1.5 text-xs font-semibold text-white">
@@ -461,13 +461,13 @@ function AuthenticScreenView({ sceneId }) {
                 <p className="text-[11px] text-slate-500">Illustrative dashboard balance view</p>
               </div>
             </div>
-            <span className="text-[11px] font-semibold text-slate-500">Paystack &amp; Bank Transfer</span>
+            <span className="text-[11px] font-semibold text-slate-500">Escrow &amp; Bank Transfer</span>
           </div>
 
           <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
               <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
-                Pending Clearing
+                Pending Escrow Clearing
               </p>
               <p className="mt-1 text-lg font-bold tabular-nums text-[#071A3D]">₦4,387,500</p>
               <p className="mt-0.5 text-[11px] text-slate-600">
@@ -489,11 +489,11 @@ function AuthenticScreenView({ sceneId }) {
             <div className="flex items-center justify-between">
               <span className="font-medium text-slate-800">Rent Payment · Reference #RH-40219</span>
               <span className="rounded bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 border border-amber-200">
-                Pending Clearing
+                Pending Escrow Clearing
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="font-medium text-slate-800">Property Unlock · Paystack Verified</span>
+              <span className="font-medium text-slate-800">Property Unlock · Escrow Recorded</span>
               <span className="rounded bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 border border-emerald-200">
                 Recorded
               </span>

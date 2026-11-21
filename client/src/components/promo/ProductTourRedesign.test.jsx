@@ -31,16 +31,25 @@ const PROHIBITED_CLAIMS = [
   /legally\s*binding/i,
   /only\s*after\s*keys/i,
   /100%\s*escrow\s*guarantee/i,
+  /paystack/i,
+  /\blegal\b|\blegally\b|\blawyer\b|\battorney\b|\bsolicitor\b|\bbarrister\b/i,
 ];
 
 let root;
 let container;
+let originalFetch;
+let originalCreateObjectURL;
+let originalRevokeObjectURL;
 
 beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
+
+  originalFetch = globalThis.fetch;
+  originalCreateObjectURL = URL.createObjectURL;
+  originalRevokeObjectURL = URL.revokeObjectURL;
 
   if (!window.matchMedia) {
     window.matchMedia = vi.fn().mockImplementation((query) => ({
@@ -63,10 +72,13 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  globalThis.fetch = originalFetch;
+  URL.createObjectURL = originalCreateObjectURL;
+  URL.revokeObjectURL = originalRevokeObjectURL;
 });
 
 describe('ProductDemoCommercial redesign', () => {
-  it('displays illustrative walkthrough notice, supports playback & scene navigation, and avoids unsupported claims', () => {
+  it('displays illustrative walkthrough notice, supports playback & scene navigation, and avoids unsupported or restricted claims', () => {
     act(() => {
       root.render(
         <MemoryRouter>
@@ -79,7 +91,6 @@ describe('ProductDemoCommercial redesign', () => {
     expect(view.getByText(/Illustrative preview · not a live transaction/i)).toBeTruthy();
     expect(view.getByText(/Structured Search Across Nigeria/i)).toBeTruthy();
 
-    // Navigate through all 6 scenes and audit visible copy against prohibited claims
     for (let i = 0; i < 6; i += 1) {
       const text = container.textContent || '';
       for (const pattern of PROHIBITED_CLAIMS) {
@@ -89,7 +100,6 @@ describe('ProductDemoCommercial redesign', () => {
       act(() => fireEvent.click(nextBtn));
     }
 
-    // Play / pause toggle
     const pauseOrPlay = view.getByRole('button', { name: /Pause walkthrough|Play walkthrough/i });
     const initialLabel = pauseOrPlay.getAttribute('aria-label');
     act(() => fireEvent.click(pauseOrPlay));
@@ -100,7 +110,7 @@ describe('ProductDemoCommercial redesign', () => {
 });
 
 describe('CommercialVideoShowcase redesign', () => {
-  it('preserves 9:16 and 16:9 format switching, MP4 download links, and accurate copy', () => {
+  it('preserves 9:16 and 16:9 format switching, unveils additional editions under More Commercials, and avoids restricted copy', () => {
     act(() => {
       root.render(<CommercialVideoShowcase isStandalone={true} />);
     });
@@ -112,13 +122,83 @@ describe('CommercialVideoShowcase redesign', () => {
     const widescreenBtn = view.getByRole('button', { name: /16:9 Widescreen Commercial/i });
     act(() => fireEvent.click(widescreenBtn));
 
-    const updatedDownload = container.querySelector('a[download]');
-    expect(updatedDownload?.getAttribute('href')).toBe('/promo/amana-app-tour-landscape.mp4');
+    expect(container.querySelector('a[download]')?.getAttribute('href')).toBe(
+      '/promo/amana-app-tour-landscape.mp4'
+    );
 
-    const text = container.textContent || '';
-    for (const pattern of PROHIBITED_CLAIMS) {
-      expect(text).not.toMatch(pattern);
+    expect(view.queryByRole('button', { name: /Tenant Edition/i })).toBeNull();
+
+    const moreBtn = view.getByRole('button', { name: /More Commercials/i });
+    act(() => fireEvent.click(moreBtn));
+
+    const editionsToCheck = [
+      {
+        btnPattern: /Tenant Edition/i,
+        landscapeHref: '/promo/amana-tenant-commercial-16x9.mp4',
+        verticalHref: '/promo/amana-tenant-commercial-9x16.mp4',
+      },
+      {
+        btnPattern: /Landlord & Agent Edition/i,
+        landscapeHref: '/promo/amana-landlord-commercial-16x9.mp4',
+        verticalHref: '/promo/amana-landlord-commercial-9x16.mp4',
+      },
+      {
+        btnPattern: /Property Protection Edition/i,
+        landscapeHref: '/promo/amana-protection-commercial-16x9.mp4',
+        verticalHref: '/promo/amana-protection-commercial-9x16.mp4',
+      },
+    ];
+
+    for (const item of editionsToCheck) {
+      act(() => fireEvent.click(view.getByRole('button', { name: item.btnPattern })));
+      expect(container.querySelector('a[download]')?.getAttribute('href')).toBe(item.landscapeHref);
+
+      const text = container.textContent || '';
+      for (const pattern of PROHIBITED_CLAIMS) {
+        expect(text).not.toMatch(pattern);
+      }
     }
+
+    act(() => fireEvent.click(view.getByRole('button', { name: /9:16 Vertical Commercial/i })));
+    expect(container.querySelector('a[download]')?.getAttribute('href')).toBe(
+      '/promo/amana-protection-commercial-9x16.mp4'
+    );
+  });
+
+  it('preloads the complete MP4 into a memory Blob URL when Play is clicked before starting playback', async () => {
+    const fakeBlob = new Blob([new Uint8Array([0, 1, 2, 3])], { type: 'video/mp4' });
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: { get: () => '4' },
+      blob: () => Promise.resolve(fakeBlob),
+    });
+    const mockCreateObjectURL = vi.fn().mockReturnValue('blob:https://rentalhub.test/buffered-clip');
+    const mockRevokeObjectURL = vi.fn();
+
+    globalThis.fetch = mockFetch;
+    URL.createObjectURL = mockCreateObjectURL;
+    URL.revokeObjectURL = mockRevokeObjectURL;
+
+    act(() => {
+      root.render(<CommercialVideoShowcase isStandalone={true} />);
+    });
+
+    const view = within(container);
+    const playBtn = view.getByRole('button', { name: /Play video/i });
+
+    await act(async () => {
+      fireEvent.click(playBtn);
+      await new Promise((resolve) => setTimeout(resolve, 220));
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/promo/amana-app-tour-commercial.mp4',
+      expect.objectContaining({ cache: 'force-cache' })
+    );
+    expect(mockCreateObjectURL).toHaveBeenCalledTimes(1);
+    const videoEl = container.querySelector('video');
+    expect(videoEl?.getAttribute('src')).toBe('blob:https://rentalhub.test/buffered-clip');
+    expect(window.HTMLMediaElement.prototype.play).toHaveBeenCalled();
   });
 });
 

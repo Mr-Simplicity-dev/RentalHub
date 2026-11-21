@@ -1,10 +1,36 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Helmet } from 'react-helmet';
 import ProductDemoCommercial from '../components/promo/ProductDemoCommercial';
 import CommercialVideoShowcase from '../components/promo/CommercialVideoShowcase';
-import { FaDownload, FaFileAlt, FaFilm, FaShieldAlt } from 'react-icons/fa';
+import { FaChevronDown, FaChevronUp, FaDownload, FaFileAlt, FaFilm, FaShieldAlt } from 'react-icons/fa';
+
+const ADDITIONAL_DOWNLOADS = [
+  {
+    edition: 'Tenant Edition — Discovery to Escrow Protection',
+    verticalHref: '/promo/amana-tenant-commercial-9x16.mp4',
+    verticalName: 'amana-tenant-edition-9x16.mp4',
+    landscapeHref: '/promo/amana-tenant-commercial-16x9.mp4',
+    landscapeName: 'amana-tenant-edition-16x9.mp4',
+  },
+  {
+    edition: 'Landlord & Accredited Agent Edition — Portfolio Command',
+    verticalHref: '/promo/amana-landlord-commercial-9x16.mp4',
+    verticalName: 'amana-landlord-agent-9x16.mp4',
+    landscapeHref: '/promo/amana-landlord-commercial-16x9.mp4',
+    landscapeName: 'amana-landlord-agent-16x9.mp4',
+  },
+  {
+    edition: 'Property Protection & Case Verification Edition',
+    verticalHref: '/promo/amana-protection-commercial-9x16.mp4',
+    verticalName: 'amana-property-protection-9x16.mp4',
+    landscapeHref: '/promo/amana-protection-commercial-16x9.mp4',
+    landscapeName: 'amana-property-protection-16x9.mp4',
+  },
+];
 
 export default function PromoPage() {
+  const [showMoreDownloads, setShowMoreDownloads] = useState(false);
+
   return (
     <div className="min-h-screen bg-[#071A3D] text-white">
       <Helmet>
@@ -27,7 +53,7 @@ export default function PromoPage() {
                 Product Walkthrough &amp; Media Assets
               </h1>
               <p className="mt-2.5 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-                An executive overview of Nigeria&apos;s structured rental platform—covering nationwide property discovery, identity verification, tracked payments, digital tenancy agreements, and Property Protection.
+                An executive overview of Nigeria&apos;s structured rental platform—covering nationwide property discovery, identity verification, escrow-tracked rent clearing, digital tenancy agreements, and Property Protection.
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2 text-xs text-slate-300">
@@ -61,16 +87,16 @@ export default function PromoPage() {
               </h3>
               <ul className="space-y-2 text-xs leading-5 text-slate-300">
                 <li>
-                  <strong className="text-white">Vertical Master:</strong> 1080 × 1920 (9:16 Full HD)
+                  <strong className="text-white">Vertical Masters:</strong> 1080 × 1920 (9:16 Full HD · 4 editions)
                 </li>
                 <li>
-                  <strong className="text-white">Widescreen Master:</strong> 1280 × 720 (16:9 HD)
+                  <strong className="text-white">Widescreen Masters:</strong> 1280 × 720 (16:9 HD · 4 editions)
                 </li>
                 <li>
-                  <strong className="text-white">Video &amp; Audio:</strong> H.264 High · AAC Stereo · 30 fps
+                  <strong className="text-white">Video &amp; Audio:</strong> H.264 High · AAC Stereo · 24 fps cinematic
                 </li>
                 <li>
-                  <strong className="text-white">Captions:</strong> Burned-in lower-third editorial overlays
+                  <strong className="text-white">Playback Reliability:</strong> Full pre-buffered browser playback for smooth viewing over variable networks
                 </li>
               </ul>
             </div>
@@ -87,7 +113,7 @@ export default function PromoPage() {
                   <strong className="text-white">Product Accuracy:</strong> Reflects implemented web &amp; dashboard workflows
                 </li>
                 <li>
-                  <strong className="text-white">Disclosures:</strong> Transparent fees, 14-working-day clearing, and optional paid services
+                  <strong className="text-white">Disclosures:</strong> Transparent fees, 14-working-day escrow clearing window, and optional paid services
                 </li>
               </ul>
             </div>
@@ -102,7 +128,7 @@ export default function PromoPage() {
                   download="amana-app-tour-9x16.mp4"
                   className="flex items-center justify-between rounded-lg border border-white/15 bg-[#071A3D] px-3.5 py-2.5 text-xs font-medium text-slate-100 transition-colors hover:border-[#C89B3C]/60 hover:bg-white/10"
                 >
-                  <span>Product Commercial (9:16 Vertical)</span>
+                  <span>Flagship Commercial (9:16 Vertical)</span>
                   <span className="font-mono text-[#E2C275]">MP4</span>
                 </a>
                 <a
@@ -110,12 +136,55 @@ export default function PromoPage() {
                   download="amana-app-tour-16x9.mp4"
                   className="flex items-center justify-between rounded-lg border border-white/15 bg-[#071A3D] px-3.5 py-2.5 text-xs font-medium text-slate-100 transition-colors hover:border-[#C89B3C]/60 hover:bg-white/10"
                 >
-                  <span>Product Commercial (16:9 Widescreen)</span>
+                  <span>Flagship Commercial (16:9 Widescreen)</span>
                   <span className="font-mono text-[#E2C275]">MP4</span>
                 </a>
+
+                <button
+                  type="button"
+                  onClick={() => setShowMoreDownloads((prev) => !prev)}
+                  aria-expanded={showMoreDownloads}
+                  className="mt-1 flex items-center justify-between rounded-lg border border-[#C89B3C]/40 bg-[#C89B3C]/10 px-3.5 py-2 text-xs font-semibold text-[#E2C275] transition-colors hover:bg-[#C89B3C]/20"
+                >
+                  <span>
+                    {showMoreDownloads ? 'Hide Additional Editions' : 'More Commercial Downloads (3 Editions)'}
+                  </span>
+                  {showMoreDownloads ? <FaChevronUp size={11} /> : <FaChevronDown size={11} />}
+                </button>
               </div>
             </div>
           </div>
+
+          {showMoreDownloads && (
+            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+              {ADDITIONAL_DOWNLOADS.map((item) => (
+                <div
+                  key={item.edition}
+                  className="rounded-xl border border-white/10 bg-[#0C244E] p-4"
+                >
+                  <p className="text-xs font-semibold text-white">{item.edition}</p>
+                  <div className="mt-3 flex flex-col gap-2">
+                    <a
+                      href={item.verticalHref}
+                      download={item.verticalName}
+                      className="flex items-center justify-between rounded-lg border border-white/15 bg-[#071A3D] px-3 py-2 text-xs text-slate-200 transition-colors hover:border-[#C89B3C]/60 hover:text-white"
+                    >
+                      <span>9:16 Vertical Master</span>
+                      <span className="font-mono text-[#E2C275]">MP4</span>
+                    </a>
+                    <a
+                      href={item.landscapeHref}
+                      download={item.landscapeName}
+                      className="flex items-center justify-between rounded-lg border border-white/15 bg-[#071A3D] px-3 py-2 text-xs text-slate-200 transition-colors hover:border-[#C89B3C]/60 hover:text-white"
+                    >
+                      <span>16:9 Widescreen Master</span>
+                      <span className="font-mono text-[#E2C275]">MP4</span>
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
     </div>
