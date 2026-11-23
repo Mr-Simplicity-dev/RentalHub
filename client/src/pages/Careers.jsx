@@ -458,7 +458,17 @@ export default function Careers() {
   );
 
   const selectedVolunteer = selectedRole?.opportunity_type === 'volunteer';
-  useEffect(()=>{setForm(previous=>({...previous,preferred_service_state:selectedRole?.service_state?(states.find(state=>state.name===selectedRole.service_state)?.displayName||selectedRole.service_state):'',preferred_service_lga:''}));},[selectedRole?.id,selectedRole?.service_state]);
+  const previousServiceRole=useRef(null);
+  useEffect(()=>{
+    if(!selectedRole)return;
+    const changed=previousServiceRole.current!==null&&String(previousServiceRole.current)!==String(selectedRole.id);
+    previousServiceRole.current=selectedRole.id;
+    setForm(previous=>{
+      const fixed=selectedRole.service_state?(states.find(state=>state.name===selectedRole.service_state)?.displayName||selectedRole.service_state):null;
+      const nextState=fixed||(changed?'':previous.preferred_service_state);
+      return {...previous,preferred_service_state:nextState,preferred_service_lga:changed||nextState!==previous.preferred_service_state?'':previous.preferred_service_lga};
+    });
+  },[selectedRole?.id,selectedRole?.service_state]);
   useEffect(()=>{let active=true;setServiceLgas([]);setServiceLocationError(false);if(form.preferred_service_state)api.get('/recruitment/locations/lgas/'+encodeURIComponent(form.preferred_service_state)).then(response=>{if(active)setServiceLgas(response.data?.data||[]);}).catch(()=>{if(active)setServiceLocationError(true);});return()=>{active=false;};},[form.preferred_service_state]);
 
   const visibleRoles = roles.filter(role=>opportunityFilter==='all'||(role.opportunity_type||'employment')===opportunityFilter);
@@ -1658,7 +1668,7 @@ export default function Careers() {
 
       <button
         type="submit"
-        disabled={submitting || (requiresLanguages(selectedRole)&&(()=>{try{validateSkills(form.language_skills);return false;}catch{return true;}})()) || roles.length === 0 || (process.env.REACT_APP_TURNSTILE_SITE_KEY && !turnstileToken)}
+        disabled={submitting || (selectedVolunteer && (!form.preferred_service_state || !form.preferred_service_lga)) || (requiresLanguages(selectedRole)&&(()=>{try{validateSkills(form.language_skills);return false;}catch{return true;}})()) || roles.length === 0 || (process.env.REACT_APP_TURNSTILE_SITE_KEY && !turnstileToken)}
         className="btn btn-primary w-full py-3.5 text-base lg:col-span-2"
       >
         {submitting ? (

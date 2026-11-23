@@ -38,4 +38,5 @@ SELECT 'Volunteer State Admin — FCT','Administrative','Unpaid volunteer opport
 Support approved state admin activities under supervision. Tell us your skills, language levels and availability. No formal degree is required. Applying is free and does not create an admin or agent account, grant authority, guarantee selection, employment or salary. Our team reviews applications and contacts selected applicants. Any later appointment, duties and access require separate approval.',0,0,c.id,'volunteer',TRUE,'FCT'
 FROM recruitment_cycles c WHERE c.is_active=TRUE AND c.open_date<=CURRENT_DATE AND COALESCE(c.extension_date,c.close_date)>=CURRENT_DATE
 AND NOT EXISTS(SELECT 1 FROM recruitment_roles r WHERE r.cycle_id=c.id AND r.opportunity_type='volunteer' AND LOWER(TRIM(r.title))=LOWER('Volunteer State Admin — FCT'));
+UPDATE recruitment_roles SET description=regexp_replace(description,'it is not anemployment offer but create ([^.]+)\.', 'Applying does not create \1. Selection and authorised onboarding are separate.', 'g') WHERE opportunity_type='volunteer' AND description LIKE '%it is not anemployment offer but create%';
 COMMIT;

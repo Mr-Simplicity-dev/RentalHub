@@ -21,8 +21,9 @@ const roles=[{id:1,title:'Paid Employment Role',opportunity_type:'employment',ap
 beforeEach(()=>{globalThis.IS_REACT_ACT_ENVIRONMENT=true;window.localStorage.clear();vi.clearAllMocks();container=document.createElement('div');document.body.appendChild(container);root=createRoot(container);});
 afterEach(async()=>{await act(async()=>root.unmount());container.remove();});
 function mockPublic(settings){api.get.mockImplementation(async url=>{
+ if(url.includes('/locations/lgas/'))return{data:{data:url.endsWith('Lagos')?['Ikeja']:['Abaji','Bwari','Gwagwalada','Kuje','Kwali','Municipal Area Council']}};
  if(url==='/recruitment/status')return{data:{data:settings}};
- if(url==='/recruitment/locations/states')return{data:{data:[{name:'Abuja',displayName:'Abuja'}]}};
+ if(url==='/recruitment/locations/states')return{data:{data:[{name:'FCT',displayName:'Abuja'},{name:'Lagos',displayName:'Lagos'}]}};
  if(url==='/recruitment/roles/active')return{data:{data:roles.filter(role=>role.opportunity_type==='volunteer'?settings.volunteer_applications_enabled:settings.is_active)}};
  return{data:{data:[]}};
 });}
@@ -59,6 +60,7 @@ test('submitting a volunteer form shows the receipt and never initializes paymen
  const set=async(name,value)=>{await act(async()=>fireEvent.change(container.querySelector('[name="'+name+'"]'),{target:{value}}));};
  for(const[name,value]of Object.entries({full_name:'Community Applicant',phone_number:'08012345678',email_address:'community@example.test',area_locality:'Kutunku',residential_address:'Local address',suitability_reason:'Relevant experience',volunteer_motivation:'Community support',availability:'Saturdays'}))await set(name,value);
  await set('state_name','Abuja');await waitFor(()=>expect(container.querySelector('select[name="lga_name"]').options.length).toBe(2));await set('lga_name','Gwagwalada');
+ await set('preferred_service_state','Abuja');await waitFor(()=>expect(container.querySelector('select[name="preferred_service_lga"]').options.length).toBe(2));await set('preferred_service_lga','Gwagwalada');
  const languageIds=['nige1257','haus1257'];
  for(const id of languageIds)await act(async()=>fireEvent.change(within(container).getByLabelText('Choose a language'),{target:{value:id}}));
  for(const select of within(container).getAllByLabelText('Speaking / understanding (or signing)'))await act(async()=>fireEvent.change(select,{target:{value:'conversational'}}));
@@ -144,4 +146,17 @@ test('Apply opens a separate form; Back preserves entered details and the dropdo
  expect(container.querySelector('select[name="role_id"]').value).toBe('2');
  expect(container.textContent).not.toContain('Application Access Fee');
  expect(api.post).not.toHaveBeenCalled();
+});
+
+test('FCT volunteer roles offer all six councils separately from residence and reset on role change',async()=>{
+ mockPublic({is_active:false,volunteer_applications_enabled:true});const get=api.get.getMockImplementation();
+ api.get.mockImplementation(url=>url==='/recruitment/roles/active'?Promise.resolve({data:{data:[roles[1],{id:3,title:'Volunteer LGA Admin — FCT',opportunity_type:'volunteer',service_state:'FCT',application_fee:0,premium_fee:0}]}}):get(url));
+ await mount('/careers?type=volunteer');await act(async()=>fireEvent.click(within(container).getAllByRole('button',{name:'Apply as Volunteer'})[1]));
+ const state=container.querySelector('[name="preferred_service_state"]'),lga=container.querySelector('[name="preferred_service_lga"]');
+ expect(Array.from(state.options).map(o=>o.value)).toEqual(['','Abuja']);expect(state.value).toBe('Abuja');
+ await waitFor(()=>expect(lga.options.length).toBe(7));await act(async()=>fireEvent.change(lga,{target:{value:'Bwari'}}));
+ await act(async()=>fireEvent.change(container.querySelector('[name="state_name"]'),{target:{value:'Lagos'}}));expect(state.value).toBe('Abuja');expect(lga.value).toBe('Bwari');
+ await act(async()=>fireEvent.change(container.querySelector('[name="role_id"]'),{target:{value:'2'}}));
+ expect(container.querySelector('[name="preferred_service_state"]').value).toBe('');expect(container.querySelector('[name="preferred_service_lga"]').value).toBe('');
+ expect(Array.from(container.querySelector('[name="preferred_service_state"]').options).map(o=>o.value)).toContain('Lagos');
 });

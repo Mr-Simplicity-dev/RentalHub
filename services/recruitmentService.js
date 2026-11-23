@@ -3281,8 +3281,6 @@ exports.createApplication = async (req, res) => {
     }
     const role = roleResult.rows[0];
     const volunteer = isVolunteer(role);
-    let servicePreference;
-    try {servicePreference=getServicePreference(role,req.body);} catch(error){return res.status(400).json({success:false,message:error.message});}
     let languageSkills=[];
     if(require('../config/utils/languagePolicy').requiresLanguages(role)){
       try{languageSkills=require('../config/utils/languagePolicy').validateSkills(req.body.language_skills);}
@@ -3292,12 +3290,15 @@ exports.createApplication = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Missing required fields: highest education' });
     }
     if (!isOpportunityOpen(role, settings)) return res.status(403).json({success:false,message:volunteer ? 'Volunteer applications are currently closed' : 'Recruitment is currently closed'});
+    let servicePreference;
+    try {servicePreference=getServicePreference(role,req.body);} catch(error){return res.status(400).json({success:false,message:error.message});}
+
     if (volunteer && (!normalizeText(volunteer_motivation) || !normalizeText(availability))) return res.status(400).json({success:false,message:'Volunteer motivation and availability are required'});
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeText(email_address)) || !/^\+?\d{10,15}$/.test(normalizeText(phone_number).replace(/[\s-]/g,''))) return res.status(400).json({success:false,message:'Enter a valid email and phone number'});
     const activationCount = await db.query(
       'SELECT COUNT(*)::INT AS count FROM recruitment_location_activation WHERE is_active = TRUE'
     );
-    if (activationCount.rows[0]?.count > 0) {
+    if (!volunteer && activationCount.rows[0]?.count > 0) {
       const locationResult = await db.query(
         `SELECT id
          FROM recruitment_location_activation
@@ -3354,7 +3355,7 @@ exports.createApplication = async (req, res) => {
       ]
     );
     if (volunteer) {
-      try { await createRecruitmentOperation({applicationId:result.rows[0].id,eventType:'volunteer_submitted',note:'Volunteer application received for manual review'}); }
+      try { await createRecruitmentOperation({applicationId:result.rows[0].id,eventType:'volunteer_submitted',note:'Volunteer application received for manual review',metadata:{service_location_source:servicePreference.source,preferred_service_state:servicePreference.state,preferred_service_lga:servicePreference.lga}}); }
       catch (error) { req.logger.warn?.('Volunteer submission operation log failed'); }
       void notifyVolunteerApplication(result.rows[0]);
     }

@@ -712,7 +712,7 @@ export default function RecruitmentAdminTab() {
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
               <FaMapMarkerAlt />
             </div>
-            <h3 className="text-lg font-bold text-slate-900">Location Activation</h3>
+            <h3 className="text-lg font-bold text-slate-900">Employment Location Activation</h3>
           </div>
           <form onSubmit={toggleLocation} className="space-y-3">
             <AdminSelect
