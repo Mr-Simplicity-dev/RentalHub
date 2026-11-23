@@ -75,7 +75,7 @@ const referencePhoto = async user => {
   }
 };
 const recordFlag = async (userId, reason, relatedId = null, pairKey = null) => {
-  const flag = await db.query("INSERT INTO identity_review_flags(user_id,reason,related_user_id,photo_pair_key) SELECT $1,$2,$3,$4 WHERE NOT EXISTS(SELECT 1 FROM identity_review_flags WHERE user_id=$1 AND reason=$2 AND related_user_id IS NOT DISTINCT FROM $3 AND photo_pair_key IS NOT DISTINCT FROM $4 AND status='pending') RETURNING id", [userId, reason, relatedId, pairKey]);
+  const flag = await db.query("INSERT INTO identity_review_flags(user_id,reason,related_user_id,photo_pair_key) SELECT $1::integer,$2::varchar,$3::integer,$4::varchar WHERE NOT EXISTS(SELECT 1 FROM identity_review_flags WHERE user_id=$1 AND reason=$2 AND related_user_id IS NOT DISTINCT FROM $3 AND photo_pair_key IS NOT DISTINCT FROM $4 AND status='pending') RETURNING id", [userId, reason, relatedId, pairKey]);
   if (flag.rows.length) {
     await db.query("INSERT INTO audit_logs(actor_id,action,target_type,target_id,metadata) VALUES(NULL,'IDENTITY_REVIEW_REQUIRED','user',$1,$2)", [userId, JSON.stringify({
       reason,
@@ -98,7 +98,7 @@ const screenPhotoUnlocked=async({userId,buffer,consent,assisted=false})=>{
  const user=(await db.query('SELECT * FROM users WHERE id=$1 AND deleted_at IS NULL',[userId])).rows[0];if(!user)throw Error('USER_NOT_FOUND');
  if(!consent){await db.query('UPDATE identity_photo_checks SET consent_revoked_at=NOW() WHERE user_id=$1 AND consent_version=$2 AND consent_revoked_at IS NULL',[userId,CONSENT_VERSION]);await db.query('DELETE FROM local_face_templates WHERE user_id=$1',[userId]);}
  let revision='local-consent-declined';if(consent){try{revision=(await localFaces.health()).engine || 'local-unavailable';}catch{revision='local-unavailable';}}
- const claim=await db.query("INSERT INTO identity_photo_checks(user_id,image_hash,consent_version,consent_at,engine_revision) VALUES($1,$2,$3,CASE WHEN $3::text IS NOT NULL THEN NOW() ELSE NULL END,$4) ON CONFLICT DO NOTHING RETURNING id",[userId,hash,consent?CONSENT_VERSION:null,revision]);
+ const claim=await db.query("INSERT INTO identity_photo_checks(user_id,image_hash,consent_version,consent_at,engine_revision) VALUES($1,$2,$3::varchar,CASE WHEN $3::varchar IS NOT NULL THEN NOW() ELSE NULL END,$4) ON CONFLICT DO NOTHING RETURNING id",[userId,hash,consent?CONSENT_VERSION:null,revision]);
  if(!claim.rows.length){const cached=(await db.query('SELECT status,reasons,consent_revoked_at FROM identity_photo_checks WHERE user_id=$1 AND image_hash=$2 AND engine_revision=$3',[userId,hash,revision])).rows[0];return {hash,status:cached?.status==='verified'&&!cached.consent_revoked_at?'verified':'review_required',reasons:cached?.reasons||['local_check_pending']};}
  const reasons=[];
  const duplicates=await db.query("SELECT id,passport_photo_hash,nin_hash FROM users WHERE id<>$1 AND deleted_at IS NULL AND (passport_photo_hash=$2 OR (nin_hash IS NOT NULL AND nin_hash=$3) OR (international_passport_number IS NOT NULL AND international_passport_number=$4))",[userId,hash,user.nin_hash,user.international_passport_number]);
@@ -144,7 +144,7 @@ const screenPhoto = async options => {
     return await screenPhotoUnlocked(options);
   } finally {
     try {
-      if (acquired) await lock.query("SELECT pg_advisory_unlock(hashtext('identity-photo-gallery'))");
+      if (acquired) await lock.query("SELECT pg_advisory_unlock(hashtext('local-identity-photo-gallery'))");
     } finally {
       lock.release();
     }

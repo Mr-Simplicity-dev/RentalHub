@@ -251,7 +251,9 @@ router.post('/apply',
    ...['phone_number','email_address','state_name','lga_name','area_locality','highest_education','current_employment_status'].map(field => body(field).optional().isString().trim().isLength({max:255})),
    ...['residential_address','skills_qualifications','suitability_reason','volunteer_motivation','availability'].map(field => body(field).optional().isString().trim().isLength({max:5000})),
    body('email_address').optional().isEmail(),
-   body('opportunity_type').optional().isIn(['employment','volunteer'])],
+   body('opportunity_type').optional().isIn(['employment','volunteer']),
+   body('preferred_service_state').optional().isString().trim().isLength({max:100}),
+   body('preferred_service_lga').optional().isString().trim().isLength({max:255})],
   validateRequest,
   recruitmentController.createApplication);
 router.put(

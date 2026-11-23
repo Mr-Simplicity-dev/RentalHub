@@ -1,3 +1,4 @@
+import {usePhotoInstructions} from '../../hooks/usePhotoInstructions';
 import {createLiveFaceMesh} from '../../utils/liveFaceMesh';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FaTimes, FaCheckCircle, FaRedo } from 'react-icons/fa';
@@ -22,7 +23,7 @@ const computeEAR = (landmarks, eyeIdx) => {
 };
 
 const LivePassportCaptureModal = ({ onCapture, onClose, title, sessionEndpoint = '/users/verification/live-capture/session', uploadEndpoint = '/users/upload-passport', consentConfirmed = false, language }) => {
-  const { t } = useTranslation(undefined, { lng: language });
+  const { t, i18n } = useTranslation(undefined, { lng: language });
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraLoading, setCameraLoading] = useState(false);
   const [cameraError, setCameraError] = useState('');
@@ -49,6 +50,10 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title, sessionEndpoint =
     livenessChecks.mouthOpen && livenessChecks.headLeft && livenessChecks.headRight &&
     livenessChecks.movedCloser && livenessChecks.movedFarther
   ), [livenessChecks]);
+
+  const prompts = {faceDetected:'Face forward in good light. Keep only your face in the frame.',centered:'Center your face in the frame',blink:'Blink your eyes once',mouthOpen:'Open your mouth once',headLeft:'Turn your head left',headRight:'Turn your head right',movedCloser:'Move closer to camera',movedFarther:'Move farther from camera'};
+  const nextInstruction = Object.keys(prompts).find(key => !livenessChecks[key]);
+  const photoVoice = usePhotoInstructions(nextInstruction ? prompts[nextInstruction] : 'Photo checks complete. Hold still.', cameraActive && !captured, language || i18n?.language);
 
   const stopResources = useCallback(() => {
     cameraRunRef.current += 1;
@@ -114,8 +119,9 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title, sessionEndpoint =
       }
     }
     if (!baseArea && faceArea > 0) metricsRef.current.baseArea = faceArea;
-    const mouthOpen = faceArea > 0
-      ? distance(landmarks[13], landmarks[14]) / h > 0.2
+    const mouthWidth = landmarks[78] && landmarks[308] ? distance(landmarks[78], landmarks[308]) : 0;
+    const mouthOpen = mouthWidth > 0
+      ? distance(landmarks[13], landmarks[14]) / mouthWidth > 0.2
       : false;
     const movedCloser = baseArea ? faceArea > baseArea * 1.18 : false;
     const movedFarther = baseArea ? faceArea < baseArea * 0.84 : false;
@@ -227,8 +233,12 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title, sessionEndpoint =
       formData.append('capture_source', 'live_camera');
       formData.append('biometric_consent',consentConfirmed ? 'true' : 'false');
       formData.append('biometric_consent_version','local-face-2026-11');
-      if (liveCaptureToken) formData.append('live_capture_token', liveCaptureToken);
-      const result = await api.post(uploadEndpoint, formData, { headers: { 'Content-Type': 'multipart/form-data', 'X-Capture-Token': liveCaptureToken } });
+      let token = liveCaptureToken;
+      if (!token) token = (await api.post(sessionEndpoint, {consent_confirmed:consentConfirmed})).data?.data?.token;
+      if (!token) throw Error('Could not start a secure photo session. Please try again.');
+      setLiveCaptureToken('');
+      formData.append('live_capture_token', token);
+      const result = await api.post(uploadEndpoint, formData, { headers: { 'Content-Type': 'multipart/form-data', 'X-Capture-Token': token } });
       if (result.data?.success !== true) throw Error(result.data?.message || 'Photo was not saved. Please try again.');
       toast.success(t('live_passport_capture.passport_uploaded', 'Passport photo uploaded successfully'));
       onCapture?.();
@@ -239,7 +249,7 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title, sessionEndpoint =
     } finally {
       setUploadingPhoto(false);
     }
-  }, [capturedImage, liveCaptureToken, onCapture, onClose, t, uploadEndpoint, consentConfirmed]);
+  }, [capturedImage, liveCaptureToken, onCapture, onClose, t, uploadEndpoint, sessionEndpoint, consentConfirmed]);
 
   useEffect(() => {
     if (capturedImage && autoSavedImage.current !== capturedImage) {autoSavedImage.current = capturedImage; handleUpload();}
@@ -299,6 +309,8 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title, sessionEndpoint =
                 </div>
               ))}
             </div>
+            <p className="mt-3 text-center text-sm" aria-live="polite">{nextInstruction ? prompts[nextInstruction] : 'Photo checks complete. Hold still.'}</p>
+            <div className="mt-3 flex justify-center gap-3 text-sm"><button type="button" onClick={photoVoice.toggle}>{photoVoice.enabled ? 'Mute instructions' : 'Read instructions aloud'}</button>{photoVoice.enabled && <button type="button" onClick={photoVoice.repeat}>Repeat instruction</button>}</div>
             {!canCaptureLive && <p className="mt-3 text-center text-sm text-amber-400">{t('live_passport_capture.complete_liveness_checks', 'Complete all liveness checks. The photo will capture automatically.')}</p>}
             {canCaptureLive && !captured && <p className="mt-3 text-center text-sm text-green-400 font-medium">{t('live_passport_capture.liveness_passed_capturing', 'Liveness checks passed. Capturing now...')}</p>}
             {livenessError && <p className="mt-2 text-center text-sm text-red-400">{livenessError}</p>}

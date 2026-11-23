@@ -1,3 +1,4 @@
+const {getServicePreference}=require('./volunteerServiceLocation');
 const requirePaymentEmail = require('../config/utils/paymentEmail');
 const db = require('../config/middleware/database');
 const crypto = require('crypto');
@@ -1504,10 +1505,11 @@ exports.getVolunteerOpportunityTemplates = async (req, res) => {
 
     res.json({
       success: true,
-      data: VOLUNTEER_OPPORTUNITY_TEMPLATES.map(({ title, type, description }) => ({
+      data: VOLUNTEER_OPPORTUNITY_TEMPLATES.map(({ title, type, description, service_state }) => ({
         title,
         type,
         description,
+        service_state,
       })),
     });
   } catch (error) {
@@ -1550,8 +1552,8 @@ exports.applyVolunteerOpportunityTemplates = async (req, res) => {
     for (const template of VOLUNTEER_OPPORTUNITY_TEMPLATES) {
       const inserted = await db.query(
         `INSERT INTO recruitment_roles
-           (title, type, description, application_fee, premium_fee, cycle_id, opportunity_type, is_active)
-         SELECT $1::varchar, $2::varchar, $3::text, 0, 0, $4::int, 'volunteer', TRUE
+           (title, type, description, application_fee, premium_fee, cycle_id, opportunity_type, is_active, service_state)
+         SELECT $1::varchar, $2::varchar, $3::text, 0, 0, $4::int, 'volunteer', TRUE, $5::varchar
          WHERE NOT EXISTS (
            SELECT 1
            FROM recruitment_roles
@@ -1560,7 +1562,7 @@ exports.applyVolunteerOpportunityTemplates = async (req, res) => {
              AND LOWER(TRIM(title)) = LOWER(TRIM($1::text))
          )
          RETURNING *`,
-        [template.title, template.type, template.description, cycleId]
+        [template.title, template.type, template.description, cycleId, template.service_state || null]
       );
 
       if (inserted.rows.length) {
@@ -1582,7 +1584,7 @@ exports.applyVolunteerOpportunityTemplates = async (req, res) => {
       },
       message: created.length
         ? `${created.length} volunteer opportunities created${skipped.length ? `; ${skipped.length} already existed` : ''}.`
-        : 'All eight volunteer opportunities already exist in this cycle.',
+        : 'All volunteer opportunities already exist in this cycle.',
     });
   } catch (error) {
     req.logger.error('applyVolunteerOpportunityTemplates error:', error);
@@ -3279,6 +3281,8 @@ exports.createApplication = async (req, res) => {
     }
     const role = roleResult.rows[0];
     const volunteer = isVolunteer(role);
+    let servicePreference;
+    try {servicePreference=getServicePreference(role,req.body);} catch(error){return res.status(400).json({success:false,message:error.message});}
     let languageSkills=[];
     if(require('../config/utils/languagePolicy').requiresLanguages(role)){
       try{languageSkills=require('../config/utils/languagePolicy').validateSkills(req.body.language_skills);}
@@ -3301,7 +3305,7 @@ exports.createApplication = async (req, res) => {
            AND LOWER(state_name) = LOWER($1)
            AND (LOWER(lga_name) = LOWER($2) OR lga_name = $3)
          LIMIT 1`,
-        [state_name, lga_name, ALL_LGAS]
+        [servicePreference?.state || state_name, servicePreference?.lga || lga_name, ALL_LGAS]
       );
       if (!locationResult.rows.length) {
         return res.status(403).json({
@@ -3318,8 +3322,8 @@ exports.createApplication = async (req, res) => {
         state_name, lga_name, area_locality, residential_address, date_of_birth,
         highest_education, years_of_experience, current_employment_status,
         skills_qualifications, suitability_reason, application_fee,
-        application_track, reference_number, status, payment_status, volunteer_motivation, availability, language_skills
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+        application_track, reference_number, status, payment_status, volunteer_motivation, availability, language_skills, preferred_service_state, preferred_service_lga
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
       RETURNING *`,
       [
         role.cycle_id,
@@ -3345,6 +3349,8 @@ exports.createApplication = async (req, res) => {
         volunteer ? normalizeText(volunteer_motivation) : null,
         volunteer ? normalizeText(availability) : null,
         JSON.stringify(languageSkills),
+        servicePreference?.state || null,
+        servicePreference?.lga || null,
       ]
     );
     if (volunteer) {

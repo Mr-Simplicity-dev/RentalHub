@@ -3,7 +3,7 @@ const VOLUNTEER_OPPORTUNITY_TEMPLATES = [
     title: 'Volunteer Customer Support Agent',
     type: 'Administrative',
     description: `About this opportunity
-This is an unpaid volunteer role supporting Amana RentalHub NG users. it is not anemployment offer but create a staff, support-admin or agent account.
+This is an unpaid volunteer role supporting Amana RentalHub NG users. Applying does not create a staff, support-admin or agent account. Selection and authorised onboarding are separate.
 
 What you will do
 - Answer first-line questions from tenants, landlords and agents through approved support channels.
@@ -34,7 +34,7 @@ Selection and contact
     title: 'Volunteer Field Operations Assistant',
     type: 'Technical',
     description: `About this opportunity
-This is an unpaid volunteer role supporting approved field activities. it is not anemployment offer but create a staff, agent or verification account.
+This is an unpaid volunteer role supporting approved field activities. Applying does not create a staff, agent or verification account. Selection and authorised onboarding are separate.
 
 What you will do
 - Observe and document approved field visits using the checklist and tools provided.
@@ -65,7 +65,7 @@ Selection and contact
     title: 'Volunteer Community Outreach Representative',
     type: 'Administrative',
     description: `About this opportunity
-This is an unpaid volunteer role representing Amana RentalHub NG in approved community outreach. it is not anemployment offer but create a staff or agent account.
+This is an unpaid volunteer role representing Amana RentalHub NG in approved community outreach. Applying does not create a staff or agent account. Selection and authorised onboarding are separate.
 
 What you will do
 - Share approved information about the platform at community events, markets, campuses and local meetings.
@@ -95,7 +95,7 @@ Selection and contact
     title: 'Volunteer Campus Representative',
     type: 'Administrative',
     description: `About this opportunity
-This is an unpaid volunteer role for students and campus community members who want to share approved Amana RentalHub NG information. it is not anemployment offer but create a staff or agent account.
+This is an unpaid volunteer role for students and campus community members who want to share approved Amana RentalHub NG information. Applying does not create a staff or agent account. Selection and authorised onboarding are separate.
 
 What you will do
 - Run approved campus awareness activities and share official platform information with students and staff.
@@ -125,7 +125,7 @@ Selection and contact
     title: 'Volunteer Property Media Assistant',
     type: 'Technical',
     description: `About this opportunity
-This is an unpaid volunteer role supporting approved property media capture. it is not anemployment offer but create a staff or verification account.
+This is an unpaid volunteer role supporting approved property media capture. Applying does not create a staff or verification account. Selection and authorised onboarding are separate.
 
 What you will do
 - Capture approved photos and short videos of properties using the shot list provided.
@@ -155,7 +155,7 @@ Selection and contact
     title: 'Volunteer Business Development & Partnerships Assistant',
     type: 'Administrative',
     description: `About this opportunity
-This is an unpaid volunteer role supporting research and approved partnership introductions. it is not anemployment offer but create a staff account or commission entitlement.
+This is an unpaid volunteer role supporting research and approved partnership introductions. Applying does not create a staff account or commission entitlement. Selection and authorised onboarding are separate.
 
 What you will do
 - Research organisations, communities and partners that may be relevant to Amana RentalHub NG.
@@ -185,7 +185,7 @@ Selection and contact
     title: 'Volunteer Creative & Social Media Assistant',
     type: 'Technical',
     description: `About this opportunity
-This is an unpaid volunteer role helping create approved content for Amana RentalHub NG. it is not anemployment offer but create a staff account.
+This is an unpaid volunteer role helping create approved content for Amana RentalHub NG. Applying does not create a staff account. Selection and authorised onboarding are separate.
 
 What you will do
 - Draft approved social posts, captions, graphics and short videos.
@@ -215,7 +215,7 @@ Selection and contact
     title: 'Volunteer Operations & Administrative Assistant',
     type: 'Administrative',
     description: `About this opportunity
-This is an unpaid volunteer role supporting day-to-day administration. it is not anemployment offer but create a staff or super-admin account.
+This is an unpaid volunteer role supporting day-to-day administration. Applying does not create a staff or super-admin account. Selection and authorised onboarding are separate.
 
 What you will do
 - Help with data entry, document organisation, scheduling and record keeping.
@@ -243,4 +243,43 @@ Selection and contact
   },
 ];
 
-module.exports = { VOLUNTEER_OPPORTUNITY_TEMPLATES };
+const FCT_VOLUNTEER_OPPORTUNITIES = [
+  {
+    "title": "Volunteer LGA Admin — FCT",
+    "type": "Administrative",
+    "service_state": "FCT",
+    "description": "Unpaid volunteer opportunity: LGA Admin for the FCT campaign. Choose any of the six FCT area councils as your preferred place to serve. Your residence may be elsewhere.\n\nSupport approved lga admin activities under supervision. Tell us your skills, language levels and availability. No formal degree is required. Applying is free and does not create an admin or agent account, grant authority, guarantee selection, employment or salary. Our team reviews applications and contacts selected applicants. Any later appointment, duties and access require separate approval."
+  },
+  {
+    "title": "Volunteer Marketing Agent — FCT",
+    "type": "Administrative",
+    "service_state": "FCT",
+    "description": "Unpaid volunteer opportunity: Marketing Agent for the FCT campaign. Choose any of the six FCT area councils as your preferred place to serve. Your residence may be elsewhere.\n\nSupport approved marketing agent activities under supervision. Tell us your skills, language levels and availability. No formal degree is required. Applying is free and does not create an admin or agent account, grant authority, guarantee selection, employment or salary. Our team reviews applications and contacts selected applicants. Any later appointment, duties and access require separate approval."
+  },
+  {
+    "title": "Volunteer Transport Admin — FCT",
+    "type": "Technical",
+    "service_state": "FCT",
+    "description": "Unpaid volunteer opportunity: Transport Admin for the FCT campaign. Choose any of the six FCT area councils as your preferred place to serve. Your residence may be elsewhere.\n\nSupport approved transport admin activities under supervision. Tell us your skills, language levels and availability. No formal degree is required. Applying is free and does not create an admin or agent account, grant authority, guarantee selection, employment or salary. Our team reviews applications and contacts selected applicants. Any later appointment, duties and access require separate approval."
+  },
+  {
+    "title": "Volunteer Fumigation Admin — FCT",
+    "type": "Technical",
+    "service_state": "FCT",
+    "description": "Unpaid volunteer opportunity: Fumigation Admin for the FCT campaign. Choose any of the six FCT area councils as your preferred place to serve. Your residence may be elsewhere.\n\nSupport approved fumigation admin activities under supervision. Tell us your skills, language levels and availability. No formal degree is required. Applying is free and does not create an admin or agent account, grant authority, guarantee selection, employment or salary. Our team reviews applications and contacts selected applicants. Any later appointment, duties and access require separate approval."
+  },
+  {
+    "title": "Volunteer Zonal Admin — FCT",
+    "type": "Administrative",
+    "service_state": "FCT",
+    "description": "Unpaid volunteer opportunity: Zonal Admin for the FCT campaign. Choose any of the six FCT area councils as your preferred place to serve. Your residence may be elsewhere.\n\nSupport approved zonal admin activities under supervision. Tell us your skills, language levels and availability. No formal degree is required. Applying is free and does not create an admin or agent account, grant authority, guarantee selection, employment or salary. Our team reviews applications and contacts selected applicants. Any later appointment, duties and access require separate approval."
+  },
+  {
+    "title": "Volunteer State Admin — FCT",
+    "type": "Administrative",
+    "service_state": "FCT",
+    "description": "Unpaid volunteer opportunity: State Admin for the FCT campaign. Choose any of the six FCT area councils as your preferred place to serve. Your residence may be elsewhere.\n\nSupport approved state admin activities under supervision. Tell us your skills, language levels and availability. No formal degree is required. Applying is free and does not create an admin or agent account, grant authority, guarantee selection, employment or salary. Our team reviews applications and contacts selected applicants. Any later appointment, duties and access require separate approval."
+  }
+];
+VOLUNTEER_OPPORTUNITY_TEMPLATES.push(...FCT_VOLUNTEER_OPPORTUNITIES);
+module.exports = { VOLUNTEER_OPPORTUNITY_TEMPLATES, FCT_VOLUNTEER_OPPORTUNITIES };

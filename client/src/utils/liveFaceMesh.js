@@ -24,6 +24,9 @@ export async function createLiveFaceMesh() {
     detectorModelUrl:`${base}/detector/model.json`,
     landmarkModelUrl:`${base}/landmarks/model.json`,
   });
+  const frame = document.createElement('canvas');
+  const context = frame.getContext('2d');
+  if (!context) {detector.dispose(); throw new Error('Camera frame processing is unavailable');}
   let closed = false, running = false, disposed = false, callback = () => {};
   const dispose = () => {if (!disposed) {disposed = true; detector.dispose();}};
   return {
@@ -36,7 +39,9 @@ export async function createLiveFaceMesh() {
       if (!(width > 0 && height > 0)) return;
       running = true;
       try {
-        const faces = await detector.estimateFaces(image, {flipHorizontal:false});
+        frame.width = width; frame.height = height;
+        context.drawImage(image, 0, 0, width, height);
+        const faces = await detector.estimateFaces(frame, {flipHorizontal:false});
         if (!closed) callback({multiFaceLandmarks:faces.length === 1 ? [faces[0].keypoints.map(p => ({x:p.x/width,y:p.y/height,z:(p.z || 0)/width}))] : []});
       } finally {running = false; if (closed) dispose();}
     },

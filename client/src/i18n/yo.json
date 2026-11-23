@@ -3398,7 +3398,14 @@
     "liveness_challenge_left": "Àyẹ̀wò ìwàláàyè: Jọ̀wọ́ yí orí rẹ sí ÒSÌ kí o sì padà",
     "liveness_challenge_right": "Àyẹ̀wò ìwàláàyè: Jọ̀wọ́ yí orí rẹ sí Ọ̀TÚN kí o sì padà",
     "liveness_challenge_blink": "Àyẹ̀wò ìwàláàyè: Jọ̀wọ́ PA ojú rẹ ní báyìí",
-    "liveness_challenge_hint": "Fèsì láàárín ìṣẹ́jú {{seconds}}"
+    "liveness_challenge_hint": "Fèsì láàárín ìṣẹ́jú {{seconds}}",
+    "service_state": "Ìpínlẹ̀ tí o fẹ́ ṣe iṣẹ́ ìyọ̀ǹda",
+    "service_lga": "Ìjọba ìbílẹ̀ tí o fẹ́ ṣe iṣẹ́ ìyọ̀ǹda",
+    "service_choice_hint": "Yan ibi tí o fẹ́ ṣiṣẹ́. Ó lè yàtọ̀ sí ibi tí o ń gbé.",
+    "service_fct_only": "Àǹfààní yìí jẹ́ fún FCT nìkan. Yan ìgbìmọ̀ agbègbè FCT tí o fẹ́.",
+    "service_choice_required": "Yan ìpínlẹ̀ àti ìjọba ìbílẹ̀ tí o fẹ́ ṣiṣẹ́.",
+    "loading_locations": "Loading local government areas…",
+    "location_error": "Could not load locations. Choose the state again to retry."
   },
   "register": {
     "modal_before": "PÀTÀKÌ",

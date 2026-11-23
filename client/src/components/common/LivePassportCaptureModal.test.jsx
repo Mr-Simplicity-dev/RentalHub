@@ -1,3 +1,4 @@
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 import {createLiveFaceMesh} from '../../utils/liveFaceMesh';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -14,14 +15,15 @@ function face({ size = 0.4, eye = 0.02, nose = 0.5 } = {}) {
   points[0] = { x: 0.5 - size / 2, y: 0.5 - size / 2 };
   points[2] = { x: 0.5 + size / 2, y: 0.5 + size / 2 };
   points[1] = { x: nose, y: 0.5 };
-  points[13] = { x: 0.5, y: 0.43 }; points[14] = { x: 0.5, y: 0.57 };
+  points[78] = {x:0.4,y:0.5}; points[308] = {x:0.6,y:0.5};
+  points[13] = { x: 0.5, y: 0.475 }; points[14] = { x: 0.5, y: 0.525 };
   for (const indices of [[33, 160, 158, 133, 153, 144], [362, 385, 387, 263, 373, 380]]) {
     const values = [[0.4, 0.5], [0.43, 0.5 - eye], [0.47, 0.5 - eye], [0.5, 0.5], [0.47, 0.5 + eye], [0.43, 0.5 + eye]];
     indices.forEach((id, i) => { points[id] = { x: values[i][0], y: values[i][1] }; });
   }
   return { multiFaceLandmarks: [points] };
 }
-test('camera completes liveness and saves once automatically without an upload button', async () => {
+test.each([false,true])('camera saves automatically and supports a fresh-token retry: %s', async (retry) => {
   vi.useFakeTimers();
   const container = document.createElement('div'); document.body.append(container);
   const root = createRoot(container);
@@ -39,7 +41,14 @@ test('camera completes liveness and saves once automatically without an upload b
   const oldCreate = URL.createObjectURL, oldRevoke = URL.revokeObjectURL;
   URL.createObjectURL = vi.fn(() => 'blob:customer-photo'); URL.revokeObjectURL = vi.fn();
   vi.stubGlobal('fetch', vi.fn(async () => ({ blob: async () => new Blob(['photo'], { type: 'image/jpeg' }) })));
-  api.post.mockResolvedValue({ data: { success: true, data: { token: 'customer-session' } } });
+  let sessions = 0, uploads = 0;
+  api.post.mockReset();
+  api.post.mockImplementation(async url => {
+    if (url === '/customer/photo/session') return {data:{success:true,data:{token:++sessions === 1 ? 'customer-session' : 'retry-session'}}};
+    uploads++;
+    if (retry && uploads === 1) throw {response:{status:500,data:{message:'Photo check unavailable'}}};
+    return {data:{success:true}};
+  });
   const saved = vi.fn();
   try {
     await act(async () => root.render(<LivePassportCaptureModal sessionEndpoint="/customer/photo/session" uploadEndpoint="/customer/photo" consentConfirmed onCapture={saved} />));
@@ -51,12 +60,13 @@ test('camera completes liveness and saves once automatically without an upload b
     }
     await act(async () => vi.advanceTimersByTime(700));
     expect(ui.getByAltText('Captured')).toBeTruthy();
+    if (retry) await act(async()=>fireEvent.click(ui.getByText('Try saving photo again')));
     expect(stop).toHaveBeenCalled();
     expect(ui.queryByRole('button',{name:'Upload Photo'})).toBeNull();
     expect(api.post.mock.calls.at(-1)[0]).toBe('/customer/photo');
-    expect(api.post.mock.calls.at(-1)[2].headers['X-Capture-Token']).toBe('customer-session');
+    expect(api.post.mock.calls.at(-1)[2].headers['X-Capture-Token']).toBe(retry ? 'retry-session' : 'customer-session');
     expect(saved).toHaveBeenCalledOnce();
-    expect(api.post.mock.calls.filter(([url])=>url==='/customer/photo')).toHaveLength(1);
+    expect(api.post.mock.calls.filter(([url])=>url==='/customer/photo')).toHaveLength(retry ? 2 : 1);
     const form=api.post.mock.calls.at(-1)[1];
     expect(form.get('biometric_consent')).toBe('true');
   } finally {

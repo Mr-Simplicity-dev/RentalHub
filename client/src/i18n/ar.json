@@ -3338,7 +3338,14 @@
     "liveness_challenge_left": "فحص الحيوية: أدر رأسك إلى اليسار ثم عد",
     "liveness_challenge_right": "فحص الحيوية: أدر رأسك إلى اليمين ثم عد",
     "liveness_challenge_blink": "فحص الحيوية: ارمش الآن",
-    "liveness_challenge_hint": "استجب خلال {{seconds}} ثانية"
+    "liveness_challenge_hint": "استجب خلال {{seconds}} ثانية",
+    "service_state": "الولاية التي تريد التطوع فيها",
+    "service_lga": "المنطقة المحلية التي تريد التطوع فيها",
+    "service_choice_hint": "اختر مكان التطوع. يمكن أن يختلف عن مكان إقامتك.",
+    "service_fct_only": "هذه الفرصة خاصة بإقليم العاصمة الفيدرالية فقط. اختر المجلس المحلي المفضل.",
+    "service_choice_required": "اختر الولاية والمنطقة المحلية للتطوع.",
+    "loading_locations": "Loading local government areas…",
+    "location_error": "Could not load locations. Choose the state again to retry."
   },
   "widget": {
     "support_title": "دعم RentalHub",

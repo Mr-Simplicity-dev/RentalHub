@@ -571,7 +571,7 @@ exports.listResponses = async (req, res) => {
 
     return res.json({
       success: true,
-      data: { total, page, limit, responses: result.rows.map(surveyResponse) },
+      data: { total, page, limit, responses: result.rows.map(row=>({...surveyResponse(row),answer_details:require('./surveyAnswerDetails').answerDetails(row)})) },
     });
   } catch (error) {
     req.logger.error('Survey responses list error:', error);

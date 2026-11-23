@@ -223,6 +223,8 @@ const loadFaceApi = () => {
 
 const EMPTY_FORM = {
   role_id: '',
+  preferred_service_state: '',
+  preferred_service_lga: '',
   full_name: '',
   phone_number: '',
   email_address: '',
@@ -306,6 +308,8 @@ export default function Careers() {
   const [roles, setRoles] = useState([]);
   const [states, setStates] = useState([]);
   const [lgas, setLgas] = useState([]);
+  const [serviceLgas,setServiceLgas]=useState([]);
+  const [serviceLocationError,setServiceLocationError]=useState(false);
   const [application, setApplication] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [applicationFormOpen, setApplicationFormOpen] = useState(false);
@@ -454,6 +458,9 @@ export default function Careers() {
   );
 
   const selectedVolunteer = selectedRole?.opportunity_type === 'volunteer';
+  useEffect(()=>{setForm(previous=>({...previous,preferred_service_state:selectedRole?.service_state?(states.find(state=>state.name===selectedRole.service_state)?.displayName||selectedRole.service_state):'',preferred_service_lga:''}));},[selectedRole?.id,selectedRole?.service_state]);
+  useEffect(()=>{let active=true;setServiceLgas([]);setServiceLocationError(false);if(form.preferred_service_state)api.get('/recruitment/locations/lgas/'+encodeURIComponent(form.preferred_service_state)).then(response=>{if(active)setServiceLgas(response.data?.data||[]);}).catch(()=>{if(active)setServiceLocationError(true);});return()=>{active=false;};},[form.preferred_service_state]);
+
   const visibleRoles = roles.filter(role=>opportunityFilter==='all'||(role.opportunity_type||'employment')===opportunityFilter);
   const volunteerForm = selectedVolunteer || (!selectedRole && visibleRoles.length > 0 && visibleRoles.every(role => role.opportunity_type === 'volunteer'));
   const changeOpportunityFilter = (type) => {
@@ -669,6 +676,7 @@ export default function Careers() {
       ...prev,
       [name]: value,
       ...(name === 'state_name' ? { lga_name: '' } : {}),
+      ...(name === 'preferred_service_state' ? {preferred_service_lga:''} : {}),
     }));
   };
 
@@ -681,6 +689,7 @@ export default function Careers() {
       toast.error(validationError);
       return;
     }
+    if (selectedVolunteer && (!form.preferred_service_state || !form.preferred_service_lga)) {toast.error(t('careers.service_choice_required'));return;}
     if (selectedVolunteer && (!form.volunteer_motivation.trim() || !form.availability.trim())) { toast.error(t('careers.volunteer_fields_required')); return; }
     if (process.env.REACT_APP_TURNSTILE_SITE_KEY && !turnstileToken) {
       toast.error(t('careers.security_check_required'));
@@ -1561,6 +1570,17 @@ export default function Careers() {
         <option value="premium">{t('careers.track_premium')}</option>
       </SelectField>}
 
+      {selectedVolunteer && <>
+        <p className="lg:col-span-2 text-sm text-slate-600">{t(selectedRole.service_state?'careers.service_fct_only':'careers.service_choice_hint')}</p>
+        <SelectField label={t('careers.service_state')} name="preferred_service_state" value={form.preferred_service_state} onChange={handleFormChange} required>
+          <option value="">{t('careers.select_state')}</option>
+          {states.filter(state=>!selectedRole.service_state||state.name===selectedRole.service_state).map(state=><option key={state.name} value={state.displayName||state.name}>{state.name==='FCT'?'FCT (Abuja)':state.displayName||state.name}</option>)}
+        </SelectField>
+        <SelectField label={t('careers.service_lga')} name="preferred_service_lga" value={form.preferred_service_lga} onChange={handleFormChange} disabled={!form.preferred_service_state||serviceLocationError} required>
+          <option value="">{t('careers.select_lga')}</option>{serviceLgas.map(lga=><option key={lga} value={lga}>{lga}</option>)}
+        </SelectField>
+        {serviceLocationError && <p role="alert" className="lg:col-span-2 text-red-700">{t('careers.location_error')} <button type="button" onClick={()=>{setForm(previous=>({...previous,preferred_service_state:'',preferred_service_lga:''}));}}> {t('careers.try_again')}</button></p>}
+      </>}
       <div className="lg:col-span-2 border-b border-slate-100 pb-1">
         <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{t('careers.personal_info')}</h3>
       </div>

@@ -3584,7 +3584,14 @@
     "liveness_challenge_left": "Liveness check: Please turn your head LEFT and back",
     "liveness_challenge_right": "Liveness check: Please turn your head RIGHT and back",
     "liveness_challenge_blink": "Liveness check: Please BLINK now",
-    "liveness_challenge_hint": "Respond within {{seconds}} seconds"
+    "liveness_challenge_hint": "Respond within {{seconds}} seconds",
+    "service_state": "State where you want to volunteer",
+    "service_lga": "LGA where you want to volunteer",
+    "service_choice_hint": "Choose where you want to serve. This can be different from where you live.",
+    "service_fct_only": "This opportunity is for FCT only. Choose your preferred FCT area council.",
+    "service_choice_required": "Choose the state and LGA where you want to volunteer.",
+    "loading_locations": "Loading local government areas…",
+    "location_error": "Could not load locations. Choose the state again to retry."
   },
   "widget": {
     "support_title": "Amana RentalHub NG Support",

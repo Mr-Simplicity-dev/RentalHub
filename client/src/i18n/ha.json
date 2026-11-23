@@ -3398,7 +3398,14 @@
     "liveness_challenge_left": "Duban rai: Da fatan za a juya kanka HAGU ka dawo",
     "liveness_challenge_right": "Duban rai: Da fatan za a juya kanka DAMA ka dawo",
     "liveness_challenge_blink": "Duban rai: Da fatan za a LUMESHE IDO yanzu",
-    "liveness_challenge_hint": "Amsa cikin dakiku {{seconds}}"
+    "liveness_challenge_hint": "Amsa cikin dakiku {{seconds}}",
+    "service_state": "Jihar da kake son aikin sa kai",
+    "service_lga": "Karamar hukumar da kake son aikin sa kai",
+    "service_choice_hint": "Zaɓi inda kake son yin aiki. Zai iya bambanta da inda kake zaune.",
+    "service_fct_only": "Wannan damar ta FCT ce kawai. Zaɓi majalisar yankin FCT da kake so.",
+    "service_choice_required": "Zaɓi jiha da ƙaramar hukumar da kake son aikin sa kai.",
+    "loading_locations": "Loading local government areas…",
+    "location_error": "Could not load locations. Choose the state again to retry."
   },
   "register": {
     "modal_before": "MUHIMMI",

@@ -3398,7 +3398,14 @@
     "liveness_challenge_left": "Nyocha ndụ: Biko tụgharịa isi gị n'AKA EKPE ma laghachi",
     "liveness_challenge_right": "Nyocha ndụ: Biko tụgharịa isi gị n'AKA NRI ma laghachi",
     "liveness_challenge_blink": "Nyocha ndụ: Biko PỊGHE ANYA GỊ ugbu a",
-    "liveness_challenge_hint": "Zaghachi n'ime {{seconds}} sekọnd"
+    "liveness_challenge_hint": "Zaghachi n'ime {{seconds}} sekọnd",
+    "service_state": "Steeti ịchọrọ ịrụ ọrụ afọ ofufo",
+    "service_lga": "Okpuru ọchịchị ịchọrọ ịrụ ọrụ afọ ofufo",
+    "service_choice_hint": "Họrọ ebe ịchọrọ ije ozi. Ọ nwere ike ịdị iche na ebe i bi.",
+    "service_fct_only": "Ohere a bụ naanị maka FCT. Họrọ kansụl mpaghara FCT ịchọrọ.",
+    "service_choice_required": "Họrọ steeti na okpuru ọchịchị ịchọrọ ije ozi.",
+    "loading_locations": "Loading local government areas…",
+    "location_error": "Could not load locations. Choose the state again to retry."
   },
   "register": {
     "modal_before": "DỊ MKPA",

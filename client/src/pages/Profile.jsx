@@ -1,3 +1,4 @@
+import {usePhotoInstructions} from '../hooks/usePhotoInstructions';
 import {createLiveFaceMesh} from '../utils/liveFaceMesh';
 import UserAvatar from '../components/common/UserAvatar';
 import AssistedPasswordForm from '../components/common/AssistedPasswordForm';
@@ -51,7 +52,7 @@ const Profile = () => {
   } = useTour();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const [photoConsent,setPhotoConsent] = useState(false);
   const [passport, setPassport] = useState(null);
@@ -122,6 +123,8 @@ const Profile = () => {
     if (!livenessChecks.movedFarther) checks.push('Move farther from camera');
     return checks;
   }, [livenessChecks]);
+  const photoVoice = usePhotoInstructions(canCaptureLive ? 'Photo checks complete. Hold still.' : (missingChecks[0] === 'Face not detected' ? 'Face forward in good light. Keep only your face in the frame.' : missingChecks[0]), showCameraModal && cameraActive && faceMeshReady, i18n?.language);
+
 
   useEffect(() => {
     const loadTotpStatus = async () => {
@@ -344,7 +347,7 @@ const Profile = () => {
     if (!metricsRef.current.baselineEar && ear > 0) {
       metricsRef.current.baselineEar = ear;
     } else if (ear > 0 && metricsRef.current.baselineEar) {
-      metricsRef.current.baselineEar = (metricsRef.current.baselineEar * 0.92) + (ear * 0.08);
+      metricsRef.current.baselineEar = Math.max(metricsRef.current.baselineEar, ear);
     }
 
     const earBaseline = metricsRef.current.baselineEar || ear || 0;
@@ -373,8 +376,6 @@ const Profile = () => {
 
     if (!metricsRef.current.baseArea) {
       metricsRef.current.baseArea = faceArea;
-    } else {
-      metricsRef.current.baseArea = (metricsRef.current.baseArea * 0.9) + (faceArea * 0.1);
     }
 
     const baseArea = metricsRef.current.baseArea || faceArea;
@@ -400,7 +401,9 @@ const Profile = () => {
       try {
         await faceMeshRef.current.send({ image: video });
       } catch (error) {
-        console.error('FaceMesh frame processing failed:', error);
+        detectionEnabledRef.current = false;
+        setLivenessError('Face checks could not finish. Close the camera and try again.');
+        return;
       }
     }
     detectionLoopRef.current = requestAnimationFrame(runDetectionLoop);
@@ -602,6 +605,8 @@ const Profile = () => {
       }
 
       const sendUpload = async (token) => {
+        if (!token) throw Error('Could not start a secure photo session. Please try again.');
+        setLiveCaptureToken('');
         const formData = new FormData();
         formData.append('passport', passport);
         formData.append('capture_source', 'live_camera');
@@ -1225,7 +1230,7 @@ const Profile = () => {
                 autoPlay
                 playsInline
                 muted
-                className="h-full w-full object-cover"
+                className="h-full w-full object-contain"
               />
 
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -1270,6 +1275,10 @@ const Profile = () => {
                 : (missingChecks[0] || 'Center your face inside the frame.')}
             </div>
 
+            <div className="mt-3 flex justify-center gap-3 text-sm text-white">
+              <button type="button" onClick={photoVoice.toggle}>{photoVoice.enabled ? 'Mute instructions' : 'Read instructions aloud'}</button>
+              {photoVoice.enabled && <button type="button" onClick={photoVoice.repeat}>Repeat instruction</button>}
+            </div>
             {livenessError && (
               <div className="mt-2 text-center text-red-300 text-sm">
                 {livenessError}
