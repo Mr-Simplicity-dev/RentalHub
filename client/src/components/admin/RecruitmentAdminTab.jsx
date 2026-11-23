@@ -46,6 +46,7 @@ const EMPTY_ROLE = {
 };
 
 const EMPTY_LOCATION = {
+  opportunity_type:'employment',
   state_name: '',
   lga_name: '',
   is_active: true,
@@ -130,8 +131,8 @@ export default function RecruitmentAdminTab() {
   const [savingEdit, setSavingEdit] = useState(false);
 
   const activeLocations = useMemo(
-    () => locations.filter((location) => location.is_active),
-    [locations]
+    () => locations.filter((location) => locationForm.opportunity_type==='volunteer'?location.volunteer_is_active:location.is_active),
+    [locations,locationForm.opportunity_type]
   );
 
   const loadCore = useCallback(async () => {
@@ -322,7 +323,7 @@ export default function RecruitmentAdminTab() {
         lga_name: locationForm.lga_name || '__ALL__',
       });
       toast.success('Recruitment location updated');
-      setLocationForm(EMPTY_LOCATION);
+      setLocationForm({...EMPTY_LOCATION,opportunity_type:locationForm.opportunity_type});
       await loadCore();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to update location');
@@ -712,9 +713,10 @@ export default function RecruitmentAdminTab() {
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
               <FaMapMarkerAlt />
             </div>
-            <h3 className="text-lg font-bold text-slate-900">Employment Location Activation</h3>
+            <h3 className="text-lg font-bold text-slate-900">Application Location Controls</h3>
           </div>
           <form onSubmit={toggleLocation} className="space-y-3">
+            <AdminSelect label="Opportunity type" value={locationForm.opportunity_type} onChange={v=>setLocationForm(p=>({...p,opportunity_type:v}))}><option value="employment">Employment</option><option value="volunteer">Volunteer</option></AdminSelect>
             <AdminSelect
               label="State"
               value={locationForm.state_name}
@@ -750,7 +752,7 @@ export default function RecruitmentAdminTab() {
             </button>
           </form>
           <div className="mt-4 max-h-56 space-y-2 overflow-y-auto pr-1">
-            {activeLocations.slice(0, 12).map((location) => (
+            {activeLocations.map((location) => (
               <div key={location.id} className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 flex items-center gap-2">
                 <FaCheckCircle className="text-xs text-emerald-600" />
                 {location.state_name} / {location.lga_name === '__ALL__' ? 'All LGAs' : location.lga_name}

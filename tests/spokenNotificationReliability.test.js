@@ -78,56 +78,137 @@ test('unavailable audio is marked permanently failed and not retried endlessly',
   assert.equal(params[3], true); // permanent flag
 });
 
-test('claimEvent uses atomic single UPDATE with claim guards', async () => {
+test('claimEvent uses atomic single UPDATE with claim guards and claim token', async () => {
   let claimSql = '';
   let claimParams;
   await withMockDb(async (sql, params) => {
     if (/UPDATE spoken_notification_events/i.test(sql) && /claim_expires_at = CURRENT_TIMESTAMP \+ INTERVAL '90 seconds'/i.test(sql)) {
       claimSql = sql;
       claimParams = params;
-      return { rows: [{ id: 5, status: 'claimed', claimed_by_device: 'devA' }] };
+      return { rows: [{ id: 5, status: 'claimed', claimed_by_device: 'devA', claim_token: 'tokA' }] };
     }
     return { rows: [] };
   }, async () => {
-    const res = await service.claimEvent({ userId: 9, eventId: 5, deviceId: 'devA' });
+    const res = await service.claimEvent({ userId: 9, eventId: 5, deviceId: 'devA', claimToken: 'tokA' });
     assert.equal(res.status, 'claimed');
   });
-  assert.match(claimSql, /attempt_count = attempt_count \+ 1/);
   assert.match(claimSql, /acknowledged_at IS NULL/);
   assert.match(claimSql, /expires_at > CURRENT_TIMESTAMP/);
   assert.match(claimSql, /attempt_count < COALESCE\(max_attempts, \$4\)/);
+  assert.match(claimSql, /claim_token = \$5/);
+  assert.match(claimSql, /claim_token IS NOT NULL AND claim_token = \$5 AND claim_expires_at > CURRENT_TIMESTAMP/);
   assert.equal(claimParams[0], 5);
   assert.equal(claimParams[1], 9);
   assert.equal(claimParams[2], 'devA');
+  assert.equal(claimParams[4], 'tokA');
 });
 
-test('simultaneous claim attempts: second claimant gets no row when first claim wins', async () => {
+test('simultaneous claims: different device IDs - only first wins', async () => {
   let call = 0;
   await withMockDb(async (sql) => {
     if (/claim_expires_at = CURRENT_TIMESTAMP \+ INTERVAL '90 seconds'/i.test(sql)) {
       call += 1;
-      if (call === 1) return { rows: [{ id: 6, status: 'claimed', claimed_by_device: 'devA' }] };
-      return { rows: [] }; // atomic row condition no longer matches
+      return call === 1 ? { rows: [{ id: 6, status: 'claimed', claimed_by_device: 'devA' }] } : { rows: [] };
     }
     return { rows: [] };
   }, async () => {
     const [a, b] = await Promise.all([
-      service.claimEvent({ userId: 1, eventId: 6, deviceId: 'devA' }),
-      service.claimEvent({ userId: 1, eventId: 6, deviceId: 'devB' }),
+      service.claimEvent({ userId: 1, eventId: 6, deviceId: 'devA', claimToken: 'tokA' }),
+      service.claimEvent({ userId: 1, eventId: 6, deviceId: 'devB', claimToken: 'tokB' }),
     ]);
     assert.ok(a);
     assert.equal(b, null);
   });
 });
 
-test('bounded retry: exhausted attempts mark failed and no next retry', async () => {
-  await withMockDb(async (sql) => {
-    if (/last_failure_reason/i.test(sql)) {
-      return { rows: [{ id: 7, status: 'failed', acknowledged_at: null, attempt_count: 3, max_attempts: 3, last_failure_reason: 'speech_error', next_eligible_at: null }] };
+test('simultaneous claims: same device ID different tokens - second concurrent request gets no claim', async () => {
+  let call = 0;
+  const seenTokens = [];
+  await withMockDb(async (sql, params) => {
+    if (/claim_expires_at = CURRENT_TIMESTAMP \+ INTERVAL '90 seconds'/i.test(sql)) {
+      call += 1;
+      seenTokens.push(params[4]);
+      // DB row lock/WHERE re-evaluation would allow first, reject second different token on active lease
+      return call === 1 ? { rows: [{ id: 7, status: 'claimed', claimed_by_device: 'devA', claim_token: params[4] }] } : { rows: [] };
     }
     return { rows: [] };
   }, async () => {
-    const res = await service.recordPlaybackResult({ userId: 7, eventId: 7, deviceId: 'dev1', outcome: 'failed', reason: 'speech_error' });
+    const [a, b] = await Promise.all([
+      service.claimEvent({ userId: 1, eventId: 7, deviceId: 'devA', claimToken: 'tok1' }),
+      service.claimEvent({ userId: 1, eventId: 7, deviceId: 'devA', claimToken: 'tok2' }),
+    ]);
+    assert.ok(a);
+    assert.equal(b, null);
+    assert.deepEqual(seenTokens, ['tok1', 'tok2']);
+  });
+});
+
+test('legitimate retry after expired claim can reclaim', async () => {
+  let claimSql = '';
+  await withMockDb(async (sql) => {
+    if (/claim_expires_at = CURRENT_TIMESTAMP \+ INTERVAL '90 seconds'/i.test(sql)) {
+      claimSql = sql;
+      return { rows: [{ id: 8, status: 'claimed', claimed_by_device: 'devB', claim_token: 'tokNew' }] };
+    }
+    return { rows: [] };
+  }, async () => {
+    const res = await service.claimEvent({ userId: 1, eventId: 8, deviceId: 'devB', claimToken: 'tokNew' });
+    assert.ok(res);
+    assert.equal(res.status, 'claimed');
+  });
+  assert.match(claimSql, /claim_expires_at IS NULL OR claim_expires_at <= CURRENT_TIMESTAMP/);
+});
+
+test('second claim while valid lease is active is rejected for different attempt', async () => {
+  await withMockDb(async (sql) => {
+    if (/claim_expires_at = CURRENT_TIMESTAMP \+ INTERVAL '90 seconds'/i.test(sql)) {
+      return { rows: [] }; // active lease, different token/device does not match
+    }
+    return { rows: [] };
+  }, async () => {
+    const res = await service.claimEvent({ userId: 1, eventId: 9, deviceId: 'devB', claimToken: 'tokDifferent' });
+    assert.equal(res, null);
+  });
+});
+
+test('acknowledged event cannot be claimed again', async () => {
+  let claimSql = '';
+  await withMockDb(async (sql) => {
+    if (/claim_expires_at = CURRENT_TIMESTAMP \+ INTERVAL '90 seconds'/i.test(sql)) {
+      claimSql = sql;
+      return { rows: [] };
+    }
+    return { rows: [] };
+  }, async () => {
+    const res = await service.claimEvent({ userId: 1, eventId: 10, deviceId: 'devA', claimToken: 'tokA' });
+    assert.equal(res, null);
+  });
+  assert.match(claimSql, /acknowledged_at IS NULL/);
+});
+
+test('expired event cannot be claimed', async () => {
+  let claimSql = '';
+  await withMockDb(async (sql) => {
+    if (/claim_expires_at = CURRENT_TIMESTAMP \+ INTERVAL '90 seconds'/i.test(sql)) {
+      claimSql = sql;
+      return { rows: [] };
+    }
+    return { rows: [] };
+  }, async () => {
+    const res = await service.claimEvent({ userId: 1, eventId: 11, deviceId: 'devA', claimToken: 'tokA' });
+    assert.equal(res, null);
+  });
+  assert.match(claimSql, /expires_at > CURRENT_TIMESTAMP/);
+});
+
+test('bounded retry: exhausted attempts mark failed and no next retry', async () => {
+  await withMockDb(async (sql) => {
+    if (/last_failure_reason/i.test(sql)) {
+      return { rows: [{ id: 12, status: 'failed', acknowledged_at: null, attempt_count: 3, max_attempts: 3, last_failure_reason: 'speech_error', next_eligible_at: null }] };
+    }
+    return { rows: [] };
+  }, async () => {
+    const res = await service.recordPlaybackResult({ userId: 7, eventId: 12, deviceId: 'dev1', outcome: 'failed', reason: 'speech_error' });
     assert.equal(res.acknowledged, false);
     assert.equal(res.event.status, 'failed');
     assert.equal(res.event.next_eligible_at, null);

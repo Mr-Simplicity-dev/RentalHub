@@ -180,8 +180,14 @@ export function useSpokenNotifications({ enabled, userId }) {
         if (seenAckRef.current.has(id) || sessionUnavailableRef.current.has(id) || isExpired(event)) continue;
 
         let claimed = null;
+        const claimToken = (typeof crypto !== 'undefined' && crypto.randomUUID)
+          ? crypto.randomUUID()
+          : `ct_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
         try {
-          const claimRes = await api.post(`/notifications/spoken/${event.id}/claim`, { deviceId: deviceIdRef.current });
+          const claimRes = await api.post(`/notifications/spoken/${event.id}/claim`, {
+            deviceId: deviceIdRef.current,
+            claimToken,
+          });
           claimed = claimRes?.data?.data;
         } catch {
           continue; // another tab/device claimed it, not eligible, or expired

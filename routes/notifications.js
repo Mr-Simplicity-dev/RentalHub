@@ -389,7 +389,11 @@ router.get('/spoken/pending', authenticate, async (req, res) => {
 
 router.post(
   '/spoken/:eventId/claim',
-  [param('eventId').isInt({ min: 1 }), body('deviceId').optional().isString().isLength({ min: 1, max: 120 })],
+  [
+    param('eventId').isInt({ min: 1 }),
+    body('deviceId').optional().isString().isLength({ min: 1, max: 120 }),
+    body('claimToken').optional().isString().isLength({ min: 8, max: 120 }),
+  ],
   validateRequest,
   authenticate,
   async (req, res) => {
@@ -398,6 +402,7 @@ router.post(
         userId: req.user.id,
         eventId: Number(req.params.eventId),
         deviceId: req.body?.deviceId,
+        claimToken: req.body?.claimToken,
       });
       if (!event) {
         return res.status(409).json({ success: false, message: 'Spoken notification not claimable' });

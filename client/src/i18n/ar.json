@@ -3345,7 +3345,9 @@
     "service_fct_only": "هذه الفرصة خاصة بإقليم العاصمة الفيدرالية فقط. اختر المجلس المحلي المفضل.",
     "service_choice_required": "اختر الولاية والمنطقة المحلية للتطوع.",
     "loading_locations": "Loading local government areas…",
-    "location_error": "Could not load locations. Choose the state again to retry."
+    "location_error": "Could not load locations. Choose the state again to retry.",
+    "service_area_control_hint": "Choose where you want to serve. Only areas opened by the recruitment team accept applications.",
+    "service_area_closed": "Applications are not open in this state yet. You can choose an open area or return later."
   },
   "widget": {
     "support_title": "دعم RentalHub",

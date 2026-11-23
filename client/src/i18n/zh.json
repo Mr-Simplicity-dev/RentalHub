@@ -3345,7 +3345,9 @@
     "service_fct_only": "This opportunity is for FCT only. Choose your preferred FCT area council.",
     "service_choice_required": "Choose the state and LGA where you want to volunteer.",
     "loading_locations": "Loading local government areas…",
-    "location_error": "Could not load locations. Choose the state again to retry."
+    "location_error": "Could not load locations. Choose the state again to retry.",
+    "service_area_control_hint": "Choose where you want to serve. Only areas opened by the recruitment team accept applications.",
+    "service_area_closed": "Applications are not open in this state yet. You can choose an open area or return later."
   },
   "widget": {
     "support_title": "RentalHub 支持",

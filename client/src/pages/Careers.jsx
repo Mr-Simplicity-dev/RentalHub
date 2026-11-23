@@ -1581,14 +1581,15 @@ export default function Careers() {
       </SelectField>}
 
       {selectedVolunteer && <>
-        <p className="lg:col-span-2 text-sm text-slate-600">{t(selectedRole.service_state?'careers.service_fct_only':'careers.service_choice_hint')}</p>
+        <p className="lg:col-span-2 text-sm text-slate-600">{t('careers.service_area_control_hint')}</p>
         <SelectField label={t('careers.service_state')} name="preferred_service_state" value={form.preferred_service_state} onChange={handleFormChange} required>
           <option value="">{t('careers.select_state')}</option>
-          {states.filter(state=>!selectedRole.service_state||state.name===selectedRole.service_state).map(state=><option key={state.name} value={state.displayName||state.name}>{state.name==='FCT'?'FCT (Abuja)':state.displayName||state.name}</option>)}
+          {states.map(state=><option key={state.name} value={state.displayName||state.name}>{state.name==='FCT'?'FCT (Abuja)':state.displayName||state.name}</option>)}
         </SelectField>
         <SelectField label={t('careers.service_lga')} name="preferred_service_lga" value={form.preferred_service_lga} onChange={handleFormChange} disabled={!form.preferred_service_state||serviceLocationError} required>
-          <option value="">{t('careers.select_lga')}</option>{serviceLgas.map(lga=><option key={lga} value={lga}>{lga}</option>)}
+          <option value="">{t('careers.select_lga')}</option>{serviceLgas.map(lga=><option disabled={!states.find(state=>(state.displayName||state.name)===form.preferred_service_state)?.volunteer_lgas?.includes(lga)} key={lga} value={lga}>{lga}</option>)}
         </SelectField>
+        {form.preferred_service_state&&!states.find(state=>(state.displayName||state.name)===form.preferred_service_state)?.volunteer_lgas?.length&&<p role="status" className="lg:col-span-2 text-sm text-amber-800">{t('careers.service_area_closed')}</p>}
         {serviceLocationError && <p role="alert" className="lg:col-span-2 text-red-700">{t('careers.location_error')} <button type="button" onClick={()=>{setForm(previous=>({...previous,preferred_service_state:'',preferred_service_lga:''}));}}> {t('careers.try_again')}</button></p>}
       </>}
       <div className="lg:col-span-2 border-b border-slate-100 pb-1">

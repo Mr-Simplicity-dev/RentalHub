@@ -3405,7 +3405,9 @@
     "service_fct_only": "Ohere a bụ naanị maka FCT. Họrọ kansụl mpaghara FCT ịchọrọ.",
     "service_choice_required": "Họrọ steeti na okpuru ọchịchị ịchọrọ ije ozi.",
     "loading_locations": "Loading local government areas…",
-    "location_error": "Could not load locations. Choose the state again to retry."
+    "location_error": "Could not load locations. Choose the state again to retry.",
+    "service_area_control_hint": "Choose where you want to serve. Only areas opened by the recruitment team accept applications.",
+    "service_area_closed": "Applications are not open in this state yet. You can choose an open area or return later."
   },
   "register": {
     "modal_before": "DỊ MKPA",

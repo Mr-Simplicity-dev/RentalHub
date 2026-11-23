@@ -456,7 +456,7 @@ router.get('/admin/volunteer-templates', authenticate, recruitmentController.get
 router.post('/admin/volunteer-templates/apply', authenticate, [body('cycle_id').isInt({ min: 1 })], validateRequest, recruitmentController.applyVolunteerOpportunityTemplates);
 
 // Location activation
-router.put('/admin/locations/toggle', authenticate, [body('state_id').isInt(), body('lga_id').optional().isInt()], validateRequest, recruitmentController.toggleLocation);
+router.put('/admin/locations/toggle', authenticate, [body('state_name').isString().trim().notEmpty(),body('lga_name').optional().isString().trim().notEmpty(),body('is_active').isBoolean({strict:true}),body('opportunity_type').optional().isIn(['employment','volunteer'])], validateRequest, recruitmentController.toggleLocation);
 router.get('/admin/locations', authenticate, recruitmentController.getLocationActivations);
 router.post('/admin/locations/bulk-activate', authenticate, [body('locations').isArray({ min: 1 })], validateRequest, recruitmentController.bulkActivateLocations);
 

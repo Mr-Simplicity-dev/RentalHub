@@ -274,7 +274,9 @@ exports.getActiveRoles = async (req, res) => {
 exports.getStates = async (req, res) => {
   try {
     const locations = require('../data/nigeriaLocations');
+    const activations = (await db.query('SELECT state_name,lga_name,volunteer_is_active FROM recruitment_location_activation WHERE volunteer_is_active = TRUE')).rows;
     const states = locations.map(l => ({
+      volunteer_lgas:l.lgas.filter(lga=>activations.some(row=>require('./volunteerServiceLocation').findState(row.state_name)?.state===l.state&&(row.lga_name===ALL_LGAS||row.lga_name===lga))),
       name: l.state,
       displayName: l.displayName,
       slug: l.slug
@@ -3291,7 +3293,7 @@ exports.createApplication = async (req, res) => {
     }
     if (!isOpportunityOpen(role, settings)) return res.status(403).json({success:false,message:volunteer ? 'Volunteer applications are currently closed' : 'Recruitment is currently closed'});
     let servicePreference;
-    try {servicePreference=getServicePreference(role,req.body);} catch(error){return res.status(400).json({success:false,message:error.message});}
+    try {const activations=volunteer?(await db.query('SELECT state_name,lga_name,volunteer_is_active FROM recruitment_location_activation WHERE volunteer_is_active = TRUE')).rows:undefined;servicePreference=getServicePreference(role,req.body,activations);} catch(error){return res.status(400).json({success:false,message:error.message});}
 
     if (volunteer && (!normalizeText(volunteer_motivation) || !normalizeText(availability))) return res.status(400).json({success:false,message:'Volunteer motivation and availability are required'});
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeText(email_address)) || !/^\+?\d{10,15}$/.test(normalizeText(phone_number).replace(/[\s-]/g,''))) return res.status(400).json({success:false,message:'Enter a valid email and phone number'});
@@ -3773,23 +3775,27 @@ exports.toggleLocation = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    const stateName = normalizeText(req.body?.state_name);
+    const state = require('./volunteerServiceLocation').findState(req.body?.state_name);
+    const stateName = state?.displayName;
     const lgaName = normalizeText(req.body?.lga_name || ALL_LGAS);
-    const isActive = Boolean(req.body?.is_active);
+    const isActive = req.body?.is_active === true;
+    const volunteerLocation = req.body?.opportunity_type === 'volunteer';
+    const column = volunteerLocation ? 'volunteer_is_active' : 'is_active';
 
-    if (!stateName) {
-      return res.status(400).json({ success: false, message: 'State is required' });
+    if (!stateName || (lgaName!==ALL_LGAS&&!state.lgas.includes(lgaName))) {
+      return res.status(400).json({ success: false, message: 'Choose a valid state and local government area' });
     }
 
-    const result = await db.query(
-      `INSERT INTO recruitment_location_activation (state_name, lga_name, is_active, updated_at)
+    const result = volunteerLocation && lgaName===ALL_LGAS ? await db.query(`INSERT INTO recruitment_location_activation(state_name,lga_name,volunteer_is_active) SELECT $1,unnest($2::text[]),$3 ON CONFLICT(state_name,lga_name) DO UPDATE SET volunteer_is_active=EXCLUDED.volunteer_is_active,updated_at=NOW() RETURNING *`,[stateName,state.lgas,isActive]) : await db.query(
+      `INSERT INTO recruitment_location_activation (state_name, lga_name, ${column}, updated_at)
        VALUES ($1, $2, $3, NOW())
        ON CONFLICT (state_name, lga_name)
-       DO UPDATE SET is_active = EXCLUDED.is_active, updated_at = NOW()
+       DO UPDATE SET ${column} = EXCLUDED.${column}, updated_at = NOW()
        RETURNING *`,
       [stateName, lgaName, isActive]
     );
 
+    await auditRecruitment(req, volunteerLocation?'VOLUNTEER_LOCATION_UPDATED':'RECRUITMENT_LOCATION_UPDATED','recruitment_location_activation',result.rows[0].id);
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
     req.logger.error('toggleLocation error:', error);

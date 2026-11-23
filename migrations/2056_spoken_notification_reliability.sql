@@ -9,7 +9,8 @@ ALTER TABLE spoken_notification_events
   ADD COLUMN IF NOT EXISTS last_failure_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS next_eligible_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS playback_failed_at TIMESTAMPTZ,
-  ADD COLUMN IF NOT EXISTS playback_failure_reason VARCHAR(64);
+  ADD COLUMN IF NOT EXISTS playback_failure_reason VARCHAR(64),
+  ADD COLUMN IF NOT EXISTS claim_token VARCHAR(120);
 
 ALTER TABLE spoken_notification_events DROP CONSTRAINT IF EXISTS spoken_notification_events_status_check;
 ALTER TABLE spoken_notification_events

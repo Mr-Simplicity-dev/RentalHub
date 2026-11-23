@@ -41,6 +41,7 @@ const ensureSchema = async () => {
       next_eligible_at TIMESTAMPTZ,
       playback_failed_at TIMESTAMPTZ,
       playback_failure_reason VARCHAR(64),
+      claim_token VARCHAR(120),
       created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT spoken_notification_events_status_check CHECK (status IN ('pending', 'claimed', 'acknowledged', 'expired', 'cancelled', 'failed'))
@@ -58,6 +59,7 @@ const ensureSchema = async () => {
   await db.query(`ALTER TABLE spoken_notification_events ADD COLUMN IF NOT EXISTS next_eligible_at TIMESTAMPTZ`);
   await db.query(`ALTER TABLE spoken_notification_events ADD COLUMN IF NOT EXISTS playback_failed_at TIMESTAMPTZ`);
   await db.query(`ALTER TABLE spoken_notification_events ADD COLUMN IF NOT EXISTS playback_failure_reason VARCHAR(64)`);
+  await db.query(`ALTER TABLE spoken_notification_events ADD COLUMN IF NOT EXISTS claim_token VARCHAR(120)`);
 };
 
 const normalizeLanguage = (value) => {
@@ -150,18 +152,27 @@ const getPendingEvents = async (userId, { limit = MAX_PENDING_EVENTS } = {}) => 
   return result.rows;
 };
 
-const claimEvent = async ({ userId, eventId, deviceId }) => {
+const claimEvent = async ({ userId, eventId, deviceId, claimToken }) => {
   await ensureSchema();
   const safeDevice = sanitizeText(deviceId || 'unknown-device', 120);
-  // Single atomic UPDATE: row lock prevents two devices claiming simultaneously.
+  const safeToken = sanitizeText(claimToken || `ct_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`, 120);
+  // Single atomic UPDATE: PostgreSQL row lock serializes concurrent updates on the same row.
+  // A different concurrent request (different claim_token) from the same device cannot steal an active lease.
   const result = await db.query(
     `UPDATE spoken_notification_events
      SET status = 'claimed',
          claimed_at = CURRENT_TIMESTAMP,
          claimed_by_device = $3,
+         claim_token = $5,
          claim_expires_at = CURRENT_TIMESTAMP + INTERVAL '90 seconds',
-         last_attempt_at = CURRENT_TIMESTAMP,
-         attempt_count = attempt_count + 1,
+         last_attempt_at = CASE
+           WHEN status = 'claimed' AND claimed_by_device = $3 AND claim_token IS NOT NULL AND claim_token = $5 AND claim_expires_at > CURRENT_TIMESTAMP THEN last_attempt_at
+           ELSE CURRENT_TIMESTAMP
+         END,
+         attempt_count = CASE
+           WHEN status = 'claimed' AND claimed_by_device = $3 AND claim_token IS NOT NULL AND claim_token = $5 AND claim_expires_at > CURRENT_TIMESTAMP THEN attempt_count
+           ELSE attempt_count + 1
+         END,
          updated_at = CURRENT_TIMESTAMP
      WHERE id = $1
        AND user_id = $2
@@ -173,10 +184,10 @@ const claimEvent = async ({ userId, eventId, deviceId }) => {
        AND (
          status = 'pending'
          OR (status = 'claimed' AND (claim_expires_at IS NULL OR claim_expires_at <= CURRENT_TIMESTAMP))
-         OR (status = 'claimed' AND claimed_by_device = $3)
+         OR (status = 'claimed' AND claimed_by_device = $3 AND claim_token IS NOT NULL AND claim_token = $5 AND claim_expires_at > CURRENT_TIMESTAMP)
        )
      RETURNING *`,
-    [eventId, userId, safeDevice, DEFAULT_MAX_ATTEMPTS]
+    [eventId, userId, safeDevice, DEFAULT_MAX_ATTEMPTS, safeToken]
   );
   return result.rows[0] || null;
 };
