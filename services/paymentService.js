@@ -2920,6 +2920,33 @@ async function notifyRentPayment(paymentId, event) {
     } else {
       await deliver(row.tenant_email, row.tenant_phone, payerMsg);
     }
+
+    if (event === 'completed') {
+      try {
+        const spokenNotificationService = require('../config/utils/spokenNotificationService');
+        const prefResult = await db.query(
+          'SELECT preferences FROM user_notification_preferences WHERE user_id = $1',
+          [row.user_id]
+        );
+        const prefs = prefResult.rows[0]?.preferences || {};
+        const lang = spokenNotificationService.normalizeLanguage(prefs.spokenNotificationLanguage || 'en');
+        await spokenNotificationService.emitSpokenEvent({
+          userId: row.user_id,
+          eventType: spokenNotificationService.EVENT_TYPES.RENT_PAYMENT_SUCCESS,
+          sourceType: 'payment',
+          sourceId: paymentId,
+          dedupKey: `rent-payment-success:${paymentId}`,
+          title: 'Rent Payment Successful',
+          message: 'Your rent payment was successful. You can view the receipt details in the app.',
+          language: lang,
+          audioKey: 'rent_payment_success_v1',
+          payload: { kind: 'rent_payment', paymentId },
+          expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+        });
+      } catch (spokenError) {
+        logger.error(`Rent payment spoken notification error: ${spokenError.message}`);
+      }
+    }
   } catch (error) {
     logger.error(`Rent payment notification error: ${error.message}`);
   }

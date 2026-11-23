@@ -13,6 +13,7 @@ import {
   setAuthSession,
 } from '../../services/authStorage';
 import { playNotificationSound } from '../../utils/notificationSound';
+import { useSpokenNotifications } from '../../hooks/useSpokenNotifications';
 
 const scrollToLinkedRoute = (to) => {
   if (typeof window === 'undefined') return;
@@ -66,6 +67,8 @@ const Header = () => {
     const [notifUnreadCount, setNotifUnreadCount] = useState(0);
     const [unreadTotal, setUnreadTotal] = useState(0);
     const [selectedNotification, setSelectedNotification] = useState(null);
+    const [spokenEnabled, setSpokenEnabled] = useState(false);
+    useSpokenNotifications({ enabled: spokenEnabled && !!user?.id, userId: user?.id });
     const [showAvatarPopup, setShowAvatarPopup] = useState(false);
     const notifRef = useRef(null);
     const prevUnreadRef = useRef(0);
@@ -238,6 +241,29 @@ if (role === 'zonal_financial_admin') return '/admin/zonal-financial-dashboard';
     }
     prevUnreadRef.current = notifUnreadCount;
   }, [notifUnreadCount]);
+
+  const fetchSpokenPreference = useCallback(async () => {
+    if (!isAuthenticated || !user?.id) return;
+    try {
+      const res = await api.get('/notifications/preferences');
+      if (res.data?.success) setSpokenEnabled(!!res.data.data?.spokenNotificationsEnabled);
+    } catch {
+      // Ignore - visual notifications remain source of truth
+    }
+  }, [isAuthenticated, user?.id]);
+
+  useEffect(() => { fetchSpokenPreference(); }, [fetchSpokenPreference]);
+
+  const toggleSpokenNotifications = async () => {
+    const next = !spokenEnabled;
+    setSpokenEnabled(next);
+    try {
+      await api.patch('/notifications/preferences', { preferences: { spokenNotificationsEnabled: next } });
+    } catch {
+      setSpokenEnabled(!next);
+      toast.error('Failed to update spoken notification setting');
+    }
+  };
 
   const markNotifAsRead = async (notifId) => {
     try {
@@ -476,14 +502,24 @@ return (
                   <div className="fixed left-2 right-2 top-20 z-50 flex max-h-[70vh] w-auto max-w-[calc(100vw-16px)] origin-top-right animate-scaleIn flex-col rounded-2xl border border-gray-100 bg-white py-2 shadow-elevated-lg sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-96">
                     <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2">
                       <h3 className="text-sm font-semibold text-gray-900">{t('header.notifications')}</h3>
-                      {notifUnreadCount > 0 && (
+                      <div className="flex items-center gap-2">
                         <button
-                          onClick={markAllNotifsAsRead}
-                          className="text-xs font-medium text-primary-600 hover:text-primary-700"
+                          onClick={toggleSpokenNotifications}
+                          className={`text-[11px] font-medium px-2 py-1 rounded-md border transition-colors ${spokenEnabled ? 'text-primary-700 bg-primary-50 border-primary-200' : 'text-gray-500 bg-gray-50 border-gray-200'}`}
+                          title="Toggle spoken notifications"
+                          aria-pressed={spokenEnabled}
                         >
-                          {t('header.mark_all_read')}
+                          {spokenEnabled ? 'Spoken: On' : 'Spoken: Off'}
                         </button>
-                      )}
+                        {notifUnreadCount > 0 && (
+                          <button
+                            onClick={markAllNotifsAsRead}
+                            className="text-xs font-medium text-primary-600 hover:text-primary-700"
+                          >
+                            {t('header.mark_all_read')}
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex-1 overflow-y-auto">

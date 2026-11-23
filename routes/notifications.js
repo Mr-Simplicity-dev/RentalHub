@@ -16,6 +16,7 @@ const {
   sendPushToAll,
   unregisterDevice,
 } = require('../config/utils/pushNotificationService');
+const spokenNotificationService = require('../config/utils/spokenNotificationService');
 
 const DEFAULT_NOTIFICATION_PREFERENCES = {
   pushMessages: true,
@@ -24,9 +25,13 @@ const DEFAULT_NOTIFICATION_PREFERENCES = {
   pushBookings: true,
   adminAlerts: true,
   updateAlerts: true,
+  spokenNotificationsEnabled: false,
+  spokenNotificationLanguage: 'en',
 };
 
 const ALLOWED_PREFERENCE_KEYS = Object.keys(DEFAULT_NOTIFICATION_PREFERENCES);
+const BOOLEAN_PREFERENCE_KEYS = ALLOWED_PREFERENCE_KEYS.filter((key) => typeof DEFAULT_NOTIFICATION_PREFERENCES[key] === 'boolean');
+const SPOKEN_LANGUAGE_OPTIONS = new Set(['en', 'ha', 'ig', 'yo']);
 
 const ensureNotificationPreferenceSchema = async () => {
   await db.query(`
@@ -41,17 +46,30 @@ const ensureNotificationPreferenceSchema = async () => {
 
 const normalizePreferences = (value = {}) =>
   ALLOWED_PREFERENCE_KEYS.reduce((acc, key) => {
-    acc[key] =
-      typeof value[key] === 'boolean'
-        ? value[key]
-        : DEFAULT_NOTIFICATION_PREFERENCES[key];
+    const defaultValue = DEFAULT_NOTIFICATION_PREFERENCES[key];
+    if (typeof defaultValue === 'boolean') {
+      acc[key] = typeof value[key] === 'boolean' ? value[key] : defaultValue;
+      return acc;
+    }
+    if (key === 'spokenNotificationLanguage') {
+      const lang = String(value[key] || defaultValue).toLowerCase().split('-')[0];
+      acc[key] = SPOKEN_LANGUAGE_OPTIONS.has(lang) ? lang : 'en';
+      return acc;
+    }
+    acc[key] = value[key] ?? defaultValue;
     return acc;
   }, {});
 
 const pickPreferenceUpdates = (value = {}) =>
   ALLOWED_PREFERENCE_KEYS.reduce((acc, key) => {
-    if (typeof value[key] === 'boolean') {
-      acc[key] = value[key];
+    const defaultValue = DEFAULT_NOTIFICATION_PREFERENCES[key];
+    if (typeof defaultValue === 'boolean') {
+      if (typeof value[key] === 'boolean') acc[key] = value[key];
+      return acc;
+    }
+    if (key === 'spokenNotificationLanguage' && typeof value[key] === 'string') {
+      const lang = value[key].toLowerCase().split('-')[0];
+      if (SPOKEN_LANGUAGE_OPTIONS.has(lang)) acc[key] = lang;
     }
     return acc;
   }, {});
@@ -110,7 +128,8 @@ router.patch(
   '/preferences',
   [
     body('preferences').optional().isObject().withMessage('Preferences must be an object'),
-    ...ALLOWED_PREFERENCE_KEYS.map((key) => body(`preferences.${key}`).optional().isBoolean()),
+    ...BOOLEAN_PREFERENCE_KEYS.map((key) => body(`preferences.${key}`).optional().isBoolean()),
+    body('preferences.spokenNotificationLanguage').optional().isIn(['en', 'ha', 'ig', 'yo']),
   ],
   validateRequest,
   authenticate,
@@ -323,6 +342,125 @@ router.patch('/read-all', authenticate, async (req, res) => {
     });
   }
 });
+
+// Spoken notification events (Phase C) - user-owned, idempotent, non-read side effects
+router.get('/spoken/pending', authenticate, async (req, res) => {
+  try {
+    await ensureNotificationPreferenceSchema();
+    const prefResult = await db.query(
+      'SELECT preferences FROM user_notification_preferences WHERE user_id = $1',
+      [req.user.id]
+    );
+    const preferences = normalizePreferences(prefResult.rows[0]?.preferences || {});
+    if (!preferences.spokenNotificationsEnabled) {
+      return res.json({ success: true, enabled: false, data: [], count: 0 });
+    }
+
+    const events = await spokenNotificationService.getPendingEvents(req.user.id, {
+      limit: Math.min(Number(req.query.limit) || 10, 10),
+    });
+
+    return res.json({
+      success: true,
+      enabled: true,
+      data: events.map((event) => ({
+        id: event.id,
+        eventType: event.event_type,
+        sourceType: event.source_type,
+        sourceId: event.source_id,
+        dedupKey: event.dedup_key,
+        title: event.title,
+        message: event.message,
+        language: event.language,
+        audioKey: event.audio_key,
+        payload: event.payload || {},
+        status: event.status,
+        expiresAt: event.expires_at,
+        claimedAt: event.claimed_at,
+        claimExpiresAt: event.claim_expires_at,
+        createdAt: event.created_at,
+      })),
+      count: events.length,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to get spoken notifications' });
+  }
+});
+
+router.post(
+  '/spoken/:eventId/claim',
+  [param('eventId').isInt({ min: 1 }), body('deviceId').optional().isString().isLength({ min: 1, max: 120 })],
+  validateRequest,
+  authenticate,
+  async (req, res) => {
+    try {
+      const event = await spokenNotificationService.claimEvent({
+        userId: req.user.id,
+        eventId: Number(req.params.eventId),
+        deviceId: req.body?.deviceId,
+      });
+      if (!event) {
+        return res.status(409).json({ success: false, message: 'Spoken notification not claimable' });
+      }
+      return res.json({
+        success: true,
+        data: {
+          id: event.id,
+          status: event.status,
+          claimedAt: event.claimed_at,
+          claimExpiresAt: event.claim_expires_at,
+          claimedByDevice: event.claimed_by_device,
+        },
+      });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: 'Failed to claim spoken notification' });
+    }
+  }
+);
+
+router.post(
+  '/spoken/:eventId/ack',
+  [
+    param('eventId').isInt({ min: 1 }),
+    body('deviceId').optional().isString().isLength({ min: 1, max: 120 }),
+    body('outcome').optional().isIn(['success', 'failed', 'interrupted', 'unavailable', 'unsupported']),
+    body('played').optional().isBoolean(),
+    body('reason').optional().isString().isLength({ min: 1, max: 64 }),
+  ],
+  validateRequest,
+  authenticate,
+  async (req, res) => {
+    try {
+      const outcome = req.body?.outcome
+        || (req.body?.played === true ? 'success' : 'failed');
+      const result = await spokenNotificationService.recordPlaybackResult({
+        userId: req.user.id,
+        eventId: Number(req.params.eventId),
+        deviceId: req.body?.deviceId,
+        outcome,
+        reason: req.body?.reason,
+      });
+      if (!result?.event) {
+        return res.status(404).json({ success: false, message: 'Spoken notification not found' });
+      }
+      return res.json({
+        success: true,
+        data: {
+          id: result.event.id,
+          status: result.event.status,
+          acknowledged: !!result.acknowledged,
+          acknowledgedAt: result.event.acknowledged_at,
+          acknowledgedByDevice: result.event.acknowledged_by_device,
+          attemptCount: result.event.attempt_count,
+          lastFailureReason: result.event.last_failure_reason,
+          nextEligibleAt: result.event.next_eligible_at,
+        },
+      });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: 'Failed to record spoken notification playback result' });
+    }
+  }
+);
 
 // Delete notification
 router.delete('/:notificationId', authenticate, async (req, res) => {

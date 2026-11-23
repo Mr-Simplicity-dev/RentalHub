@@ -125,14 +125,14 @@ describe('CommercialVideoShowcase redesign', () => {
 
     const view = within(container);
     const downloadLink = container.querySelector('a[download]');
-    expect(downloadLink?.getAttribute('href')).toBe('/promo-videos/amana-app-tour-commercial.mp4');
+    expect(downloadLink?.getAttribute('href')).toBe('/api/promo-videos/download/flagship/vertical/en');
     expect(container.querySelector('video')?.getAttribute('poster')).toBe('/promo-videos/posters/flagship-9x16.jpg');
 
     const widescreenBtn = view.getByRole('button', { name: /16:9 Widescreen Commercial/i });
     act(() => fireEvent.click(widescreenBtn));
 
     expect(container.querySelector('a[download]')?.getAttribute('href')).toBe(
-      '/promo-videos/amana-app-tour-landscape.mp4'
+      '/api/promo-videos/download/flagship/landscape/en'
     );
 
     expect(view.queryByRole('button', { name: /Tenant Edition/i })).toBeNull();
@@ -143,18 +143,18 @@ describe('CommercialVideoShowcase redesign', () => {
     const editionsToCheck = [
       {
         btnPattern: /Tenant Edition/i,
-        landscapeHref: '/promo-videos/amana-tenant-commercial-16x9.mp4',
-        verticalHref: '/promo-videos/amana-tenant-commercial-9x16.mp4',
+        landscapeHref: '/api/promo-videos/download/tenant/landscape/en',
+        verticalHref: '/api/promo-videos/download/tenant/vertical/en',
       },
       {
         btnPattern: /Landlord & Agent Edition/i,
-        landscapeHref: '/promo-videos/amana-landlord-commercial-16x9.mp4',
-        verticalHref: '/promo-videos/amana-landlord-commercial-9x16.mp4',
+        landscapeHref: '/api/promo-videos/download/landlord/landscape/en',
+        verticalHref: '/api/promo-videos/download/landlord/vertical/en',
       },
       {
         btnPattern: /Property Protection Edition/i,
-        landscapeHref: '/promo-videos/amana-protection-commercial-16x9.mp4',
-        verticalHref: '/promo-videos/amana-protection-commercial-9x16.mp4',
+        landscapeHref: '/api/promo-videos/download/protection/landscape/en',
+        verticalHref: '/api/promo-videos/download/protection/vertical/en',
       },
     ];
 
@@ -170,7 +170,7 @@ describe('CommercialVideoShowcase redesign', () => {
 
     act(() => fireEvent.click(view.getByRole('button', { name: /9:16 Vertical Commercial/i })));
     expect(container.querySelector('a[download]')?.getAttribute('href')).toBe(
-      '/promo-videos/amana-protection-commercial-9x16.mp4'
+      '/api/promo-videos/download/protection/vertical/en'
     );
   });
 
@@ -218,6 +218,37 @@ describe('CommercialVideoShowcase redesign', () => {
     expect(parseFloat(volSlider.value)).toBeCloseTo(0.8, 1);
     act(() => fireEvent.click(volUp));
     expect(parseFloat(volSlider.value)).toBeCloseTo(0.9, 1);
+  });
+
+  it('shows promo language selector, keeps English available, and shows unavailable state for Hausa without touching app language', () => {
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
+
+    act(() => {
+      root.render(<CommercialVideoShowcase isStandalone={true} />);
+    });
+
+    const view = within(container);
+    const langSelect = view.getByRole('combobox', { name: /Promo video language/i });
+    expect(langSelect.value).toBe('en');
+
+    act(() => {
+      fireEvent.change(langSelect, { target: { value: 'ha' } });
+    });
+
+    expect(langSelect.value).toBe('ha');
+    expect(view.getByText(/Hausa version not available yet/i)).toBeTruthy();
+    expect(view.getByRole('button', { name: /Unavailable/i })).toBeTruthy();
+    expect(container.querySelector('video')?.getAttribute('src')).toBeNull();
+
+    const rentalhubLangWrites = setItemSpy.mock.calls.filter(([key]) => key === 'rentalhub_language');
+    expect(rentalhubLangWrites).toHaveLength(0);
+
+    act(() => {
+      fireEvent.change(langSelect, { target: { value: 'en' } });
+    });
+    expect(container.querySelector('a[download]')?.getAttribute('href')).toBe('/api/promo-videos/download/flagship/vertical/en');
+
+    setItemSpy.mockRestore();
   });
 });
 

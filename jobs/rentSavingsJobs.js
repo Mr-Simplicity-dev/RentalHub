@@ -3,6 +3,8 @@ const logger = require('../config/utils/logger');
 const cron = require('../services/backgroundJobRuntime').cron;
 const db = require('../config/middleware/database');
 const NotificationService = require('../services/NotificationService');
+const { createNotification } = require('../config/utils/notificationService');
+const spokenNotificationService = require('../config/utils/spokenNotificationService');
 
 /**
  * Rent Savings Cron Jobs
@@ -88,16 +90,17 @@ async function checkMissedMonthlyContributions() {
 }
 
 /**
- * Check for plans approaching rent due date (within 7 days)
+ * Check for plans approaching rent-savings target due date (within 7 days).
+ * Wording is intentionally rent-savings specific (not ordinary tenancy rent).
  */
 async function checkApproachingDueDates() {
   try {
-    logger.info('[RentSavingsJobs] Checking approaching due dates...');
+    logger.info('[RentSavingsJobs] Checking approaching rent-savings due dates...');
     const now = new Date();
     const sevenDaysFromNow = new Date(now);
     sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+    const todayKey = now.toISOString().slice(0, 10);
 
-    // Find plans where rent due date is within the next 7 days
     const approachingPlans = await db.query(
       `SELECT rsp.*, u.full_name AS tenant_name, u.email AS tenant_email,
               p.title AS property_title
@@ -114,23 +117,42 @@ async function checkApproachingDueDates() {
     let withdrawalReminderCount = 0;
 
     for (const plan of approachingPlans.rows) {
-      const totalSaved = Number(plan.total_saved).toLocaleString();
-      const dueDate = new Date(plan.rent_due_date).toLocaleDateString();
+      const totalSaved = Number(plan.total_saved || 0).toLocaleString('en-NG');
+      const dueDate = new Date(plan.rent_due_date).toLocaleDateString('en-NG', { year: 'numeric', month: 'long', day: 'numeric' });
+      const dedupKey = `rent-savings-due:${plan.id}:${todayKey}`;
+      const title = 'Rent-Savings Contribution Due Reminder';
+      const message = `Your rent-savings target for "${plan.property_title}" is due on ${dueDate}. You have NGN ${totalSaved} saved in your rent-savings plan. Review your plan and withdraw when ready.`;
 
-      await NotificationService.sendNotification(
-        plan.tenant_id,
-        '🏠 Rent Due Date Approaching!',
-        `Your rent for "${plan.property_title}" is due on ${dueDate}. You have ₦${totalSaved} saved. Withdraw now to pay your rent.`,
-        'rent_savings_due_reminder',
-        plan.id,
-        'rent_savings_plan'
-      );
+      const notification = await createNotification({
+        userId: plan.tenant_id,
+        type: 'rent_savings_due_reminder',
+        title,
+        message,
+        link: `/dashboard/rent-savings/${plan.id}`,
+        dedupKey,
+      });
+
+      if (notification?.id) {
+        await spokenNotificationService.emitSpokenEvent({
+          userId: plan.tenant_id,
+          eventType: spokenNotificationService.EVENT_TYPES.RENT_SAVINGS_DUE_REMINDER,
+          sourceType: 'rent_savings_plan',
+          sourceId: plan.id,
+          dedupKey,
+          title,
+          message: `Rent-savings reminder: your target for ${plan.property_title} is due on ${dueDate}. Please check your rent-savings plan in the app for details.`,
+          language: 'en',
+          audioKey: 'rent_savings_due_reminder_v1',
+          payload: { planId: plan.id, dueDate: plan.rent_due_date, kind: 'rent_savings' },
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        });
+      }
 
       withdrawalReminderCount++;
-      logger.info(`[RentSavingsJobs] Due date reminder sent to tenant #${plan.tenant_id} for plan #${plan.id}`);
+      logger.info(`[RentSavingsJobs] Rent-savings due reminder processed for tenant #${plan.tenant_id} plan #${plan.id}`);
     }
 
-    logger.info(`[RentSavingsJobs] Due date check complete. Sent ${withdrawalReminderCount} reminders.`);
+    logger.info(`[RentSavingsJobs] Rent-savings due date check complete. Processed ${withdrawalReminderCount} plans.`);
   } catch (error) {
     logger.error('[RentSavingsJobs] Error in due date check:', error);
   }

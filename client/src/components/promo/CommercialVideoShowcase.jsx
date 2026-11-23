@@ -7,6 +7,8 @@ import {
   FaDownload,
   FaExpand,
   FaFilm,
+  FaInfoCircle,
+  FaLanguage,
   FaMobileAlt,
   FaPause,
   FaPlay,
@@ -15,6 +17,21 @@ import {
   FaVolumeMute,
   FaVolumeUp,
 } from 'react-icons/fa';
+
+const PROMO_LANGUAGES = [
+  { code: 'en', label: 'English' },
+  { code: 'ha', label: 'Hausa' },
+  { code: 'ig', label: 'Igbo' },
+  { code: 'yo', label: 'Yoruba' },
+];
+
+const PROMO_LANGUAGE_LABELS = PROMO_LANGUAGES.reduce((acc, lang) => {
+  acc[lang.code] = lang.label;
+  return acc;
+}, {});
+
+const buildPromoDownloadHref = (editionId, formatKey, langCode) =>
+  `/api/promo-videos/download/${encodeURIComponent(editionId)}/${encodeURIComponent(formatKey)}/${encodeURIComponent(langCode)}`;
 
 const EDITIONS = [
   {
@@ -283,10 +300,29 @@ const EDITIONS = [
 
 const EXTRA_EDITIONS = EDITIONS.slice(1);
 
-export default function CommercialVideoShowcase({ isStandalone = false }) {
+export default function CommercialVideoShowcase({
+  isStandalone = false,
+  promoLanguage,
+  onPromoLanguageChange,
+}) {
+  const [internalPromoLanguage, setInternalPromoLanguage] = useState('en');
+  const selectedPromoLanguage = promoLanguage ?? internalPromoLanguage;
+  const normalizedPromoLanguage = PROMO_LANGUAGE_LABELS[selectedPromoLanguage] ? selectedPromoLanguage : 'en';
+  const setPromoLanguage = (nextLang) => {
+    const safeLang = PROMO_LANGUAGE_LABELS[nextLang] ? nextLang : 'en';
+    if (onPromoLanguageChange) {
+      onPromoLanguageChange(safeLang);
+      return;
+    }
+    if (promoLanguage === undefined) {
+      setInternalPromoLanguage(safeLang);
+    }
+  };
+  const showInternalPromoSelector = promoLanguage === undefined && typeof onPromoLanguageChange !== 'function';
   const [activeEditionId, setActiveEditionId] = useState('flagship');
   const [activeFormat, setActiveFormat] = useState('vertical');
   const [showMoreEditions, setShowMoreEditions] = useState(false);
+  const [promoManifest, setPromoManifest] = useState(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -308,7 +344,54 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
   const activeEdition = EDITIONS.find((ed) => ed.id === activeEditionId) || EDITIONS[0];
   const activeClip = activeEdition.formats[activeFormat] || activeEdition.formats.vertical;
   const isWidescreen = activeClip.aspect === '16/9';
-  const currentVideoSrc = activeClip.videoSrc;
+  const manifestAsset = promoManifest?.assets?.[activeEdition.id]?.[activeFormat]?.[normalizedPromoLanguage] || null;
+  const isLanguageAvailable = normalizedPromoLanguage === 'en'
+    ? true
+    : Boolean(manifestAsset?.available && manifestAsset?.src);
+  const currentVideoSrc = isLanguageAvailable
+    ? (normalizedPromoLanguage === 'en' ? activeClip.videoSrc : manifestAsset.src)
+    : null;
+  const downloadHref = buildPromoDownloadHref(activeEdition.id, activeFormat, normalizedPromoLanguage);
+  const downloadName = isLanguageAvailable
+    ? (manifestAsset?.downloadName || activeClip.downloadName)
+    : activeClip.downloadName;
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/promo-videos/manifest', { headers: { Accept: 'application/json' } })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((payload) => {
+        if (active && payload?.success && payload?.data) {
+          setPromoManifest(payload.data);
+        }
+      })
+      .catch(() => {
+        // Manifest is optional for English fallback; unavailable-state logic handles non-English safely.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    const video = videoRef.current;
+    if (video) {
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+    }
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setLoadState('idle');
+    setLoadProgress(0);
+    setLoadedBytesLabel('');
+    setLoadedBlobUrl(null);
+    setLoadError('');
+  }, [normalizedPromoLanguage]);
 
   useEffect(() => {
     const cache = blobCacheRef.current;
@@ -333,6 +416,24 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
+    }
+
+    if (!currentVideoSrc) {
+      setLoadedBlobUrl(null);
+      setLoadState('idle');
+      setLoadProgress(0);
+      setLoadedBytesLabel('');
+      setLoadError('');
+      setCurrentTime(0);
+      setDuration(activeEdition.defaultDuration);
+      setIsPlaying(false);
+      const video = videoRef.current;
+      if (video) {
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+      }
+      return;
     }
 
     const cachedUrl = blobCacheRef.current.get(currentVideoSrc) || null;
@@ -412,7 +513,7 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
 
   const preloadAndPlay = async (seekSec = null) => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || !currentVideoSrc) return;
 
     const existingBlobUrl = blobCacheRef.current.get(currentVideoSrc);
     if (existingBlobUrl) {
@@ -541,7 +642,7 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
 
   const togglePlay = () => {
     const video = videoRef.current;
-    if (!video || loadState === 'loading') return;
+    if (!video || !currentVideoSrc || loadState === 'loading') return;
 
     if (isPlaying) {
       video.pause();
@@ -592,6 +693,7 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
   };
 
   const seekToChapter = (startSec) => {
+    if (!currentVideoSrc) return;
     const targetSec = Math.min(startSec, duration || startSec);
     if (loadState !== 'ready' && !blobCacheRef.current.has(currentVideoSrc)) {
       preloadAndPlay(targetSec);
@@ -654,6 +756,25 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
         </div>
 
         <div className="mb-6 flex flex-wrap items-center justify-center gap-3">
+          {showInternalPromoSelector && (
+            <label className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-slate-200">
+              <FaLanguage size={14} className="text-[#E2C275]" aria-hidden="true" />
+              <span className="sr-only">Promo language</span>
+              <select
+                value={normalizedPromoLanguage}
+                onChange={(e) => setPromoLanguage(e.target.value)}
+                aria-label="Promo video language"
+                className="bg-transparent text-sm font-medium text-white outline-none [&>option]:text-slate-900"
+              >
+                {PROMO_LANGUAGES.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
           {(['vertical', 'landscape']).map((formatKey) => {
             const fmt = activeEdition.formats[formatKey];
             const isActive = activeFormat === formatKey;
@@ -780,26 +901,45 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
               }`}
             >
               <div
-                className={`relative w-full cursor-pointer bg-slate-950 ${
+                className={`relative w-full bg-slate-950 ${isLanguageAvailable ? 'cursor-pointer' : 'cursor-default'} ${
                   isWidescreen ? 'aspect-video' : 'aspect-[9/16]'
                 }`}
-                onClick={togglePlay}
+                onClick={isLanguageAvailable ? togglePlay : undefined}
               >
                 <video
-                  key={currentVideoSrc}
+                  key={currentVideoSrc || `${activeEdition.id}-${activeFormat}-${normalizedPromoLanguage}-unavailable`}
                   ref={videoRef}
-                  src={loadedBlobUrl || currentVideoSrc}
+                  src={isLanguageAvailable ? (loadedBlobUrl || currentVideoSrc) : undefined}
                   poster={activeClip.posterSrc}
                   className="h-full w-full object-cover"
                   playsInline
                   muted={isMuted}
-                  preload="metadata"
+                  preload={isLanguageAvailable ? 'metadata' : 'none'}
                   onTimeUpdate={handleTimeUpdate}
                   onLoadedMetadata={handleTimeUpdate}
                   onEnded={() => setIsPlaying(false)}
                 />
 
-                {loadState === 'loading' && (
+                {!isLanguageAvailable && (
+                  <div
+                    className="absolute inset-0 flex flex-col items-center justify-center bg-[#051430]/88 px-6 text-center backdrop-blur-[1px]"
+                    role="status"
+                    aria-live="polite"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[#C89B3C]/50 bg-[#071A3D]/90 text-[#E2C275]">
+                      <FaInfoCircle size={20} aria-hidden="true" />
+                    </span>
+                    <p className="mt-4 text-sm font-semibold text-white">
+                      {PROMO_LANGUAGE_LABELS[normalizedPromoLanguage]} version not available yet
+                    </p>
+                    <p className="mt-2 max-w-sm text-xs leading-5 text-slate-300">
+                      This edition is awaiting approved native-language narration and a reviewed localized video. The English version remains available.
+                    </p>
+                  </div>
+                )}
+
+                {isLanguageAvailable && loadState === 'loading' && (
                   <div
                     className="absolute inset-0 flex flex-col items-center justify-center bg-[#051430]/88 px-6 text-center backdrop-blur-[2px]"
                     role="status"
@@ -810,7 +950,7 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
                       Preparing Uninterrupted Playback
                     </span>
                     <p className="mt-2 text-2xl font-semibold tabular-nums text-white">
-                      {loadProgress > 0 ? `${loadProgress}%` : 'Loading…'}
+                      {loadProgress > 0 ? `${loadProgress}%` : 'Loading...'}
                     </p>
                     {loadedBytesLabel && (
                       <p className="mt-0.5 font-mono text-[11px] text-slate-300">
@@ -836,7 +976,7 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
                   </div>
                 )}
 
-                {loadState === 'error' && (
+                {isLanguageAvailable && loadState === 'error' && (
                   <div
                     className="absolute inset-0 flex flex-col items-center justify-center bg-[#051430]/92 px-6 text-center"
                     onClick={(e) => e.stopPropagation()}
@@ -853,19 +993,19 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
                   </div>
                 )}
 
-                {!isPlaying && loadState !== 'loading' && loadState !== 'error' && (
+                {isLanguageAvailable && !isPlaying && loadState !== 'loading' && loadState !== 'error' && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#071A3D]/25 transition-colors hover:bg-[#071A3D]/15">
                     <span className="flex h-16 w-16 items-center justify-center rounded-full border border-[#E2C275]/80 bg-[#071A3D]/90 text-white shadow-xl">
                       <FaPlay className="ml-1" size={20} aria-hidden="true" />
                     </span>
                     <span className="mt-3 rounded-md border border-white/20 bg-[#051430]/90 px-3 py-1 text-[11px] font-medium text-slate-100 shadow">
                       {loadState === 'ready'
-                        ? `Play ${activeEdition.shortLabel} · Buffered`
-                        : `Play ${activeEdition.shortLabel} · Buffers Fully`}
+                        ? `Play ${activeEdition.shortLabel} - Buffered`
+                        : `Play ${activeEdition.shortLabel} - Buffers Fully`}
                     </span>
                   </div>
                 )}
-              </div>
+              </div>              </div>
 
               <div className="border-t border-white/10 bg-[#051430] px-4 py-3">
                 <div className="mb-2.5 flex items-center gap-3">
@@ -880,7 +1020,8 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
                     value={currentTime}
                     onChange={handleSeek}
                     aria-label="Seek video timeline"
-                    className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-white/15 accent-[#C89B3C]"
+                    disabled={!isLanguageAvailable}
+                    className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-white/15 accent-[#C89B3C] disabled:cursor-not-allowed disabled:opacity-50"
                   />
                   <span className="font-mono text-[11px] tabular-nums text-slate-300">
                     {formatTime(duration)}
@@ -892,7 +1033,7 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
                     <button
                       type="button"
                       onClick={togglePlay}
-                      disabled={loadState === 'loading'}
+                      disabled={!isLanguageAvailable || loadState === 'loading'}
                       aria-label={isPlaying ? 'Pause video' : 'Play video'}
                       className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/15 bg-white/10 text-white transition-colors hover:bg-white/20 disabled:opacity-50"
                     >
@@ -949,14 +1090,26 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <a
-                      href={currentVideoSrc}
-                      download={activeClip.downloadName}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#C89B3C]/50 bg-[#C89B3C]/15 px-3 text-xs font-semibold text-[#E2C275] transition-colors hover:bg-[#C89B3C]/25"
-                    >
-                      <FaDownload size={10} aria-hidden="true" />
-                      <span>Download MP4</span>
-                    </a>
+                    {isLanguageAvailable ? (
+                      <a
+                        href={downloadHref}
+                        download={downloadName}
+                        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#C89B3C]/50 bg-[#C89B3C]/15 px-3 text-xs font-semibold text-[#E2C275] transition-colors hover:bg-[#C89B3C]/25"
+                      >
+                        <FaDownload size={10} aria-hidden="true" />
+                        <span>Download MP4</span>
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled
+                        title={`${PROMO_LANGUAGE_LABELS[normalizedPromoLanguage]} version is not available yet`}
+                        className="inline-flex h-8 cursor-not-allowed items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-3 text-xs font-semibold text-slate-400 opacity-70"
+                      >
+                        <FaDownload size={10} aria-hidden="true" />
+                        <span>Unavailable</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={handleFullscreen}
@@ -1038,7 +1191,6 @@ export default function CommercialVideoShowcase({ isStandalone = false }) {
             </div>
           </div>
         </div>
-      </div>
     </section>
   );
 }

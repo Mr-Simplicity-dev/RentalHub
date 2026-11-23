@@ -84,6 +84,7 @@ const referralRoutes = require('./routes/referrals');
 const smsDeliveryRoutes = require('./routes/smsDelivery');
 const appLinksRoutes = require('./routes/appLinks');
 const downloadsRoutes = require('./routes/downloads');
+const promoVideosRoutes = require('./routes/promoVideos');
 const premblyRecoveryRoutes = require('./routes/premblyRecovery');
 const whatsappWebhookRoutes = require('./routes/whatsappWebhook');
 
@@ -707,6 +708,7 @@ const publicDownloadLimiter = rateLimit({
 // Mobile release downloads must stay public and available even when database-backed
 // feature flag checks are unavailable.
 app.use('/api/downloads', publicDownloadLimiter, downloadsRoutes);
+app.use('/api/promo-videos', promoVideosRoutes);
 app.get('/api/downloads/app-version', publicDownloadLimiter, (req, res, next) => {
   req.url = '/app-version';
   return downloadsRoutes(req, res, next);

@@ -40,6 +40,7 @@ const Home = () => {
   const [savedPropertyIds, setSavedPropertyIds] = useState([]);
 
   const [featuredProperties, setFeaturedProperties] = useState([]);
+  const [promoVideoLanguage, setPromoVideoLanguage] = useState('en');
   const [popularLocations, setPopularLocations] = useState(DEFAULT_POPULAR_LOCATIONS);
   const [showAllStates, setShowAllStates] = useState(false);
   const [treatedCases, setTreatedCases] = useState(null);
@@ -437,7 +438,35 @@ const Home = () => {
         <div className="container mx-auto px-4 max-w-7xl mb-8">
           <ProductDemoCommercial />
         </div>
-        <CommercialVideoShowcase isStandalone={false} />
+        <div className="container mx-auto max-w-7xl px-4 mb-6">
+          <div className="flex flex-col gap-3 rounded-xl border border-white/10 bg-[#0C244E]/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-white">Promo video language</p>
+              <p className="text-xs text-slate-300">
+                Changes only this promotional video. It does not change the app language.
+              </p>
+            </div>
+            <label className="inline-flex items-center gap-2 text-sm text-slate-200">
+              <span className="sr-only">Select promo video language</span>
+              <select
+                value={promoVideoLanguage}
+                onChange={(e) => setPromoVideoLanguage(e.target.value)}
+                aria-label="Select promo video language"
+                className="rounded-lg border border-white/20 bg-[#071A3D] px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#C89B3C] [&>option]:text-slate-900"
+              >
+                <option value="en">English</option>
+                <option value="ha">Hausa</option>
+                <option value="ig">Igbo</option>
+                <option value="yo">Yoruba</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <CommercialVideoShowcase
+          isStandalone={false}
+          promoLanguage={promoVideoLanguage}
+          onPromoLanguageChange={setPromoVideoLanguage}
+        />
       </div>
 
       {treatedCases && (
