@@ -194,7 +194,8 @@
     "view_refund": "عرض الاسترداد",
     "go_to_dashboard": "الانتقال إلى لوحة التحكم",
     "verification": "التحقق",
-    "toggle_mobile_menu": "تبديل قائمة الجوال"
+    "toggle_mobile_menu": "تبديل قائمة الجوال",
+    "spoken_unavailable": "A voice for the selected language is not available on this device. You can still read your notifications."
   },
   "applications": {
     "load_failed": "فشل تحميل الطلبات",

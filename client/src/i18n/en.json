@@ -194,7 +194,8 @@
     "view_refund": "View Refund",
     "go_to_dashboard": "Go to Dashboard",
     "verification": "Verification",
-    "toggle_mobile_menu": "Toggle mobile menu"
+    "toggle_mobile_menu": "Toggle mobile menu",
+    "spoken_unavailable": "A voice for the selected language is not available on this device. You can still read your notifications."
   },
   "applications": {
     "load_failed": "Failed to load applications",

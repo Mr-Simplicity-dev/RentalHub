@@ -194,7 +194,8 @@
     "view_refund": "Duba Maido da Kuɗi",
     "go_to_dashboard": "Je Allon Aiki",
     "verification": "Tabbatarwa",
-    "toggle_mobile_menu": "Bude ko rufe menu na waya"
+    "toggle_mobile_menu": "Bude ko rufe menu na waya",
+    "spoken_unavailable": "Babu muryar harshen da ka zaɓa a wannan na’ura. Har yanzu kana iya karanta sanarwarka."
   },
   "applications": {
     "load_failed": "An kasa lodawa aikace-aikace",

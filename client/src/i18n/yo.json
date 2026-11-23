@@ -194,7 +194,8 @@
     "view_refund": "Wo Àtúnpamọ́",
     "go_to_dashboard": "Lọ Sí Àtòjọ Ìṣàkóso",
     "verification": "Ìmúdájú",
-    "toggle_mobile_menu": "Ṣí/tì àkójọ fóónù"
+    "toggle_mobile_menu": "Ṣí/tì àkójọ fóónù",
+    "spoken_unavailable": "Ohùn èdè tí o yàn kò sí lórí ẹ̀rọ yìí. O ṣì lè ka àwọn ìfitónilétí rẹ."
   },
   "applications": {
     "load_failed": "Àwọn ìbéèrè kò ṣeé gbàjáde",

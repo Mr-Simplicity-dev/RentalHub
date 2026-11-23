@@ -123,17 +123,9 @@ async function checkApproachingDueDates() {
       const title = 'Rent-Savings Contribution Due Reminder';
       const message = `Your rent-savings target for "${plan.property_title}" is due on ${dueDate}. You have NGN ${totalSaved} saved in your rent-savings plan. Review your plan and withdraw when ready.`;
 
-      const notification = await createNotification({
-        userId: plan.tenant_id,
-        type: 'rent_savings_due_reminder',
-        title,
-        message,
-        link: `/dashboard/rent-savings/${plan.id}`,
-        dedupKey,
-      });
+      await createNotification(plan.tenant_id, 'rent_savings_due_reminder', title, message, `/dashboard/rent-savings/${plan.id}`, dedupKey);
 
-      if (notification?.id) {
-        await spokenNotificationService.emitSpokenEvent({
+      await spokenNotificationService.emitSpokenEvent({
           userId: plan.tenant_id,
           eventType: spokenNotificationService.EVENT_TYPES.RENT_SAVINGS_DUE_REMINDER,
           sourceType: 'rent_savings_plan',
@@ -141,12 +133,10 @@ async function checkApproachingDueDates() {
           dedupKey,
           title,
           message: `Rent-savings reminder: your target for ${plan.property_title} is due on ${dueDate}. Please check your rent-savings plan in the app for details.`,
-          language: 'en',
           audioKey: 'rent_savings_due_reminder_v1',
           payload: { planId: plan.id, dueDate: plan.rent_due_date, kind: 'rent_savings' },
           expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        });
-      }
+      });
 
       withdrawalReminderCount++;
       logger.info(`[RentSavingsJobs] Rent-savings due reminder processed for tenant #${plan.tenant_id} plan #${plan.id}`);

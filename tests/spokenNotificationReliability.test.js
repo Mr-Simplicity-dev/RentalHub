@@ -18,16 +18,16 @@ test('successful playback records acknowledged result only on success', async ()
   const calls = [];
   await withMockDb(async (sql, params) => {
     calls.push({ sql, params });
-    if (/UPDATE spoken_notification_events/i.test(sql) && /acknowledged_at = CURRENT_TIMESTAMP/i.test(sql)) {
+    if (/UPDATE spoken_notification_events/i.test(sql) && /acknowledged_at\s*=\s*CURRENT_TIMESTAMP/i.test(sql)) {
       return { rows: [{ id: 1, status: 'acknowledged', acknowledged_at: new Date().toISOString(), acknowledged_by_device: 'dev1', attempt_count: 1, last_failure_reason: null, next_eligible_at: null }] };
     }
     return { rows: [] };
   }, async () => {
-    const res = await service.recordPlaybackResult({ userId: 7, eventId: 1, deviceId: 'dev1', outcome: 'success' });
+    const res = await service.recordPlaybackResult({ userId: 7, eventId: 1, deviceId: 'dev1', outcome: 'success' , claimToken: 'test-claim-token' });
     assert.equal(res.acknowledged, true);
     assert.equal(res.event.status, 'acknowledged');
   });
-  assert.ok(calls.some((c) => /acknowledged_at = CURRENT_TIMESTAMP/i.test(c.sql)));
+  assert.ok(calls.some((c) => /acknowledged_at\s*=\s*CURRENT_TIMESTAMP/i.test(c.sql)));
 });
 
 test('failed playback is recorded separately and not acknowledged', async () => {
@@ -39,7 +39,7 @@ test('failed playback is recorded separately and not acknowledged', async () => 
     }
     return { rows: [] };
   }, async () => {
-    const res = await service.recordPlaybackResult({ userId: 7, eventId: 2, deviceId: 'dev1', outcome: 'failed', reason: 'speech_error' });
+    const res = await service.recordPlaybackResult({ userId: 7, eventId: 2, deviceId: 'dev1', outcome: 'failed', reason: 'speech_error' , claimToken: 'test-claim-token' });
     assert.equal(res.acknowledged, false);
     assert.equal(res.event.status, 'pending');
     assert.equal(res.event.last_failure_reason, 'speech_error');
@@ -55,7 +55,7 @@ test('interrupted playback is recorded as recoverable failure', async () => {
     }
     return { rows: [] };
   }, async () => {
-    const res = await service.recordPlaybackResult({ userId: 7, eventId: 3, deviceId: 'dev1', outcome: 'interrupted', reason: 'speech_interrupted' });
+    const res = await service.recordPlaybackResult({ userId: 7, eventId: 3, deviceId: 'dev1', outcome: 'interrupted', reason: 'speech_interrupted' , claimToken: 'test-claim-token' });
     assert.equal(res.acknowledged, false);
     assert.equal(res.event.status, 'pending');
   });
@@ -70,19 +70,19 @@ test('unavailable audio is marked permanently failed and not retried endlessly',
     }
     return { rows: [] };
   }, async () => {
-    const res = await service.recordPlaybackResult({ userId: 7, eventId: 4, deviceId: 'dev1', outcome: 'unavailable', reason: 'speech_synthesis_unavailable' });
+    const res = await service.recordPlaybackResult({ userId: 7, eventId: 4, deviceId: 'dev1', outcome: 'unavailable', reason: 'speech_synthesis_unavailable' , claimToken: 'test-claim-token' });
     assert.equal(res.acknowledged, false);
     assert.equal(res.permanent, true);
     assert.equal(res.event.status, 'failed');
   });
-  assert.equal(params[3], true); // permanent flag
+  assert.equal(params[4], true); // permanent flag
 });
 
 test('claimEvent uses atomic single UPDATE with claim guards and claim token', async () => {
   let claimSql = '';
   let claimParams;
   await withMockDb(async (sql, params) => {
-    if (/UPDATE spoken_notification_events/i.test(sql) && /claim_expires_at = CURRENT_TIMESTAMP \+ INTERVAL '90 seconds'/i.test(sql)) {
+    if (/UPDATE spoken_notification_events/i.test(sql) && /SET status = 'claimed'/i.test(sql)) {
       claimSql = sql;
       claimParams = params;
       return { rows: [{ id: 5, status: 'claimed', claimed_by_device: 'devA', claim_token: 'tokA' }] };
@@ -93,9 +93,9 @@ test('claimEvent uses atomic single UPDATE with claim guards and claim token', a
     assert.equal(res.status, 'claimed');
   });
   assert.match(claimSql, /acknowledged_at IS NULL/);
-  assert.match(claimSql, /expires_at > CURRENT_TIMESTAMP/);
+  assert.match(claimSql, /expires_at\s*>\s*CURRENT_TIMESTAMP/);
   assert.match(claimSql, /attempt_count < COALESCE\(max_attempts, \$4\)/);
-  assert.match(claimSql, /claim_token = \$5/);
+  assert.match(claimSql, /claim_token\s*=\s*\$5/);
   assert.match(claimSql, /claim_token IS NOT NULL AND claim_token = \$5 AND claim_expires_at > CURRENT_TIMESTAMP/);
   assert.equal(claimParams[0], 5);
   assert.equal(claimParams[1], 9);
@@ -106,7 +106,7 @@ test('claimEvent uses atomic single UPDATE with claim guards and claim token', a
 test('simultaneous claims: different device IDs - only first wins', async () => {
   let call = 0;
   await withMockDb(async (sql) => {
-    if (/claim_expires_at = CURRENT_TIMESTAMP \+ INTERVAL '90 seconds'/i.test(sql)) {
+    if (/SET status = 'claimed'/i.test(sql)) {
       call += 1;
       return call === 1 ? { rows: [{ id: 6, status: 'claimed', claimed_by_device: 'devA' }] } : { rows: [] };
     }
@@ -125,7 +125,7 @@ test('simultaneous claims: same device ID different tokens - second concurrent r
   let call = 0;
   const seenTokens = [];
   await withMockDb(async (sql, params) => {
-    if (/claim_expires_at = CURRENT_TIMESTAMP \+ INTERVAL '90 seconds'/i.test(sql)) {
+    if (/SET status = 'claimed'/i.test(sql)) {
       call += 1;
       seenTokens.push(params[4]);
       // DB row lock/WHERE re-evaluation would allow first, reject second different token on active lease
@@ -146,7 +146,7 @@ test('simultaneous claims: same device ID different tokens - second concurrent r
 test('legitimate retry after expired claim can reclaim', async () => {
   let claimSql = '';
   await withMockDb(async (sql) => {
-    if (/claim_expires_at = CURRENT_TIMESTAMP \+ INTERVAL '90 seconds'/i.test(sql)) {
+    if (/SET status = 'claimed'/i.test(sql)) {
       claimSql = sql;
       return { rows: [{ id: 8, status: 'claimed', claimed_by_device: 'devB', claim_token: 'tokNew' }] };
     }
@@ -156,12 +156,12 @@ test('legitimate retry after expired claim can reclaim', async () => {
     assert.ok(res);
     assert.equal(res.status, 'claimed');
   });
-  assert.match(claimSql, /claim_expires_at IS NULL OR claim_expires_at <= CURRENT_TIMESTAMP/);
+  assert.match(claimSql, /claim_expires_at IS NULL OR claim_expires_at\s*<=\s*CURRENT_TIMESTAMP/);
 });
 
 test('second claim while valid lease is active is rejected for different attempt', async () => {
   await withMockDb(async (sql) => {
-    if (/claim_expires_at = CURRENT_TIMESTAMP \+ INTERVAL '90 seconds'/i.test(sql)) {
+    if (/SET status = 'claimed'/i.test(sql)) {
       return { rows: [] }; // active lease, different token/device does not match
     }
     return { rows: [] };
@@ -174,7 +174,7 @@ test('second claim while valid lease is active is rejected for different attempt
 test('acknowledged event cannot be claimed again', async () => {
   let claimSql = '';
   await withMockDb(async (sql) => {
-    if (/claim_expires_at = CURRENT_TIMESTAMP \+ INTERVAL '90 seconds'/i.test(sql)) {
+    if (/SET status = 'claimed'/i.test(sql)) {
       claimSql = sql;
       return { rows: [] };
     }
@@ -189,7 +189,7 @@ test('acknowledged event cannot be claimed again', async () => {
 test('expired event cannot be claimed', async () => {
   let claimSql = '';
   await withMockDb(async (sql) => {
-    if (/claim_expires_at = CURRENT_TIMESTAMP \+ INTERVAL '90 seconds'/i.test(sql)) {
+    if (/SET status = 'claimed'/i.test(sql)) {
       claimSql = sql;
       return { rows: [] };
     }
@@ -198,7 +198,7 @@ test('expired event cannot be claimed', async () => {
     const res = await service.claimEvent({ userId: 1, eventId: 11, deviceId: 'devA', claimToken: 'tokA' });
     assert.equal(res, null);
   });
-  assert.match(claimSql, /expires_at > CURRENT_TIMESTAMP/);
+  assert.match(claimSql, /expires_at\s*>\s*CURRENT_TIMESTAMP/);
 });
 
 test('bounded retry: exhausted attempts mark failed and no next retry', async () => {
@@ -208,7 +208,7 @@ test('bounded retry: exhausted attempts mark failed and no next retry', async ()
     }
     return { rows: [] };
   }, async () => {
-    const res = await service.recordPlaybackResult({ userId: 7, eventId: 12, deviceId: 'dev1', outcome: 'failed', reason: 'speech_error' });
+    const res = await service.recordPlaybackResult({ userId: 7, eventId: 12, deviceId: 'dev1', outcome: 'failed', reason: 'speech_error' , claimToken: 'test-claim-token' });
     assert.equal(res.acknowledged, false);
     assert.equal(res.event.status, 'failed');
     assert.equal(res.event.next_eligible_at, null);

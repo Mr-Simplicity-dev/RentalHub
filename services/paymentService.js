@@ -2875,7 +2875,7 @@ async function isTenantEligibleForProperty(tenantId, propertyId) {
 async function notifyRentPayment(paymentId, event) {
   try {
     const result = await db.query(
-      `SELECT p.id, p.user_id, p.payer_user_id, p.amount, p.property_id,
+      `SELECT p.id, p.user_id, p.payer_user_id, p.amount, p.property_id, p.payment_type, p.payment_status,
               tenant.email AS tenant_email, tenant.phone AS tenant_phone, tenant.full_name AS tenant_name,
               payer.email AS payer_email, payer.phone AS payer_phone, payer.full_name AS payer_name,
               prop.title AS property_title
@@ -2887,7 +2887,8 @@ async function notifyRentPayment(paymentId, event) {
       [paymentId]
     );
     const row = result.rows[0];
-    if (!row) return;
+    if (!row || row.payment_type !== 'rent_payment' || !['initiated','completed'].includes(event)) return;
+    if (event === 'completed' && row.payment_status !== 'completed') return;
 
     const amount = `NGN ${Number(row.amount || 0).toLocaleString('en-NG')}`;
     const title = row.property_title || 'a property';

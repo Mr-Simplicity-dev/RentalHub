@@ -33,16 +33,7 @@ const ALLOWED_PREFERENCE_KEYS = Object.keys(DEFAULT_NOTIFICATION_PREFERENCES);
 const BOOLEAN_PREFERENCE_KEYS = ALLOWED_PREFERENCE_KEYS.filter((key) => typeof DEFAULT_NOTIFICATION_PREFERENCES[key] === 'boolean');
 const SPOKEN_LANGUAGE_OPTIONS = new Set(['en', 'ha', 'ig', 'yo']);
 
-const ensureNotificationPreferenceSchema = async () => {
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS user_notification_preferences (
-      user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-      preferences JSONB NOT NULL DEFAULT '{}'::jsonb,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-};
+const ensureNotificationPreferenceSchema = () => db.query('SELECT user_id, preferences FROM user_notification_preferences WHERE FALSE');
 
 const normalizePreferences = (value = {}) =>
   ALLOWED_PREFERENCE_KEYS.reduce((acc, key) => {
@@ -391,8 +382,8 @@ router.post(
   '/spoken/:eventId/claim',
   [
     param('eventId').isInt({ min: 1 }),
-    body('deviceId').optional().isString().isLength({ min: 1, max: 120 }),
-    body('claimToken').optional().isString().isLength({ min: 8, max: 120 }),
+    body('deviceId').isString().isLength({ min: 1, max: 120 }),
+    body('claimToken').isString().isLength({ min: 8, max: 120 }),
   ],
   validateRequest,
   authenticate,
@@ -427,7 +418,8 @@ router.post(
   '/spoken/:eventId/ack',
   [
     param('eventId').isInt({ min: 1 }),
-    body('deviceId').optional().isString().isLength({ min: 1, max: 120 }),
+    body('deviceId').isString().isLength({ min: 1, max: 120 }),
+    body('claimToken').isString().isLength({ min: 8, max: 120 }),
     body('outcome').optional().isIn(['success', 'failed', 'interrupted', 'unavailable', 'unsupported']),
     body('played').optional().isBoolean(),
     body('reason').optional().isString().isLength({ min: 1, max: 64 }),
@@ -442,6 +434,7 @@ router.post(
         userId: req.user.id,
         eventId: Number(req.params.eventId),
         deviceId: req.body?.deviceId,
+        claimToken: req.body?.claimToken,
         outcome,
         reason: req.body?.reason,
       });

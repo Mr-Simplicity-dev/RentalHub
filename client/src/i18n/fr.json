@@ -194,7 +194,8 @@
     "review_submission": "Examiner la soumission",
     "view_ticket": "Voir le ticket",
     "view_refund": "Voir le remboursement",
-    "go_to_dashboard": "Aller au tableau de bord"
+    "go_to_dashboard": "Aller au tableau de bord",
+    "spoken_unavailable": "A voice for the selected language is not available on this device. You can still read your notifications."
   },
   "applications": {
     "load_failed": "Échec du chargement des demandes",

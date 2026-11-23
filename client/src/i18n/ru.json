@@ -194,7 +194,8 @@
     "view_refund": "Просмотреть возврат",
     "go_to_dashboard": "Перейти в панель управления",
     "verification": "Проверка",
-    "toggle_mobile_menu": "Переключить мобильное меню"
+    "toggle_mobile_menu": "Переключить мобильное меню",
+    "spoken_unavailable": "A voice for the selected language is not available on this device. You can still read your notifications."
   },
   "applications": {
     "load_failed": "Не удалось загрузить заявки",
