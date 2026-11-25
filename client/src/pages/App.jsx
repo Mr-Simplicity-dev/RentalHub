@@ -382,6 +382,7 @@ const LandlordRoute = ({ children }) => {
   if (user?.user_type !== 'landlord') {
     if (user?.user_type === 'tenant') return <Navigate to="/tenant/dashboard" />;
     if (user?.user_type === 'agent') return <Navigate to="/agent/dashboard" />;
+    if (String(user?.user_type || '').trim().toLowerCase() === 'marketing_agent') return <Navigate to="/marketing-agent/dashboard" replace />;
     if (user?.user_type === 'lawyer') return <Navigate to="/lawyer" />;
     if (user?.user_type === 'state_lawyer') return <Navigate to="/lawyer/state" />;
     if (user?.user_type === 'zonal_lawyer') return <Navigate to="/lawyer/zonal" />;
@@ -428,7 +429,7 @@ const MarketingAgentRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (user?.user_type !== 'marketing_agent') return <Navigate to="/dashboard" />;
+  if (String(user?.user_type || '').trim().toLowerCase() !== 'marketing_agent') return <Navigate to="/dashboard" />;
 
   return children;
 };

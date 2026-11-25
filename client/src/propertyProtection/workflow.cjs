@@ -250,6 +250,7 @@ function dashboardPathFor(user) {
  const role=user?.user_type;
  if(role==='super_admin')return '/super-admin';
  if(role==='agent')return '/agent/dashboard';
+ if(role==='marketing_agent')return '/marketing-agent/dashboard';
  if(role==='tenant')return '/tenant/dashboard';
  if(['lawyer','state_lawyer','zonal_lawyer','super_lawyer'].includes(role))return {lawyer:'/lawyer',state_lawyer:'/lawyer/state',zonal_lawyer:'/lawyer/zonal',super_lawyer:'/lawyer/super'}[role];
  if(['super_support_admin','state_support_admin','lga_support_admin'].includes(role))return '/admin/'+{super_support_admin:'super-support-dashboard',state_support_admin:'state-support-dashboard',lga_support_admin:'lga-support-dashboard'}[role];

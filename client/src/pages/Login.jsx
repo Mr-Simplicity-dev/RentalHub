@@ -70,10 +70,10 @@ const Login = () => {
   const [searchParams] = useSearchParams();
 
   const redirectUserAfterLogin = (user) => {
-    const role = user?.user_type;
+    const role = String(user?.user_type || '').trim().toLowerCase();
     const isRecruitmentAdmin = role === 'recruitment_admin' || user?.is_recruitment_admin === true;
     const redirectParam = searchParams.get('redirect');
-    const allowedPaths = ['/dashboard', '/tenant/dashboard', '/super-admin', '/profile', '/applications', '/messages', '/saved-properties', '/payment-history', '/my-properties', '/verification-status', '/subscribe', '/my-disputes', '/my-damage-reports', '/subscribed-properties'];
+    const allowedPaths = ['/dashboard', '/tenant/dashboard', '/agent/dashboard', '/marketing-agent/dashboard', '/super-admin', '/profile', '/applications', '/messages', '/saved-properties', '/payment-history', '/my-properties', '/verification-status', '/subscribe', '/my-disputes', '/my-damage-reports', '/subscribed-properties'];
     const safeRedirect = redirectParam && redirectParam.startsWith('/') && !redirectParam.includes('//') && allowedPaths.some(p => redirectParam === p || redirectParam.startsWith(p + '/')) ? redirectParam : '';
 
     if (safeRedirect) {
@@ -99,7 +99,7 @@ const Login = () => {
       navigate('/admin/zonal-financial-dashboard');
     } else if (role === 'state_admin' || role === 'state_financial_admin') {
       navigate('/admin');
-    } else if (role === 'admin' || role === 'lga_admin') {
+    } else if (role === 'admin' || role === 'lga_admin' || role === 'zonal_admin') {
       navigate('/admin');
     } else if (role === 'super_fumigation_admin') {
       navigate('/admin/fumigation-cleaning/super');
@@ -123,6 +123,8 @@ const Login = () => {
       navigate('/lawyer');
     } else if (role === 'agent') {
       navigate('/agent/dashboard');
+    } else if (role === 'marketing_agent') {
+      navigate('/marketing-agent/dashboard');
     } else if (role === 'landlord') {
       navigate('/dashboard');
     } else {
@@ -170,7 +172,7 @@ const Login = () => {
           localStorage.removeItem(REMEMBERED_EMAIL_KEY);
         }
 
-        const user = response.data?.user || {};
+        const user = response?.data?.user || response?.user || {};
         redirectUserAfterLogin(user);
       } else {
         toast.error(response.message || t('login.failed'));
