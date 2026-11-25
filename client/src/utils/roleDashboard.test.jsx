@@ -82,4 +82,20 @@ describe('roleDashboard routing contract across every platform role', () => {
     expect(appSource).toContain('path="/super-admin/transportation"');
     expect(appSource).not.toContain('<Route path="transportation" element={<TransportationSuperAdminDashboard />} />');
   });
+
+  test('AdminLayout provides matching sidebar navigation links for every fixed zonal, super transportation, and recruitment role', () => {
+    const layoutSource = fs.readFileSync(
+      path.resolve(__dirname, '../pages/admin/AdminLayout.jsx'),
+      'utf8'
+    );
+    expect(layoutSource).toContain('isZonalAdmin');
+    expect(layoutSource).toContain('isZonalFinancialAdmin');
+    expect(layoutSource).toContain('isZonalSupportAdmin');
+    expect(layoutSource).toContain('?tab=state-admins');
+    expect(layoutSource).toContain('?tab=incidents');
+    expect(layoutSource).toContain('#zonal-finance-zone-overview');
+    expect(layoutSource).toContain('/admin/recruitment?tab=interviews');
+    expect(layoutSource).toContain('/admin/fumigation-cleaning/zonal');
+    expect(layoutSource).toContain('/admin/transportation/zonal');
+  });
 });

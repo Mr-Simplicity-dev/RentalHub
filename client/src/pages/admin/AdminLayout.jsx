@@ -510,6 +510,14 @@ const AdminLayoutContent = () => {
         : roleTheme.hoverNav
     }`;
 
+  const recruitmentTab = new URLSearchParams(location.search).get('tab') || 'overview';
+  const recruitmentNavItem = (tab) =>
+    `flex items-center px-4 py-3 rounded-lg transition-colors ${
+      location.pathname === '/admin/recruitment' && recruitmentTab === tab
+        ? roleTheme.activeNav
+        : roleTheme.hoverNav
+    }`;
+
   const fumigationTab = new URLSearchParams(location.search).get('tab') || 'overview';
   const fumigationNavItem = (tab) =>
     `flex items-center px-4 py-3 rounded-lg transition-colors ${
@@ -870,9 +878,29 @@ const AdminLayoutContent = () => {
               </p>
 
               <div className="space-y-2">
-                <NavLink to="/admin/recruitment" className={navItem}>
+                <NavLink to="/admin/recruitment?tab=overview" className={() => recruitmentNavItem('overview')}>
+                  <FaTachometerAlt className="mr-3" />
+                  Overview
+                </NavLink>
+                <NavLink to="/admin/recruitment?tab=cycles" className={() => recruitmentNavItem('cycles')}>
+                  <FaClipboardList className="mr-3" />
+                  Cycles
+                </NavLink>
+                <NavLink to="/admin/recruitment?tab=roles" className={() => recruitmentNavItem('roles')}>
                   <FaUserShield className="mr-3" />
-                  Recruitment Dashboard
+                  Roles
+                </NavLink>
+                <NavLink to="/admin/recruitment?tab=locations" className={() => recruitmentNavItem('locations')}>
+                  <FaMapMarkerAlt className="mr-3" />
+                  Locations
+                </NavLink>
+                <NavLink to="/admin/recruitment?tab=applicants" className={() => recruitmentNavItem('applicants')}>
+                  <FaUsers className="mr-3" />
+                  Applicants
+                </NavLink>
+                <NavLink to="/admin/recruitment?tab=interviews" className={() => recruitmentNavItem('interviews')}>
+                  <FaCheckCircle className="mr-3" />
+                  Interviews
                 </NavLink>
               </div>
             </div>
@@ -975,9 +1003,21 @@ const AdminLayoutContent = () => {
                 Zonal Finance
               </p>
               <div className="space-y-2">
-                <NavLink to="/admin/zonal-financial-dashboard" className={navItem}>
+                <NavLink to="/admin/zonal-financial-dashboard#zonal-finance-personal" className={navItem}>
                   <FaWallet className="mr-3" />
-                  Zonal Finance Dashboard
+                  Earnings Overview
+                </NavLink>
+                <NavLink to="/admin/zonal-financial-dashboard#zonal-finance-zone-overview" className={navItem}>
+                  <FaChartLine className="mr-3" />
+                  Zone Finance Overview
+                </NavLink>
+                <NavLink to="/admin/zonal-financial-dashboard#zonal-finance-withdrawals" className={navItem}>
+                  <FaMoneyBill className="mr-3" />
+                  Withdrawal History
+                </NavLink>
+                <NavLink to="/admin/zonal-financial-dashboard#zonal-finance-calculator-fees" className={navItem}>
+                  <FaCalculator className="mr-3" />
+                  Rent Calculator Fees
                 </NavLink>
               </div>
             </div>
@@ -1135,34 +1175,98 @@ const AdminLayoutContent = () => {
           {isTransportationAdmin && (
             <div>
               <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
-                Transportation Admin
+                {role === 'super_transportation_admin'
+                  ? 'Super Transportation'
+                  : role === 'zonal_transportation_admin'
+                  ? 'Zonal Transportation'
+                  : 'Transportation Admin'}
               </p>
-              <div className="space-y-2">
-                <NavLink to={`${transportationBasePath}?tab=overview`} className={() => transportationNavItem('overview')}>
-                  <FaTachometerAlt className="mr-3" />
-                  Overview
-                </NavLink>
-                <NavLink to={`${transportationBasePath}?tab=bookings`} className={() => transportationNavItem('bookings')}>
-                  <FaClipboardList className="mr-3" />
-                  Bookings
-                </NavLink>
-                <NavLink to={`${transportationBasePath}?tab=services`} className={() => transportationNavItem('services')}>
-                  <FaTruck className="mr-3" />
-                  Services
-                </NavLink>
-                <NavLink to={`${transportationBasePath}?tab=alerts`} className={() => transportationNavItem('alerts')}>
-                  <FaExclamationTriangle className="mr-3" />
-                  Alerts
-                </NavLink>
-                <NavLink to={`${transportationBasePath}?tab=support-escalations`} className={() => transportationNavItem('support-escalations')}>
-                  <FaArrowUp className="mr-3" />
-                  Support Escalations
-                </NavLink>
-                <NavLink to={`${transportationBasePath}?tab=analytics`} className={() => transportationNavItem('analytics')}>
-                  <FaChartLine className="mr-3" />
-                  Analytics
-                </NavLink>
-              </div>
+              {role === 'super_transportation_admin' ? (
+                <div className="space-y-2">
+                  <NavLink to={`${transportationBasePath}?tab=overview`} className={() => transportationNavItem('overview')}>
+                    <FaTachometerAlt className="mr-3" />
+                    Overview
+                  </NavLink>
+                  <NavLink to={`${transportationBasePath}?tab=tracking`} className={() => transportationNavItem('tracking')}>
+                    <FaBroadcastTower className="mr-3" />
+                    National Fleet Tracking
+                  </NavLink>
+                  <NavLink to={`${transportationBasePath}?tab=state-admins`} className={() => transportationNavItem('state-admins')}>
+                    <FaUsers className="mr-3" />
+                    State Admins
+                  </NavLink>
+                  <NavLink to={`${transportationBasePath}?tab=alerts`} className={() => transportationNavItem('alerts')}>
+                    <FaExclamationTriangle className="mr-3" />
+                    Alerts
+                  </NavLink>
+                  <NavLink to={`${transportationBasePath}?tab=support-escalations`} className={() => transportationNavItem('support-escalations')}>
+                    <FaArrowUp className="mr-3" />
+                    Escalations
+                  </NavLink>
+                  <NavLink to={`${transportationBasePath}?tab=health`} className={() => transportationNavItem('health')}>
+                    <FaShieldAlt className="mr-3" />
+                    System Health
+                  </NavLink>
+                  <NavLink to={`${transportationBasePath}?tab=metrics`} className={() => transportationNavItem('metrics')}>
+                    <FaChartLine className="mr-3" />
+                    Metrics
+                  </NavLink>
+                </div>
+              ) : role === 'zonal_transportation_admin' ? (
+                <div className="space-y-2">
+                  <NavLink to={`${transportationBasePath}?tab=overview`} className={() => transportationNavItem('overview')}>
+                    <FaTachometerAlt className="mr-3" />
+                    Zonal Overview
+                  </NavLink>
+                  <NavLink to={`${transportationBasePath}?tab=tracking`} className={() => transportationNavItem('tracking')}>
+                    <FaBroadcastTower className="mr-3" />
+                    Live Zonal Fleet Radar
+                  </NavLink>
+                  <NavLink to={`${transportationBasePath}?tab=states`} className={() => transportationNavItem('states')}>
+                    <FaMapMarkerAlt className="mr-3" />
+                    Member States Activity
+                  </NavLink>
+                  <NavLink to={`${transportationBasePath}?tab=bookings`} className={() => transportationNavItem('bookings')}>
+                    <FaClipboardList className="mr-3" />
+                    Zonal Bookings
+                  </NavLink>
+                  <NavLink to={`${transportationBasePath}?tab=incidents`} className={() => transportationNavItem('incidents')}>
+                    <FaExclamationTriangle className="mr-3" />
+                    Zonal Incidents
+                  </NavLink>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <NavLink to={`${transportationBasePath}?tab=overview`} className={() => transportationNavItem('overview')}>
+                    <FaTachometerAlt className="mr-3" />
+                    Overview
+                  </NavLink>
+                  <NavLink to={`${transportationBasePath}?tab=tracking`} className={() => transportationNavItem('tracking')}>
+                    <FaBroadcastTower className="mr-3" />
+                    Live Fleet Tracking
+                  </NavLink>
+                  <NavLink to={`${transportationBasePath}?tab=bookings`} className={() => transportationNavItem('bookings')}>
+                    <FaClipboardList className="mr-3" />
+                    Bookings
+                  </NavLink>
+                  <NavLink to={`${transportationBasePath}?tab=services`} className={() => transportationNavItem('services')}>
+                    <FaTruck className="mr-3" />
+                    Services
+                  </NavLink>
+                  <NavLink to={`${transportationBasePath}?tab=alerts`} className={() => transportationNavItem('alerts')}>
+                    <FaExclamationTriangle className="mr-3" />
+                    Alerts
+                  </NavLink>
+                  <NavLink to={`${transportationBasePath}?tab=support-escalations`} className={() => transportationNavItem('support-escalations')}>
+                    <FaArrowUp className="mr-3" />
+                    Support Escalations
+                  </NavLink>
+                  <NavLink to={`${transportationBasePath}?tab=analytics`} className={() => transportationNavItem('analytics')}>
+                    <FaChartLine className="mr-3" />
+                    Analytics
+                  </NavLink>
+                </div>
+              )}
             </div>
           )}
 
