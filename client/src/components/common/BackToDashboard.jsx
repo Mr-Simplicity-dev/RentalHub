@@ -3,41 +3,12 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { FaArrowLeft } from 'react-icons/fa';
 import { useAuth } from '../../hooks/useAuth';
-
-const dashboardPathByRole = {
-  tenant: '/tenant/dashboard',
-  landlord: '/dashboard',
-  agent: '/agent/dashboard',
-  marketing_agent: '/marketing-agent/dashboard',
-  super_admin: '/super-admin',
-  lga_admin: '/admin',
-  state_admin: '/admin',
-  state_financial_admin: '/admin',
-  lga_financial_admin: '/admin/financial-dashboard',
-  financial_admin: '/admin/financial-dashboard',
-  super_financial_admin: '/admin/super-financial-dashboard',
-  zonal_financial_admin: '/admin/zonal-financial-dashboard',
-  lga_support_admin: '/admin/lga-support-dashboard',
-  state_support_admin: '/admin/state-support-dashboard',
-  super_support_admin: '/admin/super-support-dashboard',
-  fumigation_admin: '/admin/fumigation-cleaning',
-  lga_fumigation_admin: '/admin/fumigation-cleaning',
-  state_fumigation_admin: '/admin/fumigation-cleaning/state',
-  super_fumigation_admin: '/admin/fumigation-cleaning/super',
-  transportation_admin: '/admin/transportation',
-  lga_transportation_admin: '/admin/transportation',
-  state_transportation_admin: '/admin/transportation/state',
-  super_transportation_admin: '/super-admin/transportation',
-  lawyer: '/lawyer',
-  state_lawyer: '/lawyer/state',
-  zonal_lawyer: '/lawyer/zonal',
-  super_lawyer: '/lawyer/super',
-};
+import { getDashboardPathForUser } from '../../utils/roleDashboard';
 
 const BackToDashboard = ({ className = '', label, to }) => {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const dashboardPath = to || dashboardPathByRole[user?.user_type] || '/dashboard';
+  const dashboardPath = to || getDashboardPathForUser(user, '/dashboard');
   const resolvedLabel = label || t('back_to_dashboard.label', 'Back to Dashboard');
 
   return (

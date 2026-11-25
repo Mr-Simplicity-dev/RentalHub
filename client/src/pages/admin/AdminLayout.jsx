@@ -93,16 +93,19 @@ const AdminLayoutContent = () => {
   const isSuperSupportAdmin = role === 'super_support_admin';
   const isStateAdmin = role === 'state_admin';
   const isCoreAdmin = ['admin', 'lga_admin'].includes(role);
+  const isZonalAdmin = role === 'zonal_admin';
   const isSuperAdmin = role === 'super_admin';
   const isFinancialAdmin = role === 'financial_admin';
   const isLgaFinancialAdmin = role === 'lga_financial_admin';
+  const isZonalFinancialAdmin = role === 'zonal_financial_admin';
   const isSuperFinancialAdmin = role === 'super_financial_admin';
   const isStateFinancialAdmin = role === 'state_financial_admin';
   const isLgaSupportAdmin = role === 'lga_support_admin';
   const isStateSupportAdmin = role === 'state_support_admin';
+  const isZonalSupportAdmin = role === 'zonal_support_admin';
   const isRecruitmentAdmin = role === 'recruitment_admin' || user?.is_recruitment_admin === true;
-  const isFumigationAdmin = ['fumigation_admin', 'lga_fumigation_admin', 'state_fumigation_admin', 'super_fumigation_admin'].includes(role);
-  const isTransportationAdmin = ['transportation_admin', 'lga_transportation_admin', 'state_transportation_admin', 'super_transportation_admin'].includes(role);
+  const isFumigationAdmin = ['fumigation_admin', 'lga_fumigation_admin', 'state_fumigation_admin', 'zonal_fumigation_admin', 'super_fumigation_admin'].includes(role);
+  const isTransportationAdmin = ['transportation_admin', 'lga_transportation_admin', 'state_transportation_admin', 'zonal_transportation_admin', 'super_transportation_admin'].includes(role);
   const isStateScopedAdmin = [
     'state_admin',
     'state_financial_admin',
@@ -117,15 +120,27 @@ const AdminLayoutContent = () => {
     'lga_transportation_admin',
     'lga_fumigation_admin',
   ].includes(role);
+  const isZonalScopedAdmin = [
+    'zonal_admin',
+    'zonal_financial_admin',
+    'zonal_support_admin',
+    'zonal_transportation_admin',
+    'zonal_fumigation_admin',
+  ].includes(role);
   const assignedStateLabel = user?.assigned_state || 'Not Assigned';
   const assignedLgaLabel = user?.assigned_city || '';
-    const fumigationBasePath = role === 'super_fumigation_admin'
+  const assignedZoneLabel = user?.assigned_zone || 'Not Assigned';
+  const fumigationBasePath = role === 'super_fumigation_admin'
     ? '/admin/fumigation-cleaning/super'
+    : role === 'zonal_fumigation_admin'
+    ? '/admin/fumigation-cleaning/zonal'
     : role === 'state_fumigation_admin'
     ? '/admin/fumigation-cleaning/state'
     : '/admin/fumigation-cleaning';
   const transportationBasePath = role === 'super_transportation_admin'
     ? '/super-admin/transportation'
+    : role === 'zonal_transportation_admin'
+    ? '/admin/transportation/zonal'
     : role === 'state_transportation_admin'
     ? '/admin/transportation/state'
     : '/admin/transportation';
@@ -341,21 +356,29 @@ const AdminLayoutContent = () => {
         mainBg: 'bg-gradient-to-br from-state-50 via-white to-state-100/40',
         panelTitle: 'State Admin Console',
       }
-    : isLgaSupportAdmin || isStateSupportAdmin
+    : isLgaSupportAdmin || isStateSupportAdmin || isZonalSupportAdmin
     ? {
         sidebarBg: 'from-amber-700 to-amber-600',
         activeNav: 'bg-amber-600 text-white',
         hoverNav: 'text-gray-700 hover:bg-amber-50',
         mainBg: 'bg-gradient-to-br from-amber-50 via-white to-amber-100/40',
-        panelTitle: isLgaSupportAdmin ? 'LGA Support Console' : 'State Support Console',
+        panelTitle: isLgaSupportAdmin
+          ? 'LGA Support Console'
+          : isZonalSupportAdmin
+          ? 'Zonal Support Console'
+          : 'State Support Console',
       }
-    : isFinancialAdmin || isLgaFinancialAdmin
+    : isFinancialAdmin || isLgaFinancialAdmin || isZonalFinancialAdmin
     ? {
         sidebarBg: 'from-emerald-700 to-emerald-600',
         activeNav: 'bg-emerald-600 text-white',
         hoverNav: 'text-gray-700 hover:bg-emerald-50',
         mainBg: 'bg-gradient-to-br from-emerald-50 via-white to-emerald-100/40',
-        panelTitle: isLgaFinancialAdmin ? 'LGA Finance Console' : 'Financial Admin Console',
+        panelTitle: isLgaFinancialAdmin
+          ? 'LGA Finance Console'
+          : isZonalFinancialAdmin
+          ? 'Zonal Finance Console'
+          : 'Financial Admin Console',
       }
     : isFumigationAdmin
     ? {
@@ -367,6 +390,8 @@ const AdminLayoutContent = () => {
           ? 'LGA Fumigation Console'
           : role === 'state_fumigation_admin'
           ? 'State Fumigation Console'
+          : role === 'zonal_fumigation_admin'
+          ? 'Zonal Fumigation Console'
           : role === 'super_fumigation_admin'
           ? 'Super Fumigation Console'
           : 'Fumigation Admin',
@@ -381,6 +406,8 @@ const AdminLayoutContent = () => {
           ? 'LGA Transportation Console'
           : role === 'state_transportation_admin'
           ? 'State Transportation Console'
+          : role === 'zonal_transportation_admin'
+          ? 'Zonal Transportation Console'
           : role === 'super_transportation_admin'
           ? 'Super Transportation Console'
           : 'Transportation Admin',
@@ -398,7 +425,7 @@ const AdminLayoutContent = () => {
         activeNav: 'bg-admin-600 text-white',
         hoverNav: 'text-gray-700 hover:bg-admin-50',
         mainBg: 'bg-gradient-to-br from-admin-50 via-white to-admin-100/40',
-        panelTitle: isCoreAdmin ? 'LGA Admin Console' : 'Admin Portal',
+        panelTitle: isZonalAdmin ? 'Zonal Admin Console' : isCoreAdmin ? 'LGA Admin Console' : 'Admin Portal',
       };
 
   const handleLogout = () => {
@@ -420,6 +447,8 @@ const AdminLayoutContent = () => {
     location.pathname === '/super-admin' && superAdminTab === 'overview';
   const supportDashboardPath = isSuperSupportAdmin
     ? '/admin/super-support-dashboard'
+    : isZonalSupportAdmin
+    ? '/admin/zonal-support-dashboard'
     : isStateSupportAdmin
     ? '/admin/state-support-dashboard'
     : '/admin/lga-support-dashboard';
@@ -516,6 +545,11 @@ const AdminLayoutContent = () => {
               {isStateScopedAdmin && (
                 <div className="mt-2 inline-flex max-w-full items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
                   <span className="truncate">Scope: {assignedStateLabel}{assignedLgaLabel ? `, ${assignedLgaLabel}` : ''}</span>
+                </div>
+              )}
+              {isZonalScopedAdmin && (
+                <div className="mt-2 inline-flex max-w-full items-center rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                  <span className="truncate">Zone: {assignedZoneLabel}</span>
                 </div>
               )}
             </div>
@@ -890,6 +924,91 @@ const AdminLayoutContent = () => {
                 <NavLink to="/admin/transportation/state" className={navItem}>
                   <FaTruck className="mr-3" />
                   Transportation Monitor
+                </NavLink>
+              </div>
+            </div>
+          )}
+
+          {/* ZONAL ADMIN */}
+          {isZonalAdmin && (
+            <div>
+              <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
+                Zonal Operations
+              </p>
+              <div className="space-y-2">
+                <NavLink to="/admin" end className={navItem}>
+                  <FaTachometerAlt className="mr-3" />
+                  Dashboard
+                </NavLink>
+                <NavLink to="/admin/users" className={navItem}>
+                  <FaUsers className="mr-3" />
+                  Users
+                </NavLink>
+                <NavLink to="/admin/properties" className={navItem}>
+                  <FaHome className="mr-3" />
+                  Properties
+                </NavLink>
+                <NavLink to="/admin/applications" className={navItem}>
+                  <FaFileAlt className="mr-3" />
+                  Applications
+                </NavLink>
+                <NavLink to="/admin/verifications" className={navItem}>
+                  <FaCheckCircle className="mr-3" />
+                  Verifications
+                </NavLink>
+                <NavLink to="/admin/zonal-support-dashboard" className={navItem}>
+                  <FaLifeRing className="mr-3" />
+                  Zonal Support
+                </NavLink>
+                <NavLink to="/admin/transportation/zonal" className={navItem}>
+                  <FaTruck className="mr-3" />
+                  Zonal Transportation
+                </NavLink>
+              </div>
+            </div>
+          )}
+
+          {/* ZONAL FINANCIAL ADMIN */}
+          {isZonalFinancialAdmin && (
+            <div>
+              <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
+                Zonal Finance
+              </p>
+              <div className="space-y-2">
+                <NavLink to="/admin/zonal-financial-dashboard" className={navItem}>
+                  <FaWallet className="mr-3" />
+                  Zonal Finance Dashboard
+                </NavLink>
+              </div>
+            </div>
+          )}
+
+          {/* ZONAL SUPPORT ADMIN */}
+          {isZonalSupportAdmin && (
+            <div>
+              <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
+                Zonal Support
+              </p>
+              <div className="space-y-2">
+                <NavLink to="/admin/zonal-support-dashboard?tab=overview" className={() => supportNavItem('overview')}>
+                  <FaTachometerAlt className="mr-3" />
+                  Overview
+                </NavLink>
+                <NavLink to="/admin/zonal-support-dashboard?tab=tickets" className={() => supportNavItem('tickets')}>
+                  <FaLifeRing className="mr-3" />
+                  Support Tickets
+                </NavLink>
+                <NavLink to="/admin/zonal-support-dashboard?tab=escalations" className={() => supportNavItem('escalations')}>
+                  <FaArrowUp className="mr-3" />
+                  Escalations
+                </NavLink>
+                <NavLink to="/admin/zonal-support-dashboard?tab=voice" className={() => supportNavItem('voice')}>
+                  <FaPhone className="mr-3" />
+                  Voice Desk
+                </NavLink>
+                <NavLink to="/admin/zonal-support-dashboard?tab=lawyers" className={() => supportNavItem('lawyers')}>
+                  <FaUsers className="mr-3" />
+                  Lawyer Directory
                 </NavLink>
               </div>
             </div>
@@ -1401,7 +1520,7 @@ const AdminLayoutContent = () => {
           <div className="min-w-0">
             <p className="text-sm font-semibold text-gray-900">{roleTheme.panelTitle}</p>
             <p className="mt-0.5 truncate text-xs text-gray-500">
-              {assignedLgaLabel || assignedStateLabel || 'Platform dashboard'}
+              {isZonalScopedAdmin ? assignedZoneLabel : (assignedLgaLabel || (user?.assigned_state ? assignedStateLabel : 'Platform dashboard'))}
             </p>
           </div>
 
@@ -1671,6 +1790,11 @@ const AdminLayoutContent = () => {
           {isStateScopedAdmin && (
             <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-center text-sm text-blue-800">
               You are viewing scoped admin data for <span className="font-semibold">{assignedStateLabel}{assignedLgaLabel ? `, ${assignedLgaLabel}` : ''}</span>.
+            </div>
+          )}
+          {isZonalScopedAdmin && (
+            <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-center text-sm text-indigo-800">
+              You are viewing scoped zonal admin data for <span className="font-semibold">{assignedZoneLabel}</span>.
             </div>
           )}
           <Outlet />

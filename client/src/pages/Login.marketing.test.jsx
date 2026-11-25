@@ -44,7 +44,7 @@ vi.mock('react-toastify', () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
-describe('Login marketing_agent post-login redirect', () => {
+describe('Login post-login dashboard redirects', () => {
   let root;
   let container;
 
@@ -62,12 +62,22 @@ describe('Login marketing_agent post-login redirect', () => {
     container.remove();
   });
 
-  test('redirects marketing_agent straight to /marketing-agent/dashboard after login', async () => {
+  test.each([
+    ['marketing_agent', '/marketing-agent/dashboard'],
+    [' Marketing_Agent ', '/marketing-agent/dashboard'],
+    ['super_transportation_admin', '/super-admin/transportation'],
+    ['zonal_transportation_admin', '/admin/transportation/zonal'],
+    ['zonal_fumigation_admin', '/admin/fumigation-cleaning/zonal'],
+    ['zonal_financial_admin', '/admin/zonal-financial-dashboard'],
+    ['zonal_support_admin', '/admin/zonal-support-dashboard'],
+    ['zonal_admin', '/admin'],
+    ['recruitment_admin', '/admin/recruitment'],
+  ])('redirects %s straight to %s after login', async (role, expectedPath) => {
     state.login.mockResolvedValue({
       success: true,
       data: {
         token: 'test-token',
-        user: { id: 42, email: 'agent@rentalhub.ng', user_type: 'marketing_agent' },
+        user: { id: 42, email: 'staff@rentalhub.ng', user_type: role },
       },
     });
 
@@ -84,7 +94,7 @@ describe('Login marketing_agent post-login redirect', () => {
     const form = container.querySelector('form');
 
     await act(async () => {
-      fireEvent.change(emailInput, { target: { value: 'agent@rentalhub.ng' } });
+      fireEvent.change(emailInput, { target: { value: 'staff@rentalhub.ng' } });
       fireEvent.change(passwordInput, { target: { value: 'StrongPass123!' } });
     });
 
@@ -93,40 +103,7 @@ describe('Login marketing_agent post-login redirect', () => {
     });
 
     expect(state.login).toHaveBeenCalledTimes(1);
-    expect(state.navigate).toHaveBeenCalledWith('/marketing-agent/dashboard');
-  });
-
-  test('normalizes mixed-case or padded marketing_agent role and workflow dashboardPathFor', async () => {
-    state.login.mockResolvedValue({
-      success: true,
-      data: {
-        token: 'test-token',
-        user: { id: 43, email: 'agent2@rentalhub.ng', user_type: ' Marketing_Agent ' },
-      },
-    });
-
-    await act(async () => {
-      root.render(
-        <MemoryRouter initialEntries={['/login']}>
-          <Login />
-        </MemoryRouter>
-      );
-    });
-
-    const emailInput = container.querySelector('input[type="text"], input[type="email"]');
-    const passwordInput = container.querySelector('input[type="password"]');
-    const form = container.querySelector('form');
-
-    await act(async () => {
-      fireEvent.change(emailInput, { target: { value: 'agent2@rentalhub.ng' } });
-      fireEvent.change(passwordInput, { target: { value: 'StrongPass123!' } });
-    });
-
-    await act(async () => {
-      fireEvent.submit(form);
-    });
-
-    expect(state.navigate).toHaveBeenCalledWith('/marketing-agent/dashboard');
-    expect(workflow.dashboardPathFor({ user_type: 'marketing_agent' })).toBe('/marketing-agent/dashboard');
+    expect(state.navigate).toHaveBeenCalledWith(expectedPath);
+    expect(workflow.dashboardPathFor({ user_type: role })).toBe(expectedPath);
   });
 });

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { ALLOWED_POST_LOGIN_REDIRECT_PATHS, getDashboardPathForUser } from '../utils/roleDashboard';
 import FloatingContactWidget from '../components/common/FloatingContactWidget';
 import WhatsAppBotWidget from '../components/common/WhatsAppBotWidget';
 import TurnstileWidget from '../components/common/TurnstileWidget';
@@ -70,66 +71,26 @@ const Login = () => {
   const [searchParams] = useSearchParams();
 
   const redirectUserAfterLogin = (user) => {
-    const role = String(user?.user_type || '').trim().toLowerCase();
-    const isRecruitmentAdmin = role === 'recruitment_admin' || user?.is_recruitment_admin === true;
     const redirectParam = searchParams.get('redirect');
-    const allowedPaths = ['/dashboard', '/tenant/dashboard', '/agent/dashboard', '/marketing-agent/dashboard', '/super-admin', '/profile', '/applications', '/messages', '/saved-properties', '/payment-history', '/my-properties', '/verification-status', '/subscribe', '/my-disputes', '/my-damage-reports', '/subscribed-properties'];
-    const safeRedirect = redirectParam && redirectParam.startsWith('/') && !redirectParam.includes('//') && allowedPaths.some(p => redirectParam === p || redirectParam.startsWith(p + '/')) ? redirectParam : '';
+    const safeRedirect =
+      redirectParam &&
+      redirectParam.startsWith('/') &&
+      !redirectParam.includes('//') &&
+      ALLOWED_POST_LOGIN_REDIRECT_PATHS.some(
+        (p) =>
+          redirectParam === p ||
+          redirectParam.startsWith(p + '/') ||
+          redirectParam.startsWith(p + '?')
+      )
+        ? redirectParam
+        : '';
 
     if (safeRedirect) {
       navigate(safeRedirect);
       return;
     }
 
-    if (role === 'super_admin') {
-      navigate('/super-admin');
-    } else if (role === 'super_support_admin') {
-      navigate('/admin/super-support-dashboard');
-    } else if (isRecruitmentAdmin) {
-      navigate('/admin/recruitment');
-    } else if (role === 'state_support_admin') {
-      navigate('/admin/state-support-dashboard');
-    } else if (role === 'lga_support_admin') {
-      navigate('/admin/lga-support-dashboard');
-    } else if (role === 'super_financial_admin') {
-      navigate('/admin/super-financial-dashboard');
-    } else if (role === 'financial_admin' || role === 'lga_financial_admin') {
-      navigate('/admin/financial-dashboard');
-    } else if (role === 'zonal_financial_admin') {
-      navigate('/admin/zonal-financial-dashboard');
-    } else if (role === 'state_admin' || role === 'state_financial_admin') {
-      navigate('/admin');
-    } else if (role === 'admin' || role === 'lga_admin' || role === 'zonal_admin') {
-      navigate('/admin');
-    } else if (role === 'super_fumigation_admin') {
-      navigate('/admin/fumigation-cleaning/super');
-    } else if (role === 'state_fumigation_admin') {
-      navigate('/admin/fumigation-cleaning/state');
-    } else if (role === 'fumigation_admin' || role === 'lga_fumigation_admin') {
-      navigate('/admin/fumigation-cleaning');
-    } else if (role === 'super_transportation_admin') {
-      navigate('/super-admin/transportation');
-    } else if (role === 'state_transportation_admin') {
-      navigate('/admin/transportation/state');
-    } else if (role === 'transportation_admin' || role === 'lga_transportation_admin') {
-      navigate('/admin/transportation');
-    } else if (role === 'super_lawyer') {
-      navigate('/lawyer/super');
-    } else if (role === 'state_lawyer') {
-      navigate('/lawyer/state');
-    } else if (role === 'zonal_lawyer') {
-      navigate('/lawyer/zonal');
-    } else if (role === 'lawyer') {
-      navigate('/lawyer');
-    } else if (role === 'agent') {
-      navigate('/agent/dashboard');
-    } else if (role === 'marketing_agent') {
-      navigate('/marketing-agent/dashboard');
-    } else if (role === 'landlord') {
-      navigate('/dashboard');
-    } else {
-      navigate('/tenant/dashboard');
-    }
+    navigate(getDashboardPathForUser(user, '/tenant/dashboard'));
   };
 
   // Load saved email if user previously checked Remember Me

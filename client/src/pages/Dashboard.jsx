@@ -2,6 +2,7 @@ import {getReviewStatus} from '../utils/verificationStatus';
 import EmailVerificationNotice from '../components/common/EmailVerificationNotice';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { getDashboardPathForUser } from '../utils/roleDashboard';
 import { useNavigate } from 'react-router-dom';
 import FloatingContactWidget from '../components/common/FloatingContactWidget';
 import WhatsAppBotWidget from '../components/common/WhatsAppBotWidget';
@@ -467,93 +468,13 @@ const Dashboard = () => {
   useEffect(() => {
     if (!user) return;
 
-    if (user.user_type === 'super_admin') {
-      navigate('/super-admin', { replace: true });
-      return;
-    }
-
-    if (user.user_type === 'super_financial_admin') {
-      navigate('/admin/super-financial-dashboard', { replace: true });
-      return;
-    }
-
-    if (user.user_type === 'financial_admin' || user.user_type === 'lga_financial_admin') {
-      navigate('/admin/financial-dashboard', { replace: true });
-      return;
-    }
-
-    if (user.user_type === 'zonal_financial_admin') {
-      navigate('/admin/zonal-financial-dashboard', { replace: true });
-      return;
-    }
-
-    if (user.user_type === 'super_support_admin') {
-      navigate('/admin/super-support-dashboard', { replace: true });
-      return;
-    }
-
-    if (user.user_type === 'state_support_admin') {
-      navigate('/admin/state-support-dashboard', { replace: true });
-      return;
-    }
-
-    if (user.user_type === 'lga_support_admin') {
-      navigate('/admin/lga-support-dashboard', { replace: true });
-      return;
-    }
-
-    if (user.user_type === 'super_fumigation_admin') {
-      navigate('/admin/fumigation-cleaning/super', { replace: true });
-      return;
-    }
-
-    if (user.user_type === 'state_fumigation_admin') {
-      navigate('/admin/fumigation-cleaning/state', { replace: true });
-      return;
-    }
-
-    if (user.user_type === 'fumigation_admin' || user.user_type === 'lga_fumigation_admin') {
-      navigate('/admin/fumigation-cleaning', { replace: true });
-      return;
-    }
-
-    if (user.user_type === 'super_transportation_admin') {
-      navigate('/super-admin/transportation', { replace: true });
-      return;
-    }
-
-    if (user.user_type === 'state_transportation_admin') {
-      navigate('/admin/transportation/state', { replace: true });
-      return;
-    }
-
-    if (user.user_type === 'transportation_admin' || user.user_type === 'lga_transportation_admin') {
-      navigate('/admin/transportation', { replace: true });
-      return;
-    }
-
-    if (['state_admin', 'state_financial_admin', 'lga_admin'].includes(user.user_type)) {
-      navigate('/admin', { replace: true });
-      return;
-    }
-
-    if (user.user_type === 'super_lawyer') {
-      navigate('/lawyer/super', { replace: true });
-      return;
-    }
-
-    if (user.user_type === 'state_lawyer') {
-      navigate('/lawyer/state', { replace: true });
-      return;
-    }
-
-    if (user.user_type === 'zonal_lawyer') {
-      navigate('/lawyer/zonal', { replace: true });
-      return;
-    }
-
-    if (user.user_type === 'lawyer') {
-      navigate('/lawyer', { replace: true });
+    const targetDashboard = getDashboardPathForUser(user, null);
+    if (
+      targetDashboard &&
+      targetDashboard !== '/dashboard' &&
+      targetDashboard !== '/tenant/dashboard'
+    ) {
+      navigate(targetDashboard, { replace: true });
       return;
     }
 

@@ -247,12 +247,24 @@ function defaultViewFor(user) { return entryFor(user)?.view || 'owner'; }
 function resolveView(user, requested) { return viewsFor(user).includes(requested) ? requested : defaultViewFor(user); }
 function viewLabelFor(user, view) { return view === 'owner' ? 'My property records' : view === 'assigned' ? 'Assigned work' : user?.user_type === 'super_admin' ? 'National oversight' : 'Area review'; }
 function dashboardPathFor(user) {
- const role=user?.user_type;
+ const role=String(user?.user_type||'').trim().toLowerCase();
  if(role==='super_admin')return '/super-admin';
+ if(role==='recruitment_admin'||user?.is_recruitment_admin===true)return '/admin/recruitment';
  if(role==='agent')return '/agent/dashboard';
  if(role==='marketing_agent')return '/marketing-agent/dashboard';
- if(role==='tenant')return '/tenant/dashboard';
+ if(role==='tenant'||role==='user')return '/tenant/dashboard';
  if(['lawyer','state_lawyer','zonal_lawyer','super_lawyer'].includes(role))return {lawyer:'/lawyer',state_lawyer:'/lawyer/state',zonal_lawyer:'/lawyer/zonal',super_lawyer:'/lawyer/super'}[role];
- if(['super_support_admin','state_support_admin','lga_support_admin'].includes(role))return '/admin/'+{super_support_admin:'super-support-dashboard',state_support_admin:'state-support-dashboard',lga_support_admin:'lga-support-dashboard'}[role];
- return ['state_admin','admin','lga_admin','zonal_admin'].includes(role)?'/admin':'/dashboard';
+ if(['super_support_admin','zonal_support_admin','state_support_admin','lga_support_admin'].includes(role))return '/admin/'+{super_support_admin:'super-support-dashboard',zonal_support_admin:'zonal-support-dashboard',state_support_admin:'state-support-dashboard',lga_support_admin:'lga-support-dashboard'}[role];
+ if(role==='super_financial_admin')return '/admin/super-financial-dashboard';
+ if(role==='zonal_financial_admin')return '/admin/zonal-financial-dashboard';
+ if(['financial_admin','lga_financial_admin'].includes(role))return '/admin/financial-dashboard';
+ if(role==='super_fumigation_admin')return '/admin/fumigation-cleaning/super';
+ if(role==='zonal_fumigation_admin')return '/admin/fumigation-cleaning/zonal';
+ if(role==='state_fumigation_admin')return '/admin/fumigation-cleaning/state';
+ if(['fumigation_admin','lga_fumigation_admin'].includes(role))return '/admin/fumigation-cleaning';
+ if(role==='super_transportation_admin')return '/super-admin/transportation';
+ if(role==='zonal_transportation_admin')return '/admin/transportation/zonal';
+ if(role==='state_transportation_admin')return '/admin/transportation/state';
+ if(['transportation_admin','lga_transportation_admin'].includes(role))return '/admin/transportation';
+ return ['state_admin','state_financial_admin','admin','lga_admin','zonal_admin'].includes(role)?'/admin':'/dashboard';
 }

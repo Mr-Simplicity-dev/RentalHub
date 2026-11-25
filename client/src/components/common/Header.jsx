@@ -3,6 +3,7 @@ import UserAvatar from './UserAvatar';
 import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { getDashboardPathForUser } from '../../utils/roleDashboard';
 import HeadphoneSupportButton from '../calls/HeadphoneSupportButton';
 import { FaBell, FaUser, FaSignOutAlt, FaEnvelope, FaBars, FaTimes, FaChevronDown, FaIdCard, FaTachometerAlt, FaFileAlt, FaCheckCircle, FaHeadset, FaExclamationTriangle, FaHome, FaTruck, FaLocationArrow, FaSprayCan, FaCompass } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
@@ -78,31 +79,10 @@ const Header = () => {
   const isImpersonating = Boolean(impersonationSession);
   const role = String(user?.user_type || '').toLowerCase();
 
-  const roleDashboardPath = useMemo(() => {
-    if (role === 'tenant') return '/tenant/dashboard';
-    if (role === 'super_admin') return '/super-admin';
-    if (role === 'super_support_admin') return '/admin/super-support-dashboard';
-    if (role === 'recruitment_admin' || user?.is_recruitment_admin === true) return '/admin/recruitment';
-    if (role === 'state_support_admin') return '/admin/state-support-dashboard';
-    if (role === 'lga_support_admin') return '/admin/lga-support-dashboard';
-    if (role === 'state_admin' || role === 'state_financial_admin' || role === 'admin' || role === 'lga_admin') return '/admin';
-    if (role === 'super_financial_admin') return '/admin/super-financial-dashboard';
-    if (role === 'financial_admin' || role === 'lga_financial_admin') return '/admin/financial-dashboard';
-if (role === 'zonal_financial_admin') return '/admin/zonal-financial-dashboard';
-    if (role === 'super_fumigation_admin') return '/admin/fumigation-cleaning/super';
-    if (role === 'state_fumigation_admin') return '/admin/fumigation-cleaning/state';
-    if (role === 'fumigation_admin' || role === 'lga_fumigation_admin') return '/admin/fumigation-cleaning';
-    if (role === 'super_transportation_admin') return '/super-admin/transportation';
-    if (role === 'state_transportation_admin') return '/admin/transportation/state';
-    if (role === 'transportation_admin' || role === 'lga_transportation_admin') return '/admin/transportation';
-    if (role === 'lawyer') return '/lawyer';
-    if (role === 'state_lawyer') return '/lawyer/state';
-    if (role === 'zonal_lawyer') return '/lawyer/zonal';
-    if (role === 'super_lawyer') return '/lawyer/super';
-    if (role === 'agent') return '/agent/dashboard';
-    if (role === 'marketing_agent') return '/marketing-agent/dashboard';
-    return '/dashboard';
-  }, [role, user?.is_recruitment_admin]);
+  const roleDashboardPath = useMemo(
+    () => getDashboardPathForUser(user, '/dashboard'),
+    [user]
+  );
 
  // Track scroll for glass effect
   useEffect(() => {

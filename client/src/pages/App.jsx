@@ -19,6 +19,7 @@ import { AuthProvider } from '../context/AuthContext';
 import { SocketProvider } from '../context/SocketContext';
 import { TourProvider } from '../context/TourContext';
 import { useAuth } from '../hooks/useAuth';
+import { getDashboardPathForUser, normalizeUserRole } from '../utils/roleDashboard';
 
 import Header from '../components/common/Header';
 import Footer from '../components/common/Footer';
@@ -169,6 +170,7 @@ const ZONAL_TRANSPORTATION_ADMIN_ROLES = [
 const SUPER_FINANCIAL_ADMIN_ROLES = ['super_financial_admin'];
 const STATE_ADMIN_ROLES = ['state_admin', 'state_financial_admin'];
 const ZONAL_ADMIN_ROLES = ['zonal_admin'];
+const ZONAL_SUPPORT_ADMIN_ROLES = ['zonal_support_admin'];
 const LGA_SUPPORT_ADMIN_ROLES = ['lga_support_admin'];
 const STATE_SUPPORT_ADMIN_ROLES = ['state_support_admin'];
 const SUPER_SUPPORT_ADMIN_ROLES = ['super_support_admin'];
@@ -178,21 +180,24 @@ const FUMIGATION_ADMIN_ROLES = ['fumigation_admin', 'lga_fumigation_admin', 'sta
 const TRANSPORTATION_ADMIN_ROLES = ['transportation_admin', 'lga_transportation_admin', 'state_transportation_admin', 'zonal_transportation_admin', 'super_transportation_admin'];
 const LGA_TRANSPORTATION_ADMIN_ROLES = ['admin', 'lga_admin', 'transportation_admin', 'lga_transportation_admin'];
 const STATE_TRANSPORTATION_ADMIN_ROLES = ['state_admin', 'state_financial_admin', 'state_support_admin', 'state_transportation_admin'];
+const SUPER_TRANSPORTATION_ADMIN_ROLES = ['super_transportation_admin', 'super_admin'];
 const LGA_FUMIGATION_ADMIN_ROLES = ['admin', 'lga_admin', 'fumigation_admin', 'lga_fumigation_admin'];
 const STATE_FUMIGATION_ADMIN_ROLES = ['state_admin', 'state_financial_admin', 'state_fumigation_admin'];
 const SUPER_FUMIGATION_ADMIN_ROLES = ['super_fumigation_admin', 'super_admin'];
 const isRecruitmentAdminUser = (user) =>
-  RECRUITMENT_ADMIN_ROLES.includes(user?.user_type) || user?.is_recruitment_admin === true;
+  RECRUITMENT_ADMIN_ROLES.includes(normalizeUserRole(user)) || user?.is_recruitment_admin === true;
 const ADMIN_SHELL_ROLES = [
   ...SUPER_ADMIN_ROLES,
   'admin',
   'lga_admin',
   ...ZONAL_ADMIN_ROLES,
   ...FINANCIAL_ADMIN_ROLES,
+  ...ZONAL_FINANCIAL_ADMIN_ROLES,
   ...SUPER_FINANCIAL_ADMIN_ROLES,
   ...STATE_ADMIN_ROLES,
   ...LGA_SUPPORT_ADMIN_ROLES,
   ...STATE_SUPPORT_ADMIN_ROLES,
+  ...ZONAL_SUPPORT_ADMIN_ROLES,
   ...SUPER_SUPPORT_ADMIN_ROLES,
   ...RECRUITMENT_ADMIN_ROLES,
   ...FUMIGATION_ADMIN_ROLES,
@@ -231,7 +236,7 @@ const FinancialAdminRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
+  if (!FINANCIAL_ADMIN_ROLES.includes(normalizeUserRole(user))) return <Navigate to="/admin" />;
 
   return children;
 };
@@ -244,7 +249,7 @@ const SuperFinancialAdminRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!SUPER_FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
+  if (!SUPER_FINANCIAL_ADMIN_ROLES.includes(normalizeUserRole(user))) return <Navigate to="/admin" />;
 
   return children;
 };
@@ -257,7 +262,7 @@ const StateAdminRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!STATE_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
+  if (!STATE_ADMIN_ROLES.includes(normalizeUserRole(user))) return <Navigate to="/admin" />;
 
   return children;
 };
@@ -270,7 +275,7 @@ const LgaSupportAdminRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!LGA_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
+  if (!LGA_SUPPORT_ADMIN_ROLES.includes(normalizeUserRole(user))) return <Navigate to="/admin" />;
 
   return children;
 };
@@ -283,7 +288,7 @@ const StateSupportAdminRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!STATE_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
+  if (!STATE_SUPPORT_ADMIN_ROLES.includes(normalizeUserRole(user))) return <Navigate to="/admin" />;
 
   return children;
 };
@@ -296,7 +301,9 @@ const ZonalSupportAdminRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!ZONAL_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
+  if (![...ZONAL_ADMIN_ROLES, ...ZONAL_SUPPORT_ADMIN_ROLES].includes(normalizeUserRole(user))) {
+    return <Navigate to="/admin" />;
+  }
 
   return children;
 };
@@ -309,7 +316,7 @@ const ZonalFinancialAdminRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!ZONAL_FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
+  if (!ZONAL_FINANCIAL_ADMIN_ROLES.includes(normalizeUserRole(user))) return <Navigate to="/admin" />;
 
   return children;
 };
@@ -323,7 +330,7 @@ const SuperSupportAdminRoute = ({ children }) => {
 
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (
-    ![...SUPER_ADMIN_ROLES, ...SUPER_SUPPORT_ADMIN_ROLES].includes(user?.user_type)
+    ![...SUPER_ADMIN_ROLES, ...SUPER_SUPPORT_ADMIN_ROLES].includes(normalizeUserRole(user))
   ) {
     return <Navigate to="/admin" />;
   }
@@ -352,7 +359,22 @@ const SuperAdminRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!SUPER_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/dashboard" />;
+  if (!SUPER_ADMIN_ROLES.includes(normalizeUserRole(user))) return <Navigate to="/dashboard" />;
+
+  return children;
+};
+
+const SuperTransportationAdminRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!SUPER_TRANSPORTATION_ADMIN_ROLES.includes(normalizeUserRole(user))) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return children;
 };
@@ -365,7 +387,8 @@ const TenantRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (user?.user_type !== 'tenant') return <Navigate to="/dashboard" />;
+  const role = normalizeUserRole(user);
+  if (role !== 'tenant' && role !== 'user') return <Navigate to="/dashboard" replace />;
 
   return children;
 };
@@ -379,30 +402,12 @@ const LandlordRoute = ({ children }) => {
 
   if (!isAuthenticated) return <Navigate to="/login" />;
 
-  if (user?.user_type !== 'landlord') {
-    if (user?.user_type === 'tenant') return <Navigate to="/tenant/dashboard" />;
-    if (user?.user_type === 'agent') return <Navigate to="/agent/dashboard" />;
-    if (String(user?.user_type || '').trim().toLowerCase() === 'marketing_agent') return <Navigate to="/marketing-agent/dashboard" replace />;
-    if (user?.user_type === 'lawyer') return <Navigate to="/lawyer" />;
-    if (user?.user_type === 'state_lawyer') return <Navigate to="/lawyer/state" />;
-    if (user?.user_type === 'zonal_lawyer') return <Navigate to="/lawyer/zonal" />;
-    if (user?.user_type === 'super_lawyer') return <Navigate to="/lawyer/super" />;
-    if (user?.user_type === 'admin' || user?.user_type === 'lga_admin' || ZONAL_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
-    if (FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/financial-dashboard" />;
-    if (SUPER_FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/super-financial-dashboard" />;
-    if (STATE_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
-    if (LGA_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/lga-support-dashboard" />;
-    if (STATE_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/state-support-dashboard" />;
-    if (SUPER_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/super-support-dashboard" />;
-    if (isRecruitmentAdminUser(user)) return <Navigate to="/admin/recruitment" />;
-    if (FUMIGATION_ADMIN_ROLES.includes(user?.user_type)) {
-      return <Navigate to={getFumigationDashboardPath(user?.user_type)} />;
+  if (normalizeUserRole(user) !== 'landlord') {
+    const targetDashboard = getDashboardPathForUser(user, null);
+    if (targetDashboard && targetDashboard !== '/dashboard') {
+      return <Navigate to={targetDashboard} replace />;
     }
-    if (TRANSPORTATION_ADMIN_ROLES.includes(user?.user_type)) {
-      return <Navigate to={getTransportationDashboardPath(user?.user_type)} />;
-    }
-    if (user?.user_type === 'super_admin') return <Navigate to="/super-admin" />;
-    return <Navigate to="/login" />;
+    return <Navigate to="/login" replace />;
   }
 
   return children;
@@ -416,7 +421,7 @@ const AgentRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (user?.user_type !== 'agent') return <Navigate to="/dashboard" />;
+  if (normalizeUserRole(user) !== 'agent') return <Navigate to="/dashboard" />;
 
   return children;
 };
@@ -442,7 +447,7 @@ const BaseLawyerRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (user?.user_type !== 'lawyer') return <Navigate to="/dashboard" />;
+  if (normalizeUserRole(user) !== 'lawyer') return <Navigate to="/dashboard" />;
 
   return children;
 };
@@ -455,7 +460,7 @@ const StateLawyerRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (user?.user_type !== 'state_lawyer') return <Navigate to="/dashboard" />;
+  if (normalizeUserRole(user) !== 'state_lawyer') return <Navigate to="/dashboard" />;
 
   return children;
 };
@@ -468,7 +473,7 @@ const ZonalLawyerRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (user?.user_type !== 'zonal_lawyer') return <Navigate to="/dashboard" />;
+  if (normalizeUserRole(user) !== 'zonal_lawyer') return <Navigate to="/dashboard" />;
 
   return children;
 };
@@ -481,7 +486,7 @@ const SuperLawyerRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (user?.user_type !== 'super_lawyer') return <Navigate to="/dashboard" />;
+  if (normalizeUserRole(user) !== 'super_lawyer') return <Navigate to="/dashboard" />;
 
   return children;
 };
@@ -494,7 +499,7 @@ const AdminShellRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!ADMIN_SHELL_ROLES.includes(user?.user_type) && !isRecruitmentAdminUser(user)) return <Navigate to="/dashboard" />;
+  if (!ADMIN_SHELL_ROLES.includes(normalizeUserRole(user)) && !isRecruitmentAdminUser(user)) return <Navigate to="/dashboard" replace />;
 
   return children;
 };
@@ -505,7 +510,7 @@ const TourAnalyticsRoute = ({ children }) => {
     return <div className="flex min-h-screen items-center justify-center">{i18n.t('app.loading')}</div>;
   }
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (!['admin', 'super_admin'].includes(user?.user_type)) {
+  if (!['admin', 'super_admin'].includes(normalizeUserRole(user))) {
     return <Navigate to="/dashboard" replace />;
   }
   return children;
@@ -519,7 +524,7 @@ const TransportationCoreAdminRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!LGA_TRANSPORTATION_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" replace />;
+  if (!LGA_TRANSPORTATION_ADMIN_ROLES.includes(normalizeUserRole(user))) return <Navigate to="/admin" replace />;
 
   return children;
 };
@@ -532,7 +537,7 @@ const TransportationStateAdminRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!STATE_TRANSPORTATION_ADMIN_ROLES.includes(user?.user_type)) {
+  if (!STATE_TRANSPORTATION_ADMIN_ROLES.includes(normalizeUserRole(user))) {
     return <Navigate to="/admin" replace />;
   }
 
@@ -547,7 +552,7 @@ const ZonalTransportationAdminRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!ZONAL_TRANSPORTATION_ADMIN_ROLES.includes(user?.user_type)) {
+  if (!ZONAL_TRANSPORTATION_ADMIN_ROLES.includes(normalizeUserRole(user))) {
     return <Navigate to="/admin" replace />;
   }
 
@@ -562,7 +567,7 @@ const LgaFumigationAdminRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!LGA_FUMIGATION_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" replace />;
+  if (!LGA_FUMIGATION_ADMIN_ROLES.includes(normalizeUserRole(user))) return <Navigate to="/admin" replace />;
 
   return children;
 };
@@ -575,7 +580,7 @@ const StateFumigationAdminRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!STATE_FUMIGATION_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" replace />;
+  if (!STATE_FUMIGATION_ADMIN_ROLES.includes(normalizeUserRole(user))) return <Navigate to="/admin" replace />;
 
   return children;
 };
@@ -588,7 +593,7 @@ const ZonalFumigationAdminRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!ZONAL_FUMIGATION_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" replace />;
+  if (!ZONAL_FUMIGATION_ADMIN_ROLES.includes(normalizeUserRole(user))) return <Navigate to="/admin" replace />;
 
   return children;
 };
@@ -601,7 +606,7 @@ const SuperFumigationAdminRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!SUPER_FUMIGATION_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" replace />;
+  if (!SUPER_FUMIGATION_ADMIN_ROLES.includes(normalizeUserRole(user))) return <Navigate to="/admin" replace />;
 
   return children;
 };
@@ -614,7 +619,7 @@ const PropertyManagerRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!['landlord', 'agent'].includes(user?.user_type)) {
+  if (!['landlord', 'agent'].includes(normalizeUserRole(user))) {
     return <Navigate to="/dashboard" />;
   }
 
@@ -623,20 +628,21 @@ const PropertyManagerRoute = ({ children }) => {
 
 const AdminHomeRoute = () => {
   const { user } = useAuth();
+  const role = normalizeUserRole(user);
 
-  if (SUPER_ADMIN_ROLES.includes(user?.user_type)) {
+  if (SUPER_ADMIN_ROLES.includes(role)) {
     return <Navigate to="/super-admin" replace />;
   }
 
-  if (SUPER_FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) {
+  if (SUPER_FINANCIAL_ADMIN_ROLES.includes(role)) {
     return <Navigate to="/admin/super-financial-dashboard" replace />;
   }
 
-  if (FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) {
+  if (FINANCIAL_ADMIN_ROLES.includes(role)) {
     return <Navigate to="/admin/financial-dashboard" replace />;
   }
 
-  if (STATE_ADMIN_ROLES.includes(user?.user_type)) {
+  if (STATE_ADMIN_ROLES.includes(role)) {
     return (
       <StateAdminRoute>
         <StateAdminDashboard />
@@ -644,19 +650,23 @@ const AdminHomeRoute = () => {
     );
   }
 
-  if (LGA_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) {
+  if (LGA_SUPPORT_ADMIN_ROLES.includes(role)) {
     return <Navigate to="/admin/lga-support-dashboard" replace />;
   }
 
-  if (STATE_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) {
+  if (STATE_SUPPORT_ADMIN_ROLES.includes(role)) {
     return <Navigate to="/admin/state-support-dashboard" replace />;
   }
 
-  if (SUPER_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) {
+  if (ZONAL_SUPPORT_ADMIN_ROLES.includes(role)) {
+    return <Navigate to="/admin/zonal-support-dashboard" replace />;
+  }
+
+  if (SUPER_SUPPORT_ADMIN_ROLES.includes(role)) {
     return <Navigate to="/admin/super-support-dashboard" replace />;
   }
 
-  if (ZONAL_FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) {
+  if (ZONAL_FINANCIAL_ADMIN_ROLES.includes(role)) {
     return <Navigate to="/admin/zonal-financial-dashboard" replace />;
   }
 
@@ -664,12 +674,12 @@ const AdminHomeRoute = () => {
     return <Navigate to="/admin/recruitment" replace />;
   }
 
-  if (FUMIGATION_ADMIN_ROLES.includes(user?.user_type)) {
-    return <Navigate to={getFumigationDashboardPath(user?.user_type)} replace />;
+  if (FUMIGATION_ADMIN_ROLES.includes(role)) {
+    return <Navigate to={getFumigationDashboardPath(role)} replace />;
   }
 
-  if (TRANSPORTATION_ADMIN_ROLES.includes(user?.user_type)) {
-    return <Navigate to={getTransportationDashboardPath(user?.user_type)} replace />;
+  if (TRANSPORTATION_ADMIN_ROLES.includes(role)) {
+    return <Navigate to={getTransportationDashboardPath(role)} replace />;
   }
 
   return <AdminDashboard />;
@@ -678,7 +688,7 @@ const AdminHomeRoute = () => {
 const AdminWithdrawalsRoute = () => {
   const { user } = useAuth();
 
-  if (STATE_ADMIN_ROLES.includes(user?.user_type)) {
+  if (STATE_ADMIN_ROLES.includes(normalizeUserRole(user))) {
     return (
       <StateAdminRoute>
         <StateAdminDashboard initialTab="withdrawals" />
@@ -686,23 +696,23 @@ const AdminWithdrawalsRoute = () => {
     );
   }
 
-  if (LGA_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) {
+  if (LGA_SUPPORT_ADMIN_ROLES.includes(normalizeUserRole(user))) {
     return <Navigate to="/admin/lga-support-dashboard" replace />;
   }
 
-  if (FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) {
+  if (FINANCIAL_ADMIN_ROLES.includes(normalizeUserRole(user))) {
     return <Navigate to="/admin/financial-dashboard" replace />;
   }
 
-  if (SUPER_FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) {
+  if (SUPER_FINANCIAL_ADMIN_ROLES.includes(normalizeUserRole(user))) {
     return <Navigate to="/admin/super-financial-dashboard" replace />;
   }
 
-  if (STATE_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) {
+  if (STATE_SUPPORT_ADMIN_ROLES.includes(normalizeUserRole(user))) {
     return <Navigate to="/admin/state-support-dashboard" replace />;
   }
 
-  if (SUPER_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) {
+  if (SUPER_SUPPORT_ADMIN_ROLES.includes(normalizeUserRole(user))) {
     return <Navigate to="/admin/super-support-dashboard" replace />;
   }
 
@@ -913,10 +923,19 @@ function App() {
                 <Route index element={<SuperAdminDashboard />} />
                 <Route path="seo" element={<SeoDashboard />} />
                 <Route path="support-governance" element={<SupportGovernancePanel />} />
-                <Route path="transportation" element={<TransportationSuperAdminDashboard />} />
                 <Route path="fumigation-cleaning" element={<FumigationOversightPanel />} />
                 <Route path="tour-analytics" element={<TourAnalyticsRoute><TourAnalytics /></TourAnalyticsRoute>} />
                 <Route path="tour-music" element={<TourMusicLibrary />} />
+              </Route>
+              <Route
+                path="/super-admin/transportation"
+                element={
+                  <SuperTransportationAdminRoute>
+                    <AdminLayout />
+                  </SuperTransportationAdminRoute>
+                }
+              >
+                <Route index element={<TransportationSuperAdminDashboard />} />
               </Route>
               <Route
                 path="/admin/seo"
