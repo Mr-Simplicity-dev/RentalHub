@@ -2,14 +2,19 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { loadEnv } from 'vite';
 import { defineConfig } from 'vitest/config';
+import apiBaseUrlConfig from './config/apiBaseUrl.cjs';
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command }) => {
   const clientEnv = loadEnv(mode, process.cwd(), 'REACT_APP_');
   const define = Object.fromEntries(
     Object.entries(clientEnv).map(([key, value]) => [
       `process.env.${key}`,
       JSON.stringify(value),
     ]),
+  );
+
+  define['process.env.REACT_APP_API_URL'] = JSON.stringify(
+    apiBaseUrlConfig.resolveApiBaseUrl(clientEnv.REACT_APP_API_URL, { production: command === 'build' }),
   );
 
   define['process.env.TURN_URL'] = 'undefined';

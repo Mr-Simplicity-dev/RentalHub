@@ -1,5 +1,6 @@
 const express = require('express');
 const { body, param } = require('express-validator');
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const { authenticate, requireSuperAdmin } = require('../config/middleware/auth');
 const validateRequest = require('../config/middleware/validateRequest');
@@ -17,6 +18,14 @@ const {
   unregisterDevice,
 } = require('../config/utils/pushNotificationService');
 const spokenNotificationService = require('../config/utils/spokenNotificationService');
+
+const spokenLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: process.env.NODE_ENV === 'production' ? 60 : 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many spoken notification requests. Please try again later.' },
+});
 
 const DEFAULT_NOTIFICATION_PREFERENCES = {
   pushMessages: true,
@@ -335,7 +344,7 @@ router.patch('/read-all', authenticate, async (req, res) => {
 });
 
 // Spoken notification events (Phase C) - user-owned, idempotent, non-read side effects
-router.get('/spoken/pending', authenticate, async (req, res) => {
+router.get('/spoken/pending', authenticate, spokenLimiter, async (req, res) => {
   try {
     await ensureNotificationPreferenceSchema();
     const prefResult = await db.query(
@@ -387,6 +396,7 @@ router.post(
   ],
   validateRequest,
   authenticate,
+  spokenLimiter,
   async (req, res) => {
     try {
       const event = await spokenNotificationService.claimEvent({
@@ -426,6 +436,7 @@ router.post(
   ],
   validateRequest,
   authenticate,
+  spokenLimiter,
   async (req, res) => {
     try {
       const outcome = req.body?.outcome
