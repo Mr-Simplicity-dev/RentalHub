@@ -184,3 +184,40 @@ test('every volunteer position card has a WhatsApp share link with a role deep l
     expect(container.querySelector('select[name="role_id"]')?.value).toBe('2');
   });
 });
+
+test('WhatsApp share link includes the full multi-line job description without truncation', async () => {
+  const longDescription =
+    'Coordinate verified community outreach across assigned wards, guide landlords and tenants through onboarding, and report weekly field activity.\n\nResponsibilities:\n- Assist local residents with property listings\n- Support neighborhood verification visits and feedback follow-ups';
+  mockPublic({ is_active: true, volunteer_applications_enabled: true });
+  const baseGet = api.get.getMockImplementation();
+  api.get.mockImplementation((url) =>
+    url === '/recruitment/roles/active'
+      ? Promise.resolve({
+          data: {
+            data: [
+              {
+                id: 9,
+                title: 'Field Outreach Volunteer',
+                opportunity_type: 'volunteer',
+                service_state: 'Lagos',
+                description: longDescription,
+                application_fee: 0,
+                premium_fee: 0,
+              },
+            ],
+          },
+        })
+      : baseGet(url)
+  );
+  await mount('/careers?type=volunteer');
+
+  const shareLink = within(container).getByRole('link', {
+    name: /Share Field Outreach Volunteer on WhatsApp/i,
+  });
+  const href = shareLink.getAttribute('href') || '';
+  const decoded = decodeURIComponent(href.slice('https://wa.me/?text='.length));
+  expect(decoded).toContain('*Job Description:*');
+  expect(decoded).toContain(longDescription);
+  expect(decoded).toContain('Location: Lagos');
+  expect(decoded).toContain('/careers?type=volunteer&role=9');
+});

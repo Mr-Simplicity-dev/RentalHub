@@ -14,20 +14,16 @@ export function buildVolunteerShareUrl(role) {
 
 export function buildVolunteerWhatsAppUrl(role) {
   const shareUrl = buildVolunteerShareUrl(role);
-  const rawDescription = String(role.description || '')
-    .replace(/\s+/g, ' ')
+  const fullDescription = String(role.description || '')
+    .replace(/\r\n/g, '\n')
     .trim();
-  const snippet =
-    rawDescription.length > 140
-      ? `${rawDescription.slice(0, 137).trim()}...`
-      : rawDescription;
 
   const lines = [
-    `Volunteer Opportunity at Amana RentalHub NG: ${role.title}`,
+    `*Volunteer Opportunity at Amana RentalHub NG: ${role.title}*`,
     role.service_state ? `Location: ${role.service_state}` : '',
     'Free to apply — no application fee or degree required.',
-    snippet,
-    `Apply here: ${shareUrl}`,
+    fullDescription ? `\n*Job Description:*\n${fullDescription}` : '',
+    `\nApply here: ${shareUrl}`,
   ].filter(Boolean);
 
   return `https://wa.me/?text=${encodeURIComponent(lines.join('\n'))}`;
