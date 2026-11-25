@@ -6,6 +6,7 @@ const { logAction } = require('./auditLogger');
 const { getSocketAuthToken } = require('./authCookies');
 const { getSessionTokenIdentity } = require('./sessionToken');
 const { zoneForState } = require('./territorialZones');
+const { canUserInitiateDirectCall, canSupportCall } = require('../../services/callDirectoryService');
 const {
   verifyGuestAccessToken,
   canUseLegacyGuestEmailAccess,
@@ -1031,29 +1032,29 @@ const configureRealtimeSocket = (io) => {
           ? payload.callType
           : 'audio';
 
-        if (!caseContext && !CALL_ALLOWED_ROLES.has(user.user_type)) {
-          throw new Error('Only tenants, landlords and agents can start calls');
-        }
-
         if (!receiverId || receiverId === Number(user.id)) {
           throw new Error('Select a valid call recipient');
         }
 
         const receiverResult = await db.query(
-          `SELECT id, full_name, email, user_type, deleted_at, is_active
+          `SELECT id, full_name, email, user_type, deleted_at, is_active,
+                  assigned_state, assigned_city, assigned_lga, assigned_zone
            FROM users
            WHERE id = $1
            LIMIT 1`,
           [receiverId]
         );
-        const receiver = receiverResult.rows[0];
 
+        const receiver = receiverResult.rows[0];
         if (!receiver || receiver.deleted_at || receiver.is_active === false) {
           throw new Error('Call recipient is not available');
         }
 
-        if (!caseContext && !CALL_ALLOWED_ROLES.has(receiver.user_type)) {
-          throw new Error('Calls can only be sent to tenants, landlords or agents');
+        if (!caseContext) {
+          const callPermission = await canUserInitiateDirectCall(user, receiver, db);
+          if (!callPermission.allowed) {
+            throw new Error(callPermission.message || 'You are not authorized to call this user directly');
+          }
         }
 
         if(caseContext&&!['audio','video'].includes(callType))throw new Error('Case meetings use audio or video.');
@@ -1165,8 +1166,8 @@ const configureRealtimeSocket = (io) => {
 
     socket.on('call:support', async (payload = {}, callback) => {
       try {
-        if (!CALL_ALLOWED_ROLES.has(user.user_type)) {
-          throw new Error('Only tenants, landlords and agents can call support');
+        if (!canSupportCall(user)) {
+          throw new Error('Your role cannot initiate a customer support queue call');
         }
 
         const callerLoc = await resolveCallerLocation(user.id);

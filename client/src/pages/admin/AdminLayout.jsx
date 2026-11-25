@@ -2,6 +2,7 @@ import AdminDashboardGate from '../../components/admin/AdminDashboardGate';
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { NavLink, Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import HeadphoneSupportButton from '../../components/calls/HeadphoneSupportButton';
 import api from '../../services/api';
 import { playNotificationSound } from '../../utils/notificationSound';
 import RoleBadge from '../../components/common/RoleBadge';
@@ -1418,6 +1419,7 @@ const AdminLayoutContent = () => {
               )}
             </Link>
 
+            <HeadphoneSupportButton />
             <div className="relative shrink-0" ref={notifRef}>
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
@@ -1530,6 +1532,7 @@ const AdminLayoutContent = () => {
                 </span>
               )}
             </Link>
+            <HeadphoneSupportButton compact />
             <div className="relative" ref={notifRefMobile}>
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
