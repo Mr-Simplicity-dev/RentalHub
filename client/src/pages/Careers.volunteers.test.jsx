@@ -163,3 +163,24 @@ test('FCT volunteer roles offer all six councils separately from residence and r
  await waitFor(()=>expect(Array.from(lga.options).find(o=>o.value==='Ikeja')?.disabled).toBe(true));
  expect(within(container).getByRole('status').textContent).toMatch(/not open/);
 });
+
+test('every volunteer position card has a WhatsApp share link with a role deep link, and opening that link pre-selects the role', async () => {
+  mockPublic({ is_active: true, volunteer_applications_enabled: true });
+  await mount();
+
+  const ui = within(container);
+  const shareLinks = ui.getAllByRole('link', { name: /Share .* on WhatsApp/i });
+  expect(shareLinks).toHaveLength(1);
+  const href = shareLinks[0].getAttribute('href') || '';
+  expect(href.startsWith('https://wa.me/?text=')).toBe(true);
+  const decoded = decodeURIComponent(href.slice('https://wa.me/?text='.length));
+  expect(decoded).toContain('Community Volunteer');
+  expect(decoded).toContain('/careers?type=volunteer&role=2');
+
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  await mount('/careers?type=volunteer&role=2');
+  await waitFor(() => {
+    expect(container.querySelector('select[name="role_id"]')?.value).toBe('2');
+  });
+});

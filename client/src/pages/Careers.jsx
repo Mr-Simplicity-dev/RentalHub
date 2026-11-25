@@ -330,9 +330,30 @@ export default function Careers() {
     setApplicationFormOpen(true);
   };
 
+  const deepLinkedRoleHandledRef = useRef(false);
+  useEffect(() => {
+    if (deepLinkedRoleHandledRef.current || !roles.length) return;
+    const requestedRoleId = searchParams.get('role');
+    if (!requestedRoleId) return;
+    const matchedRole = roles.find((role) => String(role.id) === String(requestedRoleId));
+    if (!matchedRole) return;
+    deepLinkedRoleHandledRef.current = true;
+    const matchedType = matchedRole.opportunity_type || 'employment';
+    if (opportunityFilter !== 'all' && opportunityFilter !== matchedType) {
+      setOpportunityFilter(matchedType);
+    }
+    setForm((prev) => ({ ...prev, role_id: String(matchedRole.id), application_track: 'standard' }));
+    setApplicationFormOpen(true);
+  }, [roles, searchParams, opportunityFilter]);
+
   const returnToOpportunities = () => {
     setApplicationFormOpen(false);
     setTurnstileToken(null);
+    if (searchParams.get('role')) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('role');
+      setSearchParams(nextParams, { replace: true });
+    }
     requestAnimationFrame(() => {
       const previous = lastOpportunityButtonRef.current;
       const buttons = opportunityListRef.current?.querySelectorAll('button');
