@@ -3,6 +3,7 @@ import UserAvatar from './UserAvatar';
 import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import HeadphoneSupportButton from '../calls/HeadphoneSupportButton';
 import { FaBell, FaUser, FaSignOutAlt, FaEnvelope, FaBars, FaTimes, FaChevronDown, FaIdCard, FaTachometerAlt, FaFileAlt, FaCheckCircle, FaHeadset, FaExclamationTriangle, FaHome, FaTruck, FaLocationArrow, FaSprayCan, FaCompass } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
@@ -99,6 +100,7 @@ if (role === 'zonal_financial_admin') return '/admin/zonal-financial-dashboard';
     if (role === 'zonal_lawyer') return '/lawyer/zonal';
     if (role === 'super_lawyer') return '/lawyer/super';
     if (role === 'agent') return '/agent/dashboard';
+    if (role === 'marketing_agent') return '/marketing-agent/dashboard';
     return '/dashboard';
   }, [role, user?.is_recruitment_admin]);
 
@@ -476,6 +478,9 @@ return (
                   </span>
                 )}
               </Link>
+
+              {/* Headphone Support / Call Directory Button */}
+              <HeadphoneSupportButton />
 
               {/* Notification Bell */}
               <div className="relative shrink-0" ref={notifRef} data-tour-id="header-notifications">

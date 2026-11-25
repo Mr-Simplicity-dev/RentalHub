@@ -804,6 +804,7 @@ app.use('/api/applications', generalOpsLimiter, applicationRoutes);
 app.use('/api/tenancy-agreements', generalOpsLimiter, tenancyAgreementRoutes);
 app.use('/api/tenancy-agreement-templates', adminLimiter, tenancyAgreementTemplateRoutes);
 app.use('/api/messages', generalOpsLimiter, messageRoutes);
+app.use('/api/calls', generalOpsLimiter, require('./routes/callDirectory'));
 app.use('/api/users', generalOpsLimiter, userRoutes);
 app.use('/api/admin', adminLimiter, adminRoutes);
 app.use('/api/admin/diaspora', adminLimiter, diasporaAdminRoutes);

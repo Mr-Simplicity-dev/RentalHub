@@ -721,7 +721,8 @@ function Layout({ children }) {
   const isDashboardShell =
     location.pathname.startsWith('/admin') ||
     location.pathname.startsWith('/super-admin') ||
-    location.pathname.startsWith('/lawyer');
+    location.pathname.startsWith('/lawyer') ||
+    location.pathname.startsWith('/marketing-agent');
   const isMobileAppPage = location.pathname === '/mobile-app';
   const isLandingPage = location.pathname === '/download';
   const isLegalPage = ['/privacy', '/terms'].includes(location.pathname);

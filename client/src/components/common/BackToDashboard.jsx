@@ -8,6 +8,7 @@ const dashboardPathByRole = {
   tenant: '/tenant/dashboard',
   landlord: '/dashboard',
   agent: '/agent/dashboard',
+  marketing_agent: '/marketing-agent/dashboard',
   super_admin: '/super-admin',
   lga_admin: '/admin',
   state_admin: '/admin',

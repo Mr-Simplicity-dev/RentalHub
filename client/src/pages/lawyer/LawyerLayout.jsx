@@ -17,6 +17,7 @@ import {
   FaUserCircle,
 } from 'react-icons/fa';
 import { useAuth } from '../../hooks/useAuth';
+import HeadphoneSupportButton from '../../components/calls/HeadphoneSupportButton';
 import api from '../../services/api';
 import { useTranslation } from 'react-i18next';
 
@@ -258,6 +259,7 @@ const LawyerLayout = () => {
               <p className="text-sm font-semibold text-slate-900">{roleTitle}</p>
             </div>
             <div className="flex items-center gap-2">
+              <HeadphoneSupportButton compact />
               <div className="relative">
                 <button
                   onClick={() => setShowNotifications(!showNotifications)}
@@ -314,6 +316,7 @@ const LawyerLayout = () => {
 
         <main ref={mainContentRef} className="min-w-0 flex-1 flex flex-col">
           <header className="sticky top-0 z-30 hidden items-center justify-end gap-4 border-b border-slate-200 bg-white/95 px-6 py-3 shadow-sm backdrop-blur lg:flex">
+            <HeadphoneSupportButton />
             <div className="relative">
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
