@@ -414,27 +414,36 @@ return (
         </Link>
 
         {/* Desktop Navigation */}
-                <nav className="hidden md:flex items-center space-x-1">
-                  <NavLink to="/properties" label={t('header.browse')} />
-                  <NavLink to="/list-property" label={t('footer.list')} />
-                  <NavLink to="/about" label={t('footer.about_us')} />
-          <NavLink to="/verify-case" label={t('header.verify_evidence')} />
+        <div className="hidden md:flex flex-col items-center justify-center">
+          <nav className="flex items-center space-x-1" aria-label="Primary navigation">
+            <NavLink to="/properties" label={t('header.browse')} />
+            <NavLink to="/list-property" label={t('footer.list')} />
+            <NavLink to="/about" label={t('footer.about_us')} />
+            <NavLink to="/verify-case" label={t('header.verify_evidence')} />
 
-          {isAuthenticated &&
-            ['landlord', 'agent'].includes(user?.user_type) && (
+            {isAuthenticated &&
+              ['landlord', 'agent'].includes(user?.user_type) && (
+                <NavLink
+                  to="/my-properties"
+                  label={t('header.my_properties')}
+                />
+              )}
+
+            {isAuthenticated && user?.user_type === 'tenant' && (
               <NavLink
-                to="/my-properties"
-                label={t('header.my_properties')}
+                to="/saved-properties"
+                label={t('header.saved')}
               />
             )}
-
-          {isAuthenticated && user?.user_type === 'tenant' && (
-            <NavLink
-              to="/saved-properties"
-              label={t('header.saved')}
-            />
-          )}
-        </nav>
+          </nav>
+          <Link
+            to="/verify-staff"
+            onClick={() => handleHeaderNavigation('/verify-staff')}
+            className="mt-0.5 rounded px-1.5 py-0.5 text-xs font-semibold text-primary-800 underline decoration-primary-600 underline-offset-4 transition-colors hover:text-primary-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 whitespace-nowrap"
+          >
+            Verify Staff Before Engaging Them
+          </Link>
+        </div>
 
         {/* Right side */}
         {/* FIXED */}
@@ -668,6 +677,17 @@ return (
                       <span>{t('header.verification')}</span>
                     </Link>
 
+                    {user?.user_type && !['tenant', 'landlord'].includes(user.user_type) && (
+                      <Link
+                        to="/my-staff-identity"
+                        className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-primary-800 transition-colors duration-150 hover:bg-primary-50 hover:text-primary-900"
+                        onClick={() => handleHeaderNavigation('/my-staff-identity')}
+                      >
+                        <FaIdCard className="text-xs text-primary-600" />
+                        <span>My Staff Identity</span>
+                      </Link>
+                    )}
+
                     <Link
                       to="/service-tracking"
                       className="flex items-center gap-2 px-4 py-2.5 text-sm text-indigo-700 font-semibold transition-colors duration-150 hover:bg-indigo-50"
@@ -851,6 +871,17 @@ return (
         </div>
       </div>
 
+      {/* Mobile/Tablet Staff Verification Link Directly Beneath Header Bar */}
+      <div className="md:hidden border-t border-gray-100 py-1.5 text-center">
+        <Link
+          to="/verify-staff"
+          onClick={() => handleHeaderNavigation('/verify-staff')}
+          className="inline-block rounded px-2 py-0.5 text-xs font-semibold text-primary-800 underline decoration-primary-600 underline-offset-4 hover:text-primary-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+        >
+          Verify Staff Before Engaging Them
+        </Link>
+      </div>
+
       {/* Mobile Menu */}
       <div
         className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${
@@ -883,6 +914,14 @@ return (
             label={t('Verify Evidence')}
             onClick={closeMobileMenu}
           />
+
+          <Link
+            to="/verify-staff"
+            onClick={(e) => closeMobileMenu(e, '/verify-staff')}
+            className="block rounded-lg px-3 py-2 text-sm font-semibold text-primary-800 underline decoration-primary-600 underline-offset-4 hover:bg-primary-50"
+          >
+            Verify Staff Before Engaging Them
+          </Link>
 
           {isAuthenticated &&
             ['landlord', 'agent'].includes(user?.user_type) && (

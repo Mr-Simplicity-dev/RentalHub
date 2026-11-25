@@ -660,6 +660,11 @@ const AdminLayoutContent = () => {
                   Verifications
                 </NavLink>
 
+                <NavLink to="/super-admin?tab=staff_identity" className={() => superAdminNavItem('staff_identity')}>
+                  <FaIdCard className="mr-3" />
+                  Staff Identity Management
+                </NavLink>
+
                 <NavLink to="/super-admin?tab=lawyer_invites" className={() => superAdminNavItem('lawyer_invites')}>
                   <FaEnvelope className="mr-3" />
                   Lawyer Invites
@@ -1711,6 +1716,18 @@ const AdminLayoutContent = () => {
                 >
                   <FaUserCircle className="text-xs text-gray-500" />
                   Profile
+                </NavLink>
+
+                <NavLink
+                  to="/my-staff-identity"
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-primary-800 transition hover:bg-primary-50 hover:text-primary-900"
+                  onClick={() => {
+                    setProfileMenuOpen(false);
+                  }}
+                  role="menuitem"
+                >
+                  <FaIdCard className="text-xs text-primary-600" />
+                  My Staff Identity
                 </NavLink>
 
                 <button

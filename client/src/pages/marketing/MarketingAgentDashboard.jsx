@@ -24,6 +24,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recha
 import api from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import HeadphoneSupportButton from '../../components/calls/HeadphoneSupportButton';
+import MyStaffIdentityPanel from '../../components/staff/MyStaffIdentityPanel';
 
 const formatNaira = (amount) => {
   const numeric = Number(amount || 0);
@@ -785,7 +786,11 @@ const MarketingAgentDashboard = () => {
       </main>
 
       {/* Commission Withdrawal Modal */}
-      {withdrawOpen && (
+      <div className="mx-auto max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
+        <MyStaffIdentityPanel compact />
+      </div>
+
+            {withdrawOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs"
           onClick={() => !withdrawSubmitting && setWithdrawOpen(false)}

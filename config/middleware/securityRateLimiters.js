@@ -223,7 +223,40 @@ const mobileTelemetryLimiter = buildLimiter({
   max: Number(process.env.MOBILE_TELEMETRY_MAX) || 30,
   message: 'Too many mobile telemetry requests. Please try again shortly.',
 });
+
+const staffVerificationLookupLimiter = buildLimiter({
+  name: 'staff-verification-lookup',
+  windowMs: Number(process.env.STAFF_LOOKUP_WINDOW_MS) || 10 * 60 * 1000,
+  max: Number(process.env.STAFF_LOOKUP_MAX) || 40,
+  message: 'Too many staff verification lookups. Please wait a few minutes and try again.',
+});
+
+const staffChallengeCreateLimiter = buildLimiter({
+  name: 'staff-challenge-create',
+  windowMs: Number(process.env.STAFF_CHALLENGE_CREATE_WINDOW_MS) || 10 * 60 * 1000,
+  max: Number(process.env.STAFF_CHALLENGE_CREATE_MAX) || 12,
+  message: 'Too many live confirmation requests. Please wait a few minutes before retrying.',
+});
+
+const staffChallengePollLimiter = buildLimiter({
+  name: 'staff-challenge-poll',
+  windowMs: Number(process.env.STAFF_CHALLENGE_POLL_WINDOW_MS) || 5 * 60 * 1000,
+  max: Number(process.env.STAFF_CHALLENGE_POLL_MAX) || 120,
+  message: 'Too many status checks. Please wait briefly.',
+});
+
+const staffImpersonationReportLimiter = buildLimiter({
+  name: 'staff-impersonation-report',
+  windowMs: Number(process.env.STAFF_IMPERSONATION_WINDOW_MS) || 30 * 60 * 1000,
+  max: Number(process.env.STAFF_IMPERSONATION_MAX) || 5,
+  message: 'Too many impersonation reports submitted from this network. Please wait before submitting another.',
+});
+
 module.exports = {
+  staffVerificationLookupLimiter,
+  staffChallengeCreateLimiter,
+  staffChallengePollLimiter,
+  staffImpersonationReportLimiter,
   assistedRegistrationQuoteLimiter,
   assistedRegistrationCreateLimiter,
   assistantReadLimiter,

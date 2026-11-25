@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import api from '../../services/api';
 import { useTranslation } from 'react-i18next';
 import Loader from '../../components/common/Loader';
+import MyStaffIdentityPanel from '../../components/staff/MyStaffIdentityPanel';
 
 const PermissionBadge = ({ enabled, label }) => (
   <span
@@ -330,6 +331,15 @@ const AgentDashboard = () => {
                 <QuickActionLink to="/messages" icon={<FaGavel />} label={t('agent_dashboard.legal_messages')} description={t('agent_dashboard.legal_messages_desc')} dataTourId="action-legal-messages" />
                 <QuickActionLink to="/agent/earnings" icon={<FaCoins />} label={t('agent_dashboard.commission_ledger')} description={t('agent_dashboard.commission_ledger_desc')} dataTourId="action-commission-ledger" />
                 <QuickActionLink to="/agent/withdrawals" icon={<FaMoneyBillWave />} label={t('agent_dashboard.withdrawals')} description={t('agent_dashboard.withdrawals_desc')} dataTourId="action-withdrawals" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <MyStaffIdentityPanel compact />
+              <div className="text-right">
+                <Link to="/my-staff-identity" className="text-xs font-semibold text-primary-700 underline underline-offset-4 hover:text-primary-900">
+                  Open Full My Staff Identity &amp; Verification History
+                </Link>
               </div>
             </div>
           </>

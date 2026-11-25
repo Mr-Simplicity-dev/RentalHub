@@ -539,6 +539,23 @@ const authenticatedUploadsStaticOptions = {
 
 // Ad-space uploads are served publicly since ad content is inherently public.
 // Passport uploads remain authenticated-only via routes/users.js.
+const staffPhotosUploadPath = path.join(__dirname, 'uploads', 'staff-photos');
+app.use('/uploads/staff-photos', (req, res, next) => {
+  const ext = path.extname(req.path || '').toLowerCase();
+  if (!['.jpg', '.jpeg', '.png', '.webp'].includes(ext)) {
+    return res.status(404).end();
+  }
+  return next();
+}, express.static(staffPhotosUploadPath, {
+  dotfiles: 'deny',
+  index: false,
+  maxAge: '1d',
+  setHeaders: (res) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  },
+}));
+
 const adSpacesUploadPath = path.join(__dirname, 'uploads', 'ad-spaces');
 if (fs.existsSync(adSpacesUploadPath)) {
   app.use('/uploads/ad-spaces', express.static(adSpacesUploadPath, {
@@ -846,6 +863,7 @@ app.use('/api/zonal-admin', adminLimiter, zonalAdminRoutes);
 app.use('/api/zonal-financial-admin', adminLimiter, zonalFinancialAdminRoutes);
 
 app.use('/api/evidence', verificationOpsLimiter, verificationRoutes);
+app.use('/api/staff-verification', require('./routes/staffVerification'));
 app.use('/api/commissions', financeOpsLimiter, agentCommissionRoutes);
 app.use('/api/admin/agents', adminLimiter, adminAgentRoutes);
 app.use('/api/withdrawals', financeOpsLimiter, agentWithdrawalRoutes);

@@ -51,11 +51,13 @@ import BankAccountsTab from "../components/admin/BankAccountsTab";
 import BankTransfersTab from "../components/admin/BankTransfersTab";
 import VirtualAccountsTab from "../components/admin/VirtualAccountsTab";
 import TransportationFleetTracker from "../components/admin/TransportationFleetTracker";
+import StaffIdentityManagementTab from "../components/admin/StaffIdentityManagementTab";
 
 const tabs = [
   "overview",
   "users",
   "verifications",
+  "staff_identity",
   "lawyer_invites",
   "platform_lawyers",
   "platform_agents",
@@ -96,6 +98,7 @@ const tabLabels = {
   overview: "Overview",
   users: "Users",
   verifications: "Verifications",
+  staff_identity: "Staff Identity Management",
   lawyer_invites: "Lawyer Invites",
   platform_lawyers: "Platform Lawyers",
   platform_agents: "Platform Agents",
@@ -141,6 +144,7 @@ const shortcutCategories = [
       { name: "overview", label: "Overview", detail: "Platform summary and key metrics" },
       { name: "users", label: "Users", detail: "Manage platform users, roles, and bans" },
       { name: "verifications", label: "Verifications", detail: "Review identity and document verifications" },
+      { name: "staff_identity", label: "Staff Identity Management", detail: "Manage verified staff IDs, permissions, live history and impersonation reports" },
       { name: "properties", label: "Properties", detail: "Browse and manage property listings" },
       { name: "property_requests", label: "Property Requests", detail: "Review listing requests from landlords and agents" },
       { name: "pricing", label: "Pricing", detail: "Configure platform pricing rules and fees" },
@@ -1593,7 +1597,11 @@ function SuperAdminDashboardContent() {
         <PlatformRatingsTab />
       )}
 
-      {tab === "recruitment" && (
+      {tab === "staff_identity" && (
+        <StaffIdentityManagementTab />
+      )}
+
+            {tab === "recruitment" && (
         <div className="super-admin-admins-section">
           <RecruitmentAdminTab />
         </div>

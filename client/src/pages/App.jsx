@@ -104,6 +104,8 @@ const SuperLawyerDashboard = React.lazy(() => import('./lawyer/SuperLawyerDashbo
 const AgentDashboard = React.lazy(() => import('./agent/AgentDashboard'));
 const MarketingAgentDashboard = React.lazy(() => import('./marketing/MarketingAgentDashboard'));
 const VerifyCase = React.lazy(() => import('./VerifyCase'));
+const VerifyStaff = React.lazy(() => import('./VerifyStaff'));
+const MyStaffIdentity = React.lazy(() => import('./MyStaffIdentity'));
 const DisputeDetails = React.lazy(() => import('./DisputeDetails'));
 const MyDisputes = React.lazy(() => import('./MyDisputes'));
 const MyDamageReports = React.lazy(() => import('./MyDamageReports'));
@@ -993,6 +995,9 @@ function App() {
                             <Route path="/agent/withdrawals" element={<AgentRoute><AgentWithdrawalPage /></AgentRoute>} />
               <Route path="/verify" element={<VerifyCase />} />
               <Route path="/verify-case" element={<VerifyCase />} />
+              <Route path="/verify-staff" element={<VerifyStaff />} />
+              <Route path="/verify-staff/:staffId" element={<VerifyStaff />} />
+              <Route path="/my-staff-identity" element={<ProtectedRoute><MyStaffIdentity /></ProtectedRoute>} />
               <Route path="/property-protection" element={<ProtectedRoute><PropertyProtection /></ProtectedRoute>} />
               <Route path="/my-disputes" element={<MyDisputes />} />
               <Route path="/my-damage-reports" element={<MyDamageReports />} />
