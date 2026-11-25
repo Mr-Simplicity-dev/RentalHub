@@ -2,32 +2,39 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaWhatsapp } from 'react-icons/fa';
 
-export function buildVolunteerShareUrl(role) {
+export function buildRoleShareUrl(role) {
   const origin =
     typeof window !== 'undefined' &&
     window.location?.origin &&
     window.location.origin !== 'null'
       ? window.location.origin
       : 'https://rentalhub.com.ng';
-  return `${origin}/careers?type=volunteer&role=${encodeURIComponent(role.id)}`;
+  const type = role?.opportunity_type === 'volunteer' ? 'volunteer' : 'employment';
+  return `${origin}/careers?type=${type}&role=${encodeURIComponent(role.id)}`;
 }
 
-export function buildVolunteerWhatsAppUrl(role) {
-  const shareUrl = buildVolunteerShareUrl(role);
+export function buildRoleWhatsAppUrl(role) {
+  const volunteer = role?.opportunity_type === 'volunteer';
+  const shareUrl = buildRoleShareUrl(role);
   const fullDescription = String(role.description || '')
     .replace(/\r\n/g, '\n')
     .trim();
 
   const lines = [
-    `*Volunteer Opportunity at Amana RentalHub NG: ${role.title}*`,
+    volunteer
+      ? `*Volunteer Opportunity at Amana RentalHub NG: ${role.title}*`
+      : `*Job Opportunity at Amana RentalHub NG: ${role.title}*`,
     role.service_state ? `Location: ${role.service_state}` : '',
-    'Free to apply — no application fee or degree required.',
+    volunteer ? 'Free to apply — no application fee or degree required.' : '',
     fullDescription ? `\n*Job Description:*\n${fullDescription}` : '',
     `\nApply here: ${shareUrl}`,
   ].filter(Boolean);
 
   return `https://wa.me/?text=${encodeURIComponent(lines.join('\n'))}`;
 }
+
+export const buildVolunteerShareUrl = buildRoleShareUrl;
+export const buildVolunteerWhatsAppUrl = buildRoleWhatsAppUrl;
 
 export default function OpportunityPicker({ roles, filter, onFilter, selected, onSelect }) {
   const { t } = useTranslation();
@@ -133,21 +140,19 @@ export default function OpportunityPicker({ roles, filter, onFilter, selected, o
                 >
                   {t(volunteer ? 'careers.apply_volunteer' : 'careers.apply_employment')}
                 </button>
-                {volunteer && (
-                  <a
-                    href={buildVolunteerWhatsAppUrl(role)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={t('careers.share_volunteer_whatsapp_aria', {
-                      title: role.title,
-                      defaultValue: `Share ${role.title} on WhatsApp`,
-                    })}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-600 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-600 hover:text-white"
-                  >
-                    <FaWhatsapp className="shrink-0 text-base" aria-hidden="true" />
-                    <span>{t('careers.share_on_whatsapp', 'Share on WhatsApp')}</span>
-                  </a>
-                )}
+                <a
+                  href={buildRoleWhatsAppUrl(role)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={t('careers.share_role_whatsapp_aria', {
+                    title: role.title,
+                    defaultValue: `Share ${role.title} on WhatsApp`,
+                  })}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-600 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-600 hover:text-white"
+                >
+                  <FaWhatsapp className="shrink-0 text-base" aria-hidden="true" />
+                  <span>{t('careers.share_on_whatsapp', 'Share on WhatsApp')}</span>
+                </a>
               </div>
             </article>
           );
