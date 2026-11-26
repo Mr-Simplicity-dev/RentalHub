@@ -155,7 +155,9 @@ describe('MarketingAgentDashboard', () => {
     expect(container.querySelector('a[href="/properties"]')).toBeTruthy();
     expect(within(container).getByTestId('headphone-support-button')).toBeTruthy();
     expect(within(container).getByTestId('marketing-notifications-button')).toBeTruthy();
-    expect(within(container).getByTestId('marketing-logout-button')).toBeTruthy();
+    const userMenuBtn = within(container).getByTestId('marketing-user-menu-button');
+    expect(userMenuBtn).toBeTruthy();
+    expect(within(container).queryByTestId('marketing-user-menu-dropdown')).toBeNull();
 
     // Commission wallet & referral invite link
     expect(within(container).getByTestId('marketing-wallet-balance').textContent).toContain('15,000');
@@ -168,8 +170,17 @@ describe('MarketingAgentDashboard', () => {
     expect(container.textContent).toContain('Musa Landlord');
     expect(container.textContent).toContain('Bola Balogun');
 
-    // Logout works
-    await act(async () => fireEvent.click(within(container).getByTestId('marketing-logout-button')));
+    // Open admin-style header dropdown and verify Profile, Staff Identity, and Logout
+    await act(async () => fireEvent.click(userMenuBtn));
+    const dropdown = within(container).getByTestId('marketing-user-menu-dropdown');
+    expect(dropdown.textContent).toContain('MARKETING AGENT');
+    expect(dropdown.querySelector('a[href="/profile"]')).toBeTruthy();
+    expect(dropdown.querySelector('a[href="/my-staff-identity"]')).toBeTruthy();
+    const logoutBtn = within(dropdown).getByTestId('marketing-logout-button');
+    expect(logoutBtn).toBeTruthy();
+
+    // Logout works from dropdown
+    await act(async () => fireEvent.click(logoutBtn));
     expect(state.auth.logout).toHaveBeenCalledTimes(1);
     expect(state.navigate).toHaveBeenCalledWith('/login');
   });

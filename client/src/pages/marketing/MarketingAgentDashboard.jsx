@@ -3,12 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   FaBell,
+  FaChevronDown,
   FaClipboardCheck,
   FaCopy,
   FaCheck,
   FaEnvelope,
   FaFileAlt,
   FaHome,
+  FaIdCard,
   FaMoneyBillWave,
   FaPhone,
   FaPlus,
@@ -24,6 +26,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recha
 import api from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import HeadphoneSupportButton from '../../components/calls/HeadphoneSupportButton';
+import RoleBadge from '../../components/common/RoleBadge';
 import MyStaffIdentityPanel from '../../components/staff/MyStaffIdentityPanel';
 
 const formatNaira = (amount) => {
@@ -64,6 +67,8 @@ const MarketingAgentDashboard = () => {
   const [notifUnreadCount, setNotifUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
   const notifRef = useRef(null);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef(null);
 
   // Respondent search filter
   const [respondentQuery, setRespondentQuery] = useState('');
@@ -139,15 +144,28 @@ const MarketingAgentDashboard = () => {
   }, [loadDashboard, loadNotifications]);
 
   useEffect(() => {
-    if (!showNotifications) return undefined;
+    if (!showNotifications && !profileMenuOpen) return undefined;
     const handleOutside = (event) => {
       if (notifRef.current && !notifRef.current.contains(event.target)) {
         setShowNotifications(false);
       }
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
+        setProfileMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setShowNotifications(false);
+        setProfileMenuOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleOutside);
-    return () => document.removeEventListener('mousedown', handleOutside);
-  }, [showNotifications]);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showNotifications, profileMenuOpen]);
 
   const markNotifAsRead = async (notifId) => {
     try {
@@ -275,7 +293,7 @@ const MarketingAgentDashboard = () => {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Dedicated Marketing Agent Top Navigation Bar */}
+      {/* Dedicated Marketing Agent Top Navigation Bar (Admin-consistent Dropdown) */}
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 shadow-xs backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           {/* Brand */}
@@ -293,7 +311,7 @@ const MarketingAgentDashboard = () => {
             </div>
           </Link>
 
-          {/* Core Agent Navigation Links */}
+          {/* Primary Desktop Shortcut */}
           <nav className="hidden items-center gap-1 md:flex" aria-label="Marketing Agent navigation">
             <Link
               to="/properties"
@@ -301,30 +319,17 @@ const MarketingAgentDashboard = () => {
             >
               <FaHome className="text-primary-600" /> Property Market
             </Link>
-            <Link
-              to="/messages"
-              className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-primary-50 hover:text-primary-700"
-            >
-              <FaEnvelope className="text-slate-500" /> Messages
-            </Link>
-            <Link
-              to="/profile"
-              className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-primary-50 hover:text-primary-700"
-            >
-              <FaUserCircle className="text-slate-500" /> Profile
-            </Link>
           </nav>
 
-          {/* Utility Controls: Headphone right beside Notification Bell + Logout */}
+          {/* Utility Controls: Messages + Headphone + Bell + Profile Dropdown (matches AdminLayout) */}
           <div className="flex items-center gap-1.5 sm:gap-2">
-            {/* Mobile Property Market shortcut */}
             <Link
-              to="/properties"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 md:hidden"
-              aria-label="Property Market"
+              to="/messages"
+              data-tour-id="header-messages"
+              aria-label="Messages"
+              className="relative shrink-0 rounded-xl p-2.5 text-slate-600 transition hover:bg-primary-50 hover:text-primary-600"
             >
-              <FaHome className="text-primary-600" />
-              <span className="hidden xs:inline">Market</span>
+              <FaEnvelope className="text-lg" />
             </Link>
 
             {/* Headphone icon right beside Notification Bell */}
@@ -335,7 +340,10 @@ const MarketingAgentDashboard = () => {
               <button
                 type="button"
                 data-testid="marketing-notifications-button"
-                onClick={() => setShowNotifications((prev) => !prev)}
+                onClick={() => {
+                  setProfileMenuOpen(false);
+                  setShowNotifications((prev) => !prev);
+                }}
                 className="relative rounded-xl p-2.5 text-slate-600 transition hover:bg-primary-50 hover:text-primary-600"
                 aria-label={t('header.notifications', 'Notifications')}
               >
@@ -362,10 +370,9 @@ const MarketingAgentDashboard = () => {
                   </div>
                   <div className="flex-1 overflow-y-auto">
                     {notifications.length === 0 ? (
-                      <div className="px-4 py-8 text-center">
-                        <FaBell className="mx-auto mb-2 text-2xl text-slate-300" />
-                        <p className="text-sm text-slate-500">No notifications yet</p>
-                      </div>
+                      <p className="px-4 py-8 text-center text-xs text-slate-500">
+                        No notifications yet.
+                      </p>
                     ) : (
                       notifications.map((notif) => (
                         <button
@@ -373,6 +380,7 @@ const MarketingAgentDashboard = () => {
                           type="button"
                           onClick={() => {
                             if (!notif.is_read) markNotifAsRead(notif.id);
+                            setShowNotifications(false);
                           }}
                           className={`block w-full border-b border-slate-50 px-4 py-3 text-left transition hover:bg-slate-50 ${
                             !notif.is_read ? 'bg-primary-50/40' : ''
@@ -392,30 +400,112 @@ const MarketingAgentDashboard = () => {
               )}
             </div>
 
-            {/* Logout Button */}
-            <button
-              type="button"
-              data-testid="marketing-logout-button"
-              onClick={handleLogout}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 sm:text-sm"
-            >
-              <FaSignOutAlt />
-              <span className="hidden sm:inline">{t('common.logout', 'Logout')}</span>
-            </button>
-          </div>
-        </div>
+            {/* Profile Dropdown Menu (matches other Admin headers) */}
+            <div className="relative shrink-0" ref={profileMenuRef}>
+              <button
+                type="button"
+                data-testid="marketing-user-menu-button"
+                data-tour-id="header-user-menu"
+                onClick={() => {
+                  setShowNotifications(false);
+                  setProfileMenuOpen((open) => !open);
+                }}
+                className="flex items-center gap-2.5 rounded-xl border border-gray-200 bg-white px-2.5 py-1.5 text-left shadow-sm transition hover:bg-gray-50 sm:px-3 sm:py-2"
+                aria-expanded={profileMenuOpen}
+                aria-haspopup="menu"
+                aria-label={t('header.user_menu', 'Account menu')}
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-900 text-sm font-semibold text-white sm:h-9 sm:w-9">
+                  {user?.full_name?.charAt(0)?.toUpperCase() || <FaUserCircle />}
+                </span>
+                <span className="hidden min-w-0 sm:block">
+                  <span className="block max-w-[160px] truncate text-sm font-semibold text-gray-900">
+                    {user?.full_name || 'Marketing Agent'}
+                  </span>
+                  <span className="block max-w-[160px] truncate text-xs text-gray-500">
+                    {user?.email || 'Marketing Agent Workspace'}
+                  </span>
+                </span>
+                <FaChevronDown
+                  className={`text-xs text-gray-500 transition-transform ${
+                    profileMenuOpen ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
 
-        {/* Mobile Quick Links Bar */}
-        <div className="flex items-center justify-around border-t border-slate-100 bg-slate-50/80 px-2 py-1.5 text-xs font-semibold text-slate-700 md:hidden">
-          <Link to="/properties" className="inline-flex items-center gap-1.5 px-2 py-1 hover:text-primary-700">
-            <FaHome /> Property Market
-          </Link>
-          <Link to="/messages" className="inline-flex items-center gap-1.5 px-2 py-1 hover:text-primary-700">
-            <FaEnvelope /> Messages
-          </Link>
-          <Link to="/profile" className="inline-flex items-center gap-1.5 px-2 py-1 hover:text-primary-700">
-            <FaUserCircle /> Profile
-          </Link>
+              {profileMenuOpen && (
+                <div
+                  data-testid="marketing-user-menu-dropdown"
+                  className="absolute right-0 z-50 mt-2 w-64 rounded-2xl border border-gray-100 bg-white py-2 shadow-xl"
+                  role="menu"
+                >
+                  <div className="border-b border-gray-100 px-4 py-3">
+                    <p className="truncate text-sm font-semibold text-gray-900">
+                      {user?.full_name || 'Marketing Agent'}
+                    </p>
+                    {user?.email && (
+                      <p className="truncate text-xs text-gray-500">{user.email}</p>
+                    )}
+                    <RoleBadge role={user?.user_type || 'marketing_agent'} className="mt-2" />
+                  </div>
+
+                  <Link
+                    to="/properties"
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 transition hover:bg-gray-50 hover:text-gray-900"
+                    onClick={() => setProfileMenuOpen(false)}
+                    role="menuitem"
+                  >
+                    <FaHome className="text-xs text-primary-600" />
+                    Property Market
+                  </Link>
+
+                  <Link
+                    to="/messages"
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 transition hover:bg-gray-50 hover:text-gray-900"
+                    onClick={() => setProfileMenuOpen(false)}
+                    role="menuitem"
+                  >
+                    <FaEnvelope className="text-xs text-gray-500" />
+                    Messages
+                  </Link>
+
+                  <Link
+                    to="/profile"
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 transition hover:bg-gray-50 hover:text-gray-900"
+                    onClick={() => setProfileMenuOpen(false)}
+                    role="menuitem"
+                  >
+                    <FaUserCircle className="text-xs text-gray-500" />
+                    Profile
+                  </Link>
+
+                  <Link
+                    to="/my-staff-identity"
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-primary-800 transition hover:bg-primary-50 hover:text-primary-900"
+                    onClick={() => setProfileMenuOpen(false)}
+                    role="menuitem"
+                  >
+                    <FaIdCard className="text-xs text-primary-600" />
+                    My Staff Identity
+                  </Link>
+
+                  <button
+                    type="button"
+                    data-testid="marketing-logout-button"
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      handleLogout();
+                    }}
+                    className="flex w-full items-center gap-2 border-t border-gray-100 px-4 py-2.5 text-left text-sm text-red-600 transition hover:bg-red-50"
+                    role="menuitem"
+                  >
+                    <FaSignOutAlt className="text-xs" />
+                    {t('common.logout', 'Logout')}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </header>
 
