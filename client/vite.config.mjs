@@ -27,6 +27,12 @@ export default defineConfig(({ mode, command }) => {
 
   return {
     plugins: [tailwindcss(), react()],
+    resolve: {
+      alias: [{
+        find: /^@tensorflow-models\/face-detection$/,
+        replacement: fileURLToPath(new URL('./src/utils/faceDetectionTfjs.js', import.meta.url)),
+      }],
+    },
     define,
     envDir,
     envPrefix: ['VITE_', 'REACT_APP_'],

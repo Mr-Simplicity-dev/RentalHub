@@ -1,7 +1,7 @@
 let runtime;
 const loadRuntime = () => {
   if (!runtime) runtime = (async () => {
-    const [tf, landmarks] = await Promise.all([import('@tensorflow/tfjs-core'), import('@tensorflow-models/face-landmarks-detection')]);
+    const [tf, landmarks] = await Promise.all([import('@tensorflow/tfjs-core'), import('@tensorflow-models/face-landmarks-detection/dist/tfjs/detector')]);
     try {
       await import('@tensorflow/tfjs-backend-webgl');
       if (!(await tf.setBackend('webgl'))) throw new Error('WebGL unavailable');
@@ -15,11 +15,13 @@ const loadRuntime = () => {
   return runtime;
 };
 
-// This runtime uses local model files and ordinary JavaScript/WebGL, not eval.
+// Load only the TFJS detector. The package root also imports the unused
+// MediaPipe global-script runtime, which has no ESM FaceMesh export.
+// Local models use ordinary JavaScript/WebGL, not eval.
 export async function createLiveFaceMesh() {
   const landmarks = await loadRuntime();
   const base = `${import.meta.env.BASE_URL}models/live-face/v1`;
-  const detector = await landmarks.createDetector(landmarks.SupportedModels.MediaPipeFaceMesh, {
+  const detector = await landmarks.load({
     runtime:'tfjs', maxFaces:2, refineLandmarks:true,
     detectorModelUrl:`${base}/detector/model.json`,
     landmarkModelUrl:`${base}/landmarks/model.json`,
