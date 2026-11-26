@@ -1,5 +1,6 @@
 const logger = require('../config/utils/logger');
 const db = require('../config/middleware/database');
+const { deliverNotification } = require('../config/utils/notificationDelivery');
 const { sendEmail } = require('../config/utils/mailer');
 const { getFrontendUrl } = require('../config/utils/frontendUrl');
 
@@ -51,7 +52,7 @@ class NotificationService {
       const tenant = tenantResult.rows[0];
       
       // Create notification record in database
-      await db.query(
+      const savedNotification = await db.query(
         `INSERT INTO notifications (
           user_id, 
           title, 
@@ -59,7 +60,7 @@ class NotificationService {
           type, 
           related_id, 
           related_type
-        ) VALUES ($1, $2, $3, $4, $5, $6)`,
+        ) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
         [
           tenantId,
           'Booking Confirmation',
@@ -69,6 +70,7 @@ class NotificationService {
           'fumigation_cleaning_booking'
         ]
       );
+      void deliverNotification(savedNotification.rows[0], { q: db });
       
       await sendTenantEmail({
         to: tenant.email,
@@ -104,7 +106,7 @@ class NotificationService {
       const tenant = tenantResult.rows[0];
       
       // Create notification record
-      await db.query(
+      const savedNotification = await db.query(
         `INSERT INTO notifications (
           user_id, 
           title, 
@@ -112,7 +114,7 @@ class NotificationService {
           type, 
           related_id, 
           related_type
-        ) VALUES ($1, $2, $3, $4, $5, $6)`,
+        ) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
         [
           tenantId,
           'Booking Cancelled',
@@ -124,6 +126,7 @@ class NotificationService {
           'fumigation_cleaning_booking'
         ]
       );
+      void deliverNotification(savedNotification.rows[0], { q: db });
       
       await sendTenantEmail({
         to: tenant.email,
@@ -161,7 +164,7 @@ class NotificationService {
       const tenant = tenantResult.rows[0];
       
       // Create notification record
-      await db.query(
+      const savedNotification = await db.query(
         `INSERT INTO notifications (
           user_id, 
           title, 
@@ -169,7 +172,7 @@ class NotificationService {
           type, 
           related_id, 
           related_type
-        ) VALUES ($1, $2, $3, $4, $5, $6)`,
+        ) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
         [
           tenantId,
           'Payment Confirmed',
@@ -179,6 +182,7 @@ class NotificationService {
           'fumigation_cleaning_booking'
         ]
       );
+      void deliverNotification(savedNotification.rows[0], { q: db });
       
       await sendTenantEmail({
         to: tenant.email,
@@ -224,7 +228,7 @@ class NotificationService {
       const message = statusMessages[newStatus] || `status has been updated to ${newStatus}`;
       
       // Create notification record
-      await db.query(
+      const savedNotification = await db.query(
         `INSERT INTO notifications (
           user_id, 
           title, 
@@ -232,7 +236,7 @@ class NotificationService {
           type, 
           related_id, 
           related_type
-        ) VALUES ($1, $2, $3, $4, $5, $6)`,
+        ) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
         [
           tenantId,
           'Booking Status Update',
@@ -242,6 +246,7 @@ class NotificationService {
           'fumigation_cleaning_booking'
         ]
       );
+      void deliverNotification(savedNotification.rows[0], { q: db });
       
       await sendTenantEmail({
         to: tenant.email,
@@ -277,7 +282,7 @@ class NotificationService {
       const tenant = tenantResult.rows[0];
       
       // Create notification record
-      await db.query(
+      const savedNotification = await db.query(
         `INSERT INTO notifications (
           user_id, 
           title, 
@@ -285,7 +290,7 @@ class NotificationService {
           type, 
           related_id, 
           related_type
-        ) VALUES ($1, $2, $3, $4, $5, $6)`,
+        ) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
         [
           tenantId,
           'Service Provider Assigned',
@@ -295,6 +300,7 @@ class NotificationService {
           'fumigation_cleaning_booking'
         ]
       );
+      void deliverNotification(savedNotification.rows[0], { q: db });
       
       await sendTenantEmail({
         to: tenant.email,
@@ -314,7 +320,7 @@ class NotificationService {
   // Send general notification
   static async sendNotification(userId, title, message, type = 'general', relatedId = null, relatedType = null) {
     try {
-      await db.query(
+      const savedNotification = await db.query(
         `INSERT INTO notifications (
           user_id, 
           title, 
@@ -322,9 +328,10 @@ class NotificationService {
           type, 
           related_id, 
           related_type
-        ) VALUES ($1, $2, $3, $4, $5, $6)`,
+        ) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
         [userId, title, message, type, relatedId, relatedType]
       );
+      void deliverNotification(savedNotification.rows[0], { q: db });
       
       return true;
     } catch (error) {
