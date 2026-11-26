@@ -53,3 +53,7 @@ Other critical constraints:
 CommonJS, matching existing files. No comments unless they clarify security
 or Twilio behaviour. Don't touch unrelated in-progress files. After changes,
 run `node --check` + the relevant test file, then the full suite.
+
+## APK build permission
+
+Build an Android APK only when the user explicitly asks for an APK build. Web/backend deployments, Git syncs, and mobile-source changes do not authorise APK builds.
