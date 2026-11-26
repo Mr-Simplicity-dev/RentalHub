@@ -11,6 +11,7 @@ const {
   normalizeLanguage,
 } = require('../config/utils/translationPolicy');
 const { getTenantPropertyUnlock } = require('../config/utils/propertyEntitlement');
+const { removePropertyContacts } = require('../config/utils/propertyContactPrivacy');
 const { TranslationError, translatePlainText } = require('./azureTranslatorService');
 
 const MAX_SOURCE_LENGTH = 5000;
@@ -60,6 +61,21 @@ const requirePlainText = (value) => {
     throw new TranslationError('TRANSLATION_INVALID_TEXT', 'No translatable text was found.', 422);
   }
   return text;
+};
+
+const redactPropertyText = (value) => (
+  removePropertyContacts({ description: typeof value === 'string' ? value : '' }).description
+);
+
+const assertNoUrlLikePropertyText = (value) => {
+  if (typeof value !== 'string') return;
+  const withoutEmail = value.replace(
+    /[^\s@<>()[\]]+\s*@\s*[^\s@.]+(?:\s*\.\s*[^\s@.]+)+/gu,
+    ' '
+  );
+  if (URL_LIKE_PATTERN.test(withoutEmail)) {
+    throw new TranslationError('TRANSLATION_INVALID_TEXT', 'No translatable text was found.', 422);
+  }
 };
 
 const isApprovedListing = (property) => (
@@ -157,7 +173,8 @@ const translatePropertyDescriptionForUser = async ({ user, propertyId, targetLan
     throw new TranslationError('PROPERTY_TRANSLATION_FORBIDDEN', 'Property not found.', 404);
   }
 
-  const sourceText = requirePlainText(property.description);
+  assertNoUrlLikePropertyText(property.description);
+  const sourceText = requirePlainText(redactPropertyText(property.description));
   const permission = canSendToTranslator({ contentType: 'text', hasAttachment: false, isPrivateConversation: true });
   if (!permission.allowed) throw new TranslationError('TRANSLATION_NOT_ALLOWED', 'Translation is not available.', 422);
 
@@ -171,8 +188,8 @@ const translatePropertyDescriptionForUser = async ({ user, propertyId, targetLan
 
   return {
     ...translationResult({
-      originalText: sourceText,
-      translatedText: translated.translatedText,
+      originalText: redactPropertyText(sourceText),
+      translatedText: redactPropertyText(translated.translatedText),
       sourceLanguage: translated.sourceLanguage,
       targetLanguage: target,
     }),

@@ -127,7 +127,7 @@ const appealDetailsQuery = ({ forUpdate = false } = {}) => `
     appellant.phone AS appellant_phone,
     reviewer.full_name AS reviewer_name,
     original_admin.full_name AS original_admin_name,
-    a.jurisdiction_state AS appeal_state
+    COALESCE(ps.state_name, target_state.state_name, target_user.assigned_state) AS appeal_state
   FROM admin_appeals a
   LEFT JOIN properties p ON p.id = a.property_id
   LEFT JOIN states ps ON ps.id = p.state_id
@@ -774,6 +774,7 @@ router.post(
         error.statusCode = 409;
         throw error;
       }
+      assertIndependentReviewer(req.user, appeal);
       await assertAppealJurisdiction(client, req.user, appeal.appeal_state);
 
       const result = await client.query(
@@ -1010,6 +1011,8 @@ router.patch(
 router._appealScopeForTest = {
   canReviewAppeal,
   parsePositiveInteger,
+  assertIndependentReviewer,
+  appealDetailsQuery,
 };
 
 module.exports = router;

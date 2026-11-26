@@ -1,31 +1,34 @@
 const logger = require('../utils/logger');
 
-const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY;
-const TURNSTILE_SITEVERIFY_TIMEOUT_MS = Number(process.env.TURNSTILE_SITEVERIFY_TIMEOUT_MS || 3000);
-// Fail-closed policy: verification is skipped ONLY when explicitly opted in
-// with TURNSTILE_SKIP_VERIFICATION=true (local development). A missing secret
-// key or misconfigured environment is NEVER silently ignored.
-const shouldSkipTurnstile = () => {
-  return (
-    process.env.TURNSTILE_SKIP_VERIFICATION === 'true' ||
-    !process.env.TURNSTILE_SECRET_KEY
-  );
+const getSecretKey = () => String(process.env.TURNSTILE_SECRET_KEY || '').trim();
+const getSiteverifyTimeoutMs = () => {
+  const value = Number(process.env.TURNSTILE_SITEVERIFY_TIMEOUT_MS);
+  return Number.isFinite(value) && value > 0 ? value : 3000;
 };
+
+// Skipping is allowed only for explicit test runs. Production cannot activate
+// this path, even if the environment variable is set by mistake.
+const canSkipTurnstile = () => (
+  process.env.NODE_ENV === 'test' && process.env.TURNSTILE_SKIP_VERIFICATION === 'true'
+);
+
+const turnstileRejection = (res) => res.status(400).json({
+  success: false,
+  message: 'Security check required. Please refresh and try again.',
+});
 
 // Cloudflare recommends binding verification to a widget action so a token
 // minted on one page cannot be replayed against a different protected action.
 // Every protected route MUST pass the exact action its form's widget uses.
 const verifyTurnstileToken = async (token, remoteIp = '', expectedAction = '') => {
-  if (shouldSkipTurnstile()) {
-    if (!process.env.TURNSTILE_SECRET_KEY) {
-      logger.warn('Turnstile verification is skipped (TURNSTILE_SKIP_VERIFICATION=true or unconfigured in non-production).');
-    }
+  if (canSkipTurnstile()) {
+    logger.warn('Turnstile verification is skipped by explicit test-only configuration.');
     return true;
   }
 
-  if (!process.env.TURNSTILE_SECRET_KEY) {
-    // Fail closed: a missing secret must never silently disable the check.
-    logger.error('TURNSTILE_SECRET_KEY is not set - rejecting Turnstile-protected request (fail closed)');
+  const secret = getSecretKey();
+  if (!secret) {
+    logger.error('TURNSTILE_SECRET_KEY is missing - rejecting Turnstile-protected request');
     return false;
   }
 
@@ -33,7 +36,7 @@ const verifyTurnstileToken = async (token, remoteIp = '', expectedAction = '') =
     const https = require('https');
     const querystring = require('querystring');
 
-    const payload = { secret: TURNSTILE_SECRET_KEY, response: token };
+    const payload = { secret, response: token };
     if (remoteIp) payload.remoteip = remoteIp;
 
     const data = querystring.stringify(payload);
@@ -65,7 +68,7 @@ const verifyTurnstileToken = async (token, remoteIp = '', expectedAction = '') =
       );
 
       // A slow Siteverify connection must never leave the request hanging.
-      req.setTimeout(TURNSTILE_SITEVERIFY_TIMEOUT_MS, () => {
+      req.setTimeout(getSiteverifyTimeoutMs(), () => {
         req.destroy(new Error('Turnstile siteverify timed out'));
       });
       req.on('error', () => resolve(false));
@@ -85,28 +88,18 @@ const requireTurnstile = (expectedAction) => {
   }
 
   return (req, res, next) => {
-    if (shouldSkipTurnstile()) {
+    if (canSkipTurnstile()) {
       return next();
     }
 
     const token = req.body?.turnstile_token;
-
-    if (!token) {
-      return res.status(400).json({
-        success: false,
-        message: 'Security check required. Please refresh and try again.',
-      });
+    if (!token || typeof token !== 'string' || !token.trim()) {
+      return turnstileRejection(res);
     }
 
-    verifyTurnstileToken(token, req.ip, expectedAction).then((valid) => {
-      if (!valid) {
-        return res.status(400).json({
-          success: false,
-          message: 'Security check failed. Please refresh and try again.',
-        });
-      }
-      next();
-    });
+    return verifyTurnstileToken(token, req.ip, expectedAction)
+      .then((valid) => (valid ? next() : turnstileRejection(res)))
+      .catch(() => turnstileRejection(res));
   };
 };
 

@@ -1,6 +1,6 @@
 const policy=require('./contactPolicy');
 const CONTACT_KEY=/^(?:(?:landlord|owner|tenant|agent|contact|property_contact|opened_by|against|actor|assigned_by|lawyer)_?)?(?:email|email_address|phone|phone_number|mobile|mobile_number|whatsapp|whatsapp_number)$/i;
-const TEXT_FIELDS=new Set(['title','description','full_address','note','message','resolution_note','lawyer_summary','content','details','amenities','structured_features']);
+const TEXT_FIELDS=new Set(['title','description','full_address','note','message','resolution_note','lawyer_summary','content','details','amenities','structured_features','original_text','translated_text']);
 const HIDDEN='Contact information hidden. Please use RentalHub support.';
 const redactContactText=value=>{
  if(!policy.inspect(value).blocked)return value;

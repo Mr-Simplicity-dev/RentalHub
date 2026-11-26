@@ -5,6 +5,7 @@ const db = require('../config/middleware/database');
 const { validationResult } = require("express-validator");
 const { getFrontendUrl } = require('../config/utils/frontendUrl');
 const { getLocationPricingQuote } = require('../config/utils/locationPricing');
+const { canCompleteFromSuccessWebhook } = require('../config/utils/paymentState');
 
 // Per-user quota for paid account-name lookups (see verifyBankAccount)
 const accountLookupQuota = new Map();
@@ -4271,8 +4272,8 @@ async function handleSuccessfulPayment(data, webhookLogger) {
       return;
     }
 
-    if (storedPayment.payment_status === 'completed' || storedPayment.payment_status === 'refunded') {
-      webhookLogger.info('Ignoring duplicate or stale Paystack success event for settled payment', {
+    if (!canCompleteFromSuccessWebhook(storedPayment.payment_status)) {
+      webhookLogger.info('Ignoring Paystack success event for a terminal or ineligible payment state', {
         reference,
         paymentId: storedPayment.id,
         status: storedPayment.payment_status,
@@ -4319,7 +4320,7 @@ async function handleSuccessfulPayment(data, webhookLogger) {
            gateway_response = $1,
            payment_channel = $3
        WHERE id = $2
-         AND payment_status <> 'refunded'
+         AND payment_status = 'pending'
        RETURNING id, payment_type, user_id, amount`,
       [JSON.stringify(data), storedPayment.id, data.channel]
     );
