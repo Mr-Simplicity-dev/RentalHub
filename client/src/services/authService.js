@@ -1,7 +1,9 @@
+import { resetWebSession, webSessionHeaders } from './webSessionClient';
 import api from './api';
 import { jwtDecode } from 'jwt-decode';
 import {
   clearAuthSession,
+  beginAuthTransition,
   getAuthToken,
   getAuthUser,
   setAuthSession,
@@ -11,6 +13,7 @@ import {
 export const authService = {
   // Register
   register: async (userData) => {
+  beginAuthTransition();
   const response = await api.post(
     '/auth/register',
     userData,
@@ -38,6 +41,7 @@ export const authService = {
 
   // Login
   login: async (email, password, turnstileToken) => {
+  beginAuthTransition();
   const response = await api.post(
     '/auth/login',
     {
@@ -69,6 +73,7 @@ export const authService = {
 
   // Google OAuth Sign-in
   googleAuth: async (credential) => {
+    beginAuthTransition();
     const response = await api.post(
       '/auth/google',
       { credential },
@@ -97,16 +102,19 @@ export const authService = {
   },
 
   // Logout (NO redirect here)
-  logout: ({ remote = true } = {}) => {
-    if (remote) {
-      api.post('/auth/logout').catch(() => { console.warn('Logout API call failed — session cleared locally'); });
-    }
+  logout: async ({ remote = true } = {}) => {
+    const headers=await webSessionHeaders();
+    beginAuthTransition();
+    const ending=remote ? api.post('/auth/logout',{}, {headers,explicitSession:true,skipAuthRefresh:true,timeout:5000}).catch(()=>{}) : Promise.resolve();
     authService.clearLocalSession();
+    await resetWebSession().catch(()=>{});
+    await ending;
   },
 
   // Get current user
  
 getCurrentUser: async () => {
+  if(!getAuthToken()) await api.get('/auth/session',{skipAuthRefresh:true});
   const response = await api.get('/auth/me', {
     // Recover an expired access token from the valid HttpOnly cookie.
     skipAuthRefresh: false,
@@ -150,7 +158,7 @@ getCurrentUser: async () => {
   // Check if authenticated
   isAuthenticated: () => {
     const token = getAuthToken();
-    if (!token) return Boolean(getAuthUser());
+    if (!token) return false;
 
     try {
       const decoded = jwtDecode(token);

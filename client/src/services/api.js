@@ -1,21 +1,11 @@
 import { createMfaVerification } from './mfaVerification.cjs';
 import axios from 'axios';
-import { clearAuthSession, getAuthToken, setAuthToken } from './authStorage';
+import { clearAuthSession, getAuthToken, setAuthToken, getCsrfToken, authGeneration } from './authStorage';
+import { initializeWebSession, getWebSessionId, webSessionHeaders, adoptWebSession } from './webSessionClient';
 import { requestMfaCode, resetMfaAttempts, showMfaEnrollment } from './mfaPromptService';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
 const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
-
-const getCookieValue = (name) => {
-  if (typeof document === 'undefined') return '';
-  const cookies = document.cookie ? document.cookie.split(';') : [];
-  const prefix = `${name}=`;
-  const match = cookies
-    .map((cookie) => cookie.trim())
-    .find((cookie) => cookie.startsWith(prefix));
-
-  return match ? decodeURIComponent(match.slice(prefix.length)) : '';
-};
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -41,9 +31,13 @@ const mfaVerification = createMfaVerification({
 });
 
 api.interceptors.request.use(
-  (config) => {
+  async (config) => {
+    config.webSessionId=config.explicitSession ? (config.headers.get?.('X-RentalHub-Session-Id') || config.headers['X-RentalHub-Session-Id']) : await initializeWebSession();
+    config.authGeneration=authGeneration();
+    config.headers['X-RentalHub-Session-Id']=config.webSessionId;
     config.mfaGeneration = mfaVerification.generation();
     const token = getAuthToken();
+    if (config.explicitSession) { return config; }
     if (config.skipAuth && typeof config.headers?.delete === 'function') {
       config.headers.delete('Authorization');
     } else if (config.skipAuth && config.headers) {
@@ -54,7 +48,7 @@ api.interceptors.request.use(
     }
 
     const method = String(config.method || 'get').toLowerCase();
-    const csrfToken = getCookieValue('csrf_token');
+    const csrfToken = getCsrfToken();
     if (csrfToken && MUTATING_METHODS.has(method)) {
       config.headers['X-CSRF-Token'] = csrfToken;
     }
@@ -75,12 +69,18 @@ api.interceptors.request.use(
 
 // Response interceptor with silent token refresh
 api.interceptors.response.use(
-  (response) => {
+  async (response) => {
+    if(response.config?.authGeneration!==authGeneration() || response.config?.webSessionId!==getWebSessionId())throw Error('Sign-in changed while the request was running.');
+    if(response.data?.data?.web_session_id){
+      if(response.config.authGeneration!==authGeneration())throw Error('Sign-in changed while the request was running.');
+      await adoptWebSession(response.data.data);
+    }
     if (response.config?.mfaAttempts) resetMfaAttempts();
     return response;
   },
   async (error) => {
     const originalRequest = error.config;
+    if(originalRequest && (originalRequest.authGeneration!==authGeneration() || originalRequest.webSessionId!==getWebSessionId()))return Promise.reject(error);
 
     if (['MFA_ENROLLMENT_REQUIRED', 'TOTP_NOT_ENABLED', 'TOTP_NOT_SETUP'].includes(error.response?.data?.code)) {
       showMfaEnrollment(error.response.data.message);
@@ -134,6 +134,8 @@ api.interceptors.response.use(
 
     originalRequest._retry = true;
     isRefreshing = true;
+    const refreshGeneration=authGeneration();
+    const refreshSessionId=getWebSessionId();
 
     try {
       const { data } = await axios.post(
@@ -141,6 +143,7 @@ api.interceptors.response.use(
         {},
         {
           withCredentials: true,
+          headers: await webSessionHeaders(),
         }
       );
 
@@ -150,6 +153,8 @@ api.interceptors.response.use(
         );
       }
 
+      if(refreshGeneration!==authGeneration()||refreshSessionId!==getWebSessionId())throw Error('Sign-in changed while refreshing.');
+      await adoptWebSession(data.data);
       const newToken = data.data.token;
 
       setAuthToken(newToken);
@@ -184,7 +189,7 @@ api.interceptors.response.use(
       pendingRequests = [];
       queuedRequests.forEach(({ reject }) => reject(refreshError));
       // A temporary outage must not destroy a valid browser session.
-      if (refreshError.response?.status === 401) invalidateSession();
+      if (refreshError.response?.status === 401 && refreshGeneration===authGeneration() && refreshSessionId===getWebSessionId()) invalidateSession();
 
       return Promise.reject(refreshError);
     }
@@ -192,3 +197,4 @@ api.interceptors.response.use(
 );
 
 export default api;
+

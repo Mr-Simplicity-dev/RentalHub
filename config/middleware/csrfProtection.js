@@ -1,3 +1,6 @@
+const jwt = require('jsonwebtoken');
+const webSessions = require('../../services/webAuthSessions');
+const { getAllowedFrontendOrigins } = require('../utils/frontendUrl');
 const crypto = require('crypto');
 const {
   AUTH_COOKIE_NAME,
@@ -20,7 +23,6 @@ const CSRF_EXEMPT_PATHS = new Set([
   '/api/auth/google',
   '/api/auth/google/start',
   '/api/auth/google/mobile/exchange',
-  '/api/auth/refresh-token',
   '/api/recruitment/payments/webhook',
   '/api/whatsapp/webhook',
   '/api/paystack/webhook',
@@ -44,11 +46,29 @@ const maybeCookieAuth = (cookies) => {
   );
 };
 
-const csrfProtection = (req, res, next) => {
+const csrfProtection = async (req, res, next) => {
   // 1. Safe methods (GET, HEAD, OPTIONS) never mutate state and are always exempt
   if (SAFE_METHODS.has(req.method)) {
     return next();
   }
+
+  const bearer = String(req.headers.authorization || '').replace(/^Bearer\s+/i,'');
+  const claims = bearer ? jwt.decode(bearer) : null;
+  const id = webSessions.tabId(req);
+  const jar = webSessions.cookies(req.headers.cookie);
+  const path = req.path || '';
+  const publicAuth = CSRF_EXEMPT_PATHS.has(path) || path.startsWith('/api/auth/register') || path.startsWith('/api/auth/lawyer/accept') || path.startsWith('/api/auth/agent/accept') || path.startsWith('/api/assisted-registration');
+  const webMutation = Boolean(claims?.sid) || (!publicAuth && (Boolean(id && jar[webSessions.cookieName(id)]) || (!webSessions.nativeRequest(req) && ['/api/auth/refresh-token','/api/auth/logout'].includes(path))));
+  if (webMutation) {
+    let origin;
+    try { origin = new URL(req.headers.origin || req.headers.referer || '').origin; } catch {}
+    if (!origin || !getAllowedFrontendOrigins().includes(origin)) return res.status(403).json({success:false,message:'Invalid request origin.'});
+    try { await webSessions.getService().verifyCsrf(req); return next(); }
+    catch(error) { return res.status(error.statusCode || 503).json({success:false,code:error.code,message:'Unable to verify this session request.'}); }
+  }
+  if (webSessions.nativeRequest(req) && !claims?.sid && (bearer || req.body?.session_token || req.headers['x-rentalhub-session-token'])) return next();
+
+  if (id && !claims?.sid) return next();
 
   const cookies = parseCookies(req.headers.cookie);
 
@@ -68,7 +88,6 @@ const csrfProtection = (req, res, next) => {
   }
 
   // 4. Exact path exemptions
-  const path = req.path || '';
   if (CSRF_EXEMPT_PATHS.has(path)) {
     return next();
   }
@@ -126,3 +145,4 @@ const csrfProtection = (req, res, next) => {
 };
 
 module.exports = csrfProtection;
+

@@ -306,6 +306,7 @@ router.post(
   authController.checkLawyerPassportForFraud
 );
 
+router.use(require('./webSessions'));
 router.get('/me', authenticate, authController.getCurrentUser);
 router.post('/refresh-token', authSensitiveLimiter, authController.refreshToken);
 router.post('/logout', authenticate, authController.logout);
@@ -330,3 +331,4 @@ router.post(
 );
 
 module.exports = router;
+

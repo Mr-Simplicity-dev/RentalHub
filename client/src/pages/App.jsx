@@ -843,6 +843,7 @@ function AssistedSessionGate({children}) {
  return children;
 }
 function App() {
+  useEffect(()=>{const clear=()=>queryClient.clear();window.addEventListener('rentalhub:account-changed',clear);return()=>window.removeEventListener('rentalhub:account-changed',clear);},[]);
   return (
     <ErrorBoundary>
     <QueryClientProvider client={queryClient}>

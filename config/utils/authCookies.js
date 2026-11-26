@@ -15,7 +15,7 @@ const parseCookies = (cookieHeader = '') =>
       if (index === -1) return acc;
       const key = part.slice(0, index).trim();
       const value = part.slice(index + 1).trim();
-      acc[key] = decodeURIComponent(value || '');
+      try { acc[key] = decodeURIComponent(value || ''); } catch {}
       return acc;
     }, {});
 
@@ -81,19 +81,8 @@ const getBearerToken = (req) => {
   return authHeader.slice(7);
 };
 
-const getAuthTokenFromRequest = (req) => {
-  // Prefer Bearer header (access token), fall back to cookie (refresh/session token)
-  return getBearerToken(req) || parseCookies(req.headers.cookie)[AUTH_COOKIE_NAME];
-};
-
-const getSocketAuthToken = (socket) => {
-  const cookies = parseCookies(socket.handshake?.headers?.cookie);
-  return (
-    socket.handshake?.auth?.token ||
-    cookies[AUTH_COOKIE_NAME] ||
-    String(socket.handshake?.headers?.authorization || '').replace(/^Bearer\s+/i, '')
-  );
-};
+const getAuthTokenFromRequest = req => getBearerToken(req);
+const getSocketAuthToken = socket => socket.handshake?.auth?.token || String(socket.handshake?.headers?.authorization || '').replace(/^Bearer\s+/i, '') || null;
 
 module.exports = {
   AUTH_COOKIE_NAME,

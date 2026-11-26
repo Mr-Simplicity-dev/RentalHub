@@ -1,11 +1,12 @@
+import { useAuth } from '../hooks/useAuth';
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate, useParams, useLocation } from 'react-router-dom';
 import api from '../services/api';
-import { setAuthSession } from '../services/authStorage';
 import { useTranslation } from 'react-i18next';
 
 const VerifyEmail = () => {
   const { t } = useTranslation();
+  const { establishSession } = useAuth();
   const [searchParams] = useSearchParams();
   const params = useParams();
   const location = useLocation();
@@ -36,7 +37,7 @@ const VerifyEmail = () => {
 
           // 🔐 Auto-login
           if (authToken && user && !res.data.requires_sign_in) {
-            setAuthSession(authToken, user);
+            await establishSession({token:authToken,user});
             api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
             setDestination(user.user_type === "tenant" ? "/tenant/dashboard" : "/dashboard");
           }
@@ -57,7 +58,7 @@ const VerifyEmail = () => {
     };
 
     verify();
-  }, [token, navigate, t]);
+  }, [token, navigate, t, establishSession]);
 
   // Countdown + redirect when successful
   useEffect(() => {

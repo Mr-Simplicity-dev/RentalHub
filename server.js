@@ -1129,11 +1129,7 @@ if(process.env.NODE_ENV==='production')io.adapter(require('@socket.io/postgres-a
 // Socket.io authentication middleware
 io.use(async (socket, next) => {
   try {
-    const { parseCookies } = require('./config/utils/authCookies');
-    const cookies = parseCookies(socket.handshake?.headers?.cookie);
-    const token = socket.handshake?.auth?.token ||
-      cookies.auth_token ||
-      String(socket.handshake?.headers?.authorization || '').replace(/^Bearer\s+/i, '');
+    const token = require('./config/utils/authCookies').getSocketAuthToken(socket);
 
     if (!token) {
       return next(new Error('Authentication required'));
@@ -1141,6 +1137,7 @@ io.use(async (socket, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
     const { userId, userType, tokenVersion } = getSessionTokenIdentity(decoded);
+    await require('./services/webSessionSockets').authorize(socket,decoded);
 
     const userResult = await db.query(
       `SELECT id, user_type, is_active, deleted_at, token_version, assisted_registration
@@ -1166,6 +1163,15 @@ io.use(async (socket, next) => {
     return next(new Error('Invalid or expired token'));
   }
 });
+
+const sessionSocketSecurity=require('./services/webSessionSockets');
+io.on('connection',sessionSocketSecurity.attach);
+if(process.env.NODE_ENV==='production'){
+ const listener=sessionSocketSecurity.createRevocationListener({io,db,logger});
+ void listener.start();
+ process.once('SIGTERM',()=>{void listener.stop();});
+ process.once('SIGINT',()=>{void listener.stop();});
+}
 
 // Export io and realtime via a shared module instead of global variables
 setRealtimeIo(io);

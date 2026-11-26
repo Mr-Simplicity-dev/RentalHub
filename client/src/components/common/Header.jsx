@@ -305,19 +305,15 @@ const Header = () => {
     scrollToLinkedRoute('/register');
   };
 
-  const stopImpersonation = () => {
-    const originalSession = getImpersonationOriginalSession();
-    if (!originalSession?.token || !originalSession?.user) {
-      toast.error('Original super admin session was not found');
-      return;
-    }
-
-    setAuthSession(originalSession.token, originalSession.user);
-    updateUser(originalSession.user);
-    api.defaults.headers.common['Authorization'] = `Bearer ${originalSession.token}`;
-    clearImpersonationOriginalSession();
-    toast.success('Returned to Super Admin session');
-    navigate('/super-admin?tab=admin');
+  const stopImpersonation = async () => {
+    try {
+      const response=await api.post('/auth/impersonation/return');
+      setAuthSession(response.data.data.token,null);
+      const current=await api.get('/auth/me');
+      updateUser(current.data.data);
+      clearImpersonationOriginalSession();
+      toast.success('Returned to Super Admin session');navigate('/super-admin?tab=admin');
+    } catch { toast.error('Please sign in again to return to your account.'); }
   };
 
   const clearAvatarLongPressTimer = () => {

@@ -59,7 +59,7 @@ export const AuthProvider = ({ children }) => {
       turnstileToken
     );
 
-    if (response.success) {
+    if (response.success && response.data?.token && response.data?.user) {
       setUser(response.data.user);
       setIsAuthenticated(true);
     }
@@ -70,7 +70,7 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     const response = await authService.register(userData);
 
-    if (response.success) {
+    if (response.success && response.data?.token && response.data?.user) {
       setUser(response.data.user);
       setIsAuthenticated(true);
     }
@@ -79,9 +79,10 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    authService.logout();
+    const ending = authService.logout();
     setUser(null);
     setIsAuthenticated(false);
+    return ending;
   };
 
   const updateUser = useCallback((userData) => {
@@ -102,17 +103,23 @@ export const AuthProvider = ({ children }) => {
     return () => {active=false;window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);};
   }, [user?.id, updateUser]);
 
-  const establishSession = async (data) => {
+  const establishSession = useCallback(async (data) => {
     setAuthSession(data.token,data.user);
     if(data.token)api.defaults.headers.common.Authorization='Bearer '+data.token;
     const current=await authService.getCurrentUser();
     setUser(current.data);setIsAuthenticated(true);
-  };
+  }, []);
+
+  useEffect(() => {
+    const resume=event=>{if(event.persisted){authService.clearLocalSession();setUser(null);setIsAuthenticated(false);setSessionAttempt(value=>value+1);}};
+    window.addEventListener('pageshow',resume);
+    return()=>window.removeEventListener('pageshow',resume);
+  },[]);
 
   const googleLogin = async (credential) => {
     const response = await authService.googleAuth(credential);
 
-    if (response.success && response.data) {
+    if (response.success && response.data?.token && response.data?.user) {
       setUser(response.data.user);
       setIsAuthenticated(true);
     }

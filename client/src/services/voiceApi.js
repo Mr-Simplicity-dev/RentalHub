@@ -1,3 +1,4 @@
+import { webSessionHeaders } from './webSessionClient';
 // ─────────────────────────────────────────────────────────────────────────────
 // Twilio Voice API client.
 //
@@ -27,7 +28,7 @@ export const fetchVoiceToken = async (line = '') => {
     response = await fetch(url, {
       method: 'GET',
       credentials: 'include',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers: await webSessionHeaders(),
     });
   } catch (networkError) {
     const error = new Error(
@@ -76,7 +77,7 @@ const authedFetch = async (path, options = {}) => {
   const token = getAuthToken();
   const headers = {
     ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...await webSessionHeaders(),
     ...(options.headers || {}),
   };
 

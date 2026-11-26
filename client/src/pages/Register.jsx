@@ -14,7 +14,6 @@ import TurnstileWidget from '../components/common/TurnstileWidget';
 import BankTransferCheckout from '../components/BankTransferCheckout';
 import RegistrationPhoneVerification from '../components/RegistrationPhoneVerification';
 import VirtualAccountCheckout from '../components/VirtualAccountCheckout';
-import { setAuthSession } from '../services/authStorage';
 import { getStoredUtm } from '../hooks/useUtmParams';
 import { useTranslation } from 'react-i18next';
 
@@ -123,14 +122,15 @@ const Register = () => {
   const [phoneVerification, setPhoneVerification] = useState(null);
   const [legacyCodeSent, setLegacyCodeSent] = useState(false);
   const legacyInitialSend = useRef(null);
+  const registrationProofs = useRef(new Map());
   const applyVerifiedRegistration = async data => {
     rememberRegistrationEmail(data);
     if (data.token && data.user) {
-      completeRegistrationDraft(); setAuthSession(data.token, data.user);
-      window.location.assign(data.user.user_type === 'tenant' ? '/tenant/dashboard' : '/dashboard');
+      completeRegistrationDraft(); await establishSession(data);
+      navigate(data.user.user_type === 'tenant' ? '/tenant/dashboard' : '/dashboard');
       return;
     }
-    if (data.reference && data.completion_token) sessionStorage.setItem('rentalhub.registration-proof:' + data.reference, data.completion_token);
+    if (data.reference && data.completion_token) registrationProofs.current.set(data.reference,data.completion_token);
     if (data.payment_method === 'bank_transfer') { setBankTransfer(data); setPaymentMethod(null); setPhoneVerification(null); return; }
     if (!data.authorization_url) throw new Error(t('register.registration_failed'));
     window.location.assign(data.authorization_url);
@@ -159,7 +159,7 @@ const Register = () => {
   setTurnstileToken(null);
   turnstileRef.current?.reset();
 };
-  const { register } = useAuth();
+  const { register , establishSession} = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(initialDraft?.step||1);
   const [errors, setErrors] = useState({});
@@ -470,7 +470,7 @@ const Register = () => {
       try {
         const response = await api.post(
           `/auth/register/payment/complete/${registrationReference}`,
-          { completion_token: sessionStorage.getItem('rentalhub.registration-proof:' + registrationReference) },
+          { completion_token: registrationProofs.current.get(registrationReference) },
           { skipAuth: true, skipAuthRefresh: true }
         );
 
@@ -479,14 +479,14 @@ const Register = () => {
         if (response.data?.success) {
           const { token, user } = response.data.data;
 
-          sessionStorage.removeItem('rentalhub.registration-proof:' + registrationReference);
+          registrationProofs.current.delete(registrationReference);
           completeRegistrationDraft();
           rememberRegistrationEmail(response.data.data);
-          setAuthSession(token, user);
+          await establishSession({token,user});
           api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
           toast.success(t('register.registration_success'));
-          window.location.assign(
+          navigate(
             user?.user_type === 'tenant'
               ? '/tenant/dashboard'
               : '/dashboard'
@@ -1443,11 +1443,11 @@ return (
                   const { token, user } = response.data.data;
                   completeRegistrationDraft();
           rememberRegistrationEmail(response.data.data);
-          setAuthSession(token, user);
+          await establishSession({token,user});
                   api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
                   toast.success(t('register.registration_success'));
-                  window.location.assign(
-                    user?.user_type === 'tenant'
+                  navigate(
+            user?.user_type === 'tenant'
                       ? '/tenant/dashboard'
                       : '/dashboard'
                   );

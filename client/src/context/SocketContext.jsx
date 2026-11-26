@@ -1,3 +1,5 @@
+import api from '../services/api';
+import { getWebSessionId } from '../services/webSessionClient';
 import useCallSounds from '../hooks/useCallSounds';
 import React, {
   createContext,
@@ -349,11 +351,17 @@ export const SocketProvider = ({ children }) => {
     if (!token) return undefined;
 
     const nextSocket = io(getSocketUrl(), {
-      auth: { token },
+      auth: { token, sessionId:getWebSessionId() },
       withCredentials: true,
       transports: ['websocket'],
     });
 
+    let disposed=false,recovering=false;
+    const reauthenticate=()=>{if(disposed||!getAuthToken())return;nextSocket.auth={token:getAuthToken(),sessionId:getWebSessionId()};nextSocket.disconnect();nextSocket.connect();};
+    const recover=async()=>{if(disposed||recovering)return;recovering=true;try{await api.get('/auth/me');reauthenticate();}catch{}finally{recovering=false;}};
+    window.addEventListener('rentalhub:access-token-changed',reauthenticate);
+    nextSocket.on('connect_error',error=>{if(/token|session|authentication/i.test(error.message||''))void recover();});
+    nextSocket.on('disconnect',reason=>{if(reason==='io server disconnect')void recover();});
     setSocket(nextSocket);
 
     nextSocket.on('connect', () => setConnected(true));
@@ -516,6 +524,8 @@ export const SocketProvider = ({ children }) => {
     });
 
     return () => {
+      disposed=true;
+      window.removeEventListener('rentalhub:access-token-changed',reauthenticate);
       nextSocket.disconnect();
       setSocket(null);
       setConnected(false);

@@ -59,7 +59,7 @@ router.post('/phone/verify', otpLimiter, async (req, res) => {
     });
     res.json({
       success: true,
-      data: internal.attachAuthSession(res, {
+      data: await internal.attachAuthSession(res, {
         user: policy.safeUser(user),
         token
       }, {

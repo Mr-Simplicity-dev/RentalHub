@@ -281,11 +281,11 @@ const impersonateAdmin = async (req, res) => {
 
 
 
-    const csrfToken = setAuthCookies(res, impersonationToken, {
+    const csrfToken = require('../webAuthSessions').nativeRequest(req) ? setAuthCookies(res, impersonationToken, {
 
       maxAge: 15 * 60 * 1000,
 
-    });
+    }) : null;
 
     const responseData = {
 
@@ -341,6 +341,10 @@ const impersonateAdmin = async (req, res) => {
 
 
 
+    if (!isNativeClient) {
+      const data = await require('../authService').assistedRegistrationInternals.attachAuthSession(res,{...responseData,token:impersonationToken},{request:req,parentId:req.auth?.sid,maxAge:15*60*1000});
+      return res.json({success:true,message:'Staff preview opened',data});
+    }
     return res.json({
 
       success: true,

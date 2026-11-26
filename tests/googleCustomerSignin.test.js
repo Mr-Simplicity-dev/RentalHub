@@ -6,7 +6,7 @@ function fixture(options={}) {
   let claim,otp;
   const query=async(sql,args=[])=>{
     audit.push(sql);
-    if(sql.startsWith('INSERT INTO google_signin_requests')){records.set(args[0],{id:args[0],mode:args[1],nonce:args[2],verifier_hash:args[3]});return {rowCount:1};}
+    if(sql.startsWith('INSERT INTO google_signin_requests')){records.set(args[0],{id:args[0],mode:args[1],nonce:args[2],verifier_hash:args[3],web_tab_hash:args[4]});return {rowCount:1};}
     const r=records.get(args[0]);
     if(sql.includes('SELECT * FROM google_signin_requests'))return {rows:r&&!r.user_id?[r]:[]};
     if(sql.includes('FROM users WHERE'))return {rows:options.missing?[]:[{...user}]};
@@ -27,10 +27,10 @@ function fixture(options={}) {
     '../config/utils/twoFactor':{verifyTotpCode:async({code})=>{if(code!=='123456')throw Error();},verifyRecoveryCode:async()=>{throw Error();}},
     '../config/utils/mailer':{sendEmail:async({html})=>{otp=html.match(/<strong>(\d+)</)[1];return {success:true};}},
     'google-auth-library':{OAuth2Client:class{async verifyIdToken({idToken,audience}){assert.equal(audience,'test-client');if(idToken!=='signed')throw Error();return {getPayload:()=>claim};}}},
-    'node:crypto':crypto,
+    'node:crypto':crypto,'./webAuthSessions':require('../services/webAuthSessions'),
   };
   const ctx={exports:{},require:k=>modules[k],process:{env:{GOOGLE_CLIENT_ID:'test-client',JWT_SECRET:'test-only-key'}}};vm.runInNewContext(source,ctx);
-  async function call(fn,body={},params={}){const res={statusCode:200,set(){},status(n){this.statusCode=n;return this;},json(obj){this.body=obj;return this;}};await ctx.exports[fn]({body,params},res);return res;}
+  async function call(fn,body={},params={},tab='a'.repeat(64)){const res={statusCode:200,set(){},status(n){this.statusCode=n;return this;},json(obj){this.body=obj;return this;}};await ctx.exports[fn]({body,params,headers:{'x-rentalhub-session-id':tab}},res);return res;}
   async function begin(mode='mobile'){const {body:{data}}=await call('start',{mode});claim={email:user.email,sub:'google-id',email_verified:true,nonce:data.nonce,...options.claim};return data;}
   return {call,begin,user,issued,audit,getOtp:()=>otp};
 }
@@ -47,3 +47,5 @@ test('forged, unverified and stale Google identity is rejected',async()=>{for(co
 test('privileged, pending, incomplete, locked and suspended accounts cannot sign in',async()=>{for(const user of [{user_type:'super_admin'},{is_recruitment_admin:true},{approval_status:'pending'},{email_verified:false},{phone:null},{is_active:false},{locked_until:'2099-01-01'},{google_subject:'other'},{assisted_registration:true,phone_verified:false}]){const f=fixture({user}),c=await f.begin();assert.ok((await f.call('authorize',{request_id:c.id,credential:'signed'})).statusCode>=400);assert.equal(f.issued.length,0);}});
 test('web requires the browser verifier and configured second factor',async()=>{const f=fixture({user:{totp_enabled:true}}),c=await f.begin('web'),body={request_id:c.id,credential:'signed'};assert.equal((await f.call('authorize',body)).statusCode,401);body.verifier=c.verifier;assert.equal((await f.call('authorize',body)).body.code,'GOOGLE_MFA_REQUIRED');assert.equal((await f.call('authorize',{...body,factor:'123456'})).body.data.token,'session');});
 test('third party Google email requires mailbox proof before linking',async()=>{const f=fixture({user:{email:'me@example.com'}}),c=await f.begin('web'),body={request_id:c.id,credential:'signed',verifier:c.verifier};assert.equal((await f.call('authorize',body)).body.code,'GOOGLE_EMAIL_REQUIRED');assert.equal((await f.call('authorize',{...body,mailbox_code:f.getOtp()})).body.data.user.id,2);});
+
+test('Google web authorization is bound to the initiating tab',async()=>{const f=fixture(),c=await f.begin('web');const r=await f.call('authorize',{request_id:c.id,credential:'signed',verifier:c.verifier},{},'b'.repeat(64));assert.equal(r.statusCode,401);assert.equal(f.issued.length,0);});

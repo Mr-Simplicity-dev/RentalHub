@@ -1,3 +1,4 @@
+const webSessions = require('../../services/webAuthSessions');
 const logger = require('../utils/logger');
 const jwt = require('jsonwebtoken');
 const db = require('./database');
@@ -19,7 +20,7 @@ const authenticate = async (req, res, next) => {
     // database. enforceFlags pre-attaches {id, user_type} straight from the
     // JWT; trusting that here would skip the token-version (logout-all),
     // deleted-account and suspension checks below.
-    if (req.user?.id && !req.user._tokenOnly) {
+    if (req.user?.id && !req.user._tokenOnly && (req.webSessionValidated || webSessions.nativeRequest(req))) {
       return await require('./assistedAccessGate')(req,res,next);
     }
 
@@ -36,6 +37,10 @@ const authenticate = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
     const { userId, tokenVersion } = getSessionTokenIdentity(decoded);
+    if (decoded.sid) {
+      req.webSession = await webSessions.getService().validateAccess(decoded, webSessions.tabId(req));
+      req.webSessionValidated = true;
+    } else if (!webSessions.nativeRequest(req)) { throw webSessions.denied(); }
 
     const result = await db.query(
       `SELECT id, email, phone, phone_verified, user_type, identity_verified, subscription_active,
@@ -88,7 +93,7 @@ const authenticate = async (req, res, next) => {
     return await require('./assistedAccessGate')(req,res,next);
   } catch (error) {
     logger.error('Auth error:', error);
-    const invalidToken = ['JsonWebTokenError', 'TokenExpiredError', 'NotBeforeError'].includes(error.name) ||
+    const invalidToken = error.code === 'AUTH_SESSION_INVALID' || ['JsonWebTokenError', 'TokenExpiredError', 'NotBeforeError'].includes(error.name) ||
       ['Invalid session token payload', 'Token is not a session token', 'Invalid session token claims'].includes(error.message);
     return res.status(invalidToken ? 401 : 503).json({
       success: false,
@@ -110,6 +115,10 @@ const optionalAuthenticate = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
     const { userId, tokenVersion } = getSessionTokenIdentity(decoded);
+    if (decoded.sid) {
+      req.webSession = await webSessions.getService().validateAccess(decoded, webSessions.tabId(req));
+      req.webSessionValidated = true;
+    } else if (!webSessions.nativeRequest(req)) { throw webSessions.denied(); }
 
     const result = await db.query(
       `SELECT id, email, phone, phone_verified, user_type, identity_verified, subscription_active,

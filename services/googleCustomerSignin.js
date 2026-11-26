@@ -1,3 +1,4 @@
+const webSessions = require('./webAuthSessions');
 const crypto = require('node:crypto');
 const { OAuth2Client } = require('google-auth-library');
 const db = require('../config/middleware/database');
@@ -56,7 +57,7 @@ async function finishSession(req,res,user,native) {
   const {generateToken,attachAuthSession} = require('./authService').assistedRegistrationInternals;
   const token = generateToken(user.id,user.user_type,{tokenVersion:user.token_version || 1});
   delete user.google_subject;
-  return res.json({success:true,data:attachAuthSession(res,{user,token},{exposeSessionToken:native})});
+  return res.json({success:true,data:await attachAuthSession(res,{user,token},{exposeSessionToken:native})});
 }
 async function confirmMailbox(row,user,subject,code) {
   if (row.mailbox_verified && row.mailbox_user_id === user.id && row.mailbox_subject === subject) return;
@@ -80,9 +81,11 @@ exports.start = endpoint(async (req,res) => {
   const clientId = audience();
   const mode = req.body.mode;
   if (!['web','mobile'].includes(mode)) throw fail(400,'Invalid sign-in request.');
+  const tab = mode === 'web' ? webSessions.tabId(req) : null;
+  if (mode === 'web' && !tab) throw expired();
   const id = crypto.randomUUID(), verifier = secret(), nonce = secret();
   await db.query('DELETE FROM google_signin_requests WHERE expires_at <= NOW()');
-  const inserted = await db.query("INSERT INTO google_signin_requests(id,mode,nonce,verifier_hash,expires_at) VALUES($1,$2,$3,$4,NOW()+INTERVAL '10 minutes')",[id,mode,nonce,digest(verifier)]);
+  const inserted = await db.query("INSERT INTO google_signin_requests(id,mode,nonce,verifier_hash,web_tab_hash,expires_at) VALUES($1,$2,$3,$4,$5,NOW()+INTERVAL '10 minutes')",[id,mode,nonce,digest(verifier),tab ? digest(tab) : null]);
   if (inserted.rowCount !== 1) throw fail(503,'Could not start a persistent sign-in session.');
   return res.json({success:true,data:{id,verifier,nonce,clientId}});
 });
@@ -94,6 +97,7 @@ exports.browserConfig = endpoint(async (req,res) => {
 exports.authorize = endpoint(async (req,res) => {
   const {credential,request_id,verifier,factor} = req.body;
   const row = await readRequest(request_id);
+  if (row.mode === 'web' && (!webSessions.tabId(req) || digest(webSessions.tabId(req)) !== row.web_tab_hash)) throw expired();
   if (row.mode === 'web' && (!hex.test(verifier || '') || digest(verifier) !== row.verifier_hash)) throw expired();
   if (typeof credential !== 'string' || credential.length>12000) throw fail(400,'Google credential required.');
   const profile = await verifyIdentity(credential,row.nonce);

@@ -129,8 +129,9 @@ const getOnlineUsersPayload = () =>
     })
     .filter(Boolean);
 
-const fetchSocketUser = async (token) => {
+const fetchSocketUser = async (token, sessionId) => {
   const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+  if(decoded.sid)await require('../../services/webAuthSessions').getService().validateAccess(decoded,sessionId);
   const { userId, tokenVersion } = getSessionTokenIdentity(decoded);
 
   const result = await db.query(
@@ -771,7 +772,7 @@ const configureRealtimeSocket = (io) => {
         return next(new Error('Authentication token required'));
       }
 
-      socket.user = await fetchSocketUser(token);
+      socket.user = await fetchSocketUser(token,socket.handshake?.auth?.sessionId);
       return next();
     } catch (error) {
       return next(new Error(error.message || 'Socket authentication failed'));

@@ -718,6 +718,8 @@ const isNativeAuthClient = (req) =>
 
 const attachAuthSession = (res, data, options = {}) => {
   if (!data?.token) return data;
+  const request = options.request || res.req;
+  if (!isNativeAuthClient(request)) return require('./webAuthSessions').getService().create(request,res,data,{parentId:options.parentId,maxAge:options.maxAge});
 
   // data.token is the 24h session token → stored in HTTP-only cookie
   // Decode it to mint a 1h access token for the Bearer header
@@ -731,7 +733,7 @@ const attachAuthSession = (res, data, options = {}) => {
     }
   } catch (_) {}
 
-  const csrfToken = setAuthCookies(res, data.token);
+  const csrfToken = require('crypto').randomBytes(24).toString('hex');
   if (shouldReturnTokenInBody()) {
     const responseData = {
       ...data,
@@ -1956,7 +1958,7 @@ exports.register = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Registration successful! Please verify your email and phone.',
-      data: attachAuthSession(res, data, { exposeSessionToken: isNativeAuthClient(req) })
+      data: await attachAuthSession(res, data, { exposeSessionToken: isNativeAuthClient(req) })
     });
 
   } catch (error) {
@@ -3027,7 +3029,7 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Registration completed successfully',
-      data: attachAuthSession(res, data, { exposeSessionToken: isNativeAuthClient(req) })
+      data: await attachAuthSession(res, data, { exposeSessionToken: isNativeAuthClient(req) })
     });
   } catch (error) {
     req.logger.error('Registration completion error:', error);
@@ -3437,7 +3439,7 @@ exports.login = async (req, res) => {
     res.json({
       success: true,
       message: 'Login successful',
-      data: attachAuthSession(res, {
+      data: await attachAuthSession(res, {
         user,
         token
       }, { exposeSessionToken: isNativeAuthClient(req) })
@@ -4211,6 +4213,10 @@ exports.acceptAgentInvite = async (req, res) => {
     const agentUser = userResult.rows[0];
     const authToken = generateToken(agentUserId, 'agent', { tokenVersion: agentUser.token_version || 1 });
 
+    if (!isNativeAuthClient(req)) {
+      const result = await attachAuthSession(res,{user:agentUser,token:authToken},{request:req});
+      return res.json({success:true,message:'Agent account activated successfully',data:result});
+    }
     const csrfToken = setAuthCookies(res, authToken);
     const responseData = {
       success: true,
@@ -4309,6 +4315,10 @@ exports.verifyLawyerOtp = async (req, res) => {
     const user = userResult.rows[0];
     const authToken = generateToken(user.id, user.user_type, { tokenVersion: user.token_version || 1 });
 
+    if (!isNativeAuthClient(req)) {
+      const data = await attachAuthSession(res,{user,token:authToken},{request:req});
+      return res.json({success:true,message:'Phone verified. Lawyer account activated successfully!',data});
+    }
     const csrfToken = setAuthCookies(res, authToken);
     const responseData = {
       success: true,
@@ -4658,7 +4668,7 @@ exports.verifyEmail = async (req, res) => {
 
     const eligibleForSession = ['tenant', 'landlord'].includes(user.user_type) && !user.is_recruitment_admin && user.is_active === true && !user.deleted_at && (!user.approval_status || user.approval_status === 'approved') && !user.totp_enabled;
     if (!eligibleForSession) return res.json({ success: true, message: 'Email verified successfully. Please sign in to continue.', requires_sign_in: true, user: { id: user.id, user_type: user.user_type, email_verified: true, phone_verified: user.phone_verified } });
-    const session = attachAuthSession(res, { user, token: generateToken(user.id, user.user_type, { tokenVersion: user.token_version || 1 }) }, { exposeSessionToken: isNativeAuthClient(req) });
+    const session = await attachAuthSession(res, { user, token: generateToken(user.id, user.user_type, { tokenVersion: user.token_version || 1 }) }, { exposeSessionToken: isNativeAuthClient(req) });
     return res.json({ success: true, message: 'Email verified successfully!', ...session, data: session });
 
   } catch (error) {
@@ -4927,14 +4937,12 @@ exports.getCurrentUser = async (req, res) => {
 // ================= REFRESH TOKEN =================
 exports.refreshToken = async (req, res) => {
   try {
+    if (!isNativeAuthClient(req)) return res.json({success:true,data:await require('./webAuthSessions').getService().refresh(req,res)});
     // Browsers refresh from the HTTP-only cookie. Native clients do not reliably
     // retain that cookie, so they can send their secure device-stored session
     // token when explicitly identified as a native RentalHub client.
     const sessionToken =
-      parseCookies(req.headers.cookie)[AUTH_COOKIE_NAME] ||
-      (isNativeAuthClient(req)
-        ? req.body?.session_token || req.headers?.['x-rentalhub-session-token']
-        : null);
+      req.body?.session_token || req.headers?.['x-rentalhub-session-token'];
     if (!sessionToken) {
       return res.status(401).json({
         success: false,
@@ -4977,9 +4985,10 @@ exports.refreshToken = async (req, res) => {
 
     res.json({
       success: true,
-      data: attachAuthSession(res, { token: newSessionToken }, { exposeSessionToken: isNativeAuthClient(req) }),
+      data: await attachAuthSession(res, { token: newSessionToken }, { exposeSessionToken: isNativeAuthClient(req) }),
     });
   } catch (error) {
+    if (!isNativeAuthClient(req)) return res.status(error.statusCode || 401).json({success:false,code:error.code,message:error.statusCode === 503 ? 'We could not check your sign-in. Please try again.' : 'Please sign in again.'});
     req.logger.error('Refresh token error:', error);
     res.status(401).json({
       success: false,
@@ -4991,6 +5000,10 @@ exports.refreshToken = async (req, res) => {
 // ================= LOGOUT =================
 exports.logout = async (req, res) => {
   try {
+    if (req.auth?.sid) {
+      await require('./webAuthSessions').getService().revoke(req,res);
+      return res.json({success:true,message:'Logged out successfully'});
+    }
     // Invalidate all existing tokens by incrementing token_version
     if (req.user && req.user.id) {
       await db.query(
@@ -5145,3 +5158,4 @@ exports.resetPassword = async (req, res) => {
 };
 
 exports.assistedRegistrationInternals = { validateAndPrepareRegistration, createUserFromPreparedRegistration, buildRegistrationPricingQuote, withPreparedRegistrationLocation, assignLawyerRoundRobin, assignAgentRoundRobin, generateToken, attachAuthSession };
+

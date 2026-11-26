@@ -1,9 +1,9 @@
+import { useAuth } from '../hooks/useAuth';
 import React, { useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
 import api from '../services/api';
-import { setAuthSession } from '../services/authStorage';
 import { useTranslation } from 'react-i18next';
 import TurnstileWidget from '../components/common/TurnstileWidget';
 
@@ -17,6 +17,8 @@ const getPasswordStrength = (password) => {
 };
 
 const AcceptLawyerInvite = () => {
+  const { establishSession } = useAuth();
+  const navigate=useNavigate();
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const token = useMemo(() => searchParams.get('token') || '', [searchParams]);
@@ -117,10 +119,10 @@ const AcceptLawyerInvite = () => {
 
       if (res.data.success && res.data.data?.token) {
         const { token: authToken, user } = res.data.data;
-        setAuthSession(authToken, user);
+        await establishSession({token:authToken,user});
         api.defaults.headers.common.Authorization = `Bearer ${authToken}`;
         toast.success('Lawyer account activated successfully!');
-        window.location.href = '/lawyer';
+        navigate('/lawyer');
       } else {
         toast.error('Authentication failed after OTP verification');
       }

@@ -196,7 +196,7 @@ const getFeatureFlagsMap = async () => {
   };
 };
 
-const attachUserFromToken = (req) => {
+const attachUserFromToken = async (req) => {
   if (req.user?.user_type) return;
 
   const token = getAuthTokenFromRequest(req);
@@ -206,6 +206,9 @@ const attachUserFromToken = (req) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
     const identity = getSessionTokenIdentity(decoded);
+    const sessions = require('../../services/webAuthSessions');
+    if (decoded.sid) await sessions.getService().validateAccess(decoded,sessions.tabId(req));
+    else if (!sessions.nativeRequest(req)) return;
     req.user = {
       ...(req.user || {}),
       id: identity.userId,
@@ -224,6 +227,7 @@ const isMaintenanceBypassRoute = (req) => {
   const allowedExactRoutes = [
     '/auth/login',
     '/auth/me',
+    '/auth/session',
     '/auth/refresh',
     '/auth/refresh-token',
     '/admin/seo/google/callback',
@@ -248,7 +252,7 @@ const isMaintenanceBypassRoute = (req) => {
 
 const enforceFlags = async (req, res, next) => {
   try {
-    attachUserFromToken(req);
+    await attachUserFromToken(req);
 
     const flags = await getFeatureFlagsMap();
 
