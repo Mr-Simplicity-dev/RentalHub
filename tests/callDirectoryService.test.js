@@ -79,3 +79,124 @@ test('Super Admin gets platform_all policy and can call anyone on the platform',
     assert.equal(res.allowed, true, `super_admin should be able to call ${role}`);
   }
 });
+
+test('Marketing Agent can call fellow Marketing Agents (teammates) and sees them in call directory', async () => {
+  const { getCallerPolicy, canUserInitiateDirectCall, getCallDirectory } = require('../services/callDirectoryService');
+
+  const marketerA = { id: 22, user_type: 'marketing_agent', assigned_state: 'Lagos' };
+  const marketerB = { id: 23, user_type: 'marketing_agent', assigned_state: 'Abuja' };
+  const policy = getCallerPolicy(marketerA);
+  assert.equal(policy.canCallTeammates, true);
+  assert.deepEqual(policy.teammateRoles, ['marketing_agent']);
+
+  const mockDb = {
+    query: async (sql, params = []) => {
+      if (sql.includes("user_type IN ('super_support_admin'")) {
+        return { rows: [{ id: 90 }] };
+      }
+      if (sql.includes('user_type = ANY($2::text[])')) {
+        const all = [
+          { id: 5, full_name: 'Rakiya Recruiter', user_type: 'recruitment_admin', assigned_state: 'Lagos' },
+          { id: 23, full_name: 'Bola Marketer', user_type: 'marketing_agent', assigned_state: 'Abuja' },
+        ];
+        const allowedTypes = Array.isArray(params[1]) ? params[1] : [];
+        return { rows: all.filter((u) => allowedTypes.includes(u.user_type)) };
+      }
+      return { rows: [] };
+    },
+  };
+
+  const allowTeammate = await canUserInitiateDirectCall(marketerA, marketerB, mockDb);
+  assert.equal(allowTeammate.allowed, true);
+  assert.equal(allowTeammate.relation, 'teammate');
+
+  const blockSelf = await canUserInitiateDirectCall(marketerA, marketerA, mockDb);
+  assert.equal(blockSelf.allowed, false);
+
+  const dir = await getCallDirectory(marketerA, {}, mockDb, (id) => id === 23);
+  assert.ok(dir.contacts.some((c) => c.id === 23 && c.relation === 'teammate' && c.online === true));
+});
+
+test('getCallHistory returns missed calls, call details, talk duration, and summary counts', async () => {
+  const { getCallHistory } = require('../services/callDirectoryService');
+  const marketerA = { id: 22, user_type: 'marketing_agent', assigned_state: 'Lagos' };
+
+  const mockDb = {
+    query: async (sql) => {
+      if (sql.includes('COUNT(*)::int AS total_count')) {
+        return {
+          rows: [{
+            total_count: 2,
+            missed_count: 1,
+            incoming_missed_count: 1,
+            answered_count: 1,
+            incoming_count: 1,
+            outgoing_count: 1,
+          }],
+        };
+      }
+      return {
+        rows: [
+          {
+            id: 'call-missed-1',
+            caller_id: 23,
+            receiver_id: 22,
+            property_id: null,
+            call_type: 'audio',
+            status: 'missed',
+            is_support_call: false,
+            support_tier: null,
+            requested_at: '2026-11-25T10:00:00.000Z',
+            started_at: null,
+            ended_at: '2026-11-25T10:00:45.000Z',
+            caller_name: 'Bola Marketer',
+            caller_user_type: 'marketing_agent',
+            caller_state: 'Abuja',
+            receiver_name: 'Mina Marketer',
+            receiver_user_type: 'marketing_agent',
+            receiver_state: 'Lagos',
+          },
+          {
+            id: 'call-ended-2',
+            caller_id: 22,
+            receiver_id: 23,
+            property_id: null,
+            call_type: 'audio',
+            status: 'ended',
+            is_support_call: false,
+            support_tier: null,
+            requested_at: '2026-11-25T09:00:00.000Z',
+            started_at: '2026-11-25T09:00:10.000Z',
+            ended_at: '2026-11-25T09:02:25.000Z',
+            caller_name: 'Mina Marketer',
+            caller_user_type: 'marketing_agent',
+            caller_state: 'Lagos',
+            receiver_name: 'Bola Marketer',
+            receiver_user_type: 'marketing_agent',
+            receiver_state: 'Abuja',
+          },
+        ],
+      };
+    },
+  };
+
+  const history = await getCallHistory(marketerA, { filter: 'all' }, mockDb, (id) => id === 23);
+  assert.equal(history.summary.total_count, 2);
+  assert.equal(history.summary.missed_count, 1);
+  assert.equal(history.summary.incoming_missed_count, 1);
+  assert.equal(history.records.length, 2);
+
+  const missed = history.records[0];
+  assert.equal(missed.status, 'missed');
+  assert.equal(missed.direction, 'incoming');
+  assert.equal(missed.is_missed, true);
+  assert.equal(missed.is_missed_for_me, true);
+  assert.equal(missed.duration_seconds, 0);
+  assert.equal(missed.counterpart.full_name, 'Bola Marketer');
+  assert.equal(missed.can_call_back, true);
+
+  const completed = history.records[1];
+  assert.equal(completed.status, 'ended');
+  assert.equal(completed.direction, 'outgoing');
+  assert.equal(completed.duration_seconds, 135);
+});

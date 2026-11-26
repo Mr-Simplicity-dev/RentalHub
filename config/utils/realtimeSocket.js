@@ -642,6 +642,34 @@ const recordCallSession = async (call, status, timestamps = {}) => {
   }
 };
 
+const notifyMissedCall = async (io, call, endedAt) => {
+  try {
+    const receiverId = Number(call?.receiver?.id);
+    if (!Number.isFinite(receiverId) || receiverId <= 0) return;
+    const callerName = call?.caller?.full_name || call?.caller?.name || 'Team member';
+    const callLabel = call?.isSupport ? 'support voice call' : (call?.callType === 'video' ? 'video call' : 'voice call');
+    const title = 'Missed Call';
+    const message = `You missed a ${callLabel} from ${callerName}.`;
+    const inserted = await db.query(
+      `INSERT INTO notifications (user_id, title, message, type, related_id, related_type)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, title, message, type, created_at`,
+      [receiverId, title, message, 'missed_call', null, 'call_session']
+    );
+    const notif = inserted.rows?.[0];
+    if (io && notif) {
+      io.to(toUserRoom(receiverId)).emit('notification:new', {
+        ...notif,
+        callId: call.id,
+        caller: call.caller,
+        endedAt,
+      });
+    }
+  } catch (error) {
+    logger.warn?.('Missed call notification skipped:', error?.message || error);
+  }
+};
+
 const logVirtualTourAudit = async (call, action, actorId) => {
   if (call.callType !== 'virtual_tour') return;
 
@@ -1091,6 +1119,7 @@ const configureRealtimeSocket = (io) => {
           activeCalls.delete(call.id);
           const endedAt = new Date().toISOString();
           void recordCallSession(currentCall, 'missed', { endedAt });
+          void notifyMissedCall(io, currentCall, endedAt);
           void logVirtualTourAudit(
             currentCall,
             'VIRTUAL_TOUR_MISSED',
@@ -1218,6 +1247,7 @@ const configureRealtimeSocket = (io) => {
           activeCalls.delete(call.id);
           const endedAt = new Date().toISOString();
           void recordCallSession(currentCall, 'missed', { endedAt });
+          void notifyMissedCall(io, currentCall, endedAt);
           emitCallEvent(io, currentCall, 'call:missed', { endedAt });
         }, CALL_RING_TIMEOUT_MS);
 
@@ -1367,15 +1397,21 @@ const configureRealtimeSocket = (io) => {
       }
 
       clearCallTimer(call);
-      call.status = 'ended';
+      const wasUnanswered = call.status === 'ringing' && !call.acceptedAt;
+      const finalStatus = wasUnanswered ? 'missed' : 'ended';
+      call.status = finalStatus;
       activeCalls.delete(call.id);
       multiPartyCallRooms.delete(String(call.id));
       const endedAt = new Date().toISOString();
-      await recordCallSession(call, 'ended', { endedAt });
-      await logVirtualTourAudit(call, 'VIRTUAL_TOUR_ENDED', user.id);
-      emitCallEvent(io, call, 'call:ended', {
-        endedAt,
-      });
+      await recordCallSession(call, finalStatus, { endedAt });
+      if (wasUnanswered) {
+        void notifyMissedCall(io, call, endedAt);
+        await logVirtualTourAudit(call, 'VIRTUAL_TOUR_MISSED', user.id);
+        emitCallEvent(io, call, 'call:missed', { endedAt });
+      } else {
+        await logVirtualTourAudit(call, 'VIRTUAL_TOUR_ENDED', user.id);
+        emitCallEvent(io, call, 'call:ended', { endedAt });
+      }
 
       if (typeof callback === 'function') {
         callback({ success: true, callId: call.id });

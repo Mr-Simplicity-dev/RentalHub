@@ -156,9 +156,11 @@ const getCallerPolicy = (caller = {}) => {
       canChatSupport: true,
       canCallSupport: true,
       canCallBoss: true,
+      canCallTeammates: true,
       canCallSubordinates: false,
       canCallAnyone: false,
       subordinateRoles: [],
+      teammateRoles: ['marketing_agent'],
       bossRoles: ['recruitment_admin', 'state_admin', 'zonal_admin', 'super_admin'],
       scopeType: 'marketing_boss',
     };
@@ -355,8 +357,11 @@ const canUserInitiateDirectCall = async (caller, receiver, db) => {
     }
   }
 
-  // 5. Marketing Agent calling their supervising boss
+  // 5. Marketing Agent calling fellow marketing teammates or their supervising boss
   if (callerRole === 'marketing_agent') {
+    if (receiverRole === 'marketing_agent') {
+      return { allowed: true, relation: 'teammate' };
+    }
     if (policy.bossRoles.includes(receiverRole) && bossMatchesCallerTerritory(caller, receiver)) {
       return { allowed: true, relation: 'boss' };
     }
@@ -584,10 +589,55 @@ const getCallDirectory = async (caller, filters = {}, db, isUserOnline) => {
         }
       }
     }
+
+    // 4. Fellow Teammates (e.g. Marketing Agents calling other Marketing Agents)
+    if (
+      policy.canCallTeammates &&
+      Array.isArray(policy.teammateRoles) &&
+      policy.teammateRoles.length > 0 &&
+      (roleFilter === '' || roleFilter === 'all' || roleFilter === 'teammate' || roleFilter === 'marketing_agent')
+    ) {
+      const where = [
+        'id <> $1',
+        'deleted_at IS NULL',
+        'COALESCE(is_active, TRUE) = TRUE',
+        'user_type = ANY($2::text[])',
+      ];
+      const params = [caller.id, policy.teammateRoles];
+      let pIdx = 3;
+
+      if (q) {
+        where.push(
+          `(LOWER(COALESCE(full_name, '')) LIKE $${pIdx} OR LOWER(COALESCE(assigned_state, '')) LIKE $${pIdx} OR LOWER(COALESCE(assigned_city, '')) LIKE $${pIdx} OR LOWER(COALESCE(assigned_lga, '')) LIKE $${pIdx})`
+        );
+        params.push(`%${q.toLowerCase()}%`);
+        pIdx += 1;
+      }
+
+      if (stateFilter) {
+        where.push(`LOWER(COALESCE(assigned_state, '')) = $${pIdx}`);
+        params.push(stateFilter.toLowerCase());
+        pIdx += 1;
+      }
+
+      const res = await db.query(
+        'SELECT id, full_name, user_type, assigned_state, assigned_city, assigned_lga, assigned_zone ' +
+        'FROM users WHERE ' + where.join(' AND ') + ' ORDER BY full_name ASC LIMIT 50',
+        params
+      );
+
+      for (const row of res.rows || []) {
+        if (contactsMap.has(Number(row.id))) continue;
+        const entry = formatDirectoryUser(row, 'teammate', isUserOnline);
+        if (!onlineOnly || entry.online) {
+          contactsMap.set(entry.id, entry);
+        }
+      }
+    }
   }
 
-  // Sort: online first, then relation priority (boss/subordinate), then alphabetical
-  const relationWeight = { boss: 0, subordinate: 1, platform: 2 };
+  // Sort: online first, then relation priority (boss/teammate/subordinate), then alphabetical
+  const relationWeight = { boss: 0, teammate: 1, subordinate: 2, platform: 3 };
   const contacts = Array.from(contactsMap.values())
     .sort((a, b) => {
       if (a.online !== b.online) return a.online ? -1 : 1;
@@ -604,10 +654,183 @@ const getCallDirectory = async (caller, filters = {}, db, isUserOnline) => {
   };
 };
 
+const computeCallDurationSeconds = (startedAt, endedAt) => {
+  if (!startedAt || !endedAt) return 0;
+  const startMs = new Date(startedAt).getTime();
+  const endMs = new Date(endedAt).getTime();
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return 0;
+  return Math.round((endMs - startMs) / 1000);
+};
+
+const getCallHistory = async (caller, filters = {}, db, isUserOnline) => {
+  const userId = Number(caller?.id);
+  const emptySummary = {
+    total_count: 0,
+    missed_count: 0,
+    incoming_missed_count: 0,
+    answered_count: 0,
+    incoming_count: 0,
+    outgoing_count: 0,
+  };
+  if (!Number.isFinite(userId) || userId <= 0) {
+    return { records: [], summary: emptySummary };
+  }
+
+  const rawFilter = String(filters.filter || 'all').trim().toLowerCase();
+  const filter = ['all', 'missed', 'incoming', 'outgoing'].includes(rawFilter) ? rawFilter : 'all';
+  const limit = Math.min(50, Math.max(1, Number.parseInt(filters.limit, 10) || 30));
+
+  try {
+    const summaryRes = await db.query(
+      `SELECT
+         COUNT(*)::int AS total_count,
+         COUNT(*) FILTER (WHERE status = 'missed')::int AS missed_count,
+         COUNT(*) FILTER (WHERE status = 'missed' AND receiver_id = $1)::int AS incoming_missed_count,
+         COUNT(*) FILTER (WHERE started_at IS NOT NULL OR status IN ('accepted', 'ended'))::int AS answered_count,
+         COUNT(*) FILTER (WHERE receiver_id = $1)::int AS incoming_count,
+         COUNT(*) FILTER (WHERE caller_id = $1)::int AS outgoing_count
+       FROM call_sessions
+       WHERE caller_id = $1 OR receiver_id = $1`,
+      [userId]
+    );
+
+    const whereClauses = ['(cs.caller_id = $1 OR cs.receiver_id = $1)'];
+    if (filter === 'missed') {
+      whereClauses.push("cs.status = 'missed'");
+    } else if (filter === 'incoming') {
+      whereClauses.push('cs.receiver_id = $1');
+    } else if (filter === 'outgoing') {
+      whereClauses.push('cs.caller_id = $1');
+    }
+
+    const listRes = await db.query(
+      `SELECT
+         cs.id,
+         cs.caller_id,
+         cs.receiver_id,
+         cs.property_id,
+         cs.call_type,
+         cs.status,
+         COALESCE(cs.is_support_call, FALSE) AS is_support_call,
+         cs.support_tier,
+         cs.requested_at,
+         cs.started_at,
+         cs.ended_at,
+         cu.full_name AS caller_name,
+         cu.user_type AS caller_user_type,
+         cu.assigned_state AS caller_state,
+         cu.assigned_city AS caller_city,
+         cu.assigned_lga AS caller_lga,
+         cu.assigned_zone AS caller_zone,
+         ru.full_name AS receiver_name,
+         ru.user_type AS receiver_user_type,
+         ru.assigned_state AS receiver_state,
+         ru.assigned_city AS receiver_city,
+         ru.assigned_lga AS receiver_lga,
+         ru.assigned_zone AS receiver_zone
+       FROM call_sessions cs
+       LEFT JOIN users cu ON cu.id = cs.caller_id
+       LEFT JOIN users ru ON ru.id = cs.receiver_id
+       WHERE ${whereClauses.join(' AND ')}
+       ORDER BY cs.requested_at DESC
+       LIMIT $2`,
+      [userId, limit]
+    );
+
+    const records = [];
+    for (const row of listRes.rows || []) {
+      const isOutgoing = Number(row.caller_id) === userId;
+      const direction = isOutgoing ? 'outgoing' : 'incoming';
+      const counterpartId = isOutgoing ? Number(row.receiver_id) || null : Number(row.caller_id) || null;
+      const counterpartName = isOutgoing
+        ? (row.receiver_name || 'Unknown Recipient')
+        : (row.caller_name || 'Unknown Caller');
+      const counterpartType = isOutgoing ? row.receiver_user_type : row.caller_user_type;
+      const counterpart = {
+        id: counterpartId,
+        full_name: counterpartName,
+        user_type: counterpartType || null,
+        role_label: counterpartType ? getRoleLabel(counterpartType) : 'User',
+        assigned_state: isOutgoing ? (row.receiver_state || null) : (row.caller_state || null),
+        assigned_city: isOutgoing ? (row.receiver_city || null) : (row.caller_city || null),
+        assigned_lga: isOutgoing ? (row.receiver_lga || null) : (row.caller_lga || null),
+        assigned_zone: isOutgoing ? (row.receiver_zone || null) : (row.caller_zone || null),
+        online:
+          counterpartId && typeof isUserOnline === 'function'
+            ? Boolean(isUserOnline(counterpartId))
+            : false,
+      };
+
+      let canCallBack = false;
+      if (counterpart.id && counterpart.user_type) {
+        try {
+          const perm = await canUserInitiateDirectCall(caller, counterpart, db);
+          canCallBack = Boolean(perm?.allowed);
+        } catch {
+          canCallBack = false;
+        }
+      }
+
+      const status = String(row.status || 'ended').toLowerCase();
+      const isMissed = status === 'missed';
+      const durationSeconds = computeCallDurationSeconds(row.started_at, row.ended_at);
+
+      records.push({
+        id: row.id,
+        status,
+        direction,
+        is_missed: isMissed,
+        is_missed_for_me: isMissed && direction === 'incoming',
+        call_type: row.call_type || 'audio',
+        is_support_call: Boolean(row.is_support_call),
+        support_tier: row.support_tier || null,
+        property_id: row.property_id || null,
+        requested_at: row.requested_at,
+        started_at: row.started_at || null,
+        ended_at: row.ended_at || null,
+        duration_seconds: durationSeconds,
+        caller: {
+          id: Number(row.caller_id) || null,
+          full_name: row.caller_name || 'Unknown Caller',
+          user_type: row.caller_user_type || null,
+          role_label: row.caller_user_type ? getRoleLabel(row.caller_user_type) : 'User',
+        },
+        receiver: {
+          id: Number(row.receiver_id) || null,
+          full_name: row.receiver_name || 'Unknown Recipient',
+          user_type: row.receiver_user_type || null,
+          role_label: row.receiver_user_type ? getRoleLabel(row.receiver_user_type) : 'User',
+        },
+        counterpart,
+        can_call_back: canCallBack,
+      });
+    }
+
+    const sRow = summaryRes.rows?.[0] || {};
+    return {
+      records,
+      summary: {
+        total_count: Number(sRow.total_count || 0),
+        missed_count: Number(sRow.missed_count || 0),
+        incoming_missed_count: Number(sRow.incoming_missed_count || 0),
+        answered_count: Number(sRow.answered_count || 0),
+        incoming_count: Number(sRow.incoming_count || 0),
+        outgoing_count: Number(sRow.outgoing_count || 0),
+      },
+    };
+  } catch (error) {
+    if (error?.code === '42P01') {
+      return { records: [], summary: emptySummary };
+    }
+    throw error;
+  }
+};
+
 module.exports = {
   getCallerPolicy,
   canSupportCall,
   canUserInitiateDirectCall,
   getCallDirectory,
+  getCallHistory,
   getRoleLabel,
 };
