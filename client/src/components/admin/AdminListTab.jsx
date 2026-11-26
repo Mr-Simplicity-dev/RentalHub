@@ -4,13 +4,6 @@ import { toast } from "react-toastify";
 import api from "../../services/api";
 import PaginationControls from "./PaginationControls";
 import { useAuth } from "../../hooks/useAuth";
-import {
-  getAuthToken,
-  getAuthUser,
-  setAuthSession,
-  setImpersonationOriginalSession,
-  isImpersonatingSession,
-} from "../../services/authStorage";
 
 const ADMINS_PAGE_SIZE = 10;
 
@@ -213,7 +206,7 @@ const formatRoleLabel = (role) => getRoleMeta(role).label;
 
 const AdminListTab = () => {
   const navigate = useNavigate();
-  const { updateUser } = useAuth();
+  const { establishSession } = useAuth();
   const [admins, setAdmins] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedAdminId, setExpandedAdminId] = useState(null);
@@ -403,13 +396,6 @@ const AdminListTab = () => {
 
   const openAdminDashboard = async (admin) => {
     try {
-      const currentToken = getAuthToken();
-      const currentUser = getAuthUser();
-
-      if (!isImpersonatingSession() && currentToken && currentUser) {
-        setImpersonationOriginalSession(currentToken, currentUser);
-      }
-
       const response = await api.post(`/super/admins/${admin.id}/impersonate`);
       const token = response?.data?.data?.token;
       const user = response?.data?.data?.user;
@@ -420,9 +406,7 @@ const AdminListTab = () => {
         return;
       }
 
-      setAuthSession(token, user);
-      updateUser(user);
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      await establishSession(response.data.data);
       toast.success(`Now viewing dashboard as ${user.full_name || user.email || 'selected admin'}`);
       navigate(redirectPath);
     } catch (error) {

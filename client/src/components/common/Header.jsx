@@ -9,11 +9,7 @@ import { FaBell, FaUser, FaSignOutAlt, FaEnvelope, FaBars, FaTimes, FaChevronDow
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
-import {
-  getImpersonationOriginalSession,
-  clearImpersonationOriginalSession,
-  setAuthSession,
-} from '../../services/authStorage';
+import { isImpersonatingSession } from '../../services/authStorage';
 import { playNotificationSound } from '../../utils/notificationSound';
 import { useSpokenNotifications } from '../../hooks/useSpokenNotifications';
 
@@ -49,7 +45,7 @@ const getNotificationAction = (link) => {
 };
 
 const Header = () => {
-  const { user, isAuthenticated, logout, updateUser } = useAuth();
+  const { user, isAuthenticated, logout, establishSession } = useAuth();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -75,8 +71,7 @@ const Header = () => {
     const notifRef = useRef(null);
     const prevUnreadRef = useRef(0);
   const { t } = useTranslation();
-  const impersonationSession = getImpersonationOriginalSession();
-  const isImpersonating = Boolean(impersonationSession);
+  const isImpersonating = isImpersonatingSession();
   const role = String(user?.user_type || '').toLowerCase();
 
   const roleDashboardPath = useMemo(
@@ -279,7 +274,6 @@ const Header = () => {
     badgeCounts.pendingWithdrawals;
 
   const handleLogout = () => {
-    clearImpersonationOriginalSession();
     logout();
     navigate('/login');
   };
@@ -308,10 +302,7 @@ const Header = () => {
   const stopImpersonation = async () => {
     try {
       const response=await api.post('/auth/impersonation/return');
-      setAuthSession(response.data.data.token,null);
-      const current=await api.get('/auth/me');
-      updateUser(current.data.data);
-      clearImpersonationOriginalSession();
+      await establishSession(response.data.data);
       toast.success('Returned to Super Admin session');navigate('/super-admin?tab=admin');
     } catch { toast.error('Please sign in again to return to your account.'); }
   };

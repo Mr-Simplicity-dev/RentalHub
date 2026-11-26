@@ -4,7 +4,7 @@ const authController = require('../controllers/authController');
 const { uploadPassportLocal, validateFileMagicBytesMiddleware } = require('../config/middleware/upload');
 const { authenticate, optionalAuthenticate, requireAdminOrSuperAdmin } = require('../config/middleware/auth');
 const { checkLoginRateLimit } = require('../config/middleware/loginRateLimiter');
-const { authSensitiveLimiter, verificationOpsLimiter, otpLimiter, otpSendLimiter, passwordResetLimiter, registrationLimiter, sensitiveActionLimiter } 
+const { authSensitiveLimiter, verificationOpsLimiter, otpLimiter, otpSendLimiter, passwordResetLimiter, registrationLimiter, sensitiveActionLimiter }
 = require('../config/middleware/securityRateLimiters');
 const { requireTurnstile } = require('../config/middleware/turnstileVerify');
 
@@ -331,4 +331,3 @@ router.post(
 );
 
 module.exports = router;
-

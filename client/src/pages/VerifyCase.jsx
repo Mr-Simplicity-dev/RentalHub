@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import axios from "axios";
+import api from "../services/api";
 import { useSearchParams } from "react-router-dom";
 import BackToDashboard from "../components/common/BackToDashboard";
 import { useTranslation } from 'react-i18next';
@@ -35,8 +35,8 @@ export default function VerifyCase() {
       setResult(null);
 
       try {
-        const res = await axios.get(
-          `/api/evidence/verify/dispute/${targetId}`,
+        const res = await api.get(
+          `/evidence/verify/dispute/${targetId}`,
           {
             params: { reference },
           }
@@ -74,8 +74,8 @@ export default function VerifyCase() {
     setResult(null);
 
     try {
-      const res = await axios.post(
-        `/api/evidence/verify/dispute/${targetId}/pay`,
+      const res = await api.post(
+        `/evidence/verify/dispute/${targetId}/pay`,
         {
           payer_email: payerEmail,
           payer_name: payerName,

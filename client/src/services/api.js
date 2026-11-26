@@ -32,8 +32,10 @@ const mfaVerification = createMfaVerification({
 
 api.interceptors.request.use(
   async (config) => {
+    const generation=config.authGeneration ?? authGeneration();
     config.webSessionId=config.explicitSession ? (config.headers.get?.('X-RentalHub-Session-Id') || config.headers['X-RentalHub-Session-Id']) : await initializeWebSession();
-    config.authGeneration=authGeneration();
+    if(!config.explicitSession && generation!==authGeneration())throw Error('Sign-in changed while the request was running.');
+    config.authGeneration=generation;
     config.headers['X-RentalHub-Session-Id']=config.webSessionId;
     config.mfaGeneration = mfaVerification.generation();
     const token = getAuthToken();
@@ -74,6 +76,7 @@ api.interceptors.response.use(
     if(response.data?.data?.web_session_id){
       if(response.config.authGeneration!==authGeneration())throw Error('Sign-in changed while the request was running.');
       await adoptWebSession(response.data.data);
+      if(response.config.authGeneration!==authGeneration())throw Error('Sign-in changed while the request was running.');
     }
     if (response.config?.mfaAttempts) resetMfaAttempts();
     return response;
@@ -154,7 +157,8 @@ api.interceptors.response.use(
       }
 
       if(refreshGeneration!==authGeneration()||refreshSessionId!==getWebSessionId())throw Error('Sign-in changed while refreshing.');
-      await adoptWebSession(data.data);
+      if(!(await adoptWebSession(data.data)))throw Error('Incomplete session refresh response.');
+      if(refreshGeneration!==authGeneration()||refreshSessionId!==getWebSessionId())throw Error('Sign-in changed while refreshing.');
       const newToken = data.data.token;
 
       setAuthToken(newToken);
@@ -197,4 +201,3 @@ api.interceptors.response.use(
 );
 
 export default api;
-

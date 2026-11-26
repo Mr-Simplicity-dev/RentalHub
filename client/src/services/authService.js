@@ -4,6 +4,7 @@ import { jwtDecode } from 'jwt-decode';
 import {
   clearAuthSession,
   beginAuthTransition,
+  authGeneration,
   getAuthToken,
   getAuthUser,
   setAuthSession,
@@ -14,6 +15,7 @@ export const authService = {
   // Register
   register: async (userData) => {
   beginAuthTransition();
+  const generation=authGeneration();
   const response = await api.post(
     '/auth/register',
     userData,
@@ -22,6 +24,8 @@ export const authService = {
       skipAuthRefresh: true,
     }
   );
+
+  if(generation!==authGeneration())throw Error('Sign-in changed while the request was running.');
 
   if (response.data.success) {
     const { token, user } = response.data.data;
@@ -42,6 +46,7 @@ export const authService = {
   // Login
   login: async (email, password, turnstileToken) => {
   beginAuthTransition();
+  const generation=authGeneration();
   const response = await api.post(
     '/auth/login',
     {
@@ -54,6 +59,8 @@ export const authService = {
       skipAuthRefresh: true,
     }
   );
+
+  if(generation!==authGeneration())throw Error('Sign-in changed while the request was running.');
 
   if (response.data.success) {
     const { token, user } = response.data.data;
@@ -74,6 +81,7 @@ export const authService = {
   // Google OAuth Sign-in
   googleAuth: async (credential) => {
     beginAuthTransition();
+    const generation=authGeneration();
     const response = await api.post(
       '/auth/google',
       { credential },
@@ -82,6 +90,8 @@ export const authService = {
         skipAuthRefresh: true,
       }
     );
+
+    if(generation!==authGeneration())throw Error('Sign-in changed while the request was running.');
 
     if (response.data.success && response.data.data) {
       const { token, user } = response.data.data;
@@ -114,11 +124,14 @@ export const authService = {
   // Get current user
  
 getCurrentUser: async () => {
+  const generation=authGeneration();
   if(!getAuthToken()) await api.get('/auth/session',{skipAuthRefresh:true});
   const response = await api.get('/auth/me', {
     // Recover an expired access token from the valid HttpOnly cookie.
     skipAuthRefresh: false,
   });
+
+  if(generation!==authGeneration())throw Error('Sign-in changed while the request was running.');
 
   if (response.data.success) {
     setAuthUser(response.data.data);

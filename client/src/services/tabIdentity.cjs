@@ -2,7 +2,7 @@ const STORAGE_KEY = 'rentalhub.web-session-id';
 const MARKER = '__rentalhubAuthEntry';
 const ID_PATTERN = /^[a-f0-9]{64}$/;
 function createTabIdentity(win) {
-  let current = null, pending = null, release = null;
+  let current = null, pending = null, release = null, changes = Promise.resolve();
   const fresh = () => Array.from(win.crypto.getRandomValues(new Uint8Array(32)),byte=>byte.toString(16).padStart(2,'0')).join('');
   const navigationKey = () => win.navigation?.currentEntry?.key || null;
   const mark = () => {
@@ -35,12 +35,26 @@ function createTabIdentity(win) {
     })();
     try{await pending;return current;}finally{pending=null;}
   };
-  const replace = async id => {
-    if(!ID_PATTERN.test(id||''))throw Error('Invalid browser session response.');
-    if(id===current)return;
-    release?.();release=null;
-    if(win.navigator.locks?.request && !(await own(id))) { current=null;try{win.sessionStorage.removeItem(STORAGE_KEY);}catch{};throw Error('This sign-in belongs to another tab.'); }
-    save(id);
+  const replace = (id, mayApply = () => true) => {
+    const operation = changes.catch(() => {}).then(async () => {
+      if (!ID_PATTERN.test(id || '')) throw Error('Invalid browser session response.');
+      if (!mayApply()) throw Error('Sign-in changed while the request was running.');
+      if (id === current) return;
+      release?.(); release = null;
+      if (win.navigator.locks?.request && !(await own(id))) {
+        current = null;
+        try { win.sessionStorage.removeItem(STORAGE_KEY); } catch {}
+        throw Error('This sign-in belongs to another tab.');
+      }
+      if (!mayApply()) {
+        release?.(); release = null; current = null;
+        try { win.sessionStorage.removeItem(STORAGE_KEY); } catch {}
+        throw Error('Sign-in changed while the request was running.');
+      }
+      save(id);
+    });
+    changes = operation;
+    return operation;
   };
   const reset = async () => { await initialize();return replace(fresh()); };
   const close = () => {release?.();release=null;current=null;};

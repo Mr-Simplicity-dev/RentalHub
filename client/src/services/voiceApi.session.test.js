@@ -1,0 +1,11 @@
+import {test,expect,vi,beforeEach,afterEach} from 'vitest';
+import axios from 'axios';
+import api from './api';
+import {fetchVoiceToken,cancelConsult} from './voiceApi';
+import {getWebSessionId} from './webSessionClient';
+import {setAuthToken,setCsrfToken,clearAuthSession} from './authStorage';
+beforeEach(()=>{setAuthToken('old-access');setCsrfToken('c'.repeat(64));});
+afterEach(()=>{vi.restoreAllMocks();clearAuthSession();delete api.defaults.headers.common.Authorization;});
+test('voice keeps its root route while sending the tab session and Bearer token',async()=>{api.defaults.adapter=async config=>{expect(config.baseURL).toBe('');expect(config.url).toBe('/voice/token?line=support');expect(config.headers.Authorization).toBe('Bearer old-access');expect(config.headers['X-RentalHub-Session-Id']).toBe(getWebSessionId());return{config,status:200,headers:{},data:{token:'voice-sdk-token'}};};expect(await fetchVoiceToken('support')).toBe('voice-sdk-token');});
+test('voice mutations carry the same session-bound CSRF token',async()=>{api.defaults.adapter=async config=>{expect(config.url).toBe('/voice/escalate');expect(config.headers['X-CSRF-Token']).toBe('c'.repeat(64));expect(JSON.parse(config.data).action).toBe('cancel-consult');return{config,status:200,headers:{},data:{success:true}};};expect((await cancelConsult('local-call')).success).toBe(true);});
+test('voice renews an expired access token through the shared refresh path',async()=>{const refresh=vi.spyOn(axios,'post').mockImplementation(async()=>({data:{success:true,data:{token:'renewed',csrf_token:'c'.repeat(64),web_session_id:getWebSessionId()}}}));api.defaults.adapter=async config=>{if(config.headers.Authorization!=='Bearer renewed')throw{config,response:{status:401,config,data:{}}};return{config,status:200,headers:{},data:{token:'voice-sdk-token'}};};expect(await fetchVoiceToken()).toBe('voice-sdk-token');expect(refresh).toHaveBeenCalledTimes(1);});

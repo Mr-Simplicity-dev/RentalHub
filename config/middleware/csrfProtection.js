@@ -145,4 +145,3 @@ const csrfProtection = async (req, res, next) => {
 };
 
 module.exports = csrfProtection;
-

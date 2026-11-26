@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FaChartPie, FaFilePdf, FaFileCsv, FaPlus, FaTrash, FaBell } from "react-icons/fa";
 import { toast } from "react-toastify";
 import api from "../../services/api";
+import { downloadAuthenticatedFile } from "../../services/authenticatedDownload";
 import SurveyWizard from "../survey/SurveyWizard";
 import MarketingAgentCommissionsPanel from "./MarketingAgentCommissionsPanel";
 import {
@@ -197,10 +198,10 @@ const SurveyAdminPanel = () => {
   };
 
   const exportPdf = () => {
-    window.open(`/api/admin/survey/export.pdf?type=${type}`, "_blank");
+    downloadAuthenticatedFile(`/admin/survey/export.pdf?type=${encodeURIComponent(type)}`, `survey-analysis-${type}.pdf`).catch(() => toast.error('Could not download the survey PDF. Please try again.'));
   };
   const exportCsv = () => {
-    window.open(`/api/admin/survey/export.csv?type=${type}`, "_blank");
+    downloadAuthenticatedFile(`/admin/survey/export.csv?type=${encodeURIComponent(type)}`, `survey-analysis-${type}.csv`).catch(() => toast.error('Could not download the survey CSV. Please try again.'));
   };
 
   const [locGateBusy, setLocGateBusy] = useState(false);

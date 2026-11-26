@@ -3,6 +3,7 @@ import handoverCopy from '../i18n/handoverCopy';
 import { useEffect, useState, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import api from '../services/api';
+import { downloadAuthenticatedFile } from '../services/authenticatedDownload';
 import { toast } from 'react-toastify';
 import { useAuth } from '../hooks/useAuth';
 import DisputeQRCode from '../components/DisputeQRCode';
@@ -450,22 +451,18 @@ export default function DisputeDetails() {
                     </p>
                   ) : null}
                   <div className="mt-4 flex gap-3 text-sm">
-                    <a
-                      href={`/api/disputes/evidence/${item.id}`}
-                      target="_blank"
-                      rel="noreferrer"
+                    <button type="button"
+                      onClick={() => downloadAuthenticatedFile(`/disputes/evidence/${item.id}`, item.file_name).catch(() => toast.error(t('dispute_details.load_failed')))}
                       className="text-primary-700 hover:underline"
                     >
                       {t('dispute_details.open_file')}
-                    </a>
-                    <a
-                      href={`/api/disputes/evidence/${item.id}/verify`}
-                      target="_blank"
-                      rel="noreferrer"
+                    </button>
+                    <button type="button"
+                      onClick={() => downloadAuthenticatedFile(`/disputes/evidence/${item.id}/verify`, `evidence-${item.id}-integrity.json`).catch(() => toast.error(t('dispute_details.load_failed')))}
                       className="text-primary-700 hover:underline"
                     >
                       {t('dispute_details.verify_hash')}
-                    </a>
+                    </button>
                   </div>
                 </div>
               ))}

@@ -53,9 +53,13 @@ async function main(){
  await evaluate(b,'login(2)');await evaluate(a,'login(2)');report.switchAKeepsB=(await evaluate(b,'current()')).userId===2;
  const c=await open('/independent');report.newTabSignedOut=(await evaluate(c,'current()')).status===401;
  await evaluate(a,`window.open('${base}/opener','_blank');true`);await delay(400);const targets=(await send('Target.getTargets')).targetInfos;const popup=targets.find(t=>t.url===base+'/opener');assert.ok(popup);const d=await attach(popup.targetId);await waitReady(d);report.openerSignedOut=(await evaluate(d,'current()')).status===401;
+ await evaluate(a,`const link=document.createElement('a');link.href='${base}/linked';link.target='_blank';document.body.append(link);link.click();true`);await delay(400);const linked=(await send('Target.getTargets')).targetInfos.find(t=>t.url===base+'/linked');assert.ok(linked);const linkedSession=await attach(linked.targetId);await waitReady(linkedSession);report.normalLinkSignedOut=(await evaluate(linkedSession,'current()')).status===401;
  const copied=await evaluate(a,'({id:identity.get(),marker:history.state.__rentalhubAuthEntry})');
  await evaluate(c,`sessionStorage.setItem('rentalhub.web-session-id',${JSON.stringify(copied.id)});history.replaceState({...history.state,__rentalhubAuthEntry:${JSON.stringify(copied.marker)}},'');true`);
  await send('Page.reload',{},c);await delay(400);await waitReady(c);report.copiedStorageSignedOut=(await evaluate(c,'current()')).status===401;
+ await evaluate(c,`sessionStorage.setItem('rentalhub.web-session-id',${JSON.stringify(copied.id)});history.replaceState({...history.state,__rentalhubAuthEntry:navigation.currentEntry.key},'');true`);await send('Page.reload',{},c);await delay(400);await waitReady(c);report.ownedIdCannotBeReused=(await evaluate(c,'current()')).status===401;
+ await evaluate(a,"history.pushState({...history.state,router:'kept'},'', '/spa-route');true");await send('Page.reload',{},a);await delay(400);await waitReady(a);report.spaNavigationThenReloadKeepsAccount=(await evaluate(a,'current()')).userId===2;
+ report.lockNamesDoNotExposeIds=await evaluate(a,"navigator.locks.query().then(({held})=>held.every(lock=>!lock.name.includes(identity.get())))");
  report.concurrentIdentifiersDistinct=await evaluate(a,'identity.get()')!==await evaluate(b,'identity.get()');
  report.cookiesNotVisibleToJavaScript=await evaluate(a,"!document.cookie.includes('rh_refresh_')");
  report.noBearerInStorage=await evaluate(a,"Object.keys(sessionStorage).every(key=>key==='rentalhub.web-session-id')&&Object.keys(localStorage).length===0");

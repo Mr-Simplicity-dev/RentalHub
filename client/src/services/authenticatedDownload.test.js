@@ -1,0 +1,10 @@
+import {test,expect,vi,beforeEach,afterEach} from 'vitest';
+import api from './api';
+import {downloadAuthenticatedFile} from './authenticatedDownload';
+vi.mock('./api',()=>({default:{get:vi.fn()}}));
+let click;
+beforeEach(()=>{vi.useFakeTimers();URL.createObjectURL=vi.fn(()=> 'blob:local-file');URL.revokeObjectURL=vi.fn();click=vi.spyOn(HTMLAnchorElement.prototype,'click').mockImplementation(function(){expect(this.href).toBe('blob:local-file');expect(this.download).toBe('survey-analysis.pdf');});});
+afterEach(()=>{vi.runOnlyPendingTimers();vi.useRealTimers();vi.restoreAllMocks();});
+test('private files use the shared tab API and a credential-free blob link',async()=>{const blob=new Blob(['local test'],{type:'application/pdf'});api.get.mockResolvedValue({data:blob});await downloadAuthenticatedFile('/admin/survey/export.pdf?type=tenant','survey-analysis.pdf');expect(api.get).toHaveBeenCalledWith('/admin/survey/export.pdf?type=tenant',{responseType:'blob'});expect(click).toHaveBeenCalledTimes(1);vi.runAllTimers();expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:local-file');});
+test('unauthorised file responses never produce a download',async()=>{api.get.mockRejectedValue({response:{status:401}});await expect(downloadAuthenticatedFile('/disputes/evidence/1','survey-analysis.pdf')).rejects.toBeTruthy();expect(click).not.toHaveBeenCalled();});
+test('a private download cannot send credentials to another origin',async()=>{await expect(downloadAuthenticatedFile('https://attacker.test/file','file')).rejects.toThrow('Invalid file path');await expect(downloadAuthenticatedFile('//attacker.test/file','file')).rejects.toThrow('Invalid file path');await expect(downloadAuthenticatedFile('/\\attacker.test/file','file')).rejects.toThrow('Invalid file path');});

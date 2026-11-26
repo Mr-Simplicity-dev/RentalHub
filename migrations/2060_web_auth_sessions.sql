@@ -44,6 +44,10 @@ $$;
 CREATE TRIGGER authentication_session_revoked AFTER UPDATE OF revoked_at,parked_at OR DELETE ON authentication_sessions FOR EACH ROW EXECUTE FUNCTION rentalhub_notify_auth_session_change();
 CREATE FUNCTION rentalhub_revoke_user_auth_sessions() RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
+  IF TG_OP = 'DELETE' THEN
+    PERFORM pg_notify('rentalhub_auth_user_revoked', OLD.id::text);
+    RETURN OLD;
+  END IF;
   IF NEW.token_version IS DISTINCT FROM OLD.token_version OR NEW.user_type IS DISTINCT FROM OLD.user_type OR NEW.is_active IS FALSE OR NEW.deleted_at IS NOT NULL THEN
     UPDATE authentication_sessions SET revoked_at=COALESCE(revoked_at,NOW()), revocation_reason=COALESCE(revocation_reason,'account_security_change') WHERE user_id=NEW.id AND revoked_at IS NULL;
     PERFORM pg_notify('rentalhub_auth_user_revoked', NEW.id::text);
@@ -52,7 +56,5 @@ BEGIN
 END;
 $$;
 CREATE TRIGGER user_auth_security_change AFTER UPDATE OF token_version,user_type,is_active,deleted_at ON users FOR EACH ROW WHEN (OLD.token_version IS DISTINCT FROM NEW.token_version OR OLD.user_type IS DISTINCT FROM NEW.user_type OR OLD.is_active IS DISTINCT FROM NEW.is_active OR OLD.deleted_at IS DISTINCT FROM NEW.deleted_at) EXECUTE FUNCTION rentalhub_revoke_user_auth_sessions();
+CREATE TRIGGER user_auth_security_delete AFTER DELETE ON users FOR EACH ROW EXECUTE FUNCTION rentalhub_revoke_user_auth_sessions();
 COMMIT;
-
-
-

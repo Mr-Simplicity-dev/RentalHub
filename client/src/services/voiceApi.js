@@ -1,23 +1,18 @@
-import { webSessionHeaders } from './webSessionClient';
-// ─────────────────────────────────────────────────────────────────────────────
-// Twilio Voice API client.
-//
-// IMPORTANT: the backend voice-token endpoint lives at GET /voice/token —
-// NOT /api/voice/token. The shared Axios client (client/src/services/api.js)
-// hard-codes base URL `/api`, so this module deliberately uses fetch with an
-// absolute path so no `/api` prefix can sneak in.
-//
-// The endpoint is protected by the backend `authenticate` middleware, which
-// reads the same Bearer JWT that authStorage manages. We reuse getAuthToken()
-// from authStorage — no second token storage is created here. `credentials:
-// "include"` keeps the session cookie flow working (refresh/CSRF infra).
-// Tokens are never logged or stored by this module.
-// ─────────────────────────────────────────────────────────────────────────────
+import api from './api';
 
-import { getAuthToken } from './authStorage';
+// Voice routes live at /voice rather than /api. Keep the shared session,
+// CSRF, refresh and stale-account response checks while preserving that path.
+const sessionFetch = async (path, options = {}) => {
+  try {
+    const response = await api.request({ url: path, baseURL: '', method: options.method || 'GET', data: options.body });
+    return { ok: true, status: response.status, json: async () => response.data };
+  } catch (error) {
+    if (!error.response) throw error;
+    return { ok: false, status: error.response.status, json: async () => error.response.data };
+  }
+};
 
 export const fetchVoiceToken = async (line = '') => {
-  const token = getAuthToken();
 
   const url = line
     ? `/voice/token?line=${encodeURIComponent(line)}`
@@ -25,10 +20,9 @@ export const fetchVoiceToken = async (line = '') => {
 
   let response;
   try {
-    response = await fetch(url, {
+    response = await sessionFetch(url, {
       method: 'GET',
       credentials: 'include',
-      headers: await webSessionHeaders(),
     });
   } catch (networkError) {
     const error = new Error(
@@ -74,19 +68,13 @@ export const fetchVoiceToken = async (line = '') => {
 };
 
 const authedFetch = async (path, options = {}) => {
-  const token = getAuthToken();
-  const headers = {
-    ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-    ...await webSessionHeaders(),
-    ...(options.headers || {}),
-  };
+
 
   let response;
   try {
-    response = await fetch(path, {
+    response = await sessionFetch(path, {
       credentials: 'include',
       ...options,
-      headers,
     });
   } catch (networkError) {
     const error = new Error('Could not reach the voice service. Check your connection.');

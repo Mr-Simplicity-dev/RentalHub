@@ -721,8 +721,8 @@ const attachAuthSession = (res, data, options = {}) => {
   const request = options.request || res.req;
   if (!isNativeAuthClient(request)) return require('./webAuthSessions').getService().create(request,res,data,{parentId:options.parentId,maxAge:options.maxAge});
 
-  // data.token is the 24h session token → stored in HTTP-only cookie
-  // Decode it to mint a 1h access token for the Bearer header
+  // Native clients keep the 24h session token in secure device storage.
+  // Mint the existing 1h Bearer access token without browser cookies.
   let accessToken = data.token;
   let tokenVersion = data?.user?.token_version || 1;
   try {
@@ -4614,11 +4614,11 @@ const ensureFraudAlertsSchema = async () => {
     );
   `);
   await db.query(`
-    CREATE INDEX IF NOT EXISTS idx_lawyer_fraud_alerts_lawyer_id 
+    CREATE INDEX IF NOT EXISTS idx_lawyer_fraud_alerts_lawyer_id
     ON lawyer_fraud_alerts(lawyer_user_id);
   `);
   await db.query(`
-    CREATE INDEX IF NOT EXISTS idx_lawyer_fraud_alerts_status 
+    CREATE INDEX IF NOT EXISTS idx_lawyer_fraud_alerts_status
     ON lawyer_fraud_alerts(status);
   `);
 };
@@ -5158,4 +5158,3 @@ exports.resetPassword = async (req, res) => {
 };
 
 exports.assistedRegistrationInternals = { validateAndPrepareRegistration, createUserFromPreparedRegistration, buildRegistrationPricingQuote, withPreparedRegistrationLocation, assignLawyerRoundRobin, assignAgentRoundRobin, generateToken, attachAuthSession };
-
