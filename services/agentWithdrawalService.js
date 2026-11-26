@@ -412,7 +412,7 @@ class AgentWithdrawalService {
       const result = await db.query(
         `UPDATE agent_withdrawal_requests
          SET status = 'completed', completed_date = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $1
+         WHERE id = $1 AND status <> 'completed'
          RETURNING *`,
         [withdrawalId]
       );
@@ -429,6 +429,21 @@ class AgentWithdrawalService {
         );
 
         await this.notifyWithdrawal(result.rows[0], 'completed');
+
+        // Email canonical agent payout receipt (markAsCompleted_receipt_wired)
+        try {
+          const { sendAgentPayoutReceipt } = require('../config/utils/paymentReceipt');
+          const row = result.rows[0];
+          sendAgentPayoutReceipt({
+            agentUserId: row.agent_user_id,
+            withdrawalId: row.id,
+            amount: row.amount,
+            reference: paymentReference || row.paystack_transfer_reference || `ARH_AGW_${row.id}`,
+            status: 'processed',
+          }).catch(() => {});
+        } catch {
+          // Receipt email failures must not break withdrawal completion.
+        }
 
         return result.rows[0];
       }

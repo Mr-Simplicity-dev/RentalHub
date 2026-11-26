@@ -68,6 +68,16 @@ const agentPayoutReceiptNumber = (withdrawalId) =>
   buildHyphenReference('AG', 'PAY', String(withdrawalId).padStart(6, '0'));
 const adminPayoutReceiptNumber = (withdrawalId) =>
   buildHyphenReference('SAW', 'PAY', String(withdrawalId).padStart(6, '0'));
+const refundReceiptNumber = (refundId) =>
+  buildHyphenReference('RFND', String(refundId).padStart(6, '0'));
+const walletTransactionReceiptNumber = (walletTxId) =>
+  buildHyphenReference('WTX', String(walletTxId).padStart(6, '0'));
+const transportReceiptNumber = (bookingId) =>
+  buildHyphenReference('RCPT', 'TRN', String(bookingId).padStart(6, '0'));
+const fumigationReceiptNumber = (bookingId) =>
+  buildHyphenReference('RCPT', 'FUM', String(bookingId).padStart(6, '0'));
+const evidenceReceiptNumber = (evidencePaymentId) =>
+  buildHyphenReference('RCPT', 'EVD', String(evidencePaymentId).padStart(6, '0'));
 
 module.exports = {
   PLATFORM_PREFIX,
@@ -89,4 +99,9 @@ module.exports = {
   userPayoutReceiptNumber,
   agentPayoutReceiptNumber,
   adminPayoutReceiptNumber,
+  refundReceiptNumber,
+  walletTransactionReceiptNumber,
+  transportReceiptNumber,
+  fumigationReceiptNumber,
+  evidenceReceiptNumber,
 };

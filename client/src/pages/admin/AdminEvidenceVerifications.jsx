@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import api from '../../services/api';
+import FinancialReceiptModal from '../../components/common/FinancialReceiptModal';
 import Loader from '../../components/common/Loader';
 import { FaSearch, FaShieldAlt, FaCheckCircle, FaTimesCircle, FaClock } from 'react-icons/fa';
 
@@ -8,6 +9,7 @@ const PAGE_SIZE = 20;
 const AdminEvidenceVerifications = () => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [receiptId, setReceiptId] = useState(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -109,7 +111,8 @@ const AdminEvidenceVerifications = () => {
                 </td>
                 <td className="px-4 py-3">₦{Number(log.amount).toLocaleString()}</td>
                 <td className="px-4 py-3">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                     {statusIcon(log.payment_status)}
                     <span className={`text-xs font-semibold ${
                       log.payment_status === 'completed' ? 'text-green-700' :
@@ -118,6 +121,16 @@ const AdminEvidenceVerifications = () => {
                     }`}>
                       {log.payment_status}
                     </span>
+                    </div>
+                    {log.payment_status === 'completed' && (
+                      <button
+                        type="button"
+                        onClick={() => setReceiptId(log.id)}
+                        className="rounded border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+                      >
+                        Receipt
+                      </button>
+                    )}
                   </div>
                 </td>
                 <td className="px-4 py-3 text-gray-500">
@@ -162,6 +175,13 @@ const AdminEvidenceVerifications = () => {
           </button>
         </div>
       )}
+    
+      <FinancialReceiptModal
+        open={Boolean(receiptId)}
+        kind="evidence"
+        recordId={receiptId}
+        onClose={() => setReceiptId(null)}
+      />
     </div>
   );
 };

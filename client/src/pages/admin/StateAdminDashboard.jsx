@@ -36,6 +36,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
   const [transactions, setTransactions] = useState([]);
   const [managedUsers, setManagedUsers] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
+  const [docModal, setDocModal] = useState({ open: false, kind: null, recordId: null });
   const [activeTab, setActiveTab] = useState(() => {
     return new URLSearchParams(location.search).get('tab') || initialTab;
   });
@@ -852,15 +853,26 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
                           {formatCurrency(transaction.commission_amount || 0)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            transaction.commission_status === 'pending'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : transaction.commission_status === 'paid'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {transaction.commission_status || 'N/A'}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              transaction.commission_status === 'pending'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : transaction.commission_status === 'paid'
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {transaction.commission_status || 'N/A'}
+                            </span>
+                            {(transaction.payment_id || transaction.id) && (
+                              <button
+                                type="button"
+                                onClick={() => setDocModal({ open: true, kind: 'payment', recordId: transaction.payment_id || transaction.id })}
+                                className="rounded border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+                              >
+                                View Receipt
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1009,7 +1021,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
                           {withdrawal.bank_name}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {withdrawal.account_number}
+                          {maskAccount(withdrawal.account_number)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -1028,7 +1040,18 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
                           {withdrawal.processed_at ? formatDate(withdrawal.processed_at) : 'Pending'}
                         </td>
                         <td className="px-6 py-4 text-sm text-red-600">
-                          {withdrawal.payout_failed_reason || '-'}
+                          <div className="flex items-center gap-2">
+                            <span>{withdrawal.payout_failed_reason || '-'}</span>
+                            {['completed', 'processed', 'failed', 'reversed', 'rejected'].includes(String(withdrawal.status || '').toLowerCase()) && (
+                              <button
+                                type="button"
+                                onClick={() => setDocModal({ open: true, kind: 'admin-payout', recordId: withdrawal.id })}
+                                className="rounded border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+                              >
+                                Payout Receipt
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}

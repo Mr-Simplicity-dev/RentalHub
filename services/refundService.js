@@ -1026,7 +1026,15 @@ exports.approveRefundRequest = async (req, res) => {
       req.logger?.error?.(`Spoken payment success cancellation error: ${spokenError.message}`);
     }
 
-    const months = refund_type === 'partial_months' ? refund_months : null;
+    // Email canonical refund confirmation (ARH-RFND-...) — best-effort, never fails the refund
+    try {
+      const { sendRefundConfirmationEmail } = require('../config/utils/paymentReceipt');
+      sendRefundConfirmationEmail(refundId).catch(() => {});
+    } catch {
+      // Best-effort.
+    }
+
+        const months = refund_type === 'partial_months' ? refund_months : null;
     const typeLabel = refund_type === 'full'
       ? 'full refund'
       : refund_type === 'partial_months'

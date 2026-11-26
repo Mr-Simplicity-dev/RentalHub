@@ -7,6 +7,7 @@ import { paymentService } from '../services/paymentService';
 import BackToDashboard from '../components/common/BackToDashboard';
 import { useAuth } from '../hooks/useAuth';
 import { useTranslation } from 'react-i18next';
+import FinancialReceiptModal from '../components/common/FinancialReceiptModal';
 
 const PAYMENT_TYPE_LABELS = {
   tenant_subscription: 'Subscription',
@@ -157,6 +158,14 @@ const PaymentHistory = () => {
   const [selectedReceiptGroup, setSelectedReceiptGroup] = useState([]);
   const [receiptData, setReceiptData] = useState(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [activeTab, setActiveTab] = useState('payments');
+  const [landlordRentReceipts, setLandlordRentReceipts] = useState([]);
+  const [walletTransactions, setWalletTransactions] = useState([]);
+  const [withdrawals, setWithdrawals] = useState([]);
+  const [refunds, setRefunds] = useState([]);
+  const [docModal, setDocModal] = useState({ open: false, kind: null, recordId: null });
+  const isLandlord = user?.user_type === 'landlord';
+  const isTenant = user?.user_type === 'tenant';
 
   // Group payments that were paid in ONE combined transaction (registration
   // base + lawyer + agent share a base reference). Separate transactions keep
@@ -295,7 +304,182 @@ const PaymentHistory = () => {
         <BackToDashboard />
       </div>
 
-      {paymentGroups.length === 0 ? (
+      <div className="mb-6 flex flex-wrap gap-2 border-b border-gray-200 pb-3">
+        {[
+          { id: 'payments', label: 'Payments', count: paymentGroups.length },
+          ...(isLandlord ? [{ id: 'rent-received', label: 'Rent Received', count: landlordRentReceipts.length }] : []),
+          { id: 'wallet', label: 'Wallet Records', count: walletTransactions.length },
+          { id: 'withdrawals', label: 'Withdrawals', count: withdrawals.length },
+          ...((isTenant || isLandlord) ? [{ id: 'refunds', label: 'Refunds', count: refunds.length }] : []),
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+              activeTab === tab.id
+                ? 'bg-sky-600 text-white shadow-sm'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            {tab.label} ({tab.count})
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'rent-received' && isLandlord && (
+        landlordRentReceipts.length === 0 ? (
+          <div className="card text-center py-10 text-gray-500">No rent payments received yet.</div>
+        ) : (
+          <div className="space-y-4">
+            {landlordRentReceipts.map((rec) => (
+              <div key={rec.id} className="card flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div className="font-semibold text-gray-900">{rec.property_title || 'Rent Received'}</div>
+                  <div className="text-sm text-gray-600 mt-0.5">
+                    Tenant: {rec.tenant_name || '—'} · <span className="font-mono text-xs text-sky-700">{rec.receipt_number}</span>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">{formatNigerianDateTime(rec.paid_at)}</div>
+                  {rec.platform_fee > 0 && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      Platform Fee: {formatAmount(rec.platform_fee, rec.currency)} · Net Credited: {formatAmount(rec.net_amount, rec.currency)}
+                    </div>
+                  )}
+                </div>
+                <div className="text-left md:text-right">
+                  <div className="text-lg font-bold text-gray-900">{formatAmount(rec.gross_amount, rec.currency)}</div>
+                  <span className="mt-1 inline-flex rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+                    {humanizeStatus(rec.payment_status)}
+                  </span>
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setDocModal({ open: true, kind: 'payment', recordId: rec.id })}
+                      className="mt-2 inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
+                    >
+                      <FaReceipt className="mr-1.5" /> View Rent Record
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+
+      {activeTab === 'wallet' && (
+        walletTransactions.length === 0 ? (
+          <div className="card text-center py-10 text-gray-500">No wallet transaction records yet.</div>
+        ) : (
+          <div className="space-y-3">
+            {walletTransactions.map((wt) => (
+              <div key={wt.id} className="card flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div className="font-semibold text-gray-900">{wt.description || wt.source || 'Wallet Transaction'}</div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {formatNigerianDateTime(wt.created_at)} · Ref: {wt.reference || wt.transaction_reference || `#${wt.id}`}
+                  </div>
+                </div>
+                <div className="text-left md:text-right">
+                  <div className={`text-base font-bold ${wt.type === 'credit' ? 'text-emerald-700' : 'text-slate-900'}`}>
+                    {wt.type === 'credit' ? '+' : '-'}{formatAmount(wt.amount, 'NGN')}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDocModal({ open: true, kind: 'wallet-transaction', recordId: wt.id })}
+                    className="mt-2 inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
+                  >
+                    <FaReceipt className="mr-1.5" /> View Transaction Record
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+
+      {activeTab === 'withdrawals' && (
+        withdrawals.length === 0 ? (
+          <div className="card text-center py-10 text-gray-500">No wallet withdrawals yet.</div>
+        ) : (
+          <div className="space-y-3">
+            {withdrawals.map((w) => {
+              const effStatus = w.paystack_transfer_status === 'reversed' ? 'reversed' : w.paystack_transfer_status === 'failed' ? 'failed' : w.status;
+              const canViewReceipt = ['processed', 'completed', 'success', 'paid', 'failed', 'reversed', 'rejected'].includes(String(effStatus || '').toLowerCase());
+              return (
+                <div key={w.id} className="card flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <div className="font-semibold text-gray-900">{w.bank_name || 'Wallet Withdrawal'}</div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {formatNigerianDateTime(w.processed_at || w.created_at)} · Withdrawal #{w.id}
+                    </div>
+                  </div>
+                  <div className="text-left md:text-right">
+                    <div className="text-base font-bold text-gray-900">{formatAmount(w.amount, 'NGN')}</div>
+                    <span className="mt-1 inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
+                      {humanizeStatus(effStatus)}
+                    </span>
+                    {canViewReceipt && (
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => setDocModal({ open: true, kind: 'user-payout', recordId: w.id })}
+                          className="mt-2 inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
+                        >
+                          <FaReceipt className="mr-1.5" /> View Payout Receipt
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
+      )}
+
+      {activeTab === 'refunds' && (isTenant || isLandlord) && (
+        refunds.length === 0 ? (
+          <div className="card text-center py-10 text-gray-500">No refund records yet.</div>
+        ) : (
+          <div className="space-y-3">
+            {refunds.map((rf) => {
+              const canViewRefundDoc = ['approved', 'refunded', 'rejected'].includes(String(rf.status || '').toLowerCase());
+              return (
+                <div key={rf.id} className="card flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <div className="font-semibold text-gray-900">{rf.property_title || `Refund Request #${rf.id}`}</div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {formatNigerianDateTime(rf.refunded_at || rf.reviewed_at || rf.created_at)} · {rf.reason || 'Rent refund'}
+                    </div>
+                  </div>
+                  <div className="text-left md:text-right">
+                    <div className="text-base font-bold text-gray-900">
+                      {formatAmount(rf.approved_amount ?? rf.requested_refund_amount ?? rf.amount, 'NGN')}
+                    </div>
+                    <span className="mt-1 inline-flex rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-800">
+                      {humanizeStatus(rf.status)}
+                    </span>
+                    {canViewRefundDoc && (
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => setDocModal({ open: true, kind: 'refund', recordId: rf.id })}
+                          className="mt-2 inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
+                        >
+                          <FaReceipt className="mr-1.5" /> View Refund Confirmation
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
+      )}
+
+      {activeTab === 'payments' && (paymentGroups.length === 0 ? (
         <div className="card text-center py-10 text-gray-500">
           {t('payment_history.no_history')}
         </div>
@@ -348,7 +532,7 @@ const PaymentHistory = () => {
                           {t('payment_history.ref')}: {first.transaction_reference}
                         </div>
                       )}
-                      {first.payment_status === 'completed' && (
+                      {(first.payment_status === 'completed' || first.payment_status === 'refunded') && (
                         <button
                           onClick={() => openReceipt(group)}
                           className="mt-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
@@ -426,7 +610,7 @@ const PaymentHistory = () => {
                         {t('payment_history.ref')}: {first.group_key || first.transaction_reference}
                       </div>
                     )}
-                    {combinedStatus === 'completed' && (
+                    {(combinedStatus === 'completed' || combinedStatus === 'refunded') && (
                       <button
                         onClick={() => openReceipt(group)}
                         className="mt-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
@@ -440,7 +624,14 @@ const PaymentHistory = () => {
             );
           })}
         </div>
-      )}
+      ))}
+
+      <FinancialReceiptModal
+        open={docModal.open}
+        kind={docModal.kind}
+        recordId={docModal.recordId}
+        onClose={() => setDocModal({ open: false, kind: null, recordId: null })}
+      />
 
       {selectedReceipt && (
         <div

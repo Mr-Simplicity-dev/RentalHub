@@ -908,6 +908,13 @@ class FumigationCleaningController {
         paymentRecord.booking_id,
         'completed'
       );
+
+      try {
+        const { sendFumigationPaymentReceipt } = require('../config/utils/paymentReceipt');
+        sendFumigationPaymentReceipt(paymentRecord.booking_id).catch(() => {});
+      } catch {
+        // Receipt email failures must not break booking verification.
+      }
       
       // Send payment confirmation notification
       try {

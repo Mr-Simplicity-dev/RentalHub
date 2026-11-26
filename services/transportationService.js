@@ -571,8 +571,17 @@ class TransportationController {
 
       const paymentId = PAYSTACK_SECRET_KEY ? reference : Date.now();
       
+      const wasAlreadyPaid = booking.payment_status === 'completed';
       // Update booking payment status
       await TransportationService.updatePaymentStatus(bookingId, 'completed', paymentId);
+      if (!wasAlreadyPaid) {
+        try {
+          const { sendTransportationPaymentReceipt } = require('../config/utils/paymentReceipt');
+          sendTransportationPaymentReceipt(bookingId).catch(() => {});
+        } catch {
+          // Receipt email failures must not break booking verification.
+        }
+      }
       
       // Get updated booking
       const updatedBooking = await TransportationService.getBookingById(bookingId);

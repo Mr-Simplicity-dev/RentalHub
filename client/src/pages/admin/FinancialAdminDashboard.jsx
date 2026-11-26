@@ -20,6 +20,8 @@ import { toast } from 'react-toastify';
 import Button from '../../components/common/Button';
 import InputDialog from '../../components/common/InputDialog';
 import AdminWithdrawalModal from '../../components/admin/AdminWithdrawalModal';
+import FinancialReceiptModal from '../../components/common/FinancialReceiptModal';
+const maskAccount = (acct) => { const s = String(acct || '').replace(/\s+/g, ''); if (!s) return '—'; return s.length <= 4 ? '•'.repeat(s.length) : '•'.repeat(s.length - 4) + s.slice(-4); };
 import TwoFactorStep from '../../components/common/TwoFactorStep';
 import useRetryableAction from '../../hooks/useRetryableAction';
 import DepartmentSupportEscalations from '../../components/admin/DepartmentSupportEscalations';
@@ -405,7 +407,13 @@ const FinancialAdminDashboard = () => {
             </div>
           </div>
 
-          <AdminWithdrawalModal
+          <FinancialReceiptModal
+        open={docModal.open}
+        kind={docModal.kind}
+        recordId={docModal.recordId}
+        onClose={() => setDocModal({ open: false, kind: null, recordId: null })}
+      />
+      <AdminWithdrawalModal
             isOpen={showPersonalWithdrawDialog}
             onClose={() => setShowPersonalWithdrawDialog(false)}
             onSubmit={async (formData) => {
@@ -868,15 +876,26 @@ const FinancialAdminDashboard = () => {
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              transaction.payment_status === 'completed'
-                                ? 'bg-green-100 text-green-800'
-                                : transaction.payment_status === 'pending'
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : 'bg-red-100 text-red-800'
-                            }`}>
-                              {transaction.payment_status}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                transaction.payment_status === 'completed'
+                                  ? 'bg-green-100 text-green-800'
+                                  : transaction.payment_status === 'pending'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-red-100 text-red-800'
+                              }`}>
+                                {transaction.payment_status}
+                              </span>
+                              {['completed', 'refunded'].includes(String(transaction.payment_status || '').toLowerCase()) && (
+                                <button
+                                  type="button"
+                                  onClick={() => setDocModal({ open: true, kind: 'payment', recordId: transaction.id })}
+                                  className="rounded border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+                                >
+                                  View Receipt
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1110,7 +1129,7 @@ const FinancialAdminDashboard = () => {
                             {withdrawal.bank_name}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {withdrawal.account_number}
+                            {maskAccount(withdrawal.account_number)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${

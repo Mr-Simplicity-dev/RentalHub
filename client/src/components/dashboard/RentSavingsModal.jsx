@@ -15,6 +15,7 @@ import {
   FaBan,
 } from 'react-icons/fa';
 import api from '../../services/api';
+import FinancialReceiptModal from '../common/FinancialReceiptModal';
 import { paymentService } from '../../services/paymentService';
 import { toast } from 'react-toastify';
 import RentCalculatorPanel from './RentCalculatorPanel';
@@ -1118,6 +1119,7 @@ function WithdrawTab({ plan, planDetails, onWithdrawMaturity, onRequestEarlyWith
 // HISTORY TAB
 // ══════════════════════════════════════════════════════════
 function HistoryTab({ plan, planDetails }) {
+  const [receiptContributionId, setReceiptContributionId] = useState(null);
   const contributions = planDetails?.contributions || [];
   const fees          = planDetails?.fees_charged   || [];
 
@@ -1178,6 +1180,13 @@ function HistoryTab({ plan, planDetails }) {
                 <p className="text-xs text-gray-500 mt-0.5">
                   1% fee: ₦{formatCurrency(c.commission_1pct)} · Net: ₦{formatCurrency(c.net_saved)}
                 </p>
+                <button
+                  type="button"
+                  onClick={() => setReceiptContributionId(c.id)}
+                  className="mt-1.5 inline-flex items-center rounded-md border border-teal-200 bg-white px-2.5 py-1 text-xs font-semibold text-teal-700 hover:bg-teal-50"
+                >
+                  View Receipt
+                </button>
               </div>
               <div className="text-right">
                 <p className="text-sm font-bold text-gray-800">₦{formatCurrency(c.amount)}</p>
@@ -1232,6 +1241,12 @@ function HistoryTab({ plan, planDetails }) {
           </div>
         </div>
       )}
+      <FinancialReceiptModal
+        open={Boolean(receiptContributionId)}
+        kind="savings"
+        recordId={receiptContributionId}
+        onClose={() => setReceiptContributionId(null)}
+      />
     </div>
   );
 }

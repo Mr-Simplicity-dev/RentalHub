@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { FaUniversity, FaCheck, FaClock, FaTimes } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
+import FinancialReceiptModal from '../../components/common/FinancialReceiptModal';
 import { getAuthUser } from '../../services/authStorage';
 import { useTranslation } from 'react-i18next';
 import Loader from '../../components/common/Loader';
@@ -16,6 +17,7 @@ const AgentWithdrawalPage = () => {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [receiptWithdrawalId, setReceiptWithdrawalId] = useState(null);
   const [withdrawTwoFactor, setWithdrawTwoFactor] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
@@ -332,6 +334,17 @@ const AgentWithdrawalPage = () => {
                             <strong>{t('agent_withdrawal.rejection_reason')}:</strong> {request.reason_for_rejection}
                           </p>
                         )}
+                        {['completed', 'processed', 'failed', 'reversed', 'rejected'].includes(
+                          String(request.paystack_transfer_status === 'reversed' ? 'reversed' : request.status || '').toLowerCase()
+                        ) && (
+                          <button
+                            type="button"
+                            onClick={() => setReceiptWithdrawalId(request.id)}
+                            className="mt-3 inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                          >
+                            View Payout Receipt
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -341,6 +354,12 @@ const AgentWithdrawalPage = () => {
           </div>
         </>
       )}
+      <FinancialReceiptModal
+        open={Boolean(receiptWithdrawalId)}
+        kind="agent-payout"
+        recordId={receiptWithdrawalId}
+        onClose={() => setReceiptWithdrawalId(null)}
+      />
     </div>
   );
 };

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
+import FinancialReceiptModal from '../components/common/FinancialReceiptModal';
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
 import {
@@ -31,6 +32,7 @@ const TransportationBookingDetails = () => {
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   
   // Load booking details
@@ -605,8 +607,16 @@ const TransportationBookingDetails = () => {
         onClose={() => !cancelling && setShowCancelModal(false)}
         onConfirm={handleCancelBooking}
       />
+      <FinancialReceiptModal
+        open={showReceiptModal}
+        kind="transportation"
+        recordId={booking?.id}
+        onClose={() => setShowReceiptModal(false)}
+      />
     </div>
   );
 };
+
+
 
 export default TransportationBookingDetails;

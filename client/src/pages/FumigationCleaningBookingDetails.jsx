@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
+import FinancialReceiptModal from '../components/common/FinancialReceiptModal';
 import { toast } from 'react-toastify';
 import {
   FaSprayCan,
@@ -39,6 +40,7 @@ const FumigationCleaningBookingDetails = () => {
   const [booking, setBooking] = useState(null);
   const [cancelling, setCancelling] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [cancellationReason, setCancellationReason] = useState('');
   const [provider, setProvider] = useState(null);
   const [compliance, setCompliance] = useState(null);
@@ -299,6 +301,15 @@ const FumigationCleaningBookingDetails = () => {
             </div>
             
             <div className="mt-4 flex w-full flex-col gap-2 md:mt-0 md:w-auto md:flex-row">
+              {booking.payment_status === 'completed' && (
+                <button
+                  type="button"
+                  onClick={() => setShowReceiptModal(true)}
+                  className="btn btn-outline w-full md:w-auto"
+                >
+                  View Service Receipt
+                </button>
+              )}
               {booking.booking_status === 'pending' && booking.payment_status === 'completed' && (
                 <button
                   onClick={() => setShowCancelModal(true)}
@@ -879,6 +890,12 @@ const FumigationCleaningBookingDetails = () => {
           </div>
         </div>
       )}
+      <FinancialReceiptModal
+        open={showReceiptModal}
+        kind="fumigation"
+        recordId={booking?.id}
+        onClose={() => setShowReceiptModal(false)}
+      />
     </div>
   );
 };

@@ -6,6 +6,7 @@ const validateRequest = require('../config/middleware/validateRequest');
 const paymentController = require('../controllers/paymentController');
 const refundController  = require('../controllers/refundController');
 const landlordPropertyFeeController = require('../controllers/landlordPropertyFeeController');
+const receiptController = require('../controllers/receiptController');
 const { authenticate, isTenant, isLandlord, isVerified, requireNotImpersonating } = require('../config/middleware/auth');
 const { requireAdminOrSuperAdmin } = require('../config/middleware/requireAdminOrSuperAdmin');
 const { criticalFinanceOpsLimiter } = require('../config/middleware/securityRateLimiters');
@@ -330,6 +331,13 @@ router.post('/verify-account',
   paymentController.verifyBankAccount
 );
 
+// Canonical platform-wide financial documents (JSON + PDF) for all roles
+router.get('/receipts/:kind/:id', authenticate, receiptController.getDocumentJson);
+router.get('/receipts/:kind/:id/pdf', authenticate, receiptController.getDocumentPdf);
+
+// Landlord rent-received confirmation records (scoped strictly to landlord's properties)
+router.get('/landlord/rent-receipts', authenticate, isLandlord, receiptController.getLandlordRentReceipts);
+
 // Get specific payment details
 router.get('/:paymentId', authenticate, paymentController.getPaymentDetails);
 
@@ -470,291 +478,22 @@ router.get('/wallet/fund/verify/:reference',
 
 // ============ WALLET & WITHDRAWALS ============
 
-// Tenant + Landlord: shared receipt data (JSON) for the Payment History
-// modal/print view - the exact object the email and PDF receipts are built from.
+// Shared payment receipt data (JSON) — delegates to canonical receiptController
 router.get('/receipt/:paymentId',
   authenticate,
-  async (req, res) => {
-    try {
-      const paymentId = Number.parseInt(req.params.paymentId, 10);
-      if (!Number.isInteger(paymentId) || paymentId <= 0) {
-        return res.status(400).json({ success: false, message: 'Invalid payment id' });
-      }
-
-      const {
-        loadReceiptContext,
-        buildReceiptData,
-      } = require('../config/utils/paymentReceipt');
-
-      const ctx = await loadReceiptContext(paymentId);
-      if (!ctx) {
-        return res.status(404).json({ success: false, message: 'Payment not found' });
-      }
-      if (Number(ctx.payment.user_id) !== Number(req.user.id)) {
-        return res.status(403).json({ success: false, message: 'Access denied' });
-      }
-
-      res.json({ success: true, data: buildReceiptData(ctx) });
-    } catch (error) {
-      req.logger.error('Receipt data error:', error);
-      res.status(500).json({ success: false, message: 'Failed to build receipt' });
-    }
-  }
+  receiptController.getPaymentReceiptJson
 );
 
-// Tenant + Landlord: downloadable PDF receipt (handles combined line items)
+// Downloadable PDF payment receipt — delegates to canonical receiptController
 router.get('/receipt-pdf/:paymentId',
   authenticate,
-  async (req, res) => {
-    try {
-      const PDFDocument = require('pdfkit');
-      const {
-        loadReceiptContext,
-        buildReceiptData,
-      } = require('../config/utils/paymentReceipt');
-
-      const paymentId = Number.parseInt(req.params.paymentId, 10);
-      if (!Number.isInteger(paymentId) || paymentId <= 0) {
-        return res.status(400).json({ success: false, message: 'Invalid payment id' });
-      }
-
-      const ctx = await loadReceiptContext(paymentId);
-      if (!ctx) {
-        return res.status(404).json({ success: false, message: 'Payment not found' });
-      }
-      if (Number(ctx.payment.user_id) !== Number(req.user.id)) {
-        return res.status(403).json({ success: false, message: 'Access denied' });
-      }
-
-      const receipt = buildReceiptData(ctx);
-
-      const doc = new PDFDocument({ size: 'A4', margin: 50 });
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader(
-        'Content-Disposition',
-        `attachment; filename="receipt-${String(paymentId).padStart(6, '0')}.pdf"`
-      );
-      doc.pipe(res);
-
-      const logoPath = path.join(__dirname, '..', 'assets', 'rentalhub-mark.png');
-      const amanaFontPath = path.join(__dirname, '..', 'assets', 'AmanaScript.ttf');
-      try { doc.registerFont('AmanaScript', amanaFontPath); } catch (e) { /* fall back to Helvetica */ }
-
-      // Helvetica has no naira glyph, so "₦12,500" printed as "12,500".
-      // Every amount on this receipt is drawn with this font instead.
-      const moneyFont = registerMoneyFont(doc);
-
-      // Header: logo + Amana wordmark + company name + contact
-      try { doc.image(logoPath, 50, 46, { width: 56, height: 56 }); } catch (e) {}
-      doc.font('AmanaScript').fontSize(21).fillColor('#6e1b2b').text('Amana', 122, 50, { width: 200 });
-      doc.font('Helvetica-Bold').fontSize(19).fillColor('#0f172a').text('Amana RentalHub NG', 122, 74, { width: 230 });
-      doc.font('Helvetica').fontSize(8).fillColor('#64748b').text('rentalhub.com.ng   •   support@rentalhub.com.ng', 122, 98, { width: 260 });
-
-      doc.moveTo(50, 126).lineTo(545, 126).strokeColor('#e2e8f0').lineWidth(1).stroke();
-
-      // Title + receipt number
-      doc.moveDown(1.1);
-      doc.font('Helvetica-Bold').fontSize(14).fillColor('#0f172a').text(receipt.documentType || 'OFFICIAL PAYMENT RECEIPT', { align: 'center' });
-      doc.moveDown(0.25);
-      doc.font('Helvetica').fontSize(10).fillColor('#0284c7').text(receipt.receiptNumber, { align: 'center' });
-      doc.moveDown(1.4);
-
-      // Details
-      const method = receipt.methodLine || (receipt.channel ? `${receipt.method} — ${receipt.channel}` : receipt.method);
-      const detailRows = [
-        ['Paid by', receipt.fullName || receipt.email],
-        ['Email', receipt.email || '—'],
-        ['Date', receipt.date],
-        ['Reference', receipt.reference || '—'],
-        ['Status', receipt.status],
-        ['Payment method', method],
-        ['Currency', receipt.currency || 'NGN'],
-      ];
-      detailRows.forEach(([label, value]) => {
-        doc.font('Helvetica').fontSize(8).fillColor('#94a3b8').text(label.toUpperCase(), 50, doc.y, { width: 120 });
-        doc.font('Helvetica-Bold').fontSize(10).fillColor('#0f172a').text(value || '—', 180, doc.y - 12, { width: 365 });
-        doc.moveDown(0.35);
-      });
-
-      // Detailed rent context - only fields that actually exist are printed.
-      if (receipt.rent) {
-        const rentRows = [
-          ['Payment For', receipt.rent.paymentFor],
-          ['Property', receipt.rent.propertyTitle],
-          ['Property Address', receipt.rent.propertyAddress],
-          ['Tenant', receipt.rent.tenantName],
-          ['Landlord', receipt.rent.landlordName],
-          [
-            'Rental Period',
-            receipt.rent.rentalPeriod
-              ? receipt.rent.rentalPeriod.end
-                ? `${receipt.rent.rentalPeriod.start} - ${receipt.rent.rentalPeriod.end}`
-                : receipt.rent.rentalPeriod.start
-              : null,
-          ],
-        ].filter(([, value]) => value);
-        if (rentRows.length) {
-          doc.moveDown(0.6);
-          rentRows.forEach(([label, value]) => {
-            doc.font('Helvetica').fontSize(8).fillColor('#94a3b8').text(label.toUpperCase(), 50, doc.y, { width: 120 });
-            doc.font('Helvetica-Bold').fontSize(10).fillColor('#0f172a').text(value, 180, doc.y - 12, { width: 365 });
-            doc.moveDown(0.35);
-          });
-        }
-      }
-
-      if (Number(receipt.quoteUsd) > 0) {
-        doc.moveDown(0.5);
-        doc.font('Helvetica').fontSize(9).fillColor('#166534');
-        doc.text(`Diaspora registration quote: $${Number(receipt.quoteUsd).toFixed(2)} USD${receipt.quoteCurrency ? ` (${receipt.quoteCurrency})` : ''}`);
-        if (receipt.fxRate) doc.font(moneyFont).text(`FX rate applied: ₦${Number(receipt.fxRate).toLocaleString()} / USD`);
-        if (receipt.fxMarkupPct) doc.font('Helvetica').text(`FX markup: ${Number(receipt.fxMarkupPct).toFixed(2)}%`);
-        doc.font(moneyFont).text(`Amount charged: ${receipt.total} NGN`);
-        doc.font('Helvetica');
-      }
-      doc.moveDown(1);
-
-      // Items table
-      const tableTop = doc.y;
-      doc.font('Helvetica-Bold').fontSize(10).fillColor('#0f172a');
-      doc.text('DESCRIPTION', 50, tableTop);
-      doc.text('AMOUNT', 400, tableTop, { width: 145, align: 'right' });
-      doc.moveTo(50, tableTop + 16).lineTo(545, tableTop + 16).strokeColor('#e2e8f0').stroke();
-
-      let y = tableTop + 24;
-      doc.font('Helvetica').fontSize(10).fillColor('#334155');
-      receipt.items.forEach((item) => {
-        doc.font('Helvetica').text(item.label, 50, y, { width: 330 });
-        doc.font(moneyFont).text(item.amount, 400, y, { width: 145, align: 'right' });
-        y += 22;
-      });
-
-      doc.moveTo(50, y + 4).lineTo(545, y + 4).strokeColor('#e2e8f0').stroke();
-      doc.moveDown(1.2);
-      doc.font('Helvetica-Bold').fontSize(12).fillColor('#0f172a').text('TOTAL PAID', 50, doc.y);
-      doc.font(moneyFont).fontSize(14).fillColor('#0284c7').text(receipt.total, 400, doc.y - 16, { width: 145, align: 'right' });
-
-      // Actual platform fee recorded against this payment, when it was
-      // deducted from the recipient instead of charged to the payer.
-      if (Number(receipt.rent?.platformFee) > 0) {
-        doc.moveDown(1.2);
-        doc.font(moneyFont).fontSize(9).fillColor('#475569');
-        doc.text(`Platform/Service Fee: ₦${Number(receipt.rent.platformFee).toLocaleString()} (deducted from the landlord's payout - not charged to you)`, { width: 495 });
-      }
-
-      // Footer
-      doc.moveDown(3);
-      doc.font('Helvetica').fontSize(9).fillColor('#94a3b8').text('Thank you for using Amana RentalHub NG.', { align: 'center' });
-      doc.moveDown(0.2);
-      doc.fontSize(8).fillColor('#cbd5e1').text(RECEIPT_NOTICE, { align: 'center' });
-
-      doc.end();
-    } catch (error) {
-      req.logger.error('Receipt PDF error:', error);
-      if (!res.headersSent) {
-        res.status(500).json({ success: false, message: 'Failed to generate receipt PDF' });
-      }
-    }
-  }
+  receiptController.getPaymentReceiptPdf
 );
 
-// Tenant: downloadable PDF receipt for a rent savings contribution
+// Downloadable PDF receipt for a rent savings contribution — delegates to canonical receiptController
 router.get('/savings-receipt.pdf',
   authenticate,
-  async (req, res) => {
-    try {
-      const PDFDocument = require('pdfkit');
-      const db = require('../config/middleware/database');
-
-      const contributionId = Number.parseInt(req.query.contribution_id, 10);
-      if (!Number.isInteger(contributionId) || contributionId <= 0) {
-        return res.status(400).json({ success: false, message: 'Invalid contribution id' });
-      }
-
-      const result = await db.query(
-        `SELECT c.*, p.monthly_savings_amount, p.target_savings_amount
-         FROM rent_savings_contributions c
-         JOIN rent_savings_plans p ON p.id = c.plan_id
-         WHERE c.id = $1`,
-        [contributionId]
-      );
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({ success: false, message: 'Contribution not found' });
-      }
-
-      const contribution = result.rows[0];
-
-      if (Number(contribution.tenant_id) !== Number(req.user.id)) {
-        return res.status(403).json({ success: false, message: 'Access denied' });
-      }
-
-      const amount = Number(contribution.amount || 0);
-      const fee = Number(contribution.commission_1pct || 0);
-      const net = Number(contribution.net_saved || 0);
-
-      const doc = new PDFDocument({ size: 'A4', margin: 50 });
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader(
-        'Content-Disposition',
-        `attachment; filename="savings-receipt-${String(contributionId).padStart(6, '0')}.pdf"`
-      );
-      doc.pipe(res);
-
-      const moneyFont = registerMoneyFont(doc);
-
-      doc.fontSize(20).text('Amana RentalHub NG', { align: 'center' });
-      doc.moveDown(0.2);
-      doc.fontSize(11).fillColor('#64748b').text('Rent Savings Contribution Receipt', { align: 'center' });
-      doc.fontSize(11).fillColor('#0f172a').text(savingsReceiptNumber(contributionId), { align: 'center' });
-      doc.moveDown();
-
-      doc.fontSize(10).fillColor('#334155');
-      doc.text(`Payer: ${req.user.full_name || req.user.email}`);
-      doc.text(`Date: ${formatNigerianDateTime(contribution.contributed_at)}`);
-      doc.text(`Reference: ${contribution.payment_reference || buildReference('RSC', contribution.plan_id)}`);
-      doc.text(`Savings Month: ${contribution.saved_for_month}`);
-      doc.text(`Status: Saved`);
-      doc.text(`Method: Wallet Balance`);
-      doc.moveDown();
-
-      const tableTop = doc.y;
-      doc.font('Helvetica-Bold');
-      doc.text('Item', 50, tableTop);
-      doc.text('Amount', 400, tableTop, { width: 150, align: 'right' });
-      doc.moveTo(50, tableTop + 16).lineTo(545, tableTop + 16).strokeColor('#e2e8f0').stroke();
-
-      let y = tableTop + 26;
-      doc.font('Helvetica');
-      const rows = [
-        ['Contribution', `₦${amount.toLocaleString()}`],
-        ['Platform fee (1%)', `₦${fee.toLocaleString()}`],
-        ['Net saved', `₦${net.toLocaleString()}`],
-      ];
-      rows.forEach(([label, value]) => {
-        doc.font('Helvetica').fillColor('#334155').text(label, 50, y, { width: 330 });
-        doc.font(moneyFont).text(value, 400, y, { width: 150, align: 'right' });
-        y += 22;
-      });
-
-      doc.moveTo(50, y).lineTo(545, y).strokeColor('#e2e8f0').stroke();
-      doc.moveDown();
-      doc.font('Helvetica-Bold');
-      doc.fillColor('#0f172a').text('Amount Saved', 50, doc.y);
-      doc.font(moneyFont).text(`₦${net.toLocaleString()}`, 400, doc.y - 14, { width: 150, align: 'right' });
-      doc.moveDown(2);
-      doc.fontSize(9).fillColor('#94a3b8').text('Thank you for saving with Amana RentalHub NG.', { align: 'center' });
-      doc.moveDown(0.2);
-      doc.fontSize(8).fillColor('#cbd5e1').text(RECEIPT_NOTICE, { align: 'center' });
-
-      doc.end();
-    } catch (error) {
-      req.logger.error('Savings receipt PDF error:', error);
-      if (!res.headersSent) {
-        res.status(500).json({ success: false, message: 'Failed to generate savings receipt PDF' });
-      }
-    }
-  }
+  receiptController.getSavingsReceiptPdf
 );
 
 // Admin/agent commission earnings statement as PDF
@@ -768,6 +507,7 @@ router.get('/commission-statement.pdf',
       const userId = req.user.id;
       const role = String(req.user.user_type || '').toLowerCase();
       const isAgent = ['agent', 'landlord_agent'].includes(role);
+      const isMarketingAgent = role === 'marketing_agent';
       const isAdminEarner = [
         'super_admin', 'admin', 'lga_admin', 'state_admin',
         'financial_admin', 'lga_financial_admin', 'state_financial_admin',
@@ -809,9 +549,25 @@ router.get('/commission-statement.pdf',
           date: c.created_at,
           meta: '',
         }));
+      } else if (isMarketingAgent) {
+        const result = await db.query(
+          `SELECT stage AS source, amount, status, created_at
+           FROM marketing_agent_commissions
+           WHERE agent_user_id = $1
+           ORDER BY created_at DESC
+           LIMIT 500`,
+          [userId]
+        );
+        items = result.rows.map((c) => ({
+          label: humanizePaymentType(c.source || 'marketing_commission'),
+          amount: Number(c.amount || 0),
+          status: c.status || 'paid',
+          date: c.created_at,
+          meta: 'Marketing',
+        }));
       }
 
-      if (!isAdminEarner && !isAgent) {
+      if (!isAdminEarner && !isAgent && !isMarketingAgent) {
         return res.status(403).json({ success: false, message: 'No commission statement available for this account' });
       }
 

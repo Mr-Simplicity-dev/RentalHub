@@ -4,6 +4,7 @@ import api from '../../services/api';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../hooks/useAuth';
 import AdminWithdrawalModal from '../../components/admin/AdminWithdrawalModal';
+import FinancialReceiptModal from '../../components/common/FinancialReceiptModal';
 import RentCalculatorFeesAdmin from '../../components/admin/RentCalculatorFeesAdmin';
 
 const formatCurrency = (value) =>
@@ -22,6 +23,7 @@ const ZonalFinancialAdminDashboard = () => {
   const [withdrawals, setWithdrawals] = useState([]);
   const [overview, setOverview] = useState(null);
   const [showWithdrawDialog, setShowWithdrawDialog] = useState(false);
+  const [docModal, setDocModal] = useState({ open: false, kind: null, recordId: null });
   const [submittingWithdrawal, setSubmittingWithdrawal] = useState(false);
 
   const load = useCallback(async () => {
@@ -171,7 +173,18 @@ const ZonalFinancialAdminDashboard = () => {
                         <td className="px-4 py-3 font-semibold text-gray-900">{formatCurrency(w.amount)}</td>
                         <td className="px-4 py-3 text-gray-600">{w.bank_name || '-'}</td>
                         <td className="px-4 py-3">
-                          <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold capitalize text-gray-700">{w.status || 'pending'}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold capitalize text-gray-700">{w.status || 'pending'}</span>
+                            {['completed', 'processed', 'failed', 'reversed', 'rejected'].includes(String(w.status || '').toLowerCase()) && (
+                              <button
+                                type="button"
+                                onClick={() => setDocModal({ open: true, kind: 'admin-payout', recordId: w.id })}
+                                className="rounded border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+                              >
+                                Payout Receipt
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -187,6 +200,12 @@ const ZonalFinancialAdminDashboard = () => {
         )}
       </div>
 
+      <FinancialReceiptModal
+        open={docModal.open}
+        kind={docModal.kind}
+        recordId={docModal.recordId}
+        onClose={() => setDocModal({ open: false, kind: null, recordId: null })}
+      />
       <AdminWithdrawalModal
         isOpen={showWithdrawDialog}
         onClose={() => setShowWithdrawDialog(false)}

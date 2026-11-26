@@ -158,6 +158,51 @@ export const paymentService = {
     return response.data;
   },
 
+  // Canonical platform-wide financial document (JSON)
+  getDocumentReceipt: async (kind, id) => {
+    const response = await api.get(`/payments/receipts/${encodeURIComponent(kind)}/${encodeURIComponent(id)}`);
+    return response.data;
+  },
+
+  // Canonical platform-wide financial document (PDF blob)
+  downloadDocumentPdf: async (kind, id) => {
+    const response = await api.get(
+      `/payments/receipts/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/pdf`,
+      { responseType: 'blob' }
+    );
+    return response.data;
+  },
+
+  // Landlord rent-received confirmation records
+  getLandlordRentReceipts: async (params = {}) => {
+    const response = await api.get('/payments/landlord/rent-receipts', { params });
+    return response.data;
+  },
+
+  // Wallet transaction ledger entries
+  getWalletTransactions: async (params = {}) => {
+    const response = await api.get('/payments/wallet/transactions', { params });
+    return response.data;
+  },
+
+  // Wallet withdrawal history
+  getWalletWithdrawals: async () => {
+    const response = await api.get('/payments/wallet/withdrawals');
+    return response.data;
+  },
+
+  // Tenant refund requests
+  getTenantRefundRequests: async () => {
+    const response = await api.get('/payments/refund/my-requests');
+    return response.data;
+  },
+
+  // Landlord refund requests
+  getLandlordRefundRequests: async () => {
+    const response = await api.get('/payments/refund/landlord');
+    return response.data;
+  },
+
   // Retry a pending payment
   retryPayment: async (paymentId) => {
     const response = await api.post(`/payments/retry/${paymentId}`);

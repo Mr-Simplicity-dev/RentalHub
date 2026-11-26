@@ -3907,10 +3907,9 @@ exports.verifyWalletFunding = async (req, res) => {
     if (!wasAlreadyCompleted) {
       // Calculate commission for wallet funding
       await commissionService.processPaymentCommission(payment.id);
+      // Email the receipt once on initial completion (duplicate verify calls skip)
+      sendReceiptForPayment(payment.id).catch(() => {});
     }
-
-    // Email the receipt for the wallet funding
-    sendReceiptForPayment(payment.id).catch(() => {});
 
       return res.json({
       success: true,
@@ -4313,6 +4312,8 @@ async function handleSuccessfulPayment(data, webhookLogger) {
       return;
     }
 
+    const wasAlreadyCompleted = storedPayment.payment_status === 'completed';
+
     const updateResult = await db.query(
       `UPDATE payments 
        SET payment_status = 'completed',
@@ -4473,8 +4474,10 @@ async function handleSuccessfulPayment(data, webhookLogger) {
       await commissionService.processPaymentCommission(paymentId);
     }
 
-    // Email the receipt for the completed payment (fires in the background)
-    sendReceiptForPayment(paymentId).catch(() => {});
+    // Email the receipt once on initial completion (duplicate webhooks must not double-email)
+    if (!wasAlreadyCompleted) {
+      sendReceiptForPayment(paymentId).catch(() => {});
+    }
 
     webhookLogger.info("Webhook payment processed:", reference);
   } catch (error) {

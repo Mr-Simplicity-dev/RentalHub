@@ -12,6 +12,8 @@ import {
 import { toast } from 'react-toastify';
 import api from '../../services/api';
 import AdminWithdrawalModal from '../../components/admin/AdminWithdrawalModal';
+import FinancialReceiptModal from '../../components/common/FinancialReceiptModal';
+const maskAccount = (acct) => { const s = String(acct || '').replace(/\s+/g, ''); if (!s) return '—'; return s.length <= 4 ? '•'.repeat(s.length) : '•'.repeat(s.length - 4) + s.slice(-4); };
 import TwoFactorStep from '../../components/common/TwoFactorStep';
 import DepartmentSupportEscalations from '../../components/admin/DepartmentSupportEscalations';
 import RentCalculatorFeesAdmin from '../../components/admin/RentCalculatorFeesAdmin';
@@ -43,6 +45,7 @@ const SuperFinancialAdminDashboard = () => {
   const [frozenFunds, setFrozenFunds] = useState([]);
   const [statePerformance, setStatePerformance] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
+  const [docModal, setDocModal] = useState({ open: false, kind: null, recordId: null });
   const [pendingWithdrawals, setPendingWithdrawals] = useState([]);
   const [recentWithdrawalDecisions, setRecentWithdrawalDecisions] = useState([]);
   const [pendingWithdrawalsLoading, setPendingWithdrawalsLoading] = useState(true);
@@ -681,6 +684,7 @@ const SuperFinancialAdminDashboard = () => {
                   <th className="py-2">Amount</th>
                   <th className="py-2">Wallet Credit</th>
                   <th className="py-2">Date</th>
+                  <th className="py-2">Document</th>
                 </tr>
               </thead>
               <tbody>
@@ -703,6 +707,19 @@ const SuperFinancialAdminDashboard = () => {
                       )}
                     </td>
                     <td className="py-2 text-gray-600">{dateLabel(tx.created_at || tx.date)}</td>
+                    <td className="py-2">
+                      {tx.id && ['completed', 'refunded'].includes(String(tx.payment_status || tx.status || 'completed').toLowerCase()) ? (
+                        <button
+                          type="button"
+                          onClick={() => setDocModal({ open: true, kind: 'payment', recordId: tx.id })}
+                          className="rounded border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+                        >
+                          View Receipt
+                        </button>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -923,6 +940,7 @@ const SuperFinancialAdminDashboard = () => {
                 <th className="py-2">Status</th>
                 <th className="py-2">Processed</th>
                 <th className="py-2">Failure Reason</th>
+                <th className="py-2">Document</th>
               </tr>
             </thead>
             <tbody>
@@ -935,7 +953,7 @@ const SuperFinancialAdminDashboard = () => {
                   <td className="py-2 text-gray-800">{dateLabel(withdrawal.requested_at)}</td>
                   <td className="py-2 font-medium text-gray-800">{currency(withdrawal.amount)}</td>
                   <td className="py-2 text-gray-600">{withdrawal.bank_name}</td>
-                  <td className="py-2 text-gray-600">{withdrawal.account_number}</td>
+                  <td className="py-2 font-mono text-gray-600">{maskAccount(withdrawal.account_number)}</td>
                   <td className="py-2">
                     <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${
                       withdrawal.status === 'pending'
@@ -951,6 +969,19 @@ const SuperFinancialAdminDashboard = () => {
                   </td>
                   <td className="py-2 text-gray-600">{withdrawal.processed_at ? dateLabel(withdrawal.processed_at) : 'Pending'}</td>
                   <td className="py-2 text-xs text-red-600">{withdrawal.payout_failed_reason || '-'}</td>
+                  <td className="py-2">
+                    {['completed', 'processed', 'failed', 'reversed', 'rejected'].includes(String(withdrawal.status || '').toLowerCase()) ? (
+                      <button
+                        type="button"
+                        onClick={() => setDocModal({ open: true, kind: 'admin-payout', recordId: withdrawal.id })}
+                        className="rounded border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+                      >
+                        Payout Receipt
+                      </button>
+                    ) : (
+                      <span className="text-xs text-gray-400">Pending</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -1073,6 +1104,12 @@ const SuperFinancialAdminDashboard = () => {
         </div>
       ) : null}
 
+      <FinancialReceiptModal
+        open={docModal.open}
+        kind={docModal.kind}
+        recordId={docModal.recordId}
+        onClose={() => setDocModal({ open: false, kind: null, recordId: null })}
+      />
       <AdminWithdrawalModal
         isOpen={showPersonalWithdrawDialog}
         onClose={() => setShowPersonalWithdrawDialog(false)}

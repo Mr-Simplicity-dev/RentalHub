@@ -248,6 +248,12 @@ exports.verifyDispute = async (req, res) => {
          WHERE transaction_reference = $2`,
         [JSON.stringify(transaction), reference]
       );
+      try {
+        const { sendEvidencePaymentReceipt } = require('../config/utils/paymentReceipt');
+        sendEvidencePaymentReceipt(payment.id).catch(() => {});
+      } catch {
+        // Receipt email failures must not break verification.
+      }
     }
 
     const result =
