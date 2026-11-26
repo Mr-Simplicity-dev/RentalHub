@@ -7,6 +7,9 @@ import { toast } from 'react-toastify';
 import BackToDashboard from '../components/common/BackToDashboard';
 import { useTranslation } from 'react-i18next';
 import { FaPaperclip, FaFile, FaTimes } from 'react-icons/fa';
+import TranslationResult from '../components/common/TranslationResult';
+import { multilingualService } from '../services/multilingualService';
+import { canTranslateMessageRecord, translationTargetLanguage } from '../utils/translationUi';
 
 const roleLabel = (role, t) => {
   if (role === 'super_admin') return t('messages.roles.super_admin');
@@ -30,7 +33,7 @@ const ESCALATION_TICKET_OPTIONS = [
 
 const Messages = () => {
   const { user } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
@@ -44,6 +47,9 @@ const Messages = () => {
   const [loadingEscalations, setLoadingEscalations] = useState(false);
   const [sending, setSending] = useState(false);
   const [updatingEscalationId, setUpdatingEscalationId] = useState('');
+  const [translationEnabled, setTranslationEnabled] = useState(false);
+  const [messageTranslations, setMessageTranslations] = useState({});
+  const [translatingMessageId, setTranslatingMessageId] = useState(null);
 
   const [recipientRoleFilter, setRecipientRoleFilter] = useState('');
   const [compose, setCompose] = useState({
@@ -61,6 +67,10 @@ const Messages = () => {
   const canCompose = isLgaAdmin || userRole === 'super_admin' || isTenantOrLandlord;
   const canUseEscalation = isLgaAdmin;
   const canViewEscalations = isLgaAdmin || userRole === 'super_admin';
+  const otherRole = String(selectedConversation?.other_user_type || '').trim().toLowerCase();
+  const canTranslateConversation =
+    (userRole === 'landlord' && otherRole === 'tenant') ||
+    (userRole === 'tenant' && otherRole === 'landlord');
 
   const roleOptions = useMemo(() => {
     if (!userRole || !canCompose) return [];
@@ -151,6 +161,20 @@ const Messages = () => {
   }, [loadConversations, loadRecipients, loadEscalations, recipientRoleFilter, canCompose]);
 
   useEffect(() => {
+    let active = true;
+    multilingualService.getConfig()
+      .then((res) => {
+        if (active) setTranslationEnabled(Boolean(res?.data?.features?.messageTranslationEnabled));
+      })
+      .catch(() => setTranslationEnabled(false));
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    setMessageTranslations({});
+  }, [selectedConversation?.other_user_id]);
+
+  useEffect(() => {
     if (!canUseEscalation || compose.message_type !== 'escalation') return;
     if (recipientRoleFilter !== 'super_admin') {
       setRecipientRoleFilter('super_admin');
@@ -166,6 +190,22 @@ const Messages = () => {
       receiver_id: String(conversation.other_user_id),
     }));
     await loadConversationMessages(conversation.other_user_id);
+  };
+
+  const handleTranslateMessage = async (message) => {
+    if (!message?.id || translatingMessageId !== null) return;
+    setTranslatingMessageId(message.id);
+    try {
+      const response = await messageService.translateMessage(
+        message.id,
+        translationTargetLanguage(i18n.language)
+      );
+      setMessageTranslations((prev) => ({ ...prev, [message.id]: response?.data || null }));
+    } catch (error) {
+      toast.error(error?.response?.data?.message || 'Translation failed. Please try again.');
+    } finally {
+      setTranslatingMessageId(null);
+    }
   };
 
   const handleSendMessage = async (event) => {
@@ -521,6 +561,7 @@ const Messages = () => {
               <div className="space-y-3 max-h-[460px] overflow-y-auto">
                 {messages.map((m) => {
                   const own = Number(m.sender_id) === Number(user?.id);
+                  const canTranslateMessage = canTranslateMessageRecord(m);
                   return (
                     <div key={m.id} className={`flex ${own ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[85%] rounded-lg p-3 ${own ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-900'}`}>
@@ -530,6 +571,23 @@ const Messages = () => {
                           </div>
                         )}
                         <p className="text-sm whitespace-pre-wrap">{m.message_text}</p>
+                        {translationEnabled && canTranslateConversation && canTranslateMessage && (
+                          <button
+                            type="button"
+                            className={`text-[11px] underline mt-1 ${own ? 'text-primary-100' : 'text-gray-600'}`}
+                            onClick={() => handleTranslateMessage(m)}
+                            disabled={translatingMessageId === m.id}
+                          >
+                            {translatingMessageId === m.id ? 'Translating…' : 'Translate'}
+                          </button>
+                        )}
+                        {messageTranslations[m.id] && (
+                          <TranslationResult
+                            originalText={messageTranslations[m.id].original_text}
+                            translatedText={messageTranslations[m.id].translated_text}
+                            label={messageTranslations[m.id].machine_translation_label}
+                          />
+                        )}
                         <div className={`text-[11px] mt-1 ${own ? 'text-primary-100' : 'text-gray-500'}`}>
                           {formatDateTime(m.created_at)}
                         </div>

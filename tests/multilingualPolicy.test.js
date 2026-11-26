@@ -23,6 +23,8 @@ test('Azure Translator config is disabled-safe and never exposes secrets in publ
     AZURE_TRANSLATOR_KEY: 'secret-key',
     AZURE_TRANSLATOR_REGION: 'southafricanorth',
     AZURE_TRANSLATOR_ENDPOINT: 'https://api.cognitive.microsofttranslator.com/',
+    PROPERTY_DESCRIPTION_TRANSLATION_ENABLED: 'true',
+    MESSAGE_TRANSLATION_ENABLED: 'true',
   };
   const config = getAzureTranslatorConfig(env);
   assert.equal(config.configured, true);
@@ -30,9 +32,17 @@ test('Azure Translator config is disabled-safe and never exposes secrets in publ
   assert.equal(isAzureTranslatorAvailable(env), true);
 
   const pub = getPublicMultilingualConfig(env);
-  assert.equal(pub.azureTranslator.configured, true);
-  assert.equal(pub.azureTranslator.region, 'southafricanorth');
-  assert.equal('key' in pub.azureTranslator, false);
+  assert.deepEqual(Object.keys(pub), ['features']);
+  assert.deepEqual(Object.keys(pub.features).sort(), [
+    'messageTranslationEnabled',
+    'propertyDescriptionTranslationEnabled',
+  ]);
+  assert.equal(pub.features.propertyDescriptionTranslationEnabled, true);
+  assert.equal(pub.features.messageTranslationEnabled, true);
+  const serialized = JSON.stringify(pub);
+  for (const leaked of ['secret-key', 'southafricanorth', 'api.cognitive.microsofttranslator.com', '3.0']) {
+    assert.equal(serialized.includes(leaked), false);
+  }
 });
 
 test('translation availability rules match approved policy', () => {

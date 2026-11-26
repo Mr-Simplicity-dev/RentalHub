@@ -15,6 +15,7 @@ import DisputeCreationModal from '../components/DisputeCreationModal';
 import PropertyFeaturesDisplay from '../components/properties/PropertyFeaturesDisplay';
 import { DamageReportCard } from '../components/damage';
 import OnlineStatusBadge from '../components/calls/OnlineStatusBadge';
+import TranslationResult from '../components/common/TranslationResult';
 import {
   FaBed,
   FaBath,
@@ -30,6 +31,8 @@ import {
   FaCalculator,
 } from 'react-icons/fa';
 import { formatCurrency, formatDate } from '../utils/helpers';
+import { translationTargetLanguage } from '../utils/translationUi';
+import { multilingualService } from '../services/multilingualService';
 import { useTranslation } from 'react-i18next';
 
 const PropertyDetail = () => {
@@ -38,7 +41,7 @@ const PropertyDetail = () => {
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, isAuthenticated } = useAuth();
   const goToCalculator = () => {
     if (!property) return;
@@ -63,9 +66,41 @@ const PropertyDetail = () => {
   const [unlocking, setUnlocking] = useState(false);
   const autoUnlockAttemptedRef = useRef(false);
   const [showDisputeModal, setShowDisputeModal] = useState(false);
+  const [descriptionTranslation, setDescriptionTranslation] = useState(null);
+  const [translatingDescription, setTranslatingDescription] = useState(false);
+  const [descriptionTranslationEnabled, setDescriptionTranslationEnabled] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    multilingualService.getConfig()
+      .then((res) => {
+        if (active) {
+          setDescriptionTranslationEnabled(Boolean(res?.data?.features?.propertyDescriptionTranslationEnabled));
+        }
+      })
+      .catch(() => setDescriptionTranslationEnabled(false));
+    return () => { active = false; };
+  }, []);
+
+  const handleTranslateDescription = async () => {
+    if (!property?.id || translatingDescription) return;
+    setTranslatingDescription(true);
+    try {
+      const response = await propertyService.translateDescription(
+        property.id,
+        translationTargetLanguage(i18n.language)
+      );
+      setDescriptionTranslation(response?.data || null);
+    } catch (error) {
+      toast.error(error?.response?.data?.message || 'Translation failed. Please try again.');
+    } finally {
+      setTranslatingDescription(false);
+    }
+  };
 
   const loadProperty = useCallback(async () => {
     setLoading(true);
+    setDescriptionTranslation(null);
     try {
       let response = null;
       const isTenant = isAuthenticated && user?.user_type === 'tenant';
@@ -532,8 +567,27 @@ const PropertyDetail = () => {
             {/* Description */}
             {hasFullAccess ? (
               <div className="mb-6">
-                <h2 className="text-xl font-semibold mb-3">{t('property_detail.description')}</h2>
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <h2 className="text-xl font-semibold">{t('property_detail.description')}</h2>
+                  {descriptionTranslationEnabled && property.description && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={handleTranslateDescription}
+                      disabled={translatingDescription}
+                    >
+                      {translatingDescription ? 'Translating…' : 'Translate'}
+                    </button>
+                  )}
+                </div>
                 <p className="text-gray-700 whitespace-pre-line">{property.description}</p>
+                {descriptionTranslation && (
+                  <TranslationResult
+                    originalText={descriptionTranslation.original_text}
+                    translatedText={descriptionTranslation.translated_text}
+                    label={descriptionTranslation.machine_translation_label}
+                  />
+                )}
               </div>
             ) : (
               <div className="mb-6">

@@ -1716,6 +1716,13 @@ exports.verifyPropertyUnlock = async (req, res) => {
 
     const payment = paymentResult.rows[0];
 
+    if (payment.payment_status === 'refunded') {
+      return res.status(409).json({
+        success: false,
+        message: "Refunded property unlock payments cannot be re-verified",
+      });
+    }
+
     if (payment.payment_status !== "completed") {
       const paystackResponse = await axios.get(
         `${PAYSTACK_BASE_URL}/transaction/verify/${reference}`,
@@ -4264,10 +4271,11 @@ async function handleSuccessfulPayment(data, webhookLogger) {
       return;
     }
 
-    if (storedPayment.payment_status === 'completed') {
-      webhookLogger.info('Ignoring duplicate Paystack success event for already completed payment', {
+    if (storedPayment.payment_status === 'completed' || storedPayment.payment_status === 'refunded') {
+      webhookLogger.info('Ignoring duplicate or stale Paystack success event for settled payment', {
         reference,
         paymentId: storedPayment.id,
+        status: storedPayment.payment_status,
       });
       return;
     }
@@ -4311,12 +4319,20 @@ async function handleSuccessfulPayment(data, webhookLogger) {
            gateway_response = $1,
            payment_channel = $3
        WHERE id = $2
+         AND payment_status <> 'refunded'
        RETURNING id, payment_type, user_id, amount`,
       [JSON.stringify(data), storedPayment.id, data.channel]
     );
 
     const completedPayment = updateResult.rows[0] || null;
-    const paymentId = completedPayment?.id || null;
+    if (!completedPayment) {
+      webhookLogger.info('Ignoring Paystack success event for a payment that became refunded', {
+        reference,
+        paymentId: storedPayment.id,
+      });
+      return;
+    }
+    const paymentId = completedPayment.id;
 
     // On-behalf rent receipts (idempotent) — never fail the webhook.
     try {
@@ -4788,6 +4804,12 @@ async function handleRefundPayment(data, webhookLogger) {
     if (paymentResult.rows.length > 0) {
       const paymentId = paymentResult.rows[0].id;
       await commissionService.clawbackCommissionsForPayment(paymentId, 'payment_refunded');
+      try {
+        const spokenNotificationService = require('../config/utils/spokenNotificationService');
+        await spokenNotificationService.cancelSpokenEventsForSource({ sourceType: 'payment', sourceId: paymentId });
+      } catch (spokenError) {
+        webhookLogger.error(`Spoken payment success cancellation error: ${spokenError.message}`);
+      }
     }
 
     webhookLogger.info("Payment refunded:", reference);
@@ -4814,6 +4836,12 @@ async function handleFailedPayment(data, webhookLogger) {
     if (paymentResult.rows.length > 0) {
       const payment = paymentResult.rows[0];
       await commissionService.clawbackCommissionsForPayment(payment.id, 'payment_failed');
+      try {
+        const spokenNotificationService = require('../config/utils/spokenNotificationService');
+        await spokenNotificationService.cancelSpokenEventsForSource({ sourceType: 'payment', sourceId: payment.id });
+      } catch (spokenError) {
+        webhookLogger.error(`Spoken payment success cancellation error: ${spokenError.message}`);
+      }
 
       try {
         const userRes = await db.query('SELECT full_name, email FROM users WHERE id = $1', [payment.user_id]);

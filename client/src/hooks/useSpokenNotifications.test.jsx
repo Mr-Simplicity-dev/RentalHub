@@ -127,14 +127,14 @@ test('unavailable SpeechSynthesis leaves the event unclaimed and preserves visua
 const futureEvent=(language='en')=>({id:91,message:language==='ha'?'An karɓi kuɗin hayarka':language==='ig'?'A natara ụgwọ ụlọ gị':language==='yo'?'A ti gba owó ilé rẹ':'Your rent payment was successful.',language,expiresAt:new Date(Date.now()+600000).toISOString()});
 const mockQueue=(event=futureEvent())=>{api.get.mockResolvedValue({data:{data:[event]}});api.post.mockImplementation(async url=>({data:{data:url.endsWith('/claim')?{id:event.id,status:'claimed'}:{id:event.id,acknowledged:true}}}));};
 async function renderHarness(props={}){const container=document.createElement('div');document.body.append(container);const root=createRoot(container);await act(async()=>root.render(<Harness {...props}/>));return {root,container,close:async()=>{await act(async()=>root.unmount());container.remove()}};}
-test.each(['ha','ig','yo'])('matching %s voice speaks its translated message and acknowledges with the winning token',async language=>{
- const speak=vi.fn(u=>queueMicrotask(()=>u.onend?.()));vi.stubGlobal('speechSynthesis',{cancel:vi.fn(),speak,getVoices:()=>[{lang:language+'-NG',name:language}]});vi.stubGlobal('SpeechSynthesisUtterance',class{constructor(text){this.text=text}});mockQueue(futureEvent(language));const page=await renderHarness();try{await waitFor(()=>api.post.mock.calls.some(c=>c[0].endsWith('/ack')));expect(speak.mock.calls[0][0].lang).toBe(language+'-NG');expect(speak.mock.calls[0][0].text).toBe(futureEvent(language).message);const claim=api.post.mock.calls.find(c=>c[0].endsWith('/claim')),ack=api.post.mock.calls.find(c=>c[0].endsWith('/ack'));expect(ack[1].claimToken).toBe(claim[1].claimToken);expect(api.patch).not.toHaveBeenCalled();}finally{await page.close()}
+test.each(['ha','ig','yo'])('installed %s browser voice is not accepted without an approved native recording',async language=>{
+ const speak=vi.fn();vi.stubGlobal('speechSynthesis',{cancel:vi.fn(),speak,getVoices:()=>[{lang:language+'-NG',name:language}]});vi.stubGlobal('SpeechSynthesisUtterance',class{constructor(text){this.text=text}});mockQueue(futureEvent(language));const page=await renderHarness();try{await act(flush);expect(api.post).not.toHaveBeenCalled();expect(speak).not.toHaveBeenCalled();expect(api.patch).not.toHaveBeenCalled();}finally{await page.close()}
 });
 test.each(['ha','ig','yo'])('without a matching %s voice no claim or false success is sent',async language=>{
  const speak=vi.fn();vi.stubGlobal('speechSynthesis',{cancel:vi.fn(),speak,getVoices:()=>[{lang:'en-NG',name:'English'}]});vi.stubGlobal('SpeechSynthesisUtterance',class{});mockQueue(futureEvent(language));const page=await renderHarness();try{await act(flush);expect(api.post).not.toHaveBeenCalled();expect(speak).not.toHaveBeenCalled();expect(api.patch).not.toHaveBeenCalled();}finally{await page.close()}
 });
 test('two tabs using one device ID send different tokens and only the winning claim plays',async()=>{
- const speak=vi.fn(u=>queueMicrotask(()=>u.onend?.()));vi.stubGlobal('speechSynthesis',{cancel:vi.fn(),speak,getVoices:()=>[{lang:'en-NG',name:'English'}]});vi.stubGlobal('SpeechSynthesisUtterance',class{});mockQueue();let claimed=false;api.post.mockImplementation(async url=>{if(url.endsWith('/claim')){if(claimed)throw Error('409 already claimed');claimed=true;return{data:{data:{id:91,status:'claimed'}}}}return{data:{data:{acknowledged:true}}}});const first=await renderHarness(),second=await renderHarness();try{await waitFor(()=>api.post.mock.calls.filter(c=>c[0].endsWith('/claim')).length===2);const claims=api.post.mock.calls.filter(c=>c[0].endsWith('/claim'));expect(claims[0][1].deviceId).toBe(claims[1][1].deviceId);expect(claims[0][1].claimToken).not.toBe(claims[1][1].claimToken);expect(speak).toHaveBeenCalledTimes(1);}finally{await first.close();await second.close()}
+ const speak=vi.fn(u=>queueMicrotask(()=>u.onend?.()));vi.stubGlobal('speechSynthesis',{cancel:vi.fn(),speak,getVoices:()=>[{lang:'en-NG',name:'English'}]});vi.stubGlobal('SpeechSynthesisUtterance',class{});mockQueue();let winningToken=null;api.post.mockImplementation(async(url,body)=>{if(url.endsWith('/claim')){if(winningToken&&body.claimToken!==winningToken)throw Error('409 already claimed');winningToken=body.claimToken;return{data:{data:{id:91,status:'claimed'}}}}return{data:{data:{acknowledged:true}}}});const first=await renderHarness(),second=await renderHarness();try{await waitFor(()=>api.post.mock.calls.filter(c=>c[0].endsWith('/claim')).length>=2&&speak.mock.calls.length===1);const claims=api.post.mock.calls.filter(c=>c[0].endsWith('/claim'));expect(claims[0][1].deviceId).toBe(claims[1][1].deviceId);expect(new Set(claims.map(c=>c[1].claimToken)).size).toBeGreaterThanOrEqual(2);expect(speak).toHaveBeenCalledTimes(1);}finally{await first.close();await second.close()}
 });
 test('disabling speech cancels current playback without a success acknowledgement',async()=>{
  const cancel=vi.fn(),speak=vi.fn();vi.stubGlobal('speechSynthesis',{cancel,speak,getVoices:()=>[{lang:'en-NG',name:'English'}]});vi.stubGlobal('SpeechSynthesisUtterance',class{});mockQueue();const page=await renderHarness();try{await waitFor(()=>speak.mock.calls.length);await act(async()=>page.root.render(<Harness enabled={false}/>));expect(cancel).toHaveBeenCalled();expect(api.post.mock.calls.some(c=>c[0].endsWith('/ack')&&c[1].outcome==='success')).toBe(false);}finally{await page.close()}
@@ -143,3 +143,42 @@ test('a claim response received after sign-out cannot start speech',async()=>{
  const speak=vi.fn();vi.stubGlobal('speechSynthesis',{cancel:vi.fn(),speak,getVoices:()=>[{lang:'en-NG',name:'English'}]});vi.stubGlobal('SpeechSynthesisUtterance',class{});mockQueue();let finish;api.post.mockImplementation(()=>new Promise(resolve=>{finish=resolve}));const page=await renderHarness();try{await waitFor(()=>finish);await act(async()=>page.root.render(<Harness enabled={false} userId={null}/>));await act(async()=>finish({data:{data:{id:91,status:'claimed'}}}));expect(speak).not.toHaveBeenCalled();expect(api.post.mock.calls.some(c=>c[0].endsWith('/ack'))).toBe(false);}finally{await page.close()}
 });
 test('expired events are never claimed',async()=>{mockQueue({...futureEvent(),expiresAt:new Date(Date.now()-1000).toISOString()});const page=await renderHarness();try{await act(flush);expect(api.post).not.toHaveBeenCalled();}finally{await page.close()}});
+
+test('a claim invalidated before speech begins is not spoken or acknowledged as success',async()=>{
+  const speak=vi.fn();vi.stubGlobal('speechSynthesis',{cancel:vi.fn(),speak,getVoices:()=>[{lang:'en-NG',name:'English'}]});vi.stubGlobal('SpeechSynthesisUtterance',class{});
+  const event={...futureEvent(),id:15,message:'Your rent payment was successful.'};
+  api.get.mockResolvedValue({data:{data:[event]}});
+  let claimCalls=0;
+  api.post.mockImplementation(async url=>{
+    if(url.endsWith('/claim')){claimCalls++;if(claimCalls===1)return{data:{data:{id:15,status:'claimed'}}};throw new Error('409 invalidated')}
+    return{data:{data:{id:15,acknowledged:true}}};
+  });
+  const page=await renderHarness();
+  try{
+    await waitFor(()=>claimCalls>=2);
+    await act(flush);
+    expect(speak).not.toHaveBeenCalled();
+    expect(api.post.mock.calls.some(c=>c[0].endsWith('/ack'))).toBe(false);
+    expect(api.patch).not.toHaveBeenCalled();
+  }finally{await page.close()}
+});
+
+test('active speech is cancelled when the claim is invalidated during playback',async()=>{
+  let utterance;const speak=vi.fn(u=>{utterance=u});const cancel=vi.fn(()=>utterance?.onerror?.({error:'interrupted'}));
+  vi.stubGlobal('speechSynthesis',{cancel,speak,getVoices:()=>[{lang:'en-NG',name:'English'}]});vi.stubGlobal('SpeechSynthesisUtterance',class{});
+  const event={...futureEvent(),id:16,message:'Your rent payment was successful.'};
+  api.get.mockResolvedValue({data:{data:[event]}});
+  let claimCalls=0;
+  api.post.mockImplementation(async url=>{
+    if(url.endsWith('/claim')){claimCalls++;if(claimCalls>=3)throw new Error('409 invalidated');return{data:{data:{id:16,status:'claimed'}}}}
+    return{data:{data:{id:16,status:'acknowledged',acknowledged:true}}};
+  });
+  const page=await renderHarness();
+  try{
+    await waitFor(()=>cancel.mock.calls.length>0,3000);
+    const ack=api.post.mock.calls.find(c=>c[0].endsWith('/ack'));
+    expect(ack?.[1]?.outcome).toBe('interrupted');
+    expect(api.post.mock.calls.some(c=>c[0].endsWith('/ack')&&c[1].outcome==='success')).toBe(false);
+    expect(api.patch).not.toHaveBeenCalled();
+  }finally{await page.close()}
+});

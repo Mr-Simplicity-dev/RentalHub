@@ -31,6 +31,13 @@ export const messageService = {
     return response.data;
   },
 
+  translateMessage: async (messageId, targetLanguage) => {
+    const response = await api.post(`/messages/${messageId}/translate`, {
+      target_language: targetLanguage,
+    });
+    return response.data;
+  },
+
   // Mark conversation as read
   markConversationAsRead: async (userId) => {
     const response = await api.patch(`/messages/conversation/${userId}/read-all`);

@@ -1384,7 +1384,7 @@ exports.approveProperty = async (req, res) => {
     // owns the listing, that it is live. Runs in the background so approval is
     // never slowed down.
     void require('../config/utils/propertyPostedNotificationService')
-      .notifyTenantsOfLiveProperty(property)
+      .notifyNewPropertyArrival(property)
       .catch(() => {});
 
     // 🔔 Notify landlord by email

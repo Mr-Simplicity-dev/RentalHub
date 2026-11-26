@@ -1019,6 +1019,12 @@ exports.approveRefundRequest = async (req, res) => {
         [refund.payment_id]
       );
     }
+    try {
+      const spokenNotificationService = require('../config/utils/spokenNotificationService');
+      await spokenNotificationService.cancelSpokenEventsForSource({ sourceType: 'payment', sourceId: refund.payment_id });
+    } catch (spokenError) {
+      req.logger?.error?.(`Spoken payment success cancellation error: ${spokenError.message}`);
+    }
 
     const months = refund_type === 'partial_months' ? refund_months : null;
     const typeLabel = refund_type === 'full'

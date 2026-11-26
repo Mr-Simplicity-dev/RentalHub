@@ -441,6 +441,10 @@ router.post(
     try {
       const outcome = req.body?.outcome
         || (req.body?.played === true ? 'success' : 'failed');
+      if (typeof req.body?.played === 'boolean' && req.body.outcome
+          && ((req.body.played && outcome !== 'success') || (!req.body.played && outcome === 'success'))) {
+        return res.status(400).json({ success: false, message: 'Conflicting playback outcome' });
+      }
       const result = await spokenNotificationService.recordPlaybackResult({
         userId: req.user.id,
         eventId: Number(req.params.eventId),

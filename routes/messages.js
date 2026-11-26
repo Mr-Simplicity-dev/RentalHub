@@ -3,7 +3,9 @@ const router = express.Router();
 const { body, param } = require('express-validator');
 const validateRequest = require('../config/middleware/validateRequest');
 const messageController = require('../controllers/messageController');
+const translationController = require('../controllers/translationController');
 const { authenticate } = require('../config/middleware/auth');
+const { translationLimiter } = require('../config/middleware/securityRateLimiters');
 
 const contactForms=require('../services/supportContactService');
 const {sensitiveActionLimiter}=require('../config/middleware/securityRateLimiters');
@@ -49,6 +51,18 @@ router.get('/conversation/:userId',
 router.get('/property/:propertyId',
   authenticate,
   messageController.getPropertyMessages
+);
+
+// Translate an existing landlord/tenant message on demand
+router.post('/:messageId/translate',
+  authenticate,
+  translationLimiter,
+  [
+    param('messageId').isInt({ min: 1 }),
+    body('target_language').isString().trim().notEmpty().isLength({ max: 20 }),
+    validateRequest,
+  ],
+  translationController.translateMessage
 );
 
 // Mark message as read

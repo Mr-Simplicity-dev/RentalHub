@@ -85,6 +85,7 @@ const smsDeliveryRoutes = require('./routes/smsDelivery');
 const appLinksRoutes = require('./routes/appLinks');
 const downloadsRoutes = require('./routes/downloads');
 const promoVideosRoutes = require('./routes/promoVideos');
+const multilingualRoutes = require('./routes/multilingual');
 const premblyRecoveryRoutes = require('./routes/premblyRecovery');
 const whatsappWebhookRoutes = require('./routes/whatsappWebhook');
 
@@ -133,6 +134,7 @@ const {
   paymentOpsLimiter,
   verificationOpsLimiter,
   financeOpsLimiter,
+  closeTranslationLimiter,
 } = require('./config/middleware/securityRateLimiters');
 
 const audit = require('./config/middleware/auditMiddleware');
@@ -401,8 +403,11 @@ const authRateLimitMax =
 const allowedOrigins = new Set(getAllowedFrontendOrigins());
 
 const TRUST_PROXY_COUNT = Number(process.env.TRUST_PROXY_COUNT);
-// Default 1 because nginx is the only reverse proxy in Contabo setup.
-// Set to 0 if Node is exposed directly, or higher for multi-proxy chains.
+// Default 1 because nginx is the only proxy proven by repository evidence.
+// Cloudflare may add another hop, but the exact runtime value is not proven
+// here. Before deployment, read each live worker's TRUST_PROXY_COUNT from its
+// /proc/<pid>/environ and confirm the chain; do not trust client-supplied
+// forwarding headers by raising this value speculatively.
 app.set('trust proxy', Number.isFinite(TRUST_PROXY_COUNT) ? TRUST_PROXY_COUNT : 1);
 
 // CSP nonce — generated per-request for inline scripts (production React SPA served by Express)
@@ -726,6 +731,7 @@ const publicDownloadLimiter = rateLimit({
 // feature flag checks are unavailable.
 app.use('/api/downloads', publicDownloadLimiter, downloadsRoutes);
 app.use('/api/promo-videos', promoVideosRoutes);
+app.use('/api/multilingual', multilingualRoutes);
 app.get('/api/downloads/app-version', publicDownloadLimiter, (req, res, next) => {
   req.url = '/app-version';
   return downloadsRoutes(req, res, next);
@@ -1078,6 +1084,7 @@ const gracefulShutdown = async (signal) => {
     if(!jobsDrained)process.exit(0);
     await require('./services/callStateBridge').getBridge().stop();
     await new Promise(resolve=>io.close(resolve));
+    await closeTranslationLimiter().catch((err) => logger.error('Translation limiter close error:', err.message));
     // Close DB pool
     await db.end().catch((err) => logger.error('DB pool close error:', err.message));
     logger.info('Database pool closed.');

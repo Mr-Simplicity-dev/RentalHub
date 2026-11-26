@@ -81,6 +81,76 @@ test('Phase C regression: spoken emit uses user language copy, not hard-coded En
   assert.notEqual(inserted[6], 'English message should be ignored');
 });
 
+test('refunded and failed payments cancel unacknowledged spoken success events', async () => {
+  const statements = [];
+  await withMockDb(async (sql, params) => {
+    statements.push({ sql: sql.replace(/\s+/g, ' ').trim(), params });
+    return { rows: [{ id: 7 }] };
+  }, async () => {
+    const cancelled = await spoken.cancelSpokenEventsForSource({ sourceType: 'payment', sourceId: 321 });
+    assert.equal(cancelled, 1);
+  });
+  const update = statements.find((entry) => /UPDATE spoken_notification_events/.test(entry.sql));
+  assert.ok(update);
+  assert.match(update.sql, /status='expired'/);
+  assert.match(update.sql, /acknowledged_at IS NULL/);
+  assert.deepEqual(update.params, ['payment', 321]);
+});
+
+test('payment refund and failure handlers suppress queued spoken success announcements', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'services', 'paymentService.js'), 'utf8');
+  const refund = src.slice(src.indexOf('async function handleRefundPayment'), src.indexOf('async function handleFailedPayment'));
+  const failed = src.slice(src.indexOf('async function handleFailedPayment'));
+  for (const handler of [refund, failed]) {
+    assert.match(handler, /cancelSpokenEventsForSource/);
+    assert.match(handler, /sourceType: 'payment'/);
+  }
+});
+
+test('source cancellation invalidates an active claim instead of leaving a reusable token', async () => {
+  const statements = [];
+  await withMockDb(async (sql, params) => {
+    statements.push({ sql: sql.replace(/\s+/g, ' ').trim(), params });
+    return { rows: [{ id: 7 }] };
+  }, async () => {
+    const cancelled = await spoken.cancelSpokenEventsForSource({ sourceType: 'payment', sourceId: 321 });
+    assert.equal(cancelled, 1);
+  });
+  const update = statements.find((entry) => /UPDATE spoken_notification_events/.test(entry.sql))?.sql || '';
+  assert.match(update, /status='expired'/);
+  assert.match(update, /claimed_by_device=NULL/);
+  assert.match(update, /claim_token=NULL/);
+  assert.match(update, /claim_expires_at=NULL/);
+  assert.match(update, /status IN \('pending','claimed'\)/);
+});
+
+test('a cancelled spoken event cannot be reclaimed or retried into playback', async () => {
+  await withMockDb(async () => ({ rows: [] }), async () => {
+    const claimed = await spoken.claimEvent({ userId: 1, eventId: 2, deviceId: 'dev1', claimToken: 'tok123456' });
+    assert.equal(claimed, null);
+  });
+});
+
+test('a cancelled spoken event cannot be acknowledged as a completed success', async () => {
+  await withMockDb(async () => ({ rows: [] }), async () => {
+    const result = await spoken.recordPlaybackResult({ userId: 1, eventId: 2, deviceId: 'dev1', claimToken: 'tok123456', outcome: 'success' });
+    assert.equal(result.event, null);
+    assert.equal(result.acknowledged, false);
+  });
+});
+
+test('manual approved refunds cancel spoken success events with or without Paystack', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'services', 'refundService.js'), 'utf8');
+  const approve = src.slice(src.indexOf('exports.approveRefundRequest'));
+  const paystackStart = approve.indexOf('if (paystackSuccess)');
+  const tryStart = approve.indexOf('try {', paystackStart);
+  const paystackBlock = approve.slice(paystackStart, tryStart);
+  assert.match(approve, /payment_status = 'refunded'/);
+  assert.equal(paystackBlock.includes('cancelSpokenEventsForSource'), false);
+  assert.ok(approve.indexOf('cancelSpokenEventsForSource') >= tryStart);
+  assert.match(approve, /sourceType: 'payment'/);
+});
+
 test('corrective migration 2058 adds claim_token safely', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'migrations', '2058_spoken_claim_ownership.sql'), 'utf8');
   assert.match(src, /ADD COLUMN IF NOT EXISTS claim_token VARCHAR\(120\)/i);

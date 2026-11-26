@@ -1,11 +1,15 @@
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { fileURLToPath } from 'node:url';
 import { loadEnv } from 'vite';
 import { defineConfig } from 'vitest/config';
 import apiBaseUrlConfig from './config/apiBaseUrl.cjs';
 
+const testEnvDir = fileURLToPath(new URL('./config/test-env/', import.meta.url));
+
 export default defineConfig(({ mode, command }) => {
-  const clientEnv = loadEnv(mode, process.cwd(), 'REACT_APP_');
+  const envDir = mode === 'test' ? testEnvDir : process.cwd();
+  const clientEnv = loadEnv(mode, envDir, 'REACT_APP_');
   const define = Object.fromEntries(
     Object.entries(clientEnv).map(([key, value]) => [
       `process.env.${key}`,
@@ -24,6 +28,7 @@ export default defineConfig(({ mode, command }) => {
   return {
     plugins: [tailwindcss(), react()],
     define,
+    envDir,
     envPrefix: ['VITE_', 'REACT_APP_'],
     build: {
       outDir: 'build',
@@ -50,6 +55,7 @@ export default defineConfig(({ mode, command }) => {
       environment: 'jsdom',
       globals: true,
       setupFiles: './src/setupTests.js',
+      testTimeout: 15000,
     },
   };
 });

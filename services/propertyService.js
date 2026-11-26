@@ -13,6 +13,7 @@ const { resolveTenantPropertyLocationAccess } = require('../config/utils/tenantL
 const { statesMatch } = require('../config/utils/stateScope');
 const { validateStructuredFeatures } = require('../config/utils/propertyFeatureSchema');
 const { resolveParkingSpaces, syncStructuredParking } = require('../config/utils/parkingInfo');
+const { getTenantPropertyUnlock } = require('../config/utils/propertyEntitlement');
 let propertySchemaReady = false;
 
 const PROPERTY_IMAGE_CAPTURE_TTL_MS =
@@ -895,12 +896,11 @@ exports.getFullPropertyDetails = async (req, res) => {
     const { propertyId } = req.params;
     const userId = req.user.id;
 
-    const unlockResult = await db.query(
-      `SELECT id, unlocked_at
-       FROM tenant_property_unlocks
-       WHERE tenant_id = $1 AND property_id = $2`,
-      [userId, propertyId]
-    );
+    const unlockResult = await getTenantPropertyUnlock({
+      userId,
+      propertyId,
+      dbQuery: db.query.bind(db),
+    });
 
     if (!unlockResult.rows.length) {
       return res.status(402).json({

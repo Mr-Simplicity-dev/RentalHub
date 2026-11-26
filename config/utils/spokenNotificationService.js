@@ -114,4 +114,18 @@ const recordPlaybackResult = async ({userId,eventId,deviceId,claimToken,outcome,
   );
   return {event:rows[0]||null,acknowledged:false,permanent};
 };
-module.exports={EVENT_TYPES,DEFAULT_EVENT_TTL_MS,CLAIM_TTL_MS,MAX_PENDING_EVENTS,DEFAULT_MAX_ATTEMPTS,RETRY_DELAY_MS,ensureSchema,normalizeLanguage,emitSpokenEvent,getPendingEvents,claimEvent,recordPlaybackResult,expireOldEvents};
+const cancelSpokenEventsForSource = async ({sourceType,sourceId}) => {
+  if (!sourceType || !sourceId) return 0;
+  try {
+    const {rows}=await db.query(
+      `UPDATE spoken_notification_events SET status='expired',claimed_by_device=NULL,claim_token=NULL,claim_expires_at=NULL,updated_at=CURRENT_TIMESTAMP
+       WHERE source_type=$1 AND source_id=$2 AND status IN ('pending','claimed') AND acknowledged_at IS NULL RETURNING id`,
+      [sanitizeText(sourceType,80),sourceId]
+    );
+    return rows.length;
+  } catch (error) {
+    logger.error('spokenNotificationService.cancelSpokenEventsForSource error', {error:error.message,sourceType,sourceId});
+    return 0;
+  }
+};
+module.exports={EVENT_TYPES,DEFAULT_EVENT_TTL_MS,CLAIM_TTL_MS,MAX_PENDING_EVENTS,DEFAULT_MAX_ATTEMPTS,RETRY_DELAY_MS,ensureSchema,normalizeLanguage,emitSpokenEvent,getPendingEvents,claimEvent,recordPlaybackResult,expireOldEvents,cancelSpokenEventsForSource};

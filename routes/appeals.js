@@ -249,7 +249,7 @@ const lockAndAssertAppealTarget = async (client, user, appeal) => {
     result = await client.query(
       `SELECT
          p.id,
-         CASE WHEN p.is_verified THEN 'verified' WHEN p.is_available THEN 'available' ELSE 'pending' END,
+         p.status,
          p.is_verified,
          p.deleted_at,
          s.state_name AS target_state
@@ -364,7 +364,7 @@ router.post(
         const propertyResult = await db.query(
           `SELECT
              p.id,
-             CASE WHEN p.is_verified THEN 'verified' WHEN p.is_available THEN 'available' ELSE 'pending' END,
+             p.status,
              p.rejection_reason,
              p.verified_by,
              p.landlord_id,
@@ -795,6 +795,7 @@ router.post(
       }
 
       if (req.body.status === 'upheld') {
+        await lockAndAssertAppealTarget(client, req.user, appeal);
         if (appeal.appeal_type === 'property' && appeal.property_id) {
           await client.query(
             `UPDATE properties
@@ -884,6 +885,11 @@ router.post(
 
       await client.query('COMMIT');
       committed = true;
+      if (req.body.status === 'upheld' && appeal.appeal_type === 'property' && appeal.property_id) {
+        void require('../config/utils/propertyPostedNotificationService')
+          .notifyNewPropertyArrival({ id: appeal.property_id })
+          .catch(() => {});
+      }
       notification = {
         userId: appeal.appellant_id,
         title: req.body.status === 'upheld' ? 'Appeal Upheld' : 'Appeal Dismissed',

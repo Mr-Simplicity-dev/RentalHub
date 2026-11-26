@@ -2,83 +2,136 @@ const db = require('../middleware/database');
 const logger = require('./logger');
 const { createNotification } = require('./notificationService');
 
-/**
- * When a property goes live:
- *  - the tenants who signed up for that state are told a new property exists
- *    ("signed up for that state" = the tenant's preferred state), and
- *  - the landlord who owns it is told his own listing is now live. He used to
- *    get an email only, so nothing appeared in his in-app notifications and
- *    his badge never moved.
- *
- * Notifications are written to the database (so they survive an app restart)
- * and pushed, which also updates the unread badge.
- */
+const ANNOUNCEMENT_TITLE = 'New property available!';
 
-const buildTenantMessage = (property) => {
-  const where = [property?.area, property?.city].filter(Boolean).join(', ');
-  const type = property?.property_type ? `${property.property_type} ` : '';
-  return where
-    ? `A new ${type}property is now available in ${where}.`
-    : `A new ${type}property is now available in your state.`;
+const validBedroomCount = (value) => {
+  const count = Number(value);
+  return Number.isInteger(count) && count > 0 && count <= 20 ? count : null;
 };
 
-const notifyTenants = async (property) => {
-  const stateId = Number(property?.state_id);
-  if (!Number.isInteger(stateId)) return { matched: 0, sent: 0 };
+const buildArrivalMessage = (property) => {
+  const bedrooms = validBedroomCount(property?.bedrooms);
+  return bedrooms
+    ? `A new ${bedrooms}-bedroom apartment has arrived on Amana RentalHub. Explore the listing now.`
+    : 'A new property has arrived on Amana RentalHub. Explore the listing now.';
+};
 
-  const recipients = await db.query(
-    `SELECT id FROM users
-     WHERE user_type IN ('tenant', 'user')
-       AND preferred_state_id = $1
-       AND deleted_at IS NULL
-       AND account_suspended_at IS NULL
-       AND id <> $2
-     LIMIT 5000`,
-    [stateId, Number(property.landlord_id) || 0]
-  );
+const loadLiveProperty = async (input, deps) => {
+  const dbQuery = deps.dbQuery || db.query;
+  const id = Number(input?.id ?? input);
+  if (!Number.isInteger(id) || id <= 0) return null;
 
-  const title = 'New property in your state';
-  const message = buildTenantMessage(property);
-  const link = `/properties/${property.id}`;
+  const conditions = [
+    'p.id = $1',
+    'p.is_available = TRUE',
+    'p.is_verified = TRUE',
+    "LOWER(COALESCE(p.status, '')) = 'available'",
+    'p.deleted_at IS NULL',
+    '(p.expires_at IS NULL OR p.expires_at > CURRENT_TIMESTAMP)',
+  ];
+  const params = [id];
 
-  let sent = 0;
-  for (const row of recipients.rows) {
-    const created = await createNotification(row.id, 'property_posted', title, message, link);
-    if (created) sent += 1;
+  try {
+    const getFlags = deps.getFeatureFlagsMap || (async () => {
+      const { getFeatureFlagsMap } = require('../config/middleware/featureFlags');
+      return getFeatureFlagsMap();
+    });
+    const flags = await getFlags();
+    if (flags?.require_property_ownership_verification) {
+      const { rows } = await dbQuery(
+        `SELECT ownership_gate_enabled_at FROM feature_flags WHERE key = 'require_property_ownership_verification'`
+      );
+      const enabledAt = rows[0]?.ownership_gate_enabled_at || null;
+      if (enabledAt) {
+        conditions.push(`(p.ownership_verification_status = 'verified' OR p.created_at <= $2)`);
+        params.push(enabledAt);
+      } else {
+        conditions.push(`p.ownership_verification_status = 'verified'`);
+      }
+    }
+  } catch {
+    return null;
   }
 
-  return { matched: recipients.rows.length, sent };
-};
-
-const notifyLandlord = async (property) => {
-  const landlordId = Number(property?.landlord_id) || Number(property?.user_id);
-  if (!Number.isInteger(landlordId) || landlordId <= 0) return { matched: 0, sent: 0 };
-
-  const title = 'Your property is live';
-  const message = `Your property "${String(property?.title || 'listing').slice(0, 80)}" has been approved and is now visible to tenants.`;
-  const link = `/properties/${property.id}`;
-
-  const created = await createNotification(
-    landlordId,
-    'property_approved',
-    title,
-    message,
-    link
+  const { rows } = await dbQuery(
+    `SELECT p.id, p.landlord_id, p.user_id, p.state_id, p.bedrooms
+     FROM properties p
+     WHERE ${conditions.join(' AND ')}`,
+    params
   );
-
-  return { matched: 1, sent: created ? 1 : 0 };
+  return rows[0] || null;
 };
 
-exports.notifyTenantsOfLiveProperty = async (property) => {
+exports.notifyNewPropertyArrival = async (input, deps = {}) => {
+  const dbQuery = deps.dbQuery || db.query;
+  const create = deps.createNotification || createNotification;
   try {
-    if (!property?.id) return { tenants: { matched: 0, sent: 0 }, landlord: { matched: 0, sent: 0 } };
+    const property = await loadLiveProperty(input, deps);
+    if (!property) return { tenants: { matched: 0, sent: 0 }, landlord: { matched: 0, sent: 0 } };
 
-    const tenants = await notifyTenants(property);
-    const landlord = await notifyLandlord(property);
+    const stateId = Number(property.state_id);
+    const ownerId = Number(property.landlord_id) || Number(property.user_id);
+    const title = ANNOUNCEMENT_TITLE;
+    const message = buildArrivalMessage(property);
+    const link = `/properties/${property.id}`;
+
+    let tenants = { matched: 0, sent: 0 };
+    if (Number.isInteger(stateId)) {
+      const recipients = await dbQuery(
+        `SELECT id FROM users
+         WHERE user_type = 'tenant'
+           AND is_active = TRUE
+           AND preferred_state_id = $1
+           AND deleted_at IS NULL
+           AND account_suspended_at IS NULL
+           AND id <> $2
+         LIMIT 5000`,
+        [stateId, Number.isInteger(ownerId) ? ownerId : 0]
+      );
+      let sent = 0;
+      for (const row of recipients.rows) {
+        const created = await create(
+          row.id,
+          'property_posted',
+          title,
+          message,
+          link,
+          `property-arrival:${property.id}:tenant:${row.id}`
+        );
+        if (created) sent += 1;
+      }
+      tenants = { matched: recipients.rows.length, sent };
+    }
+
+    let landlord = { matched: 0, sent: 0 };
+    if (Number.isInteger(ownerId) && ownerId > 0) {
+      const eligible = await dbQuery(
+        `SELECT id FROM users
+         WHERE id = $1
+           AND user_type IN ('landlord', 'agent', 'user')
+           AND is_active = TRUE
+           AND deleted_at IS NULL
+           AND account_suspended_at IS NULL`,
+        [ownerId]
+      );
+      if (eligible.rows.length) {
+        const created = await create(
+          ownerId,
+          'property_approved',
+          title,
+          message,
+          link,
+          `property-arrival:${property.id}:landlord:${ownerId}`
+        );
+        landlord = { matched: 1, sent: created ? 1 : 0 };
+      }
+    }
 
     return { tenants, landlord };
   } catch (error) {
-    logger.error('Notify on live property error:', error);
+    logger.error('New property arrival announcement error:', error);
     return { tenants: { matched: 0, sent: 0 }, landlord: { matched: 0, sent: 0 } };
   }
 };
+
+exports.notifyTenantsOfLiveProperty = exports.notifyNewPropertyArrival;

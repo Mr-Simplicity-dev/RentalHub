@@ -56,22 +56,12 @@ const getMultilingualFeatureFlags = (env = process.env) => ({
 });
 
 const getPublicMultilingualConfig = (env = process.env) => {
-  const translator = getAzureTranslatorConfig(env);
-  const speech = getAzureSpeechConfig(env);
   const flags = getMultilingualFeatureFlags(env);
   return {
-    azureTranslator: {
-      enabled: translator.enabled,
-      configured: translator.configured,
-      region: translator.region || null,
-      endpoint: translator.endpoint,
-      apiVersion: translator.apiVersion,
+    features: {
+      propertyDescriptionTranslationEnabled: flags.propertyDescriptionTranslationEnabled,
+      messageTranslationEnabled: flags.messageTranslationEnabled,
     },
-    azureSpeech: {
-      configured: speech.configured,
-      region: speech.region || null,
-    },
-    features: flags,
   };
 };
 

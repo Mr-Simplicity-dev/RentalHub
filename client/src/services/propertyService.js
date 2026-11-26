@@ -44,6 +44,13 @@ export const propertyService = {
     return response.data;
   },
 
+  translateDescription: async (id, targetLanguage) => {
+    const response = await api.post(`/properties/${id}/translate-description`, {
+      target_language: targetLanguage,
+    });
+    return response.data;
+  },
+
   // Create property
   createProperty: async (propertyData) => {
     const response = await api.post('/properties', propertyData);

@@ -1,6 +1,7 @@
 const rateLimit = require('express-rate-limit');
 const crypto = require('crypto');
 const redis = require('../utils/redis');
+const { createTranslationLimiter } = require('./translationRateLimiter');
 
 // The existing Redis-compatible adapter is currently process-local. Named
 // buckets isolate limits; persistent account lockouts remain database-backed.
@@ -224,6 +225,7 @@ const mobileTelemetryLimiter = buildLimiter({
   message: 'Too many mobile telemetry requests. Please try again shortly.',
 });
 
+
 const staffVerificationLookupLimiter = buildLimiter({
   name: 'staff-verification-lookup',
   windowMs: Number(process.env.STAFF_LOOKUP_WINDOW_MS) || 10 * 60 * 1000,
@@ -252,11 +254,20 @@ const staffImpersonationReportLimiter = buildLimiter({
   message: 'Too many impersonation reports submitted from this network. Please wait before submitting another.',
 });
 
+
+// Translation never falls back to process-local memory. See
+// translationRateLimiter.js for the shared-store/fail-closed behaviour.
+const translationLimiter = createTranslationLimiter({ env: process.env });
+
 module.exports = {
   staffVerificationLookupLimiter,
   staffChallengeCreateLimiter,
   staffChallengePollLimiter,
   staffImpersonationReportLimiter,
+
+  translationLimiter,
+  closeTranslationLimiter: () => translationLimiter.close?.(),
+
   assistedRegistrationQuoteLimiter,
   assistedRegistrationCreateLimiter,
   assistantReadLimiter,

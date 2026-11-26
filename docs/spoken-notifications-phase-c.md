@@ -16,7 +16,7 @@ Both successful and unsuccessful playback results require the current device and
 
 Playback stops on mute, sign-out, account change or component removal. A late claim response cannot start playback for a previous account. Unavailable voices are detected before claiming, so that device does not consume the event or block a capable device.
 
-The browser uses a matching installed Hausa, Igbo or Yoruba voice only when one exists. It does not read those messages using an English voice. Missing voices produce a visible explanation; the normal notification stays readable. Actual availability depends on the device. No paid speech provider is called. Optional approved audio must be keyed by both event and language in the existing playback registry.
+English may use an installed English browser voice. Hausa, Igbo and Yoruba must use an approved native-speaker recording keyed by event and language; installed browser voices are not substitutes. With no approved recording, the web interface explains that audio is unavailable while leaving the normal notification readable. No paid speech provider is called.
 
 ## Database correction
 
@@ -58,4 +58,4 @@ The owner separately approved the deployment and migration 2058 after the isolat
 - The APK remained v1.0.70 with unchanged binary and metadata; its public download returned HTTP 200.
 - Rollback backup: `/var/www/rentalhub/.deployment-backups/phasec-1795447312349`.
 
-Matching installed voices are still needed for real speech in Hausa, Igbo and Yoruba. When absent, the web interface explains that audio is unavailable while leaving ordinary notifications readable. No paid speech provider is enabled.
+Approved native-speaker recordings are still needed for real speech in Hausa, Igbo and Yoruba. When absent, the web interface explains that audio is unavailable while leaving ordinary notifications readable. No paid speech provider is enabled.

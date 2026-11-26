@@ -4,6 +4,8 @@ router.use(require('../config/utils/propertyContactPrivacy').hidePropertyContact
 const { body } = require('express-validator');
 const validateRequest = require('../config/middleware/validateRequest');
 const propertyController = require('../controllers/propertyController');
+const translationController = require('../controllers/translationController');
+const { translationLimiter } = require('../config/middleware/securityRateLimiters');
 const {
   authenticate,
   optionalAuthenticate,
@@ -357,6 +359,15 @@ router.post('/:propertyId/ownership-document', authenticate, isLandlordOrAgent, 
 });
 
 // Get property by ID (limited info for non-subscribers) — keep LAST
+router.post(
+  '/:propertyId/translate-description',
+  authenticate,
+  translationLimiter,
+  [body('target_language').isString().trim().notEmpty().isLength({ max: 20 })],
+  validateRequest,
+  translationController.translatePropertyDescription
+);
+
 router.get('/:propertyId', propertyController.getPropertyById);
 
 const propertyUpdates = require('../services/propertyUpdateService');

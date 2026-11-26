@@ -5,6 +5,7 @@ const DEVICE_KEY='rentalhub_spoken_device_id';
 const INTERACTION_KEY='rentalhub_spoken_user_interacted';
 const LANGUAGES=['en','ha','ig','yo'];
 const APPROVED_AUDIO={};
+const CLAIM_VALIDATION_DELAY_MS=1200;
 const normalizeLanguage=value=>String(value||'en').toLowerCase().split(/[-_]/)[0];
 const result=(outcome,reason=null)=>({outcome,reason});
 const isExpired=event=>{const expiry=new Date(event?.expiresAt).getTime();return !Number.isFinite(expiry)||expiry<=Date.now()};
@@ -18,7 +19,12 @@ const randomToken=()=>{
 const getDeviceId=()=>{try{const old=window.localStorage.getItem(DEVICE_KEY);if(old)return old;const id=randomToken();if(id)window.localStorage.setItem(DEVICE_KEY,id);return id}catch{return randomToken()}};
 const voiceFor=language=>{if(!hasSpeech())return null;const voices=window.speechSynthesis.getVoices?.()||[];return voices.find(voice=>normalizeLanguage(voice.lang)===language)||null;};
 const audioFor=event=>APPROVED_AUDIO[event.audioKey]?.[normalizeLanguage(event.language)]||null;
-const canPlay=event=>LANGUAGES.includes(normalizeLanguage(event.language))&&Boolean(audioFor(event)||(hasSpeech()&&(normalizeLanguage(event.language)==='en'||voiceFor(normalizeLanguage(event.language)))));
+const canPlay=event=>{
+  const language=normalizeLanguage(event.language);
+  if(!LANGUAGES.includes(language))return false;
+  if(audioFor(event))return true;
+  return language==='en'&&Boolean(voiceFor('en'));
+};
 
 export function useSpokenNotifications({enabled,userId}) {
   const [interacted,setInteracted]=useState(hasInteracted);
@@ -42,7 +48,7 @@ export function useSpokenNotifications({enabled,userId}) {
   },[]);
   const playSpeech=useCallback(event=>new Promise(resolve=>{
     const language=normalizeLanguage(event.language),voice=voiceFor(language);
-    if(!LANGUAGES.includes(language)||!hasSpeech()||(language!=='en'&&!voice))return resolve(result('unavailable','unsupported_language_voice'));
+    if(!LANGUAGES.includes(language)||language!=='en'||!hasSpeech()||!voice)return resolve(result('unavailable','approved_audio_unavailable'));
     const synth=window.speechSynthesis,utterance=new window.SpeechSynthesisUtterance(String(event.message||'').slice(0,500));
     let done=false,timer;
     const finish=(outcome,reason)=>{if(done)return;done=true;clearTimeout(timer);utterance.onend=null;utterance.onerror=null;if(cancelRef.current===cancel)cancelRef.current=null;resolve(result(outcome,reason));};
@@ -62,6 +68,12 @@ export function useSpokenNotifications({enabled,userId}) {
     timer=setTimeout(()=>{finish('failed','audio_timeout');audio.pause();},20000);
     try{const promise=audio.play();promise?.catch(error=>finish(error?.name==='NotSupportedError'?'unavailable':'failed',error?.name==='NotAllowedError'?'autoplay_blocked':'audio_play_failed'))}catch{finish('failed','audio_exception')}
   }),[]);
+  const revalidateClaim=useCallback(async(eventId,claimToken)=>{
+    try{
+      const response=await api.post(`/notifications/spoken/${eventId}/claim`,{deviceId:deviceRef.current,claimToken});
+      return Boolean(response?.data?.data);
+    }catch{return false}
+  },[]);
   const processPending=useCallback(async()=>{
     if(!enabled||!userId||!interacted||busyRef.current||!mountedRef.current||!deviceRef.current)return;
     const generation=generationRef.current;
@@ -76,16 +88,28 @@ export function useSpokenNotifications({enabled,userId}) {
         const claimToken=randomToken();if(!claimToken)continue;
         let claim;try{claim=await api.post(`/notifications/spoken/${event.id}/claim`,{deviceId:deviceRef.current,claimToken})}catch{continue}
         if(!active())break;if(!claim?.data?.data)continue;
+        const stillOwnsClaim=await revalidateClaim(event.id,claimToken);
+        if(!active())break;if(!stillOwnsClaim)continue;
         setUnavailableLanguage(null);
-        const source=audioFor(event),playback=source?await playAudio(source):await playSpeech(event);
-        if(!active())break;
+        const source=audioFor(event);let validationTimer;
         try{
-          const ack=await api.post(`/notifications/spoken/${event.id}/ack`,{deviceId:deviceRef.current,claimToken,outcome:playback.outcome,...(playback.reason?{reason:playback.reason}:{})});
-          if(playback.outcome==='success'&&ack?.data?.data?.acknowledged===true){seenRef.current.add(id);try{channelRef.current?.postMessage({userId,ackEventId:id})}catch{}}
-        }catch{}
+          const playback=source?playAudio(source):playSpeech(event);
+          validationTimer=window.setTimeout(async()=>{
+            if(!active()||typeof cancelRef.current!=='function')return;
+            const valid=await revalidateClaim(event.id,claimToken);
+            if(!active()||typeof cancelRef.current!=='function')return;
+            if(!valid)cancelRef.current();
+          },CLAIM_VALIDATION_DELAY_MS);
+          const playbackResult=await playback;
+          if(!active())break;
+          try{
+            const ack=await api.post(`/notifications/spoken/${event.id}/ack`,{deviceId:deviceRef.current,claimToken,outcome:playbackResult.outcome,...(playbackResult.reason?{reason:playbackResult.reason}:{})});
+            if(playbackResult.outcome==='success'&&ack?.data?.data?.acknowledged===true){seenRef.current.add(id);try{channelRef.current?.postMessage({userId,ackEventId:id})}catch{}}
+          }catch{}
+        }finally{if(validationTimer)window.clearTimeout(validationTimer)}
       }
     }catch{}finally{busyRef.current=false;}
-  },[enabled,userId,interacted,playAudio,playSpeech]);
+  },[enabled,userId,interacted,playAudio,playSpeech,revalidateClaim]);
   useEffect(()=>{
     if(!enabled||!userId)return undefined;
     processPending();const interval=window.setInterval(processPending,30000);
