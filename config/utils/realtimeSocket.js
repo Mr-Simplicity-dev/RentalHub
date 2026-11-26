@@ -1163,6 +1163,8 @@ const configureRealtimeSocket = (io) => {
           createdAt: call.createdAt,
         });
 
+        void require('../../services/callSoundService').notifyIncoming(call, receiver).catch(() => logger.warn('Incoming call push could not be sent'));
+
         socket.emit('call:outgoing', {
           callId: call.id,
           callType: call.callType,
@@ -1179,6 +1181,7 @@ const configureRealtimeSocket = (io) => {
           callback({
             success: true,
             call: {
+              ...require('../../services/callSoundService').invitation(call),
               callId: call.id,
               status: call.status,
               receiver: call.receiver,
@@ -1267,6 +1270,8 @@ const configureRealtimeSocket = (io) => {
           createdAt: call.createdAt,
         });
 
+        void require('../../services/callSoundService').notifyIncoming(call, receiver).catch(() => logger.warn('Incoming call push could not be sent'));
+
         socket.emit('call:outgoing', {
           callId: call.id,
           callType: call.callType,
@@ -1285,6 +1290,7 @@ const configureRealtimeSocket = (io) => {
           callback({
             success: true,
             call: {
+              ...require('../../services/callSoundService').invitation(call),
               callId: call.id,
               status: call.status,
               receiver: call.receiver,

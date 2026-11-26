@@ -149,7 +149,7 @@ router.patch(
         `INSERT INTO user_notification_preferences (user_id, preferences)
          VALUES ($1, $2)
          ON CONFLICT (user_id)
-         DO UPDATE SET preferences = EXCLUDED.preferences, updated_at = CURRENT_TIMESTAMP
+         DO UPDATE SET preferences = user_notification_preferences.preferences || EXCLUDED.preferences, updated_at = CURRENT_TIMESTAMP
          RETURNING preferences`,
         [req.user.id, JSON.stringify(next)]
       );

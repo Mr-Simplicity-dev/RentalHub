@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "source": "Locally generated RentalHub tones and Microsoft Zira synthesized greeting; no third-party music",
+  "files": [
+    {
+      "name": "call_normal.wav",
+      "bytes": 132344,
+      "sha256": "9940a6a1ac3565a5f30353703aea2af7bb9794b323e41663a955fb86372dd396"
+    },
+    {
+      "name": "call_greeting.wav",
+      "bytes": 259734,
+      "sha256": "57172bf720849d3ec7d59726d3ba33b7c3a556fc6e3973c81268a9fef616988f"
+    },
+    {
+      "name": "call_ringback.wav",
+      "bytes": 176444,
+      "sha256": "5a46bf595cd2e51b7c8f662cf2518d051376b60fd655d8758af62e506ec6ae69"
+    }
+  ]
+}

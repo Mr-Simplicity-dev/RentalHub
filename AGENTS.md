@@ -57,3 +57,5 @@ run `node --check` + the relevant test file, then the full suite.
 ## APK build permission
 
 Build an Android APK only when the user explicitly asks for an APK build. Web/backend deployments, Git syncs, and mobile-source changes do not authorise APK builds.
+
+Before an explicitly requested mobile build, run `npm run prepare:call-sounds` in RentalHubMobile to verify/restore the ignored audio assets. This command alone does not build an APK. After tested and authorised changes, keep local Git and the server in step; preserve unrelated unfinished work and never deploy it merely to clear the working tree.

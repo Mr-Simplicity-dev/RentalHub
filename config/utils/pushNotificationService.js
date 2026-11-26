@@ -94,7 +94,8 @@ const sendPushToUser = async (userId, notification = {}) => {
 
   const messages = tokenResult.rows.map(({ expo_push_token: to }) => ({
     to,
-    sound: 'default',
+    sound: notification.sound === null ? null : (notification.sound || 'default'),
+    ...(Number.isInteger(notification.ttl) ? { ttl: Math.max(0, Math.min(45, notification.ttl)) } : {}),
     title: String(notification.title || 'Amana RentalHub NG').slice(0, 255),
     body: String(notification.body || '').slice(0, 1000),
     data: notification.data || {},

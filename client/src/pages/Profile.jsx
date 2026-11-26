@@ -1,3 +1,4 @@
+import CallSoundSettings from '../components/calls/CallSoundSettings';
 import {usePhotoInstructions} from '../hooks/usePhotoInstructions';
 import {createLiveFaceMesh} from '../utils/liveFaceMesh';
 import UserAvatar from '../components/common/UserAvatar';
@@ -754,6 +755,7 @@ const Profile = () => {
         <BackToDashboard />
       </div>
 
+      <CallSoundSettings />
       <AssistedPasswordForm />
       <div className="card mb-6" data-tour-id="profile-details-workflow">
         <h2 className="font-semibold mb-4">{t('profile.account_title')}</h2>

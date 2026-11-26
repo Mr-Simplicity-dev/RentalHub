@@ -1,3 +1,4 @@
+import CallSoundSettings from '../components/calls/CallSoundSettings';
 import PropertyProtectionEntry from '../components/common/PropertyProtectionEntry';
 import AssistedRegistrationCard from '../components/admin/AssistedRegistrationCard';
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
@@ -54,6 +55,7 @@ import TransportationFleetTracker from "../components/admin/TransportationFleetT
 import StaffIdentityManagementTab from "../components/admin/StaffIdentityManagementTab";
 
 const tabs = [
+  "call_settings",
   "overview",
   "users",
   "verifications",
@@ -95,6 +97,7 @@ const tabs = [
 ];
 
 const tabLabels = {
+  call_settings: 'Call Settings',
   overview: "Overview",
   users: "Users",
   verifications: "Verifications",
@@ -141,6 +144,7 @@ const shortcutCategories = [
     label: "Platform Management",
     color: "indigo",
     items: [
+      { name: 'call_settings', label: 'Call Settings', detail: 'Incoming ringtones, optional greeting and caller sound' },
       { name: "overview", label: "Overview", detail: "Platform summary and key metrics" },
       { name: "users", label: "Users", detail: "Manage platform users, roles, and bans" },
       { name: "verifications", label: "Verifications", detail: "Review identity and document verifications" },
@@ -1607,6 +1611,7 @@ function SuperAdminDashboardContent() {
         </div>
       )}
 
+      {tab === 'call_settings' && <CallSoundSettings admin />}
       {tab === "flags" && (
         <FlagsTab flags={flags} toggleFlag={toggleFlag} />
       )}

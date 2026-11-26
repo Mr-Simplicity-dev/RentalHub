@@ -1,3 +1,4 @@
+import useCallSounds from '../hooks/useCallSounds';
 import React, {
   createContext,
   useCallback,
@@ -39,6 +40,7 @@ export const SocketProvider = ({ children }) => {
   const [onlineUserIds, setOnlineUserIds] = useState(() => new Set());
   const [incomingCall, setIncomingCall] = useState(null);
   const [outgoingCall, setOutgoingCall] = useState(null);
+  const callSounds = useCallSounds(incomingCall || outgoingCall, incomingCall ? 'incoming' : 'outgoing');
   const [activeCallNotice, setActiveCallNotice] = useState(null);
   const [activeMediaCall, setActiveMediaCall] = useState(null);
   const [mediaCallStatus, setMediaCallStatus] = useState('idle');
@@ -812,6 +814,8 @@ export const SocketProvider = ({ children }) => {
       {children}
       <CallNotification
         incomingCall={incomingCall}
+        soundBlocked={callSounds.blocked}
+        onEnableSound={callSounds.enable}
         outgoingCall={outgoingCall}
         activeCallNotice={activeCallNotice}
         onAccept={acceptCall}

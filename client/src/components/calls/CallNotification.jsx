@@ -3,6 +3,8 @@ import { FaPhone, FaPhoneSlash, FaTimes } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 
 const CallNotification = ({
+  soundBlocked,
+  onEnableSound,
   incomingCall,
   outgoingCall,
   activeCallNotice,
@@ -69,6 +71,7 @@ const CallNotification = ({
             </p>
           )}
 
+          {soundBlocked && <button type='button' onClick={onEnableSound} className='mt-3 rounded-lg border px-3 py-2 text-sm'>Enable call sounds</button>}
           <div className="mt-4 flex flex-wrap gap-2">
             {isIncoming && (
               <>

@@ -2336,6 +2336,8 @@ router.get('/token', voiceTokenLimiter, authenticate, requireVoiceAgent, (req, r
 
 router.get('/ice-servers', voiceTokenLimiter, authenticate, require('../services/webrtcIceService').iceServersHandler);
 
+router.use(require('./callSounds'));
+
 module.exports = router;
 
 // Test-only exports â€” same convention as routes/support.js (_supportScopeForTest).
