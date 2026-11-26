@@ -1,38 +1,17 @@
-const compact = (items) => items.filter(Boolean);
+import api from '../services/api';
 
-/**
- * ICE servers for web calls.
- *
- * STUN cannot relay media, so calls fail behind strict carrier NAT (common on
- * mobile data) even though they work on WiFi. TURN fixes that; it is added
- * when the environment provides credentials. Web and app share this shape, so
- * the two surfaces behave the same way.
- */
-export const getWebRtcIceServers = () => {
-  const turnUrl = process.env.REACT_APP_TURN_URL || process.env.TURN_URL;
-  const turnUsername =
-    process.env.REACT_APP_TURN_USERNAME || process.env.TURN_USERNAME;
-  const turnPassword =
-    process.env.REACT_APP_TURN_PASSWORD || process.env.TURN_PASSWORD;
+export const getWebRtcIceServers = () => [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+];
 
-  const servers = compact([
-    { urls: 'stun:stun.l.google.com:19302' },
-    turnUrl
-      ? {
-          urls: turnUrl,
-          username: turnUsername,
-          credential: turnPassword,
-        }
-      : null,
-  ]);
-
-  if (turnUrl && String(turnUrl).startsWith('turn:')) {
-    servers.push({
-      urls: `turns:${String(turnUrl).slice(5)}`,
-      username: turnUsername,
-      credential: turnPassword,
-    });
+export const loadWebRtcIceServers = async () => {
+  const response = await api.get('/voice/ice-servers', { timeout: 12000 });
+  const servers = response.data?.data;
+  if (response.data?.success !== true || !Array.isArray(servers) || !servers.some(
+    (server) => [].concat(server.urls || []).some((url) => /^turns?:/.test(url))
+  )) {
+    throw new Error('The call connection service is unavailable. Please try again shortly.');
   }
-
   return servers;
 };

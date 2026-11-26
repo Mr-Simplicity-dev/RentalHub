@@ -12,7 +12,8 @@ import { useAuth } from '../hooks/useAuth';
 import { getAuthToken } from '../services/authStorage';
 import CallNotification from '../components/calls/CallNotification';
 import AudioCallPanel from '../components/calls/AudioCallPanel';
-import { getWebRtcIceServers } from '../config/webrtcConfig';
+import { loadWebRtcIceServers } from '../config/webrtcConfig';
+import { createCallSignalBuffer } from '../utils/callSignalBuffer.cjs';
 
 export const SocketContext = createContext(null);
 
@@ -55,8 +56,12 @@ export const SocketProvider = ({ children }) => {
   const remoteStreamRef = useRef(null);
   const activeMediaCallRef = useRef(null);
   const mediaInitPromiseRef = useRef(null);
+  const mediaGenerationRef = useRef(0);
+  const signalBufferRef = useRef(createCallSignalBuffer());
 
   const cleanupMediaResources = useCallback(() => {
+    mediaGenerationRef.current += 1;
+    signalBufferRef.current.clear();
     if (screenStreamRef.current) {
       screenStreamRef.current.getTracks().forEach((track) => {
         track.onended = null;
@@ -95,9 +100,9 @@ export const SocketProvider = ({ children }) => {
     setScreenShareSupported(Boolean(navigator.mediaDevices?.getDisplayMedia));
   }, []);
 
-  const createPeerConnection = useCallback((call, activeSocket) => {
+  const createPeerConnection = useCallback((call, activeSocket, iceServers) => {
     const peer = new RTCPeerConnection({
-      iceServers: getWebRtcIceServers(),
+      iceServers,
     });
     const nextRemoteStream = new MediaStream();
 
@@ -140,16 +145,15 @@ export const SocketProvider = ({ children }) => {
     (call, { initiator = false, activeSocket } = {}) => {
       if (!call?.callId || !activeSocket) return Promise.resolve(null);
 
+      if (mediaInitPromiseRef.current) return mediaInitPromiseRef.current;
+
       if (activeMediaCallRef.current?.callId === call.callId && peerRef.current) {
         return Promise.resolve(peerRef.current);
       }
 
-      if (mediaInitPromiseRef.current) {
-        return mediaInitPromiseRef.current;
-      }
-
       const initPromise = (async () => {
         cleanupMediaResources();
+        const generation = mediaGenerationRef.current;
         const isVideoCall = isVideoEnabledCall(call.callType);
         activeMediaCallRef.current = call;
         setActiveMediaCall(call);
@@ -160,6 +164,8 @@ export const SocketProvider = ({ children }) => {
           throw new Error('Calls require a supported HTTPS browser.');
         }
 
+        const iceServers = await loadWebRtcIceServers();
+        if (generation !== mediaGenerationRef.current) return null;
         const localStream = await navigator.mediaDevices.getUserMedia({
           audio: true,
           video: isVideoCall
@@ -172,6 +178,10 @@ export const SocketProvider = ({ children }) => {
             : false,
         });
 
+        if (generation !== mediaGenerationRef.current) {
+          localStream.getTracks().forEach(track => track.stop());
+          return null;
+        }
         localStreamRef.current = localStream;
         cameraTrackRef.current = localStream.getVideoTracks()[0] || null;
         setLocalStream(localStream);
@@ -179,7 +189,7 @@ export const SocketProvider = ({ children }) => {
         setCameraEnabled(isVideoCall ? localStream.getVideoTracks().some((track) => track.enabled) : false);
         setScreenSharing(false);
 
-        const peer = createPeerConnection(call, activeSocket);
+        const peer = createPeerConnection(call, activeSocket, iceServers);
         peerRef.current = peer;
 
         localStream.getTracks().forEach((track) => {
@@ -200,16 +210,17 @@ export const SocketProvider = ({ children }) => {
         return peer;
       })();
 
-      mediaInitPromiseRef.current = initPromise;
-
-      return initPromise.catch((error) => {
+      const pending = initPromise.catch((error) => {
+        if (activeMediaCallRef.current?.callId !== call.callId) return null;
         cleanupMediaResources();
         toast.error(error.message || 'Unable to start call');
         activeSocket.emit('call:end', { callId: call.callId });
         return null;
       }).finally(() => {
-        mediaInitPromiseRef.current = null;
+        if (mediaInitPromiseRef.current === pending) mediaInitPromiseRef.current = null;
       });
+      mediaInitPromiseRef.current = pending;
+      return pending;
     },
     [cleanupMediaResources, createPeerConnection]
   );
@@ -466,6 +477,7 @@ export const SocketProvider = ({ children }) => {
         await peer.setRemoteDescription(
           new RTCSessionDescription(payload.description)
         );
+        await signalBufferRef.current.drain(payload.callId, peer, RTCIceCandidate);
         const answer = await peer.createAnswer();
         await peer.setLocalDescription(answer);
         nextSocket.emit('call:signal:answer', {
@@ -480,10 +492,11 @@ export const SocketProvider = ({ children }) => {
 
     nextSocket.on('call:signal:answer', async (payload) => {
       try {
-        if (!peerRef.current) return;
+        if (activeMediaCallRef.current?.callId !== payload.callId || !peerRef.current) return;
         await peerRef.current.setRemoteDescription(
           new RTCSessionDescription(payload.description)
         );
+        await signalBufferRef.current.drain(payload.callId, peerRef.current, RTCIceCandidate);
       } catch (error) {
         toast.error(error.message || 'Could not connect call');
         nextSocket.emit('call:end', { callId: payload.callId });
@@ -492,10 +505,9 @@ export const SocketProvider = ({ children }) => {
 
     nextSocket.on('call:signal:ice-candidate', async (payload) => {
       try {
-        if (!peerRef.current || !payload.candidate) return;
-        await peerRef.current.addIceCandidate(
-          new RTCIceCandidate(payload.candidate)
-        );
+        if (activeMediaCallRef.current?.callId !== payload.callId || !payload.candidate) return;
+        signalBufferRef.current.add(payload.callId, payload.candidate);
+        await signalBufferRef.current.drain(payload.callId, peerRef.current, RTCIceCandidate);
       } catch {
         // Ignore late ICE candidates after a call has ended.
       }
