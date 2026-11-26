@@ -82,28 +82,26 @@ const unregisterDevice = async ({ userId, token }) => {
   );
 };
 
-const sendPushToUser = async (userId, notification = {}) => {
-  await ensurePushSchema();
-  const tokenResult = await db.query(
-    `SELECT expo_push_token
+const sendPushToUser = async (userId, notification = {}, { q = db } = {}) => {
+  if (q === db) await ensurePushSchema();
+  const tokenResult = await q.query(
+    `SELECT expo_push_token, platform, device_id
      FROM push_device_tokens
      WHERE user_id = $1 AND enabled = TRUE`,
     [userId]
   );
   if (!tokenResult.rows.length) return { sent: 0 };
 
-  const messages = tokenResult.rows.map(({ expo_push_token: to }) => ({
+  const messages = tokenResult.rows.filter(row => !notification.nativeCallOnly || (row.platform === 'android' && row.device_id?.endsWith(':incoming-v1'))).map(({ expo_push_token: to, platform, device_id }) => ({
     to,
-    sound: notification.sound === null ? null : (notification.sound || 'default'),
+    ...((notification.dataOnly || (platform === 'android' && device_id?.endsWith(':incoming-v1') && notification.data?.type === 'incoming_call')) ? {} : { sound: notification.sound === null ? null : (notification.sound || 'default'), title: String(notification.title || 'Amana RentalHub NG').slice(0,255), body: String(notification.body || '').slice(0,1000), channelId: platform === 'android' && device_id?.endsWith(':incoming-v1') && notification.channelId === 'general' ? 'activity-v2' : notification.channelId || 'messages' }),
     ...(Number.isInteger(notification.ttl) ? { ttl: Math.max(0, Math.min(45, notification.ttl)) } : {}),
-    title: String(notification.title || 'Amana RentalHub NG').slice(0, 255),
-    body: String(notification.body || '').slice(0, 1000),
-    data: notification.data || {},
-    channelId: notification.channelId || 'messages',
+    data: { ...(notification.data || {}), receiverId: Number(userId) },
     priority: 'high',
     ...(notification.badge !== undefined ? { badge: Number(notification.badge || 0) } : {}),
   }));
 
+  if (!messages.length) return { sent: 0 };
   try {
     const response = await axios.post(EXPO_PUSH_URL, messages, {
       headers: {
@@ -125,14 +123,16 @@ const sendPushToUser = async (userId, notification = {}) => {
       .filter(Boolean);
 
     if (invalidTokens.length) {
-      await db.query(
+      await q.query(
         `UPDATE push_device_tokens
          SET enabled = FALSE, updated_at = NOW()
          WHERE expo_push_token = ANY($1::text[])`,
         [invalidTokens]
       );
     }
-    return { sent: messages.length, invalid: invalidTokens.length };
+    const accepted = tickets.filter(ticket => ticket?.status === 'ok').length;
+    const rejected = tickets.filter(ticket => ticket?.status === 'error').map(ticket => ticket.details?.error || 'provider-rejected');
+    return { sent: accepted, invalid: invalidTokens.length, ...(rejected.length ? { error: [...new Set(rejected)].join(', ') } : {}) };
   } catch (error) {
     logger.error('Expo push delivery failed:', error.message);
     return { sent: 0, error: error.message };
@@ -170,7 +170,9 @@ const sendExpoMessages = async (messages) => {
         [invalidTokens]
       );
     }
-    return { sent: messages.length, invalid: invalidTokens.length };
+    const accepted = tickets.filter(ticket => ticket?.status === 'ok').length;
+    const rejected = tickets.filter(ticket => ticket?.status === 'error').map(ticket => ticket.details?.error || 'provider-rejected');
+    return { sent: accepted, invalid: invalidTokens.length, ...(rejected.length ? { error: [...new Set(rejected)].join(', ') } : {}) };
   } catch (error) {
     logger.error('Expo push delivery failed:', error.message);
     return { sent: 0, invalid: 0, error: error.message };
@@ -192,21 +194,20 @@ const sendPushToAll = async (notification = {}, filters = {}) => {
   }
 
   const tokenResult = await db.query(
-    `SELECT DISTINCT pdt.expo_push_token
+    `SELECT DISTINCT pdt.expo_push_token, pdt.platform, pdt.device_id, pdt.user_id
      FROM push_device_tokens pdt
      LEFT JOIN user_notification_preferences unp ON unp.user_id = pdt.user_id
      WHERE ${where.join(' AND ')}`,
     params
   );
 
-  const tokens = tokenResult.rows.map((row) => row.expo_push_token).filter(Boolean);
-  const messages = tokens.map((to) => ({
+  const messages = tokenResult.rows.filter(row => row.expo_push_token).map(({ expo_push_token: to, platform, device_id, user_id }) => ({
     to,
     sound: 'default',
     title: String(notification.title || 'Amana RentalHub NG').slice(0, 255),
     body: String(notification.body || '').slice(0, 1000),
-    data: notification.data || {},
-    channelId: notification.channelId || 'general',
+    data: { ...(notification.data || {}), receiverId: Number(user_id) },
+    channelId: platform === 'android' && device_id?.endsWith(':incoming-v1') && (!notification.channelId || notification.channelId === 'general') ? 'activity-v2' : notification.channelId || 'general',
     priority: 'high',
     badge: Number(notification.badge || 1),
   }));

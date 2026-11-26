@@ -119,6 +119,7 @@ function createBridge({
       if (userId && !participants.map(Number).includes(Number(userId)))
         continue;
       const ended = { ...state, status: "ended" };
+      void require("./callSoundService").notifyStopped(ended).catch(() => {});
       await db.query(
         "UPDATE call_sessions SET status='ended',ended_at=NOW(),room_state=$2 WHERE id=$1",
         [row.id, JSON.stringify(ended)],

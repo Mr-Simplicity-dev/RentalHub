@@ -16,7 +16,7 @@ test('recovery rejects another recipient, expired and ended calls',()=>{
 });
 test('incoming push uses a short TTL, custom channels and no unread badge or contact details',async()=>{
  let sent;const call={id:'a',createdAt:new Date().toISOString()};const q={query:async sql=>sql.includes('call_sessions')?{rows:[{status:'ringing'}]}:sql.includes('app_settings')?{rows:[]}:{rows:[{preferences:{incomingCallSound:'greeting'}}]}};
- await service.notifyIncoming(call,{id:3,user_type:'recruitment_admin'},{q,sendPush:async(id,notification)=>{sent={id,notification};}});assert.equal(sent.id,3);assert.equal(sent.notification.sound,'call_greeting.wav');assert.equal(sent.notification.channelId,'calls-greeting-v1');assert.ok(sent.notification.ttl<=45);assert.equal(sent.notification.badge,undefined);assert.equal(sent.notification.data.type,'incoming_call');assert.equal(sent.notification.data.email,undefined);
+ await service.notifyIncoming(call,{id:3,user_type:'recruitment_admin'},{q,signAlert:()=> 'isolated-test-alert',sendPush:async(id,notification)=>{sent={id,notification};}});assert.equal(sent.id,3);assert.equal(sent.notification.sound,'call_greeting.wav');assert.equal(sent.notification.channelId,'calls-greeting-v1');assert.ok(sent.notification.ttl<=45);assert.equal(sent.notification.badge,undefined);assert.equal(sent.notification.data.type,'incoming_call');assert.equal(sent.notification.data.email,undefined);
  let count=0;await service.notifyIncoming({...call,createdAt:'2000-01-01T00:00:00Z'},{id:3},{q,sendPush:async()=>count++});assert.equal(count,0);
 });
 test('ordinary preference updates retain call choice and only Super Admin can change policy',()=>{

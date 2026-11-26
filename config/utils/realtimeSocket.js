@@ -357,6 +357,7 @@ const emitCallRoomUpdate = (io, call, extra = {}) => {
 };
 
 const emitCallEvent = (io, call, eventName, payload = {}) => {
+  if (call.status !== 'ringing') void require('../../services/callSoundService').notifyStopped(call).catch(() => logger.warn('Call notification dismissal could not be sent'));
   const room = ensureCallRoom(call);
   const message = {
     callId: call.id,
@@ -599,7 +600,12 @@ const recordCallRoomEvent = async ({ callId, action, actorUserId, targetUserId, 
 const recordCallSession = async (call, status, timestamps = {}) => {
   try {
     await ensureCallHistorySchema();
-
+    if (['accepted', 'rejected'].includes(status)) {
+      const changed = await db.query("UPDATE call_sessions SET status=$2, started_at=COALESCE($3,started_at), ended_at=COALESCE($4,ended_at), updated_at=NOW(), room_state=$5 WHERE id=$1 AND status='ringing' RETURNING id", [call.id, status, timestamps.startedAt || null, timestamps.endedAt || null, JSON.stringify(require('../../services/callStateBridge').serialize(call))]);
+      if (!changed.rows.length) return false;
+      await db.query("SELECT pg_notify('rentalhub_call_state',$1)", [call.id]);
+      return true;
+    }
     await db.query(
       `INSERT INTO call_sessions (
          id,
@@ -639,6 +645,7 @@ const recordCallSession = async (call, status, timestamps = {}) => {
     await require('../../services/callStateBridge').getBridge().save(call);
   } catch (error) {
     logger.error('Call session history failed:', error.message);
+    if (['accepted', 'rejected'].includes(status)) return false;
     if(call.disputeId)throw error;
   }
 };
@@ -658,6 +665,7 @@ const notifyMissedCall = async (io, call, endedAt) => {
       [receiverId, title, message, 'missed_call', null, 'call_session']
     );
     const notif = inserted.rows?.[0];
+    if (notif) void require('./notificationDelivery').deliverNotification({ ...notif, user_id: receiverId });
     if (io && notif) {
       io.to(toUserRoom(receiverId)).emit('notification:new', {
         ...notif,
@@ -1309,7 +1317,7 @@ const configureRealtimeSocket = (io) => {
     });
 
     socket.on('call:accept', async (payload = {}, callback) => {
-      const call = activeCalls.get(payload.callId);
+      let call = activeCalls.get(payload.callId);
       if (!call || call.status !== 'ringing') {
         if (typeof callback === 'function') {
           callback({ success: false, message: 'Call is no longer available' });
@@ -1324,17 +1332,17 @@ const configureRealtimeSocket = (io) => {
         return;
       }
 
-      clearCallTimer(call);
-      call.status = 'accepted';
-      call.acceptedAt = new Date().toISOString();
+      call = { ...call, status: 'accepted', acceptedAt: new Date().toISOString() };
       call.participants = ensureCallRoom(call)?.participants || call.participants || normalizeRoomParticipants([
         { id: call.caller.id, name: call.caller.full_name || call.caller.name || 'Caller', role: 'caller', status: 'connected' },
         { id: call.receiver.id, name: call.receiver.full_name || call.receiver.name || 'Receiver', role: 'receiver', status: 'connected' },
       ]);
+      if (await recordCallSession(call, 'accepted', { startedAt: call.acceptedAt }) === false) {
+        if (typeof callback === 'function') callback({ success: false, message: 'This call has already changed. Please try again.' });
+        return;
+      }
+      clearCallTimer(call);
       activeCalls.set(call.id, call);
-      await recordCallSession(call, 'accepted', {
-        startedAt: call.acceptedAt,
-      });
       await recordCallRoomEvent({
         callId: call.id,
         action: 'accepted',
@@ -1353,7 +1361,7 @@ const configureRealtimeSocket = (io) => {
     });
 
     socket.on('call:reject', async (payload = {}, callback) => {
-      const call = activeCalls.get(payload.callId);
+      let call = activeCalls.get(payload.callId);
       if (!call) {
         if (typeof callback === 'function') {
           callback({ success: false, message: 'Call is no longer available' });
@@ -1368,11 +1376,14 @@ const configureRealtimeSocket = (io) => {
         return;
       }
 
-      clearCallTimer(call);
-      call.status = 'rejected';
-      activeCalls.delete(call.id);
+      call = { ...call, status: 'rejected' };
       const endedAt = new Date().toISOString();
-      await recordCallSession(call, 'rejected', { endedAt });
+      if (await recordCallSession(call, 'rejected', { endedAt }) === false) {
+        if (typeof callback === 'function') callback({ success: false, message: 'This call has already changed.' });
+        return;
+      }
+      clearCallTimer(call);
+      activeCalls.delete(call.id);
       await logVirtualTourAudit(call, 'VIRTUAL_TOUR_REJECTED', user.id);
       emitCallEvent(io, call, 'call:rejected', {
         endedAt,

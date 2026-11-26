@@ -36,9 +36,9 @@ test('spoken event SQL with temporary in-memory fixtures only',async t=>{
 
   await t.test('the actual rent-savings job creates one ordinary reminder and one translated spoken event on retries',async()=>{
     await pg.query('UPDATE user_notification_preferences SET preferences=$1 WHERE user_id=7',[JSON.stringify({spokenNotificationsEnabled:true,spokenNotificationLanguage:'ha'})]);
-    let mockedPushes=0;const ordinary=loadModule('config/utils/notificationService.js',{'../middleware/database':{query:(sql,params)=>pg.query(sql,params)},'./pushNotificationService':{sendPushToUser:async()=>{mockedPushes++}},'./unreadActivityService':{getPushBadgeCount:async()=>1}});
+    let mockedPushes=0;const pendingPushes=[];const delivery=loadModule('config/utils/notificationDelivery.js',{'../middleware/database':{query:(sql,params)=>pg.query(sql,params)},'./pushNotificationService':{sendPushToUser:async()=>{mockedPushes++}},'./unreadActivityService':{getPushBadgeCount:async()=>1}});const ordinary=loadModule('config/utils/notificationService.js',{'../middleware/database':{query:(sql,params)=>pg.query(sql,params)},'./notificationDelivery':{deliverNotification:n=>{const promise=delivery.deliverNotification(n);pendingPushes.push(promise);return promise;}}});
     const job=loadModule('jobs/rentSavingsJobs.js',{'../services/backgroundJobRuntime':{timeout:{setTimeout(){throw Error('Scheduling is forbidden in this test')}},cron:{schedule(){throw Error('Scheduling is forbidden in this test')}}},'../config/middleware/database':{query:async()=>({rows:[{id:99,tenant_id:7,total_saved:1000,property_title:'Test only',rent_due_date:new Date(Date.now()+86400000)}]})},'../services/NotificationService':{},'../config/utils/notificationService':ordinary,'../config/utils/spokenNotificationService':service});
-    await job.checkApproachingDueDates();await job.checkApproachingDueDates();
+    await job.checkApproachingDueDates();await job.checkApproachingDueDates();await Promise.all(pendingPushes);
     assert.equal((await pg.query("SELECT COUNT(*)::int AS n FROM notifications WHERE type='rent_savings_due_reminder'")).rows[0].n,1);
     const events=(await pg.query("SELECT * FROM spoken_notification_events WHERE source_type='rent_savings_plan' AND source_id=99")).rows;assert.equal(events.length,1);assert.equal(events[0].language,'ha');assert.equal(mockedPushes,1);
   });

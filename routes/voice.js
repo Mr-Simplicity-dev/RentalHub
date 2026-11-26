@@ -44,7 +44,7 @@ const {
   authenticate,
   requireAdminOrSuperAdmin,
 } = require('../config/middleware/auth');
-const { voiceTokenLimiter } = require('../config/middleware/securityRateLimiters');
+const { voiceTokenLimiter, callNotificationLimiter } = require('../config/middleware/securityRateLimiters');
 const adService = require('../services/adService');
 const {
   isVoiceReadRole,
@@ -63,6 +63,9 @@ const {
 } = require('../services/voiceRouting');
 
 const router = express.Router();
+const callNotificationActions = require('../services/callNotificationActions').createHandlers({ db, emit: require('../config/utils/realtimeEmitter').emitToUser, notifyStopped: (...args) => require('../services/callSoundService').notifyStopped(...args) });
+router.get('/calls/:callId/notification-status', callNotificationLimiter, callNotificationActions.status);
+router.post('/calls/:callId/notification-decline', callNotificationLimiter, callNotificationActions.decline);
 router.use(require('../config/middleware/csrfProtection'));
 
 // â”€â”€ Configuration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

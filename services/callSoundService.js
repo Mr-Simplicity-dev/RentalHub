@@ -17,11 +17,15 @@ async function savePreference(user,choice,q=db){
 }
 const expiresAt=call=>new Date(new Date(call.createdAt).getTime()+Number(process.env.CALL_RING_TIMEOUT_MS||45000)).toISOString();
 const invitation=call=>({callId:call.id,callType:call.callType,caller:call.caller,receiver:call.receiver,propertyId:call.propertyId,propertyTitle:call.propertyTitle,status:call.status,isSupport:call.isSupport,createdAt:call.createdAt,expiresAt:expiresAt(call),...(call.disputeId?{disputeId:call.disputeId}:{})});
-async function notifyIncoming(call,receiver,{q=db,sendPush=(...args)=>require('../config/utils/pushNotificationService').sendPushToUser(...args)}={}){
+async function notifyIncoming(call,receiver,{q=db,signAlert=(...args)=>require('./callNotificationActions').issueToken(...args),sendPush=(...args)=>require('../config/utils/pushNotificationService').sendPushToUser(...args)}={}){
  const remaining=Math.ceil((Date.parse(expiresAt(call))-Date.now())/1000);if(remaining<=0)return;
  const prefs=await settings(receiver,q);
  const current=await q.query('SELECT status FROM call_sessions WHERE id=$1',[call.id]);if(current.rows[0]?.status!=='ringing')return;const sound=prefs.effectiveSound;
- return sendPush(receiver.id,{title:'Incoming RentalHub call',body:'Open RentalHub to answer. This call will expire shortly.',sound:sound==='silent'?null:sound==='greeting'?'call_greeting.wav':'call_normal.wav',channelId:'calls-'+sound+'-v1',ttl:Math.min(45,remaining),data:{type:'incoming_call',callId:call.id,expiresAt:expiresAt(call)}});
+ return sendPush(receiver.id,{title:'Incoming RentalHub call',body:'Open RentalHub to answer. This call will expire shortly.',sound:sound==='silent'?null:sound==='greeting'?'call_greeting.wav':'call_normal.wav',channelId:'calls-'+sound+'-v1',ttl:Math.min(45,remaining),data:{type:'incoming_call',callId:call.id,receiverId:receiver.id,callerName:String(call.caller?.full_name||call.caller?.name||'RentalHub caller').slice(0,120),callType:call.callType||'audio',sound,expiresAt:expiresAt(call),alertToken:signAlert(call.id,receiver.id,expiresAt(call))}});
 }
 const recoverInvitation=(call,userId,now=Date.now())=>call&&Number(call.receiver?.id)===Number(userId)&&call.status==='ringing'&&Date.parse(expiresAt(call))>now?invitation(call):null;
-module.exports={recoverInvitation,DEFAULT_POLICY,SOUNDS,isWorker,normalizePolicy,resolveSound,settings,savePreference,expiresAt,invitation,notifyIncoming};
+async function notifyStopped(call,{sendPush=(...args)=>require('../config/utils/pushNotificationService').sendPushToUser(...args)}={}) {
+ if(!call.receiver?.id)return;
+ return sendPush(call.receiver.id,{nativeCallOnly:true,dataOnly:true,ttl:45,data:{type:'call_cancelled',callId:call.id,receiverId:call.receiver.id}});
+}
+module.exports={notifyStopped,recoverInvitation,DEFAULT_POLICY,SOUNDS,isWorker,normalizePolicy,resolveSound,settings,savePreference,expiresAt,invitation,notifyIncoming};

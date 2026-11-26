@@ -10,9 +10,9 @@ const logger = require('./logger');
  * messages. Opening any one of them reduces the number by one.
  */
 
-const safeCount = async (sql, params, label) => {
+const safeCount = async (sql, params, label, q = db) => {
   try {
-    const result = await db.query(sql, params);
+    const result = await q.query(sql, params);
     const value = Number(result.rows[0]?.count || 0);
     return Number.isFinite(value) ? value : 0;
   } catch (error) {
@@ -22,28 +22,28 @@ const safeCount = async (sql, params, label) => {
   }
 };
 
-const countUnreadNotifications = (userId) =>
+const countUnreadNotifications = (userId, q = db) =>
   safeCount(
     'SELECT COUNT(*)::int AS count FROM notifications WHERE user_id = $1 AND is_read = FALSE',
     [userId],
-    'notifications'
+    'notifications', q
   );
 
-const countUnreadMessages = (userId) =>
+const countUnreadMessages = (userId, q = db) =>
   safeCount(
     'SELECT COUNT(*)::int AS count FROM messages WHERE receiver_id = $1 AND is_read = FALSE',
     [userId],
-    'messages'
+    'messages', q
   );
 
-exports.getUnreadActivityCount = async (userId) => {
+exports.getUnreadActivityCount = async (userId, q = db) => {
   if (!userId) {
     return { total: 0, unreadNotifications: 0, unreadMessages: 0 };
   }
 
   const [unreadNotifications, unreadMessages] = await Promise.all([
-    countUnreadNotifications(userId),
-    countUnreadMessages(userId),
+    countUnreadNotifications(userId, q),
+    countUnreadMessages(userId, q),
   ]);
 
   return {
@@ -58,8 +58,8 @@ exports.getUnreadActivityCount = async (userId) => {
  * number that arrives while the app is closed is the real count, not a
  * hard-coded 1.
  */
-exports.getPushBadgeCount = async (userId) => {
-  const { total } = await exports.getUnreadActivityCount(userId);
+exports.getPushBadgeCount = async (userId, q = db) => {
+  const { total } = await exports.getUnreadActivityCount(userId, q);
   return total;
 };
 

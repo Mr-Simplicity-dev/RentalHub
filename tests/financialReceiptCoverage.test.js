@@ -576,7 +576,7 @@ test('9. Receipt numbers stay identical across repeated requests and legacy refe
 test('10. Webhook/verification receipt email delivery is guarded against duplicate completions', () => {
   const fs = require('fs');
   const path = require('path');
-  const psSrc = fs.readFileSync(path.join(__dirname, '..', 'services', 'paymentService.js'), 'utf8');
+  const psSrc = fs.readFileSync(path.join(__dirname, '..', 'services', 'paymentService.js'), 'utf8').replace(/\r\n/g, '\n');
   assert.ok(psSrc.includes("const wasAlreadyCompleted = storedPayment.payment_status === 'completed';"));
   assert.ok(psSrc.includes('if (!wasAlreadyCompleted) {\n      sendReceiptForPayment(paymentId).catch(() => {});'));
 });

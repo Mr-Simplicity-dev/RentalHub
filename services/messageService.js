@@ -3,7 +3,7 @@ const { validationResult } = require('express-validator');
 const { sendMessageNotification } = require('../config/utils/emailService');
 const { detectPhoneNumber } = require('../config/utils/phoneNumberFilter');
 const { emitToUser } = require('../config/utils/realtimeEmitter');
-const { sendPushToUser } = require('../config/utils/pushNotificationService');
+const { sendOrdinaryPush: sendPushToUser } = require('../config/utils/notificationDelivery');
 const { getPushBadgeCount } = require('../config/utils/unreadActivityService');
 const logger = require('../config/utils/logger');
 

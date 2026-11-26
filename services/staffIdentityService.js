@@ -391,6 +391,7 @@ const sanitizeOptionalPhotoUrl = (raw) => {
 
 function createStaffIdentityService(deps = {}) {
   const db = deps.db || defaultDb;
+  const deliverNotification = deps.deliverNotification || ((notification) => require('../config/utils/notificationDelivery').deliverNotification(notification, { q: db }));
   const qrcode = deps.qrcode || defaultQrCode;
   const activityLogger = deps.activityLogger || defaultActivityLogger;
   const realtimeEmitter = deps.realtimeEmitter || defaultRealtimeEmitter;
@@ -442,11 +443,12 @@ function createStaffIdentityService(deps = {}) {
   const createInAppNotification = async ({ userId, title, message, type = 'staff_verification', link = '/my-staff-identity' }) => {
     if (!userId) return;
     try {
-      await db.query(
+      const saved = await db.query(
         `INSERT INTO notifications (user_id, title, message, type, link, is_read, created_at)
-         VALUES ($1, $2, $3, $4, $5, FALSE, NOW())`,
+         VALUES ($1, $2, $3, $4, $5, FALSE, NOW()) RETURNING *`,
         [userId, title, message, type, link]
       );
+      void Promise.resolve(deliverNotification(saved.rows[0])).catch(error => logger.warn('Staff identity push skipped:', error.message));
     } catch (err) {
       logger.warn('Staff verification notification insert skipped:', err.message);
     }
