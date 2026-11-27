@@ -30,7 +30,7 @@ function createHandlers({ db, emit, notifyStopped }) {
         await db.query("SELECT pg_notify('rentalhub_call_state',$1)", [req.params.callId]);
         const payload = { callId: req.params.callId, status: 'rejected', endedAt: new Date().toISOString() };
         for (const id of new Set([row.caller_id, row.receiver_id])) emit(id, 'call:rejected', payload);
-        await db.query("INSERT INTO call_room_events(id,call_id,action,actor_user_id,metadata,created_at) VALUES($1,$2,'rejected',$3,$4,NOW())", [crypto.randomUUID(), req.params.callId, claims.receiverId, JSON.stringify({ source: 'android_notification' })]);
+        // Rejection is recorded in call_sessions, matching the existing in-app decline flow.
         await notifyStopped({ ...row.room_state, id: req.params.callId, receiver: { id: row.receiver_id }, status: 'rejected' });
       }
       return res.json({ success: true });

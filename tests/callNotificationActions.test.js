@@ -59,7 +59,7 @@ test('status and decline reject missing, expired or ordinary login tokens before
 });
 test('real SQL keeps decline bound to the recipient and permits only one ringing transition', async () => {
   const pg = new PGlite();
-  await pg.exec(`CREATE TABLE call_sessions(id uuid PRIMARY KEY,caller_id int,receiver_id int,status text,room_state jsonb,started_at timestamptz,ended_at timestamptz,updated_at timestamptz); CREATE TABLE call_room_events(id uuid PRIMARY KEY,call_id uuid,action text,actor_user_id int,metadata jsonb,created_at timestamptz);`);
+  await pg.exec(`CREATE TABLE call_sessions(id uuid PRIMARY KEY,caller_id int,receiver_id int,status text,room_state jsonb,started_at timestamptz,ended_at timestamptz,updated_at timestamptz); CREATE TABLE call_room_events(id uuid PRIMARY KEY,call_id uuid,action text CHECK(action IN ('created','accepted','join','leave','add_participant','remove_participant','host_transfer')),actor_user_id int,metadata jsonb,created_at timestamptz);`);
   await pg.query("INSERT INTO call_sessions(id,caller_id,receiver_id,status,room_state) VALUES($1,1,2,'ringing',$2)", [id, JSON.stringify({
     id,
     receiver: {
@@ -109,11 +109,13 @@ test('real SQL keeps decline bound to the recipient and permits only one ringing
       }
     }, wrongDecline);
     assert.equal((await pg.query('SELECT status FROM call_sessions')).rows[0].status, 'ringing');
-    await Promise.all(Array.from({
+    const declines = await Promise.all(Array.from({
       length: 8
-    }, () => handlers.decline(req, response())));
+    }, async () => { const res = response(); await handlers.decline(req, res); return res; }));
+    for (const res of declines) { assert.equal(res.code, 200); assert.equal(res.body.success, true); }
     assert.equal((await pg.query('SELECT status FROM call_sessions')).rows[0].status, 'rejected');
-    assert.equal((await pg.query('SELECT * FROM call_room_events')).rows.length, 1);
+    assert.equal((await pg.query('SELECT * FROM call_room_events')).rows.length, 0);
+    assert.ok((await pg.query('SELECT ended_at FROM call_sessions')).rows[0].ended_at);
     assert.equal(emitted.length, 2);
     assert.equal(stopped.length, 1);
     await pg.query("UPDATE call_sessions SET status='accepted'");
