@@ -7,3 +7,5 @@ test('a browser sound permission promise cannot restart ringing after logout or 
  try{await act(async()=>root.render(<Probe/>));const initial=api.get.mock.calls.length;await act(async()=>enable());await act(async()=>root.unmount());await act(async()=>{release();await Promise.resolve();vi.runAllTimers();});expect(api.get.mock.calls.length).toBe(initial);expect(pause).toHaveBeenCalled();}
  finally{vi.useRealTimers();vi.unstubAllGlobals();}
 });
+
+test('browser call tones use full app gain without changing the device volume',async()=>{const {playCallSound}=await import('./useCallSounds');let played=0;vi.stubGlobal('Audio',class{play(){expect(this.volume).toBe(1);played++;return Promise.resolve();}pause(){}removeAttribute(){}load(){}});try{for(const sound of ['normal','greeting','ringback']){const player=await playCallSound(sound);player.stop();}expect(played).toBe(3);}finally{vi.unstubAllGlobals();}});

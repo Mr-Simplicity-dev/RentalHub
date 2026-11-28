@@ -3,7 +3,7 @@ import api from '../services/api';
 import {createCallSoundSession,ringingExpiry} from '../utils/callSoundSession.cjs';
 export const loadCallSounds=async()=>(await api.get('/voice/call-sounds')).data.data;
 export function playCallSound(sound,loop=true){
- const player=new Audio('/call-sounds/call_'+sound+'.wav');player.loop=loop;player.volume=0.65;
+ const player=new Audio('/call-sounds/call_'+sound+(['normal','greeting'].includes(sound)?'_v2':'')+'.wav');player.loop=loop;player.volume=1;
  return player.play().then(()=>({stop:()=>{player.pause();player.removeAttribute('src');player.load();}})).catch(e=>{player.pause();throw e;});
 }
 export default function useCallSounds(call,direction){
@@ -12,7 +12,7 @@ export default function useCallSounds(call,direction){
  if(!session.current)session.current=createCallSoundSession({loadSettings:loadCallSounds,play:playCallSound,onBlocked:setBlocked});
  const cancelPreview=useCallback(()=>{version.current++;clearTimeout(previewTimer.current);preview.current?.pause();preview.current=null;},[]);
  const enable=useCallback(()=>{
-  cancelPreview();const current=version.current;const player=new Audio('/call-sounds/call_normal.wav');preview.current=player;player.volume=0.5;
+  cancelPreview();const current=version.current;const player=new Audio('/call-sounds/call_normal_v2.wav');preview.current=player;player.volume=1;
   player.play().then(()=>{
    if(!alive.current||current!==version.current){player.pause();return;}
    setBlocked(false);previewTimer.current=setTimeout(()=>{

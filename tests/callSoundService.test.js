@@ -33,3 +33,5 @@ test('a call accepted before push delivery is not sent as a new invitation',asyn
  let sent=0;const q={query:async sql=>sql.includes('call_sessions')?{rows:[{status:'accepted'}]}:{rows:[]}};
  await service.notifyIncoming({id:'ended',createdAt:new Date().toISOString()},{id:3,user_type:'recruitment_admin'},{q,sendPush:async()=>sent++});assert.equal(sent,0);
 });
+
+for(const role of ['tenant','landlord','marketing_agent'])test(role+' receives a normal incoming-call push without needing an admin role',async()=>{let sent;const q={query:async sql=>sql.includes('call_sessions')?{rows:[{status:'ringing'}]}:sql.includes('app_settings')?{rows:[]}:{rows:[{preferences:{}}]}};await service.notifyIncoming({id:'isolated-role-call',createdAt:new Date().toISOString(),receiver:{id:9}},{id:9,user_type:role},{q,signAlert:()=> 'isolated-role-token',sendPush:async(id,notice)=>{sent={id,notice};}});assert.equal(sent.id,9);assert.equal(sent.notice.data.sound,'normal');assert.equal(sent.notice.sound,'call_normal.wav');assert.equal(sent.notice.data.receiverId,9);assert.equal(sent.notice.badge,undefined);});
