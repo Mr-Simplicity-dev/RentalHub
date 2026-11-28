@@ -38,7 +38,6 @@ export const AuthProvider = ({ children }) => {
       } catch (error) {
         if (!active || generation!==authGeneration()) return;
         if (error.response?.status === 401) {
-          authService.clearLocalSession();
           setUser(null);
           setIsAuthenticated(false);
         } else {
