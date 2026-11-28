@@ -22,7 +22,7 @@ const proposal=async(ticketId,queryable=db)=>(await queryable.query(`SELECT h.id
  WHERE h.ticket_id=$1 ORDER BY h.id DESC LIMIT 1`,[ticketId])).rows[0]||null;
 const properties=async(customerId)=>(await db.query(`SELECT p.id,p.title,s.state_name,COALESCE(NULLIF(TRIM(p.lga_name),''),p.city) AS city
  FROM properties p LEFT JOIN states s ON s.id=p.state_id
- WHERE p.deleted_at IS NULL AND (p.landlord_id=$1 OR p.user_id=$1 OR EXISTS(
+ WHERE p.deleted_at IS NULL AND (p.landlord_id=$1 OR EXISTS(
  SELECT 1 FROM applications a WHERE a.property_id=p.id AND a.tenant_id=$1 AND a.status='approved'))
  ORDER BY p.id DESC LIMIT 200`,[customerId])).rows;
 const propertyAccess=async(actor,customerId,propertyId,queryable=db)=>{

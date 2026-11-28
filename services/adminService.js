@@ -451,7 +451,7 @@ const buildUserScopeClause = async (user) => {
           SELECT 1
           FROM properties sp
           JOIN states sp_st ON sp_st.id = sp.state_id
-          WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
+          WHERE sp.landlord_id = users.id
             AND LOWER(TRIM(sp_st.state_name)) = LOWER(TRIM($${stateIdx}))
         )
         OR EXISTS (
@@ -473,7 +473,7 @@ const buildUserScopeClause = async (user) => {
         EXISTS (
           SELECT 1
           FROM properties sp
-          WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
+          WHERE sp.landlord_id = users.id
             AND LOWER(TRIM(COALESCE(sp.lga_name, ''))) = LOWER(TRIM($${cityIdx}))
         )
         OR EXISTS (
@@ -857,7 +857,7 @@ exports.getPendingVerifications = async (req, res) => {
           SELECT 1
           FROM properties sp
           JOIN states sp_st ON sp_st.id = sp.state_id
-          WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
+          WHERE sp.landlord_id = users.id
             AND LOWER(TRIM(sp_st.state_name)) = LOWER(TRIM($${i}))
         )
         OR EXISTS (
@@ -878,7 +878,7 @@ exports.getPendingVerifications = async (req, res) => {
         EXISTS (
           SELECT 1
           FROM properties sp
-          WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
+          WHERE sp.landlord_id = users.id
             AND LOWER(TRIM(COALESCE(sp.lga_name, ''))) = LOWER(TRIM($${i}))
         )
         OR EXISTS (
@@ -971,7 +971,7 @@ exports.approveVerification = async (req, res) => {
              SELECT 1
              FROM properties sp
              JOIN states sp_st ON sp_st.id = sp.state_id
-             WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
+             WHERE sp.landlord_id = users.id
                AND LOWER(TRIM(sp_st.state_name)) = LOWER(TRIM($${stateIdx}))
            )
            OR EXISTS (
@@ -993,7 +993,7 @@ exports.approveVerification = async (req, res) => {
            EXISTS (
              SELECT 1
              FROM properties sp
-             WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
+             WHERE sp.landlord_id = users.id
                AND LOWER(TRIM(COALESCE(sp.lga_name, ''))) = LOWER(TRIM($${cityIdx}))
            )
            OR EXISTS (
@@ -1074,7 +1074,7 @@ exports.rejectVerification = async (req, res) => {
              SELECT 1
              FROM properties sp
              JOIN states sp_st ON sp_st.id = sp.state_id
-             WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
+             WHERE sp.landlord_id = users.id
                AND LOWER(TRIM(sp_st.state_name)) = LOWER(TRIM($${stateIdx}))
            )
            OR EXISTS (
@@ -1096,7 +1096,7 @@ exports.rejectVerification = async (req, res) => {
            EXISTS (
              SELECT 1
              FROM properties sp
-             WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
+             WHERE sp.landlord_id = users.id
                AND LOWER(TRIM(COALESCE(sp.lga_name, ''))) = LOWER(TRIM($${cityIdx}))
            )
            OR EXISTS (
@@ -1195,7 +1195,7 @@ exports.getAllProperties = async (req, res) => {
     const countQuery = `
       SELECT COUNT(*)
       FROM properties p
-      LEFT JOIN users u ON p.user_id = u.id
+      LEFT JOIN users u ON p.landlord_id = u.id
       LEFT JOIN states s ON s.id = p.state_id
       ${whereClause}
     `;
@@ -1221,7 +1221,7 @@ exports.getAllProperties = async (req, res) => {
         s.state_name AS state_name,
         u.full_name AS landlord_name
       FROM properties p
-      LEFT JOIN users u ON p.user_id = u.id
+      LEFT JOIN users u ON p.landlord_id = u.id
       LEFT JOIN states s ON s.id = p.state_id
       ${whereClause}
       ORDER BY EXISTS (SELECT 1 FROM property_update_requests pur WHERE pur.property_id=p.id AND pur.status='pending') DESC, p.created_at DESC
@@ -1583,7 +1583,7 @@ exports.getAllApplications = async (req, res) => {
       FROM applications a
       JOIN users t ON a.tenant_id = t.id
       JOIN properties p ON a.property_id = p.id
-      LEFT JOIN users l ON p.user_id = l.id
+      LEFT JOIN users l ON p.landlord_id = l.id
       ${whereClause}
     `;
     const countResult = await db.query(countQuery, params);
@@ -1600,7 +1600,7 @@ exports.getAllApplications = async (req, res) => {
       FROM applications a
       JOIN users t ON a.tenant_id = t.id
       JOIN properties p ON a.property_id = p.id
-      LEFT JOIN users l ON p.user_id = l.id
+      LEFT JOIN users l ON p.landlord_id = l.id
       ${whereClause}
       ORDER BY a.created_at DESC
       LIMIT $${i++} OFFSET $${i++}
@@ -1812,7 +1812,7 @@ exports.getUserById = async (req, res) => {
              SELECT 1
              FROM properties sp
              JOIN states sp_st ON sp_st.id = sp.state_id
-             WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
+             WHERE sp.landlord_id = users.id
                AND LOWER(TRIM(sp_st.state_name)) = LOWER(TRIM($${stateIdx}))
            )
            OR EXISTS (
@@ -1834,7 +1834,7 @@ exports.getUserById = async (req, res) => {
            EXISTS (
              SELECT 1
              FROM properties sp
-             WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
+             WHERE sp.landlord_id = users.id
                AND LOWER(TRIM(COALESCE(sp.lga_name, ''))) = LOWER(TRIM($${cityIdx}))
            )
            OR EXISTS (
@@ -1956,7 +1956,7 @@ exports.assignAgentToLandlord = async (req, res) => {
              SELECT 1
              FROM properties sp
              JOIN states sp_st ON sp_st.id = sp.state_id
-             WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
+             WHERE sp.landlord_id = users.id
                AND LOWER(TRIM(sp_st.state_name)) = LOWER(TRIM($${stateIdx}))
            )
            OR EXISTS (
@@ -1978,7 +1978,7 @@ exports.assignAgentToLandlord = async (req, res) => {
            EXISTS (
              SELECT 1
              FROM properties sp
-             WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
+             WHERE sp.landlord_id = users.id
                AND LOWER(TRIM(COALESCE(sp.lga_name, ''))) = LOWER(TRIM($${cityIdx}))
            )
            OR EXISTS (
@@ -2093,7 +2093,7 @@ exports.getPropertyById = async (req, res) => {
       `SELECT p.*, u.full_name AS landlord_name, u.email AS landlord_email,
               COALESCE(ops.operations, '[]'::json) AS operations
        FROM properties p
-       LEFT JOIN users u ON p.user_id = u.id
+       LEFT JOIN users u ON p.landlord_id = u.id
        LEFT JOIN states s ON s.id = p.state_id
        LEFT JOIN LATERAL (
          SELECT json_agg(row_to_json(operation_rows) ORDER BY operation_rows.created_at DESC, operation_rows.id DESC) AS operations
@@ -2167,7 +2167,7 @@ exports.getApplicationById = async (req, res) => {
        JOIN users t ON a.tenant_id = t.id
        JOIN properties p ON a.property_id = p.id
        LEFT JOIN states s ON s.id = p.state_id
-       LEFT JOIN users l ON p.user_id = l.id
+       LEFT JOIN users l ON p.landlord_id = l.id
        LEFT JOIN LATERAL (
          SELECT json_agg(row_to_json(operation_rows) ORDER BY operation_rows.created_at DESC, operation_rows.id DESC) AS operations
          FROM (

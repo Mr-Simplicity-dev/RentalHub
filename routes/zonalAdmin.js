@@ -89,7 +89,7 @@ router.get('/users', async (req, res) => {
       AND (u.full_name ILIKE $2 OR u.email ILIKE $2 OR u.phone ILIKE $2)
       AND EXISTS (
         SELECT 1 FROM properties p JOIN states s ON s.id = p.state_id
-        WHERE (p.user_id = u.id OR p.landlord_id = u.id) AND s.state_name = ANY($1) AND s.state_name ILIKE $4
+        WHERE p.landlord_id = u.id AND s.state_name = ANY($1) AND s.state_name ILIKE $4
         UNION ALL
         SELECT 1 FROM applications a JOIN properties p ON p.id = a.property_id JOIN states s ON s.id = p.state_id
         WHERE a.tenant_id = u.id AND s.state_name = ANY($1) AND s.state_name ILIKE $4
@@ -114,11 +114,11 @@ router.get('/properties', async (req, res) => {
     const params = [scope.states, `%${String(req.query.search || '').trim()}%`];
     const where = `s.state_name = ANY($1) AND (p.title ILIKE $2 OR u.full_name ILIKE $2 OR p.city ILIKE $2)`;
     const [count, data] = await Promise.all([
-      db.query(`SELECT COUNT(*) FROM properties p LEFT JOIN users u ON u.id = p.user_id JOIN states s ON s.id = p.state_id WHERE ${where}`, params),
+      db.query(`SELECT COUNT(*) FROM properties p LEFT JOIN users u ON u.id = p.landlord_id JOIN states s ON s.id = p.state_id WHERE ${where}`, params),
       db.query(`SELECT p.id, p.title, p.rent_amount, p.status,
           CASE WHEN p.is_verified THEN 'approved' WHEN LOWER(COALESCE(p.status,'')) = 'rejected' THEN 'rejected' ELSE 'pending' END AS approval_status,
           p.is_available, p.featured, p.created_at, p.city, s.state_name AS state, s.state_name, u.full_name AS landlord_name
-        FROM properties p LEFT JOIN users u ON u.id = p.user_id JOIN states s ON s.id = p.state_id
+        FROM properties p LEFT JOIN users u ON u.id = p.landlord_id JOIN states s ON s.id = p.state_id
         WHERE ${where} ORDER BY p.created_at DESC LIMIT $3 OFFSET $4`, [...params, limit, offset]),
     ]);
     return sendPage(res, data.rows, Number(count.rows[0].count), page, limit);
@@ -134,7 +134,7 @@ router.get('/applications', async (req, res) => {
     if (!scope) return res.status(403).json({ success: false, message: 'Zonal Admin account is missing a valid assigned_zone' });
     const { page, limit, offset } = pagination(req.query);
     const params = [scope.states, `%${String(req.query.search || '').trim()}%`];
-    const joins = `FROM applications a JOIN users t ON t.id = a.tenant_id JOIN properties p ON p.id = a.property_id LEFT JOIN users l ON l.id = p.user_id JOIN states s ON s.id = p.state_id`;
+    const joins = `FROM applications a JOIN users t ON t.id = a.tenant_id JOIN properties p ON p.id = a.property_id LEFT JOIN users l ON l.id = p.landlord_id JOIN states s ON s.id = p.state_id`;
     const where = `s.state_name = ANY($1) AND (t.full_name ILIKE $2 OR p.title ILIKE $2 OR l.full_name ILIKE $2)`;
     const [count, data] = await Promise.all([
       db.query(`SELECT COUNT(*) ${joins} WHERE ${where}`, params),
@@ -156,7 +156,7 @@ router.get('/verifications', async (req, res) => {
     const where = `u.deleted_at IS NULL AND (u.email_verified = TRUE OR (u.assisted_registration=TRUE AND u.email IS NULL)) AND u.phone_verified = TRUE
       AND COALESCE(u.identity_verification_status, CASE WHEN u.identity_verified THEN 'verified' ELSE 'pending' END) = 'pending'
       AND (u.full_name ILIKE $2 OR u.email ILIKE $2 OR u.phone ILIKE $2)
-      AND EXISTS (SELECT 1 FROM properties p JOIN states s ON s.id = p.state_id WHERE (p.user_id = u.id OR p.landlord_id = u.id) AND s.state_name = ANY($1)
+      AND EXISTS (SELECT 1 FROM properties p JOIN states s ON s.id = p.state_id WHERE p.landlord_id = u.id AND s.state_name = ANY($1)
         UNION ALL SELECT 1 FROM applications a JOIN properties p ON p.id = a.property_id JOIN states s ON s.id = p.state_id WHERE a.tenant_id = u.id AND s.state_name = ANY($1))`;
     const [count, data] = await Promise.all([
       db.query(`SELECT COUNT(*) FROM users u WHERE ${where}`, params),

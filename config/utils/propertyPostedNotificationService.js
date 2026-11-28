@@ -54,7 +54,7 @@ const loadLiveProperty = async (input, deps) => {
   }
 
   const { rows } = await dbQuery(
-    `SELECT p.id, p.landlord_id, p.user_id, p.state_id, p.bedrooms
+    `SELECT p.id, p.landlord_id, p.state_id, p.bedrooms
      FROM properties p
      WHERE ${conditions.join(' AND ')}`,
     params
@@ -70,7 +70,7 @@ exports.notifyNewPropertyArrival = async (input, deps = {}) => {
     if (!property) return { tenants: { matched: 0, sent: 0 }, landlord: { matched: 0, sent: 0 } };
 
     const stateId = Number(property.state_id);
-    const ownerId = Number(property.landlord_id) || Number(property.user_id);
+    const ownerId = Number(property.landlord_id);
     const title = ANNOUNCEMENT_TITLE;
     const message = buildArrivalMessage(property);
     const link = `/properties/${property.id}`;

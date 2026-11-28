@@ -752,7 +752,7 @@ const getAdminStateUsers = async (req, res) => {
 
                LEFT JOIN states s ON s.id = p.state_id
 
-               WHERE (p.user_id = u.id OR p.landlord_id = u.id)
+               WHERE p.landlord_id = u.id
 
                  AND LOWER(TRIM(s.state_name)) = LOWER(TRIM($1))
 

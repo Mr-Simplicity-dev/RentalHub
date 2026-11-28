@@ -1680,7 +1680,7 @@ exports.createProperty = async (req, res) => {
 
     const result = await client.query(
       `INSERT INTO properties (
-         landlord_id, user_id, state, state_id, lga_name, city, area, full_address,
+          landlord_id, state, state_id, lga_name, city, area, full_address,
          latitude, longitude,
          property_type, bedrooms, bathrooms, parking_spaces,
          price, rent_amount, payment_frequency,
@@ -1688,11 +1688,10 @@ exports.createProperty = async (req, res) => {
          submission_key, submission_fingerprint
        )
        VALUES (
-         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27
+          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26
        )
       RETURNING *`,
       [
-        landlordUserId,
         landlordUserId,
         resolvedStateName,
         resolvedStateId,

@@ -5,5 +5,25 @@ test('opening landlord property management never rewrites account role constrain
 test('state finance can read the shared dashboard without gaining operations approval access',()=>{const guard=load('config/middleware/requireStateAdmin.js',n=>n==='../utils/roleHierarchy'?real('./config/utils/roleHierarchy'):real(n));for(const role of ['state_admin','state_financial_admin','tenant','landlord','lga_admin']){for(const name of ['requireStateDashboardAccess','requireStateAdmin']){let next=false;const res={statusCode:200,status(c){this.statusCode=c;return this},json(){}};guard[name]({user:{user_type:role}},res,()=>{next=true});assert.equal(next,name==='requireStateAdmin'?role==='state_admin':['state_admin','state_financial_admin'].includes(role));}}let status;guard.requireStateDashboardAccess({}, {status(c){status=c;return this},json(){}},()=>assert.fail('guest allowed'));assert.equal(status,401);});
 test('only the four read-only dashboard calls gain the dashboard guard',()=>{const routes=fs.readFileSync(path.join(root,'routes/stateAdmin.js'),'utf8');assert.match(routes,/router.get\('\/dashboard',\s*requireStateDashboardAccess/);assert.match(routes,/router.post\('\/withdraw',\s*requireStateAdmin/);assert.equal((routes.match(/\n  requireStateDashboardAccess,/g)||[]).length,4);});
 test('LGA and zonal dashboard owner queries use the canonical property owner field',()=>{const admin=fs.readFileSync(path.join(root,'services/adminService.js'),'utf8');const start=admin.indexOf('exports.getStats ='),end=admin.indexOf('\nexports.',start+1),stats=admin.slice(start,end);assert.ok(!stats.includes('sp.user_id'));assert.ok(stats.includes('sp.landlord_id = u.id'));const zonal=fs.readFileSync(path.join(root,'routes/zonalAdmin.js'),'utf8').split("router.get('/admins'")[0];assert.ok(!zonal.includes('p.user_id'));assert.ok(zonal.includes('SELECT p.landlord_id AS user_id'));assert.ok(zonal.includes('s.state_name = ANY($1)'));});
+test('property ownership lookups use landlord_id from the properties schema',()=>{
+  const files=[
+    'services/adminService.js',
+    'services/supportDisputeHandoverService.js',
+    'services/superAdmin/verificationService.js',
+    'routes/users.js',
+    'routes/zonalAdmin.js',
+    'config/utils/propertyAlertService.js',
+    'config/utils/propertyPostedNotificationService.js',
+  ];
+  for(const file of files){
+    const source=fs.readFileSync(path.join(root,file),'utf8');
+    assert.doesNotMatch(source,/\b(?:p|sp|scoped_property)\.user_id\s*=/,file);
+    assert.doesNotMatch(source,/property\.user_id\b/,file);
+  }
+  const properties=fs.readFileSync(path.join(root,'services/propertyService.js'),'utf8');
+  const insert=properties.slice(properties.indexOf('INSERT INTO properties ('),properties.indexOf('RETURNING *',properties.indexOf('INSERT INTO properties (')));
+  assert.match(insert,/landlord_id/);
+  assert.doesNotMatch(insert,/user_id/);
+});
 
 for(const endpoint of ['/transactions','/managed-users','/withdrawals'])test('state finance reads only scoped data through '+endpoint,async()=>{const registered=[],queries=[];const router={use(){},get(route,...handlers){registered.push({route,handlers})},post(){}};const chain=new Proxy(()=>chain,{get:()=>chain,apply:()=>chain});const guards=load('config/middleware/requireStateAdmin.js',n=>n==='../utils/roleHierarchy'?real('./config/utils/roleHierarchy'):real(n));load('routes/stateAdmin.js',n=>n==='express'?{Router:()=>router}:n==='express-validator'?{body:chain,validationResult:()=>({isEmpty:()=>true})}:n.includes('stateAdminController')?{}:n.includes('requireStateAdmin')?guards:n.includes('twoFactor')?{}:n.includes('/auth')?{authenticate(){}}:n.includes('database')?{query:async(sql,params)=>{queries.push({sql,params});return{rows:sql.includes('SELECT assigned_state')?[{assigned_state:'Kogi',assigned_city:'Lokoja'}]:/COUNT\(\*\) as total/.test(sql)?[{total:'0'}]:[]}}}:real(n));const route=registered.find(r=>r.route===endpoint);assert.ok(route);const req={user:{id:65,user_type:'state_financial_admin'},query:{},logger:{error(){}}},res={statusCode:200,status(c){this.statusCode=c;return this},json(body){this.body=body;return this}};let allowed=false;route.handlers[0](req,res,()=>{allowed=true});assert.equal(allowed,true);await route.handlers.at(-1)(req,res);assert.equal(res.statusCode,200);assert.equal(res.body.success,true);assert.ok(queries.length);assert.ok(queries.every(q=>!/^\s*(INSERT|UPDATE|DELETE)/i.test(q.sql)));if(endpoint==='/withdrawals'){assert.ok(queries.every(q=>q.sql.includes('WHERE admin_id = $1')));assert.ok(queries.every(q=>q.params[0]===65));}if(endpoint==='/managed-users')assert.ok(queries.every(q=>q.sql.includes('WHERE u.referred_by = $1')&&q.params[0]===65));if(endpoint==='/transactions')assert.ok(queries.filter(q=>q.sql.includes('FROM payments')).every(q=>q.params.includes('Kogi')));});

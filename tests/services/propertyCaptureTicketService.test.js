@@ -24,7 +24,7 @@ const createDatabase = async () => {
     CREATE TABLE properties (
       id SERIAL PRIMARY KEY,
       landlord_id INTEGER NOT NULL,
-      user_id INTEGER
+      status VARCHAR(32) NOT NULL DEFAULT 'pending'
     );
     CREATE TABLE property_photos (
       id SERIAL PRIMARY KEY,

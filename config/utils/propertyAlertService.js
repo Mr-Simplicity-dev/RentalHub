@@ -528,7 +528,7 @@ const findLandlordsForRequest = async (alert) => {
     `SELECT DISTINCT u.id, u.full_name, u.email, u.user_type
      FROM users u
      INNER JOIN properties p
-       ON (p.landlord_id = u.id OR p.user_id = u.id)
+       ON p.landlord_id = u.id
      LEFT JOIN states s ON s.id = p.state_id
      WHERE u.user_type = 'landlord'
        AND u.deleted_at IS NULL

@@ -101,7 +101,7 @@ const canViewPassportPhoto = async ({ requester, ownerId, filename }) => {
              SELECT 1
              FROM properties scoped_property
              JOIN states property_state ON property_state.id = scoped_property.state_id
-             WHERE (scoped_property.user_id = target.id OR scoped_property.landlord_id = target.id)
+             WHERE scoped_property.landlord_id = target.id
                AND LOWER(TRIM(property_state.state_name)) = LOWER(TRIM($2))
            )
            OR EXISTS (
@@ -120,7 +120,7 @@ const canViewPassportPhoto = async ({ requester, ownerId, filename }) => {
              SELECT 1
              FROM properties scoped_property
              JOIN states property_state ON property_state.id = scoped_property.state_id
-             WHERE (scoped_property.user_id = target.id OR scoped_property.landlord_id = target.id)
+             WHERE scoped_property.landlord_id = target.id
                AND LOWER(TRIM(property_state.state_name)) = LOWER(TRIM($2))
                AND LOWER(TRIM(COALESCE(scoped_property.lga_name, ''))) = LOWER(TRIM($3))
            )
