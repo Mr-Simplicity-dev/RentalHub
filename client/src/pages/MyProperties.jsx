@@ -9,6 +9,7 @@ import BackToDashboard from '../components/common/BackToDashboard';
 import { useTranslation } from 'react-i18next';
 import AppealModal from '../components/common/AppealModal';
 import PropertyUpdateEditor from '../components/properties/PropertyUpdateEditor';
+import ListingAssistancePanel from '../components/properties/ListingAssistancePanel';
 
 const MyProperties = () => {
   const { user } = useAuth();
@@ -49,6 +50,12 @@ const MyProperties = () => {
           <Link to="/add-property" className="btn btn-primary">{t('my_properties.add_property')}</Link>
         </div>
       </div>
+
+      {user?.user_type === 'landlord' ? (
+        <div className="mb-6">
+          <ListingAssistancePanel properties={items} showPropertyPicker />
+        </div>
+      ) : null}
 
       <div className="space-y-4">
         {items.map(p => {

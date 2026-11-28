@@ -260,14 +260,17 @@ const HeadphoneSupportButton = ({ compact = false, className = '' }) => {
           params: { filter: targetFilter, limit: 40 },
         });
         const payload = res?.data?.data || {};
+        await api.patch('/calls/history/viewed');
         if (Array.isArray(payload.records)) {
           setCallRecords(payload.records);
         } else {
           setCallRecords([]);
         }
-        if (payload.summary) {
-          setHistorySummary(payload.summary);
-        }
+        setHistorySummary((previous) => ({
+          ...previous,
+          ...payload.summary,
+          incoming_unread_missed_count: 0,
+        }));
       } catch (err) {
         setHistoryError(err?.response?.data?.message || 'Unable to load call records right now.');
       } finally {
@@ -414,7 +417,9 @@ const HeadphoneSupportButton = ({ compact = false, className = '' }) => {
 
   const bossContacts = contacts.filter((c) => c.relation === 'boss');
   const teammateContacts = contacts.filter((c) => c.relation === 'teammate');
-  const incomingMissedCount = Number(historySummary?.incoming_missed_count || 0);
+  const incomingMissedCount = Number(
+    historySummary?.incoming_unread_missed_count ?? historySummary?.incoming_missed_count ?? 0
+  );
   const totalMissedCount = Number(historySummary?.missed_count || 0);
 
   const renderCallRecordsBody = () => (

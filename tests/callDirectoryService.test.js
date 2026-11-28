@@ -80,14 +80,15 @@ test('Super Admin gets platform_all policy and can call anyone on the platform',
   }
 });
 
-test('Marketing Agent can call fellow Marketing Agents (teammates) and sees them in call directory', async () => {
+test('Marketing Agent can call their team lead but cannot call the Super Admin or other agents', async () => {
   const { getCallerPolicy, canUserInitiateDirectCall, getCallDirectory } = require('../services/callDirectoryService');
 
   const marketerA = { id: 22, user_type: 'marketing_agent', assigned_state: 'Lagos' };
   const marketerB = { id: 23, user_type: 'marketing_agent', assigned_state: 'Abuja' };
   const policy = getCallerPolicy(marketerA);
-  assert.equal(policy.canCallTeammates, true);
-  assert.deepEqual(policy.teammateRoles, ['marketing_agent']);
+  assert.equal(policy.canCallTeammates, false);
+  assert.deepEqual(policy.teammateRoles, []);
+  assert.equal(policy.bossRoles.includes('super_admin'), false);
 
   const mockDb = {
     query: async (sql, params = []) => {
@@ -106,15 +107,59 @@ test('Marketing Agent can call fellow Marketing Agents (teammates) and sees them
     },
   };
 
-  const allowTeammate = await canUserInitiateDirectCall(marketerA, marketerB, mockDb);
-  assert.equal(allowTeammate.allowed, true);
-  assert.equal(allowTeammate.relation, 'teammate');
+  const denyTeammate = await canUserInitiateDirectCall(marketerA, marketerB, mockDb);
+  assert.equal(denyTeammate.allowed, false);
 
   const blockSelf = await canUserInitiateDirectCall(marketerA, marketerA, mockDb);
   assert.equal(blockSelf.allowed, false);
 
+  const denySuperAdmin = await canUserInitiateDirectCall(marketerA, { id: 24, user_type: 'super_admin' }, mockDb);
+  assert.equal(denySuperAdmin.allowed, false);
+
   const dir = await getCallDirectory(marketerA, {}, mockDb, (id) => id === 23);
-  assert.ok(dir.contacts.some((c) => c.id === 23 && c.relation === 'teammate' && c.online === true));
+  assert.ok(dir.contacts.some((c) => c.id === 5 && c.relation === 'boss'));
+  assert.equal(dir.contacts.some((c) => c.id === 23), false);
+});
+
+test('Recruitment team lead and national admins can call the system Super Admin', async () => {
+  const superAdmin = { id: 100, user_type: 'super_admin' };
+  for (const role of ['recruitment_admin', 'super_support_admin', 'super_financial_admin', 'super_lawyer']) {
+    const result = await canUserInitiateDirectCall({ id: 200, user_type: role }, superAdmin, mockDb);
+    assert.equal(result.allowed, true, `${role} should be able to call the Super Admin`);
+  }
+  const leadCallsMarketing = await canUserInitiateDirectCall(
+    { id: 201, user_type: 'recruitment_admin' },
+    { id: 202, user_type: 'marketing_agent' },
+    mockDb
+  );
+  assert.equal(leadCallsMarketing.allowed, true);
+});
+
+test('call identity shows admin department and gives the system Super Admin the caller ID', () => {
+  const { getCallIdentity } = require('../services/callDirectoryService');
+  const legalCaller = {
+    id: 41,
+    full_name: 'Ada Lawyer',
+    user_type: 'super_lawyer',
+    passport_photo_url: '/uploads/passports/passport_41_photo.jpg',
+  };
+
+  const departmentIdentity = getCallIdentity(legalCaller, { user_type: 'state_transportation_admin' });
+  assert.equal(departmentIdentity.call_display_name, 'Legal Department');
+  assert.equal(departmentIdentity.call_display_detail, 'Ada Lawyer · National Super Lawyer');
+  assert.equal(departmentIdentity.department_label, 'Legal Department');
+  assert.equal(departmentIdentity.call_display_kind, 'brand');
+  assert.equal(departmentIdentity.passport_photo_url, legalCaller.passport_photo_url);
+
+  const nationalIdentity = getCallIdentity(legalCaller, { user_type: 'state_lawyer' });
+  assert.equal(nationalIdentity.call_display_name, 'National Legal Admin');
+
+  const superAdminIdentity = getCallIdentity(legalCaller, { user_type: 'super_admin' });
+  assert.equal(superAdminIdentity.call_display_name, 'Ada Lawyer');
+  assert.equal(superAdminIdentity.call_display_detail, 'National Super Lawyer · Legal Department · ID 41');
+
+  const technicalIdentity = getCallIdentity({ id: 1, full_name: 'System Admin', user_type: 'super_admin' }, { user_type: 'tenant' });
+  assert.equal(technicalIdentity.call_display_name, 'Amana RentalHub Technical Team');
 });
 
 test('getCallHistory returns missed calls, call details, talk duration, and summary counts', async () => {
@@ -129,6 +174,7 @@ test('getCallHistory returns missed calls, call details, talk duration, and summ
             total_count: 2,
             missed_count: 1,
             incoming_missed_count: 1,
+            incoming_unread_missed_count: 1,
             answered_count: 1,
             incoming_count: 1,
             outgoing_count: 1,
@@ -184,6 +230,7 @@ test('getCallHistory returns missed calls, call details, talk duration, and summ
   assert.equal(history.summary.total_count, 2);
   assert.equal(history.summary.missed_count, 1);
   assert.equal(history.summary.incoming_missed_count, 1);
+  assert.equal(history.summary.incoming_unread_missed_count, 1);
   assert.equal(history.records.length, 2);
 
   const missed = history.records[0];
@@ -193,10 +240,26 @@ test('getCallHistory returns missed calls, call details, talk duration, and summ
   assert.equal(missed.is_missed_for_me, true);
   assert.equal(missed.duration_seconds, 0);
   assert.equal(missed.counterpart.full_name, 'Bola Marketer');
-  assert.equal(missed.can_call_back, true);
+  assert.equal(missed.can_call_back, false);
 
   const completed = history.records[1];
   assert.equal(completed.status, 'ended');
   assert.equal(completed.direction, 'outgoing');
   assert.equal(completed.duration_seconds, 135);
+});
+
+test('markIncomingMissedCallsAsViewed only clears the signed-in receiver missed-call count', async () => {
+  const { markIncomingMissedCallsAsViewed } = require('../services/callDirectoryService');
+  let query;
+  const updatedCount = await markIncomingMissedCallsAsViewed(22, {
+    query: async (...args) => {
+      query = args;
+      return { rowCount: 3 };
+    },
+  });
+
+  assert.equal(updatedCount, 3);
+  assert.match(query[0], /receiver_id = \$1 AND status = 'missed' AND receiver_viewed_at IS NULL/);
+  assert.deepEqual(query[1], [22]);
+  assert.equal(await markIncomingMissedCallsAsViewed(0, { query: async () => { throw new Error('must not query'); } }), 0);
 });

@@ -14,13 +14,16 @@ const { statesMatch } = require('../config/utils/stateScope');
 const { validateStructuredFeatures } = require('../config/utils/propertyFeatureSchema');
 const { resolveParkingSpaces, syncStructuredParking } = require('../config/utils/parkingInfo');
 const { getTenantPropertyUnlock } = require('../config/utils/propertyEntitlement');
+const {
+  CAPTURE_TICKET_TTL_MS,
+  consumeCaptureTickets,
+  getCommittedClipRetry,
+  getCommittedPhotoRetry,
+  hashCaptureToken,
+  issueCaptureTicket,
+  lockCaptureTickets,
+} = require('./propertyCaptureTicketService');
 let propertySchemaReady = false;
-
-const PROPERTY_IMAGE_CAPTURE_TTL_MS =
-  Number(process.env.PROPERTY_IMAGE_CAPTURE_TTL_MS) || 10 * 60 * 1000;
-const propertyImageCaptureSessions = new Map();
-
-const getPropertyImageCaptureKey = (userId, token) => `${userId}:${token}`;
 
 // Ownership gate: when the super admin enables require_property_ownership_verification,
 // unverified listings are hidden from public browse/search/featured. Returns false
@@ -49,41 +52,6 @@ const applyOwnershipGate = (whereConditions, params, paramCountRef, gateEnabledA
   }
   whereConditions.push(`p.ownership_verification_status = 'verified'`);
   return paramCountRef;
-};
-
-
-const prunePropertyImageCaptureSessions = () => {
-  const now = Date.now();
-
-  for (const [key, value] of propertyImageCaptureSessions.entries()) {
-    if (!value || value.expiresAt <= now) {
-      propertyImageCaptureSessions.delete(key);
-    }
-  }
-};
-
-const createPropertyImageCaptureToken = (userId) => {
-  prunePropertyImageCaptureSessions();
-
-  const token = crypto.randomBytes(24).toString('hex');
-  propertyImageCaptureSessions.set(getPropertyImageCaptureKey(userId, token), {
-    expiresAt: Date.now() + PROPERTY_IMAGE_CAPTURE_TTL_MS,
-  });
-
-  return token;
-};
-
-const consumePropertyImageCaptureToken = (userId, token) => {
-  if (!token || typeof token !== 'string') return false;
-
-  prunePropertyImageCaptureSessions();
-
-  const key = getPropertyImageCaptureKey(userId, token);
-  const session = propertyImageCaptureSessions.get(key);
-  if (!session) return false;
-
-  propertyImageCaptureSessions.delete(key);
-  return session.expiresAt > Date.now();
 };
 
 const parsePropertyImageCaptureTokens = (value) => {
@@ -138,6 +106,78 @@ const parseCoordinate = (value, min, max) => {
   return numericValue;
 };
 
+const createSubmissionFingerprint = (body, imageTokens, imageCount) => {
+  const fields = [
+    'state_id',
+    'state',
+    'lga_name',
+    'city',
+    'area',
+    'full_address',
+    'latitude',
+    'longitude',
+    'property_type',
+    'bedrooms',
+    'bathrooms',
+    'parking_spaces',
+    'rent_amount',
+    'payment_frequency',
+    'title',
+    'description',
+    'amenities',
+    'is_available',
+    'structured_features',
+  ];
+  const submission = fields.reduce((result, field) => {
+    const value = body[field];
+    result[field] = value === undefined || value === null ? '' : String(value).trim();
+    return result;
+  }, {});
+  submission.image_tokens = imageTokens.map(hashCaptureToken);
+  submission.image_count = imageCount;
+  return crypto.createHash('sha256').update(JSON.stringify(submission)).digest('hex');
+};
+
+const sanitizeSubmittedProperty = (property) => {
+  const safeProperty = { ...property };
+  delete safeProperty.submission_key;
+  delete safeProperty.submission_fingerprint;
+  return safeProperty;
+};
+
+const cleanupUploadedPropertyMedia = async (files, context) => {
+  for (const file of files) {
+    const publicId = file.filename || file.public_id;
+    if (!publicId) {
+      logger.error('Uploaded property media could not be cleaned up because its public ID is missing.', {
+        context,
+        mimetype: file.mimetype,
+      });
+      continue;
+    }
+
+    try {
+      const resourceType = String(file.mimetype || '').startsWith('video/') ? 'video' : 'image';
+      const result = await cloudinary.uploader.destroy(publicId, {
+        resource_type: resourceType,
+      });
+      if (result?.result && !['ok', 'not found'].includes(result.result)) {
+        logger.error('Uploaded property media cleanup did not complete.', {
+          context,
+          publicId,
+          result: result.result,
+        });
+      }
+    } catch (error) {
+      logger.error('Uploaded property media cleanup failed.', {
+        context,
+        publicId,
+        error: error.message,
+      });
+    }
+  }
+};
+
 const ensurePropertySchema = async () => {
   if (propertySchemaReady) return;
   await db.query(`
@@ -149,10 +189,34 @@ const ensurePropertySchema = async () => {
     ADD COLUMN IF NOT EXISTS longitude DECIMAL(11, 8),
     ADD COLUMN IF NOT EXISTS parking_spaces INTEGER NOT NULL DEFAULT 0,
     ADD COLUMN IF NOT EXISTS structured_features JSONB NOT NULL DEFAULT '{}'::jsonb,
-    ADD COLUMN IF NOT EXISTS video_variants JSONB NOT NULL DEFAULT '[]'::jsonb;
+    ADD COLUMN IF NOT EXISTS video_variants JSONB NOT NULL DEFAULT '[]'::jsonb,
+    ADD COLUMN IF NOT EXISTS submission_key VARCHAR(80),
+    ADD COLUMN IF NOT EXISTS submission_fingerprint VARCHAR(64);
 
     ALTER TABLE property_photos
-    ADD COLUMN IF NOT EXISTS upload_order INTEGER DEFAULT 0;
+    ADD COLUMN IF NOT EXISTS upload_order INTEGER DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS capture_token_hash VARCHAR(64);
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_properties_landlord_submission_key
+      ON properties (landlord_id, submission_key)
+      WHERE submission_key IS NOT NULL;
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_property_photos_capture_token
+      ON property_photos (capture_token_hash)
+      WHERE capture_token_hash IS NOT NULL;
+
+    CREATE TABLE IF NOT EXISTS property_capture_tickets (
+      token_hash VARCHAR(64) PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at TIMESTAMPTZ NOT NULL,
+      consumed_at TIMESTAMPTZ,
+      consumed_for_property_id INTEGER REFERENCES properties(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_property_capture_tickets_user_expiry
+      ON property_capture_tickets (user_id, expires_at)
+      WHERE consumed_at IS NULL;
 
     CREATE TABLE IF NOT EXISTS tenant_property_unlocks (
       id SERIAL PRIMARY KEY,
@@ -172,8 +236,16 @@ const ensurePropertySchema = async () => {
       clip_order INTEGER NOT NULL DEFAULT 0,
       shot_key VARCHAR(60),
       duration_seconds NUMERIC(6,2),
+      capture_token_hash VARCHAR(64),
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+
+    ALTER TABLE property_clips
+      ADD COLUMN IF NOT EXISTS capture_token_hash VARCHAR(64);
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_property_clips_capture_token
+      ON property_clips (capture_token_hash)
+      WHERE capture_token_hash IS NOT NULL;
 
     CREATE INDEX IF NOT EXISTS idx_property_clips_property
       ON property_clips(property_id, clip_order ASC, id ASC);
@@ -869,7 +941,7 @@ exports.getPropertyById = async (req, res) => {
 
     res.json({
       success: true,
-      data: property,
+      data: sanitizeSubmittedProperty(property),
       message: 'Pay to view the full address and property details. Phone and email contacts are not included.'
     });
   } catch (error) {
@@ -1271,13 +1343,14 @@ exports.getPropertyUsers = async (req, res) => {
 
 exports.createPropertyImageCaptureSession = async (req, res) => {
   try {
-    const token = createPropertyImageCaptureToken(req.user.id);
+    await ensurePropertySchema();
+    const token = await issueCaptureTicket(req.user.id);
 
     return res.json({
       success: true,
       data: {
         token,
-        expires_in_seconds: Math.floor(PROPERTY_IMAGE_CAPTURE_TTL_MS / 1000),
+        expires_in_seconds: Math.floor(CAPTURE_TICKET_TTL_MS / 1000),
       },
     });
   } catch (error) {
@@ -1295,6 +1368,16 @@ exports.createPropertyImageCaptureSession = async (req, res) => {
 // -----------------------------------------------------
 exports.createProperty = async (req, res) => {
   let client;
+  let transactionOpen = false;
+  let commitAttempted = false;
+  let persistedFiles = false;
+  let submissionKey = '';
+  let submissionFingerprint = '';
+  let landlordUserId;
+  const uploadedFiles = [
+    ...(req.files?.images || []),
+    ...(req.files?.video || []),
+  ];
   try {
     await ensurePropertySchema();
 
@@ -1311,16 +1394,7 @@ exports.createProperty = async (req, res) => {
     });
     if (!managerContext) return;
 
-    const landlordUserId = managerContext.landlordUserId;
-    const landlordVerified = await ensureLandlordOwnerIsVerified(landlordUserId);
-
-    if (!landlordVerified) {
-      return res.status(403).json({
-        success: false,
-        message: 'Please complete identity verification (NIN + Passport) first.',
-      });
-    }
-
+    landlordUserId = managerContext.landlordUserId;
     const {
       state_id,
       state,
@@ -1347,6 +1421,7 @@ exports.createProperty = async (req, res) => {
     const video = req.files?.video?.[0] || null;
     const imageCaptureSource = String(req.body.image_capture_source || '').trim();
     const imageCaptureTokens = parsePropertyImageCaptureTokens(req.body.image_capture_tokens);
+    submissionKey = String(req.body.submission_key || '').trim();
     const allowedTypes = [
       'apartment',
       'house',
@@ -1356,6 +1431,13 @@ exports.createProperty = async (req, res) => {
       'flat',
       'room',
     ];
+
+    if (!/^[a-zA-Z0-9._:-]{16,80}$/.test(submissionKey)) {
+      return res.status(400).json({
+        success: false,
+        message: 'A valid submission key is required. Please retry from the property form.',
+      });
+    }
 
     if (!images.length) {
       return res.status(400).json({
@@ -1383,17 +1465,6 @@ exports.createProperty = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Each live property image must have its own capture session.',
-      });
-    }
-
-    const allImageTokensValid = imageCaptureTokens.every((token) =>
-      consumePropertyImageCaptureToken(req.user.id, token)
-    );
-
-    if (!allImageTokensValid) {
-      return res.status(403).json({
-        success: false,
-        message: 'Invalid or expired live image capture session. Please retake the property photos.',
       });
     }
 
@@ -1461,8 +1532,14 @@ exports.createProperty = async (req, res) => {
     }
 
     let resolvedLgaName = null;
+    if (!String(lga_name || '').trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'A valid local government area is required.',
+      });
+    }
 
-    if (String(lga_name || '').trim()) {
+    try {
       const resolvedLocation = await resolveLocationSelection({
         stateId: resolvedStateId,
         lgaName: lga_name,
@@ -1472,6 +1549,14 @@ exports.createProperty = async (req, res) => {
       resolvedStateId = resolvedLocation.state_id;
       resolvedStateName = resolvedLocation.state_name;
       resolvedLgaName = resolvedLocation.lga_name;
+    } catch (error) {
+      if (error.statusCode === 400) {
+        return res.status(400).json({
+          success: false,
+          message: error.message,
+        });
+      }
+      throw error;
     }
 
     if (managerContext.isAgent) {
@@ -1499,8 +1584,87 @@ exports.createProperty = async (req, res) => {
       });
     }
 
+    submissionFingerprint = createSubmissionFingerprint(
+      req.body,
+      imageCaptureTokens,
+      images.length
+    );
+    const priorSubmission = await db.query(
+      `SELECT * FROM properties
+       WHERE landlord_id = $1 AND submission_key = $2
+       LIMIT 1`,
+      [landlordUserId, submissionKey]
+    );
+    if (priorSubmission.rows.length) {
+      const property = priorSubmission.rows[0];
+      if (property.submission_fingerprint !== submissionFingerprint) {
+        return res.status(409).json({
+          success: false,
+          code: 'SUBMISSION_KEY_REUSED',
+          message: 'This submission key was already used for a different listing.',
+        });
+      }
+      return res.status(200).json({
+        success: true,
+        message: 'This property was already submitted for review.',
+        data: sanitizeSubmittedProperty(property),
+        already_submitted: true,
+      });
+    }
+
+    const landlordVerified = await ensureLandlordOwnerIsVerified(landlordUserId);
+    if (!landlordVerified) {
+      return res.status(403).json({
+        success: false,
+        message: 'Please complete identity verification (NIN + Passport) first.',
+      });
+    }
+
     client = await db.connect();
     await client.query('BEGIN');
+    transactionOpen = true;
+
+    const captureTickets = await lockCaptureTickets(
+      client,
+      req.user.id,
+      imageCaptureTokens
+    );
+    if (!captureTickets.valid) {
+      await client.query('ROLLBACK');
+      transactionOpen = false;
+      const existing = await db.query(
+        `SELECT * FROM properties
+         WHERE landlord_id = $1 AND submission_key = $2
+         LIMIT 1`,
+        [landlordUserId, submissionKey]
+      );
+      if (existing.rows[0]?.submission_fingerprint === submissionFingerprint) {
+        return res.status(200).json({
+          success: true,
+          message: 'This property was already submitted for review.',
+          data: sanitizeSubmittedProperty(existing.rows[0]),
+          already_submitted: true,
+        });
+      }
+      if (existing.rows.length) {
+        return res.status(409).json({
+          success: false,
+          code: 'SUBMISSION_KEY_REUSED',
+          message: 'This submission key was already used for a different listing.',
+        });
+      }
+      return res.status(403).json({
+        success: false,
+        code: captureTickets.reason === 'expired'
+          ? 'CAPTURE_SESSION_EXPIRED'
+          : captureTickets.reason === 'used'
+            ? 'CAPTURE_SESSION_USED'
+            : 'CAPTURE_SESSION_INVALID',
+        message: captureTickets.reason === 'expired'
+          ? 'The live photo session expired. Retake the photos before submitting.'
+          : 'The live photo session is no longer valid. Retake the photos before submitting.',
+      });
+    }
 
     const hasExplicitParking = parking_spaces !== undefined && parking_spaces !== null && parking_spaces !== '';
     const resolvedParkingSpaces = resolveParkingSpaces({
@@ -1520,10 +1684,11 @@ exports.createProperty = async (req, res) => {
          latitude, longitude,
          property_type, bedrooms, bathrooms, parking_spaces,
          price, rent_amount, payment_frequency,
-         title, description, amenities, structured_features, is_available, is_verified, status, video_url
+         title, description, amenities, structured_features, is_available, is_verified, status, video_url,
+         submission_key, submission_fingerprint
        )
        VALUES (
-         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25
+         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27
        )
       RETURNING *`,
       [
@@ -1552,6 +1717,8 @@ exports.createProperty = async (req, res) => {
         false,
         'pending',
         video ? video.path : null,
+        submissionKey,
+        submissionFingerprint,
       ]
     );
 
@@ -1561,35 +1728,80 @@ exports.createProperty = async (req, res) => {
       for (let i = 0; i < images.length; i++) {
         const file = images[i];
         await client.query(
-          `INSERT INTO property_photos (property_id, photo_url, is_primary, upload_order)
-           VALUES ($1, $2, $3, $4)`,
-          [property.id, file.path, i === 0, i]
+          `INSERT INTO property_photos
+             (property_id, photo_url, is_primary, upload_order, capture_token_hash)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [property.id, file.path, i === 0, i, hashCaptureToken(imageCaptureTokens[i])]
         );
       }
     }
 
-    await client.query('COMMIT');
+    await consumeCaptureTickets(
+      client,
+      req.user.id,
+      captureTickets.hashes,
+      property.id
+    );
 
-    // The listing is already live; the tour video is built in the background
-    // so a slow encode never delays the landlord's submission.
+    commitAttempted = true;
+    await client.query('COMMIT');
+    transactionOpen = false;
+    persistedFiles = true;
+
     if (images.length >= 2) {
-      const { enqueuePropertyTour } = require('../jobs/propertyTourJobs');
-      enqueuePropertyTour(property.id).catch(() => {});
+      try {
+        const { enqueuePropertyTour } = require('../jobs/propertyTourJobs');
+        enqueuePropertyTour(property.id).catch((error) =>
+          req.logger.error('Queue property tour after listing submission failed:', error)
+        );
+      } catch (error) {
+        req.logger.error('Queue property tour after listing submission failed:', error);
+      }
     }
 
-    require('../config/utils/sitemapGenerator').invalidateSitemap();
+    try {
+      require('../config/utils/sitemapGenerator').invalidateSitemap();
+    } catch (error) {
+      req.logger.error('Sitemap invalidation after listing submission failed:', error);
+    }
 
     res.status(201).json({
       success: true,
-      message: 'Property created and submitted for admin verification.',
-      data: property,
+      message: 'Property created and submitted for review.',
+      data: sanitizeSubmittedProperty(property),
     });
   } catch (error) {
-    if (client) {
+    if (client && transactionOpen) {
       try {
         await client.query('ROLLBACK');
-      } catch {}
+        transactionOpen = false;
+      } catch (rollbackError) {
+        req.logger.error('Create property rollback failed:', rollbackError);
+      }
     }
+
+    if (error.code === '23505' && submissionKey) {
+      try {
+        const existing = await db.query(
+          `SELECT * FROM properties
+           WHERE landlord_id = $1 AND submission_key = $2
+           LIMIT 1`,
+          [landlordUserId || req.user?.id, submissionKey]
+        );
+        const property = existing.rows[0];
+        if (property && property.submission_fingerprint === submissionFingerprint) {
+          return res.status(200).json({
+            success: true,
+            message: 'This property was already submitted for review.',
+            data: sanitizeSubmittedProperty(property),
+            already_submitted: true,
+          });
+        }
+      } catch (lookupError) {
+        req.logger.error('Duplicate property submission lookup failed:', lookupError);
+      }
+    }
+
     req.logger.error('Create property error:', error);
     res.status(500).json({
       success: false,
@@ -1597,6 +1809,9 @@ exports.createProperty = async (req, res) => {
     });
   } finally {
     if (client) client.release();
+    if (!persistedFiles && !commitAttempted) {
+      await cleanupUploadedPropertyMedia(uploadedFiles, 'create-property');
+    }
   }
 };
 
@@ -1606,23 +1821,22 @@ exports.createProperty = async (req, res) => {
 // Upload Property Photos
 // -----------------------------------------------------
 exports.uploadPropertyPhotos = async (req, res) => {
+  let client;
+  let transactionOpen = false;
+  let commitAttempted = false;
+  let persistedFiles = false;
+  const files = Array.isArray(req.files) ? req.files : [];
   try {
+    await ensurePropertySchema();
     const { propertyId } = req.params;
     const userId = req.user.id;
+    const managerContext = await resolvePropertyManagerContext(req, res, {
+      propertyId,
+      requiredPermission: 'can_manage_properties',
+    });
+    if (!managerContext) return;
 
-    const propertyCheck = await db.query(
-      'SELECT id FROM properties WHERE id = $1 AND landlord_id = $2',
-      [propertyId, userId]
-    );
-
-    if (propertyCheck.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Property not found or unauthorized'
-      });
-    }
-
-    if (!req.files || req.files.length === 0) {
+    if (!files.length) {
       return res.status(400).json({
         success: false,
         message: 'Please upload at least one photo'
@@ -1639,7 +1853,7 @@ exports.uploadPropertyPhotos = async (req, res) => {
       });
     }
 
-    if (imageCaptureTokens.length !== req.files.length) {
+    if (imageCaptureTokens.length !== files.length) {
       return res.status(400).json({
         success: false,
         message: 'Every property image must be captured live before upload.',
@@ -1654,56 +1868,106 @@ exports.uploadPropertyPhotos = async (req, res) => {
       });
     }
 
-    const allImageTokensValid = imageCaptureTokens.every((token) =>
-      consumePropertyImageCaptureToken(req.user.id, token)
-    );
+    client = await db.connect();
+    await client.query('BEGIN');
+    transactionOpen = true;
+    await client.query('SELECT id FROM properties WHERE id = $1 FOR UPDATE', [propertyId]);
+    const tickets = await lockCaptureTickets(client, userId, imageCaptureTokens);
 
-    if (!allImageTokensValid) {
+    if (!tickets.valid) {
+      await client.query('ROLLBACK');
+      transactionOpen = false;
+      if (tickets.reason === 'used') {
+        const retryRows = await getCommittedPhotoRetry(
+          db,
+          userId,
+          imageCaptureTokens.map(hashCaptureToken),
+          propertyId
+        );
+        if (retryRows) {
+          return res.json({
+            success: true,
+            message: 'These photos were already uploaded.',
+            data: retryRows,
+            already_uploaded: true,
+          });
+        }
+      }
       return res.status(403).json({
         success: false,
-        message: 'Invalid or expired live image capture session. Please retake the property photos.',
+        code: tickets.reason === 'expired' ? 'CAPTURE_SESSION_EXPIRED' : 'CAPTURE_SESSION_INVALID',
+        message: tickets.reason === 'expired'
+          ? 'The live photo session expired. Retake the photos before uploading.'
+          : 'Invalid or already-used live photo session. Retake the photos before uploading.',
       });
     }
 
-    const countResult = await db.query(
+    const countResult = await client.query(
       'SELECT COUNT(*) FROM property_photos WHERE property_id = $1',
       [propertyId]
     );
+    const currentCount = parseInt(countResult.rows[0].count, 10) || 0;
+    const results = [];
 
-    let currentCount = parseInt(countResult.rows[0].count);
-
-    const photoPromises = req.files.map(async (file, index) => {
-      const isPrimary = currentCount === 0 && index === 0;
-      const uploadOrder = currentCount + index;
-
-      return db.query(
-        `INSERT INTO property_photos (property_id, photo_url, is_primary, upload_order)
-         VALUES ($1, $2, $3, $4)
+    for (let index = 0; index < files.length; index += 1) {
+      const file = files[index];
+      const result = await client.query(
+        `INSERT INTO property_photos
+           (property_id, photo_url, is_primary, upload_order, capture_token_hash)
+         VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
-        [propertyId, file.path, isPrimary, uploadOrder]
+        [
+          propertyId,
+          file.path,
+          currentCount === 0 && index === 0,
+          currentCount + index,
+          hashCaptureToken(imageCaptureTokens[index]),
+        ]
       );
-    });
-
-    const results = await Promise.all(photoPromises);
-
-    // Photos added after the fact should earn a tour video too, but only when
-    // the property has no video yet.
-    if (currentCount + results.length >= 2) {
-      const { enqueuePropertyTour } = require('../jobs/propertyTourJobs');
-      enqueuePropertyTour(propertyId).catch(() => {});
+      results.push(result.rows[0]);
     }
 
-    res.json({
+    await consumeCaptureTickets(client, userId, tickets.hashes, propertyId);
+    commitAttempted = true;
+    await client.query('COMMIT');
+    transactionOpen = false;
+    persistedFiles = true;
+
+    if (currentCount + results.length >= 2) {
+      try {
+        const { enqueuePropertyTour } = require('../jobs/propertyTourJobs');
+        enqueuePropertyTour(propertyId).catch((error) =>
+          req.logger.error('Queue property tour after photo upload failed:', error)
+        );
+      } catch (error) {
+        req.logger.error('Queue property tour after photo upload failed:', error);
+      }
+    }
+
+    return res.json({
       success: true,
       message: `${results.length} photo(s) uploaded successfully`,
-      data: results.map(r => r.rows[0])
+      data: results,
     });
   } catch (error) {
+    if (client && transactionOpen) {
+      try {
+        await client.query('ROLLBACK');
+        transactionOpen = false;
+      } catch (rollbackError) {
+        req.logger.error('Upload photos rollback failed:', rollbackError);
+      }
+    }
     req.logger.error('Upload photos error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to upload photos'
     });
+  } finally {
+    if (client) client.release();
+    if (!persistedFiles && !commitAttempted) {
+      await cleanupUploadedPropertyMedia(files, 'upload-property-photos');
+    }
   }
 };
 
@@ -1715,25 +1979,23 @@ exports.uploadPropertyPhotos = async (req, res) => {
 // carry the same live-capture promise as the photos: the clip must come from
 // the in-app camera, never the gallery.
 exports.uploadPropertyClips = async (req, res) => {
+  let client;
+  let transactionOpen = false;
+  let commitAttempted = false;
+  let persistedFiles = false;
+  const files = Array.isArray(req.files) ? req.files : [];
   try {
     await ensurePropertySchema();
 
     const { propertyId } = req.params;
     const userId = req.user.id;
+    const managerContext = await resolvePropertyManagerContext(req, res, {
+      propertyId,
+      requiredPermission: 'can_manage_properties',
+    });
+    if (!managerContext) return;
 
-    const propertyCheck = await db.query(
-      'SELECT id FROM properties WHERE id = $1 AND landlord_id = $2',
-      [propertyId, userId]
-    );
-
-    if (propertyCheck.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Property not found or unauthorized'
-      });
-    }
-
-    if (!req.files || req.files.length === 0) {
+    if (!files.length) {
       return res.status(400).json({
         success: false,
         message: 'Please record at least one property clip'
@@ -1750,7 +2012,7 @@ exports.uploadPropertyClips = async (req, res) => {
       });
     }
 
-    if (captureTokens.length !== req.files.length) {
+    if (captureTokens.length !== files.length) {
       return res.status(400).json({
         success: false,
         message: 'Every property clip must be recorded live before upload.',
@@ -1765,54 +2027,103 @@ exports.uploadPropertyClips = async (req, res) => {
       });
     }
 
-    const allTokensValid = captureTokens.every((token) =>
-      consumePropertyImageCaptureToken(userId, token)
-    );
-
-    if (!allTokensValid) {
+    const shotKeys = parseClipShotKeys(req.body.clip_shot_keys);
+    client = await db.connect();
+    await client.query('BEGIN');
+    transactionOpen = true;
+    await client.query('SELECT id FROM properties WHERE id = $1 FOR UPDATE', [propertyId]);
+    const tickets = await lockCaptureTickets(client, userId, captureTokens);
+    if (!tickets.valid) {
+      await client.query('ROLLBACK');
+      transactionOpen = false;
+      if (tickets.reason === 'used') {
+        const retryRows = await getCommittedClipRetry(
+          db,
+          userId,
+          captureTokens.map(hashCaptureToken),
+          propertyId
+        );
+        if (retryRows) {
+          return res.json({
+            success: true,
+            message: 'These clips were already uploaded.',
+            data: retryRows,
+            already_uploaded: true,
+          });
+        }
+      }
       return res.status(403).json({
         success: false,
-        message: 'Invalid or expired live capture session. Please record the clips again.',
+        code: tickets.reason === 'expired' ? 'CAPTURE_SESSION_EXPIRED' : 'CAPTURE_SESSION_INVALID',
+        message: tickets.reason === 'expired'
+          ? 'The live clip session expired. Record the clips again before uploading.'
+          : 'Invalid or already-used live clip session. Record the clips again before uploading.',
       });
     }
 
-    const countResult = await db.query(
+    const countResult = await client.query(
       'SELECT COUNT(*) FROM property_clips WHERE property_id = $1',
       [propertyId]
     );
-
     const currentCount = parseInt(countResult.rows[0].count, 10) || 0;
-    const shotKeys = parseClipShotKeys(req.body.clip_shot_keys);
-
-    const clipPromises = req.files.map(async (file, index) => {
-      const uploadOrder = currentCount + index;
-
-      return db.query(
-        `INSERT INTO property_clips (property_id, clip_url, clip_order, shot_key)
-         VALUES ($1, $2, $3, $4)
+    const results = [];
+    for (let index = 0; index < files.length; index += 1) {
+      const file = files[index];
+      const result = await client.query(
+        `INSERT INTO property_clips
+           (property_id, clip_url, clip_order, shot_key, capture_token_hash)
+         VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
-        [propertyId, file.path, uploadOrder, shotKeys[index] || null]
+        [
+          propertyId,
+          file.path,
+          currentCount + index,
+          shotKeys[index] || null,
+          hashCaptureToken(captureTokens[index]),
+        ]
       );
-    });
+      results.push(result.rows[0]);
+    }
 
-    const results = await Promise.all(clipPromises);
+    await consumeCaptureTickets(client, userId, tickets.hashes, propertyId);
+    commitAttempted = true;
+    await client.query('COMMIT');
+    transactionOpen = false;
+    persistedFiles = true;
 
-    // Clips change the tour, so rebuild it. The landlord's own uploaded video is
-    // still protected: generatePropertyTour never overwrites one unless forced.
-    const { enqueuePropertyTour } = require('../jobs/propertyTourJobs');
-    enqueuePropertyTour(propertyId).catch(() => {});
+    try {
+      const { enqueuePropertyTour } = require('../jobs/propertyTourJobs');
+      enqueuePropertyTour(propertyId).catch((error) =>
+        req.logger.error('Queue property tour after clip upload failed:', error)
+      );
+    } catch (error) {
+      req.logger.error('Queue property tour after clip upload failed:', error);
+    }
 
-    res.json({
+    return res.json({
       success: true,
       message: `${results.length} clip(s) uploaded successfully`,
-      data: results.map((r) => r.rows[0])
+      data: results
     });
   } catch (error) {
+    if (client && transactionOpen) {
+      try {
+        await client.query('ROLLBACK');
+        transactionOpen = false;
+      } catch (rollbackError) {
+        req.logger.error('Upload clips rollback failed:', rollbackError);
+      }
+    }
     req.logger.error('Upload clips error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to upload clips'
     });
+  } finally {
+    if (client) client.release();
+    if (!persistedFiles && !commitAttempted) {
+      await cleanupUploadedPropertyMedia(files, 'upload-property-clips');
+    }
   }
 };
 

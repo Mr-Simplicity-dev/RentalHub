@@ -108,7 +108,7 @@ describe('HeadphoneSupportButton', () => {
     expect(state.navigate).toHaveBeenCalledWith('/support');
   });
 
-  test('Marketing Agent can call fellow marketing teammates, call supervisor, and inspect missed calls & call details', async () => {
+  test('Marketing Agent can call their supervisor but not peers, and can inspect call records', async () => {
     state.auth = {
       isAuthenticated: true,
       user: { id: 22, user_type: 'marketing_agent', full_name: 'Mina Marketer' },
@@ -119,6 +119,7 @@ describe('HeadphoneSupportButton', () => {
         total_count: 2,
         missed_count: 1,
         incoming_missed_count: 1,
+        incoming_unread_missed_count: 1,
         answered_count: 1,
       },
       records: [
@@ -137,7 +138,7 @@ describe('HeadphoneSupportButton', () => {
           caller: { id: 23, full_name: 'Bola Marketer', role_label: 'Marketing Agent' },
           receiver: { id: 22, full_name: 'Mina Marketer', role_label: 'Marketing Agent' },
           counterpart: { id: 23, full_name: 'Bola Marketer', user_type: 'marketing_agent', role_label: 'Marketing Agent', online: true },
-          can_call_back: true,
+          can_call_back: false,
         },
         {
           id: 'call-done-2',
@@ -170,7 +171,7 @@ describe('HeadphoneSupportButton', () => {
               canChatSupport: true,
               canCallSupport: true,
               canCallBoss: true,
-              canCallTeammates: true,
+              canCallTeammates: false,
               canCallSubordinates: false,
               canCallAnyone: false,
             },
@@ -185,15 +186,6 @@ describe('HeadphoneSupportButton', () => {
                 online: true,
                 relation: 'boss',
               },
-              {
-                id: 23,
-                full_name: 'Bola Marketer',
-                user_type: 'marketing_agent',
-                role_label: 'Marketing Agent',
-                assigned_state: 'Abuja',
-                online: true,
-                relation: 'teammate',
-              },
             ],
           },
         },
@@ -207,15 +199,14 @@ describe('HeadphoneSupportButton', () => {
     await act(async () => fireEvent.click(within(container).getByTestId('headphone-support-button')));
     expect(container.textContent).toContain('Chat with Support');
     expect(container.textContent).toContain('Call Support');
-    expect(container.textContent).toContain('Marketing Team');
-    expect(container.textContent).toContain('Bola Marketer');
     expect(container.textContent).toContain('Rakiya Recruiter');
+    expect(container.textContent).not.toContain('Bola Marketer');
 
-    // Call fellow marketing agent teammate
-    const teammateRow = within(container).getByTestId('teammate-contact-23');
-    await act(async () => fireEvent.click(within(teammateRow).getByRole('button', { name: /Call/i })));
+    // Call the recruitment team lead.
+    const supervisorRow = within(container).getByTestId('boss-contact-5');
+    await act(async () => fireEvent.click(within(supervisorRow).getByRole('button', { name: /Call/i })));
     expect(state.socket.startCall).toHaveBeenCalledWith(
-      expect.objectContaining({ receiverId: 23, callType: 'audio' })
+      expect.objectContaining({ receiverId: 5, callType: 'audio' })
     );
 
     // Re-open and check Call Records tab + Missed Call + Call Details
@@ -226,6 +217,10 @@ describe('HeadphoneSupportButton', () => {
     expect(recordsPanel.textContent).toContain('Missed Call');
     expect(recordsPanel.textContent).toContain('Bola Marketer');
     expect(recordsPanel.textContent).toContain('2m 15s');
+    const missedRecord = within(recordsPanel).getByTestId('call-record-call-missed-1');
+    expect(within(missedRecord).queryByRole('button', { name: /Call Back/i })).toBeNull();
+    expect(api.patch).toHaveBeenCalledWith('/calls/history/viewed');
+    expect(within(container).queryByTestId('headphone-missed-badge')).toBeNull();
 
     // Expand call details
     await act(async () =>

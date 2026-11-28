@@ -10,8 +10,12 @@ import BackToDashboard from '../components/common/BackToDashboard';
 import LivePropertyPhotoCapture from '../components/properties/LivePropertyPhotoCapture';
 import LivePropertyClipCapture from '../components/properties/LivePropertyClipCapture';
 import PropertyFeaturesForm from '../components/properties/PropertyFeaturesForm';
+import ListingAssistancePanel from '../components/properties/ListingAssistancePanel';
 
 const PROPERTY_TYPES = ['apartment', 'house', 'bungalow', 'duplex', 'studio', 'flat', 'room'];
+const createSubmissionKey = () =>
+  globalThis.crypto?.randomUUID?.() ||
+  `web-${Date.now()}-${Math.random().toString(36).slice(2, 18)}`;
 
 const AddProperty = () => {
   const navigate = useNavigate();
@@ -22,6 +26,8 @@ const AddProperty = () => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [createdPropertyId, setCreatedPropertyId] = useState(null);
+  const [clipUploadError, setClipUploadError] = useState('');
+  const [submissionKey] = useState(createSubmissionKey);
   const [form, setForm] = useState({
     title: '', description: '', state: '', state_id: '', lga_name: '', city: '', area: '', property_type: '',
     rent_amount: '', payment_frequency: 'yearly', bedrooms: '', bathrooms: '', parking_spaces: '',
@@ -145,6 +151,7 @@ const AddProperty = () => {
     try {
       const fd = new FormData();
       Object.entries(form).forEach(([key, value]) => fd.append(key, value));
+      fd.append('submission_key', submissionKey);
       fd.append('amenities', JSON.stringify(form.amenities ? form.amenities.split(',').map((item) => item.trim()).filter(Boolean) : []));
       fd.append('structured_features', JSON.stringify(structuredFeatures || {}));
       fd.append('image_capture_source', 'live_camera');
@@ -157,21 +164,44 @@ const AddProperty = () => {
       // Clips attach to the new property. They are optional, so a clips problem
       // never fails a submitted listing.
       const createdId = res.data?.id;
-      if (createdId && clips.length) {
+      setCreatedPropertyId(createdId);
+      setStep(2);
+      let clipUploadFailed = false;
+      if (createdId && clips.length && clipCaptureTokens.length === clips.length) {
         try {
           await propertyService.uploadClips(createdId, clips, clipCaptureTokens, []);
-        } catch (clipError) {
-          toast.info('Your property was submitted successfully, but the optional clips could not be added. You can add them again from the property page.');
+          setClipUploadError('');
+        } catch (error) {
+          clipUploadFailed = true;
+          setClipUploadError(error?.response?.data?.message || 'Optional clips could not be uploaded.');
         }
       }
 
-      // Set the created property ID to show post-publish UI
-      setCreatedPropertyId(createdId);
-      setStep(2);
-      
-      toast.success(res.message || t('add_property.success'));
+      if (clipUploadFailed) {
+        toast.info('Your listing was submitted for review, but its optional clips still need to be uploaded.');
+      } else {
+        toast.success(res.message || t('add_property.success'));
+      }
     } catch (error) {
       toast.error(error?.response?.data?.message || t('add_property.failed'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const retryClipUpload = async () => {
+    if (!createdPropertyId || !clips.length || clipCaptureTokens.length !== clips.length) {
+      setClipUploadError('Record at least one clip and make sure every clip has a live-capture ticket.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await propertyService.uploadClips(createdPropertyId, clips, clipCaptureTokens, []);
+      setClipUploadError('');
+      toast.success('Optional property clips uploaded.');
+    } catch (error) {
+      setClipUploadError(error?.response?.data?.message || 'Optional clips could not be uploaded. Retake expired clips and retry.');
     } finally {
       setLoading(false);
     }
@@ -232,6 +262,12 @@ const AddProperty = () => {
             <MapPicker value={form.latitude && form.longitude ? { lat: Number(form.latitude), lng: Number(form.longitude) } : null} onChange={({ lat, lng }) => setForm((prev) => ({ ...prev, latitude: lat, longitude: lng }))} />
             {form.latitude && form.longitude && <p className="text-xs text-gray-500">{Number(form.latitude).toFixed(5)}, {Number(form.longitude).toFixed(5)}</p>}
           </div>
+          {user?.user_type === 'landlord' ? (
+            <ListingAssistancePanel
+              initialStateId={form.state_id}
+              initialLgaName={form.lga_name}
+            />
+          ) : null}
           <LivePropertyPhotoCapture
             photos={images}
             captureTokens={imageCaptureTokens}
@@ -290,9 +326,23 @@ const AddProperty = () => {
       {step === 2 && createdPropertyId && (
         <div className="card space-y-6">
           <div className="space-y-3 text-center">
-            <h2 className="text-xl font-semibold">🎉 Property Submitted Successfully!</h2>
-            <p className="text-sm text-gray-500">Your property has been submitted successfully and is awaiting verification. It will become publicly visible after approval. You can add Property Maintenance Assessments while you wait.</p>
+            <h2 className="text-xl font-semibold">🎉 Property submitted for review</h2>
+            <p className="text-sm text-gray-500">Your property is awaiting review and will become publicly visible only after approval. You can add Property Maintenance Assessments while you wait.</p>
           </div>
+
+          {clipUploadError ? (
+            <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+              <p>{clipUploadError}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" onClick={retryClipUpload} disabled={loading} className="btn btn-primary disabled:opacity-50">
+                  {loading ? 'Uploading…' : 'Retry clip upload'}
+                </button>
+                <button type="button" onClick={() => setStep(1)} className="btn">
+                  Retake or add clips
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-center">
             <p className="text-sm text-emerald-800">✅ Property ID: {createdPropertyId}</p>

@@ -93,6 +93,34 @@ const validateAgentStateCompatibility = async (landlordUserId, agentUserId) => {
 };
 
 class AdminAgentService {
+  static async assignListingAssistanceAgent(client, landlordUserId, agentUserId, assignedByUserId, requestId) {
+    await ensureAssignmentOperationSchema();
+    const result = await client.query(
+      `INSERT INTO landlord_agents
+         (landlord_user_id, agent_user_id, assigned_by_user_id,
+          can_manage_properties, can_manage_damage_reports, can_manage_disputes,
+          can_manage_legal, can_manage_finances)
+       VALUES ($1, $2, $3, TRUE, FALSE, FALSE, FALSE, FALSE)
+       RETURNING *`,
+      [landlordUserId, agentUserId, assignedByUserId]
+    );
+    const assignment = result.rows[0];
+    if (!assignment) throw new Error('Agent assignment could not be created');
+
+    await client.query(
+      `INSERT INTO landlord_agent_assignment_operations
+         (assignment_id, actor_id, event_type, note, new_status, metadata)
+       VALUES ($1, $2, 'assignment_created', $3, 'active', $4::jsonb)`,
+      [
+        assignment.id,
+        assignedByUserId,
+        'Free landlord listing assistance request assigned.',
+        JSON.stringify({ request_id: requestId, listing_assistance: true }),
+      ]
+    );
+    return assignment;
+  }
+
   /**
    * Get all landlord-agent assignments
    */

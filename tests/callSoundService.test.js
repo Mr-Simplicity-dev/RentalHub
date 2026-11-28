@@ -19,6 +19,19 @@ test('incoming push uses a short TTL, custom channels and no unread badge or con
  await service.notifyIncoming(call,{id:3,user_type:'recruitment_admin'},{q,signAlert:()=> 'isolated-test-alert',sendPush:async(id,notification)=>{sent={id,notification};}});assert.equal(sent.id,3);assert.equal(sent.notification.sound,'call_greeting.wav');assert.equal(sent.notification.channelId,'calls-greeting-v1');assert.ok(sent.notification.ttl<=45);assert.equal(sent.notification.badge,undefined);assert.equal(sent.notification.data.type,'incoming_call');assert.equal(sent.notification.data.email,undefined);
  let count=0;await service.notifyIncoming({...call,createdAt:'2000-01-01T00:00:00Z'},{id:3},{q,sendPush:async()=>count++});assert.equal(count,0);
 });
+test('incoming call alerts show department identity and the caller ID to the system Super Admin',async()=>{
+ let sent;const q={query:async sql=>sql.includes('call_sessions')?{rows:[{status:'ringing'}]}:sql.includes('app_settings')?{rows:[]}:{rows:[{preferences:{}}]}};
+ const call={id:'identity-call',createdAt:new Date().toISOString(),caller:{id:41,full_name:'Ada Lawyer',user_type:'super_lawyer',call_display_name:'Ada Lawyer',call_display_detail:'National Super Lawyer · Legal Department · ID 41'}};
+ await service.notifyIncoming(call,{id:1,user_type:'super_admin'},{q,signAlert:()=> 'identity-token',sendPush:async(id,notice)=>{sent=notice;}});
+ assert.equal(sent.title,'Incoming call: Ada Lawyer');
+ assert.equal(sent.body,call.caller.call_display_detail);
+ assert.equal(sent.data.callerName,'Ada Lawyer');
+ assert.equal(sent.data.callerDetail,call.caller.call_display_detail);
+ assert.equal(sent.data.callerId,'41');
+
+ await service.notifyIncoming({...call,id:'regular-call'},{id:2,user_type:'tenant'},{q,signAlert:()=> 'identity-token',sendPush:async(_id,notice)=>{sent=notice;}});
+ assert.equal(sent.data.callerId,undefined);
+});
 test('ordinary preference updates retain call choice and only Super Admin can change policy',()=>{
  const fs=require('fs');const route=fs.readFileSync(require.resolve('../routes/callSounds'),'utf8');assert.match(route,/router.use\(authenticate/);assert.match(route,/router.patch\('\/call-sounds\/admin',requireSuperAdmin/);assert.match(route,/CALL_SOUND_POLICY_UPDATED/);assert.match(fs.readFileSync(require.resolve('../routes/notifications'),'utf8'),/user_notification_preferences.preferences \|\| EXCLUDED.preferences/);
 });

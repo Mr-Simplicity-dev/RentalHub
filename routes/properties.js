@@ -159,7 +159,7 @@ router.post(
   [
     body('state_id').optional().isInt(),
     body('state').optional().trim().notEmpty(),
-    body('lga_name').optional({ checkFalsy: true }).trim().isLength({ min: 2, max: 120 }),
+    body('lga_name').trim().notEmpty().isLength({ min: 2, max: 120 }),
     body().custom((_, { req }) => {
       if (req.body.state_id || req.body.state) return true;
       throw new Error('state_id or state is required');
@@ -184,7 +184,6 @@ router.post(
     body('payment_frequency').isIn(['monthly', 'yearly']),
     body('title').trim().notEmpty(),
     body('description').trim().notEmpty(),
-    validateRequest,
   ],
   propertyController.createProperty
 );

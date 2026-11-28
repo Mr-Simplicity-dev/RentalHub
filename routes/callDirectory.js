@@ -5,7 +5,12 @@ const router = express.Router();
 const db = require('../config/middleware/database');
 const { authenticate } = require('../config/middleware/auth');
 const realtimeSocket = require('../config/utils/realtimeSocket');
-const { getCallerPolicy, getCallDirectory, getCallHistory } = require('../services/callDirectoryService');
+const {
+  getCallerPolicy,
+  getCallDirectory,
+  getCallHistory,
+  markIncomingMissedCallsAsViewed,
+} = require('../services/callDirectoryService');
 
 router.get('/policy', authenticate, async (req, res) => {
   try {
@@ -53,6 +58,16 @@ router.get('/history', authenticate, async (req, res) => {
   } catch (error) {
     req.logger?.error?.('Call history lookup failed:', error);
     return res.status(500).json({ success: false, message: 'Failed to load call records' });
+  }
+});
+
+router.patch('/history/viewed', authenticate, async (req, res) => {
+  try {
+    const updatedCount = await markIncomingMissedCallsAsViewed(req.user?.id, db);
+    return res.json({ success: true, data: { updated_count: updatedCount } });
+  } catch (error) {
+    req.logger?.error?.('Mark missed calls viewed failed:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update missed calls' });
   }
 });
 

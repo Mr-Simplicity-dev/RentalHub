@@ -41,6 +41,7 @@ const LivePropertyClipCapture = ({
   const [cameraError, setCameraError] = useState('');
   const [facingMode, setFacingMode] = useState('environment');
   const [previews, setPreviews] = useState([]);
+  const [pendingClip, setPendingClip] = useState(null);
 
   // Object URLs are created once per clip and revoked, rather than rebuilt on
   // every render, so the browser does not leak a blob URL per frame.
@@ -158,38 +159,51 @@ const LivePropertyClipCapture = ({
     startCamera(facingMode === 'environment' ? 'user' : 'environment');
   }, [facingMode, startCamera]);
 
-  const saveClip = useCallback(
-    async (blob) => {
-      if (!blob) {
-        toast.error(t('live_property_clip.record_failed', 'Could not record the clip. Please try again.'));
-        return;
-      }
-
+  const verifyPendingClip = useCallback(
+    async (file) => {
+      setCameraError('');
       setSaving(true);
-
       try {
         const session = await propertyService.createLiveCaptureSession();
         const token = session?.data?.token;
 
         if (!session?.success || !token) {
-          toast.error(t('live_property_capture.verify_failed_retake', 'Could not verify live capture. Please retake the photo.'));
-          return;
+          setPendingClip(file);
+          setCameraError(t('live_property_capture.verify_failed_try_again', 'Could not verify the live clip. The recording is preserved; retry verification.'));
+          return false;
         }
 
-        const file = new File([blob], `property-clip-${Date.now()}.webm`, { type: blob.type || 'video/webm' });
         const nextClips = [...clips, file];
         const nextTokens = [...captureTokens, token];
 
         onChange?.(nextClips, nextTokens);
         onTokensChange?.(nextTokens);
+        setPendingClip(null);
+        return true;
       } catch (error) {
         console.error('Property clip session failed:', error);
-        toast.error(error?.response?.data?.message || t('live_property_capture.verify_failed_try_again', 'Could not verify live capture. Please try again.'));
+        setPendingClip(file);
+        setCameraError(error?.response?.data?.message || t('live_property_capture.verify_failed_try_again', 'Could not verify the live clip. The recording is preserved; retry verification.'));
+        return false;
       } finally {
         setSaving(false);
       }
     },
     [captureTokens, clips, onChange, onTokensChange, t]
+  );
+
+  const saveClip = useCallback(
+    async (blob) => {
+      if (!blob) {
+        setCameraError(t('live_property_clip.record_failed', 'Could not record the clip. Please try again.'));
+        return;
+      }
+
+      const file = new File([blob], `property-clip-${Date.now()}.webm`, { type: blob.type || 'video/webm' });
+      setPendingClip(file);
+      await verifyPendingClip(file);
+    },
+    [t, verifyPendingClip]
   );
 
   const stopRecording = useCallback(() => {
@@ -274,6 +288,8 @@ const LivePropertyClipCapture = ({
   const clearClips = useCallback(() => {
     onChange?.([], []);
     onTokensChange?.([]);
+    setPendingClip(null);
+    setCameraError('');
   }, [onChange, onTokensChange]);
 
   const canAddMore = clips.length < maxClips;
@@ -301,7 +317,19 @@ const LivePropertyClipCapture = ({
       </div>
 
       {cameraError && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{cameraError}</div>
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {cameraError}
+          {pendingClip ? (
+            <button
+              type="button"
+              onClick={() => verifyPendingClip(pendingClip)}
+              disabled={saving}
+              className="ml-3 font-semibold underline disabled:opacity-50"
+            >
+              {saving ? t('live_property_capture.saving', 'Saving...') : t('live_property_capture.retry_verification', 'Retry verification')}
+            </button>
+          ) : null}
+        </div>
       )}
 
       {cameraOpen && (

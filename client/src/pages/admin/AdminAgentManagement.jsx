@@ -3,6 +3,7 @@ import { FaUser } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
 import Loader from '../../components/common/Loader';
+import ListingAssistanceQueue from '../../components/admin/ListingAssistanceQueue';
 
 const AdminAgentManagement = () => {
   const [assignments, setAssignments] = useState([]);
@@ -180,6 +181,8 @@ const AdminAgentManagement = () => {
           </button>
         </div>
       </div>
+
+      <ListingAssistanceQueue />
 
       {/* Filters */}
       <div className="flex gap-3">

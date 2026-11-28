@@ -33,6 +33,24 @@ const scrollToLinkedRoute = (to) => {
   }, 0);
 };
 
+const getInternalNotificationPath = (link) => {
+  if (typeof window === 'undefined') return null;
+  const raw = String(link || '').trim();
+  if (!raw) return null;
+
+  try {
+    const url = new URL(raw, window.location.origin);
+    const isRentalHubHost = ['rentalhub.com.ng', 'www.rentalhub.com.ng'].includes(
+      url.hostname.toLowerCase()
+    );
+    if (!['http:', 'https:'].includes(url.protocol)) return null;
+    if (url.origin !== window.location.origin && !isRentalHubHost) return null;
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return null;
+  }
+};
+
 const getNotificationAction = (link) => {
   if (!link) return { icon: FaIdCard, labelKey: 'take_action' };
   const l = link.toLowerCase();
@@ -253,6 +271,26 @@ const Header = () => {
     } catch {
       // Ignore
     }
+  };
+
+  const openNotification = (notif) => {
+    if (!notif.is_read) void markNotifAsRead(notif.id);
+    if (!notif.link) {
+      setSelectedNotification(notif);
+      return;
+    }
+
+    const destination = getInternalNotificationPath(notif.link);
+    if (!destination) {
+      setShowNotifications(false);
+      toast.error('This notification link could not be opened safely.');
+      return;
+    }
+
+    setSelectedNotification(null);
+    setShowNotifications(false);
+    navigate(destination);
+    scrollToLinkedRoute(destination);
   };
 
   const markAllNotifsAsRead = async () => {
@@ -517,10 +555,7 @@ return (
                             className={`cursor-pointer border-b border-gray-50 px-4 py-3 transition-colors hover:bg-gray-50 ${
                               !notif.is_read ? 'bg-primary-50/40' : ''
                             }`}
-                            onClick={() => {
-                              setSelectedNotification(notif);
-                              if (!notif.is_read) markNotifAsRead(notif.id);
-                            }}
+                            onClick={() => openNotification(notif)}
                           >
                             <div className="flex items-start gap-3">
                               <div className="min-w-0 flex-1">

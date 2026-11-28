@@ -51,6 +51,17 @@ const DEPARTMENT_LADDERS = {
   transportation: ['super_admin', 'super_transportation_admin', 'zonal_transportation_admin', 'state_transportation_admin', 'lga_transportation_admin'],
 };
 
+const DEPARTMENT_LABELS = Object.freeze({
+  operations: 'Operations Team',
+  support: 'Support Department',
+  finance: 'Finance Department',
+  legal: 'Legal Department',
+  fumigation: 'Fumigation Department',
+  transportation: 'Transportation Department',
+  recruitment: 'Marketing Team',
+  technical: 'Technical Team',
+});
+
 const ALIAS_TO_CANONICAL = {
   admin: 'lga_admin',
   fumigation_admin: 'lga_fumigation_admin',
@@ -99,6 +110,52 @@ const getDepartmentInfo = (role) => {
     }
   }
   return null;
+};
+
+const getCallIdentity = (user = {}, recipient = {}) => {
+  const role = canonicalRole(user.user_type || user.role);
+  const recipientRole = canonicalRole(recipient.user_type || recipient.role);
+  const roleLabel = getRoleLabel(role);
+  const department = role === 'super_admin'
+    ? 'technical'
+    : getDepartmentInfo(role)?.department || (role === 'recruitment_admin' ? 'recruitment' : null);
+  const departmentLabel = department ? DEPARTMENT_LABELS[department] : null;
+  const recipientDepartment = getDepartmentInfo(recipientRole)?.department;
+  const isAdmin = ALL_ADMIN_ROLES.includes(role);
+  const isNationalAdmin = role.startsWith('super_') || role === 'financial_admin';
+  const name = String(user.full_name || user.name || 'RentalHub user').trim();
+  let callDisplayName = name;
+
+  if (recipientRole !== 'super_admin') {
+    if (role === 'super_admin') {
+      callDisplayName = 'Amana RentalHub Technical Team';
+    } else if (role === 'recruitment_admin') {
+      callDisplayName = 'Marketing Team Lead';
+    } else if (isNationalAdmin && department && recipientDepartment === department) {
+      callDisplayName = `National ${departmentLabel.replace(/ (Department|Team)$/, '')} Admin`;
+    } else if (isAdmin && departmentLabel) {
+      callDisplayName = departmentLabel;
+    }
+  }
+
+  const detailParts = recipientRole === 'super_admin'
+    ? [roleLabel, departmentLabel, user.id != null ? `ID ${user.id}` : null]
+    : role === 'super_admin'
+      ? ['Amana RentalHub official call']
+      : isAdmin
+        ? [name, roleLabel]
+        : [roleLabel];
+
+  return {
+    role_label: roleLabel,
+    position_label: roleLabel,
+    department,
+    department_label: departmentLabel,
+    passport_photo_url: user.passport_photo_url || null,
+    call_display_name: callDisplayName,
+    call_display_detail: detailParts.filter(Boolean).join(' · '),
+    call_display_kind: isAdmin ? 'brand' : 'person',
+  };
 };
 
 const getCallerPolicy = (caller = {}) => {
@@ -156,12 +213,12 @@ const getCallerPolicy = (caller = {}) => {
       canChatSupport: true,
       canCallSupport: true,
       canCallBoss: true,
-      canCallTeammates: true,
+      canCallTeammates: false,
       canCallSubordinates: false,
       canCallAnyone: false,
       subordinateRoles: [],
-      teammateRoles: ['marketing_agent'],
-      bossRoles: ['recruitment_admin', 'state_admin', 'zonal_admin', 'super_admin'],
+      teammateRoles: [],
+      bossRoles: ['recruitment_admin', 'state_admin', 'zonal_admin'],
       scopeType: 'marketing_boss',
     };
   }
@@ -357,11 +414,8 @@ const canUserInitiateDirectCall = async (caller, receiver, db) => {
     }
   }
 
-  // 5. Marketing Agent calling fellow marketing teammates or their supervising boss
+  // 5. Marketing Agent calling their supervising boss
   if (callerRole === 'marketing_agent') {
-    if (receiverRole === 'marketing_agent') {
-      return { allowed: true, relation: 'teammate' };
-    }
     if (policy.bossRoles.includes(receiverRole) && bossMatchesCallerTerritory(caller, receiver)) {
       return { allowed: true, relation: 'boss' };
     }
@@ -662,12 +716,25 @@ const computeCallDurationSeconds = (startedAt, endedAt) => {
   return Math.round((endMs - startMs) / 1000);
 };
 
+const markIncomingMissedCallsAsViewed = async (userId, db) => {
+  const id = Number(userId);
+  if (!Number.isSafeInteger(id) || id <= 0) return 0;
+  const result = await db.query(
+    `UPDATE call_sessions
+     SET receiver_viewed_at = NOW()
+     WHERE receiver_id = $1 AND status = 'missed' AND receiver_viewed_at IS NULL`,
+    [id]
+  );
+  return Number(result.rowCount || 0);
+};
+
 const getCallHistory = async (caller, filters = {}, db, isUserOnline) => {
   const userId = Number(caller?.id);
   const emptySummary = {
     total_count: 0,
     missed_count: 0,
     incoming_missed_count: 0,
+    incoming_unread_missed_count: 0,
     answered_count: 0,
     incoming_count: 0,
     outgoing_count: 0,
@@ -686,6 +753,7 @@ const getCallHistory = async (caller, filters = {}, db, isUserOnline) => {
          COUNT(*)::int AS total_count,
          COUNT(*) FILTER (WHERE status = 'missed')::int AS missed_count,
          COUNT(*) FILTER (WHERE status = 'missed' AND receiver_id = $1)::int AS incoming_missed_count,
+         COUNT(*) FILTER (WHERE status = 'missed' AND receiver_id = $1 AND receiver_viewed_at IS NULL)::int AS incoming_unread_missed_count,
          COUNT(*) FILTER (WHERE started_at IS NOT NULL OR status IN ('accepted', 'ended'))::int AS answered_count,
          COUNT(*) FILTER (WHERE receiver_id = $1)::int AS incoming_count,
          COUNT(*) FILTER (WHERE caller_id = $1)::int AS outgoing_count
@@ -813,6 +881,7 @@ const getCallHistory = async (caller, filters = {}, db, isUserOnline) => {
         total_count: Number(sRow.total_count || 0),
         missed_count: Number(sRow.missed_count || 0),
         incoming_missed_count: Number(sRow.incoming_missed_count || 0),
+        incoming_unread_missed_count: Number(sRow.incoming_unread_missed_count || 0),
         answered_count: Number(sRow.answered_count || 0),
         incoming_count: Number(sRow.incoming_count || 0),
         outgoing_count: Number(sRow.outgoing_count || 0),
@@ -832,5 +901,7 @@ module.exports = {
   canUserInitiateDirectCall,
   getCallDirectory,
   getCallHistory,
+  markIncomingMissedCallsAsViewed,
   getRoleLabel,
+  getCallIdentity,
 };

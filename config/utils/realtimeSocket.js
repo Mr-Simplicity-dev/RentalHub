@@ -6,7 +6,7 @@ const { logAction } = require('./auditLogger');
 const { getSocketAuthToken } = require('./authCookies');
 const { getSessionTokenIdentity } = require('./sessionToken');
 const { zoneForState } = require('./territorialZones');
-const { canUserInitiateDirectCall, canSupportCall } = require('../../services/callDirectoryService');
+const { canUserInitiateDirectCall, canSupportCall, getCallIdentity } = require('../../services/callDirectoryService');
 const {
   verifyGuestAccessToken,
   canUseLegacyGuestEmailAccess,
@@ -87,6 +87,11 @@ const getPublicUser = (user) => ({
   user_type: user.user_type,
 });
 
+const getCallParticipant = (user, recipient) => ({
+  ...getPublicUser(user),
+  ...getCallIdentity(user, recipient),
+});
+
 const addOnlineSocket = (socket) => {
   const userId = String(socket.user.id);
   const sockets = onlineUsers.get(userId) || new Set();
@@ -135,7 +140,7 @@ const fetchSocketUser = async (token, sessionId) => {
   const { userId, tokenVersion } = getSessionTokenIdentity(decoded);
 
   const result = await db.query(
-    `SELECT id, full_name, email, user_type, deleted_at, is_active, token_version,
+    `SELECT id, full_name, email, user_type, passport_photo_url, deleted_at, is_active, token_version,
             assigned_state, assigned_city, assigned_lga, assigned_zone, assisted_registration
      FROM users
      WHERE id = $1
@@ -1074,7 +1079,7 @@ const configureRealtimeSocket = (io) => {
         }
 
         const receiverResult = await db.query(
-          `SELECT id, full_name, email, user_type, deleted_at, is_active,
+          `SELECT id, full_name, email, user_type, passport_photo_url, deleted_at, is_active,
                   assigned_state, assigned_city, assigned_lga, assigned_zone
            FROM users
            WHERE id = $1
@@ -1108,8 +1113,8 @@ const configureRealtimeSocket = (io) => {
 
         const call = {
           id: crypto.randomUUID(),
-          caller: getPublicUser(user),
-          receiver: getPublicUser(receiver),
+          caller: getCallParticipant(user, receiver),
+          receiver: getCallParticipant(receiver, user),
           callType,
           propertyId: caseContext?caseContext.property_id:(payload.propertyId ? Number(payload.propertyId) : null),
           disputeId:caseContext?.id||null,
@@ -1226,7 +1231,7 @@ const configureRealtimeSocket = (io) => {
         }
 
         const receiverResult = await db.query(
-          `SELECT id, full_name, email, user_type, deleted_at, is_active
+          `SELECT id, full_name, email, user_type, passport_photo_url, deleted_at, is_active
            FROM users
            WHERE id = $1
            LIMIT 1`,
@@ -1240,8 +1245,8 @@ const configureRealtimeSocket = (io) => {
 
         const call = {
           id: crypto.randomUUID(),
-          caller: getPublicUser(user),
-          receiver: getPublicUser(receiver),
+          caller: getCallParticipant(user, receiver),
+          receiver: getCallParticipant(receiver, user),
           callType: 'audio',
           propertyId: null,
           propertyTitle: '',

@@ -21,7 +21,10 @@ async function notifyIncoming(call,receiver,{q=db,signAlert=(...args)=>require('
  const remaining=Math.ceil((Date.parse(expiresAt(call))-Date.now())/1000);if(remaining<=0)return;
  const prefs=await settings(receiver,q);
  const current=await q.query('SELECT status FROM call_sessions WHERE id=$1',[call.id]);if(current.rows[0]?.status!=='ringing')return;const sound=prefs.effectiveSound;
- return sendPush(receiver.id,{title:'Incoming RentalHub call',body:'Open RentalHub to answer. This call will expire shortly.',sound:sound==='silent'?null:sound==='greeting'?'call_greeting.wav':'call_normal.wav',channelId:'calls-'+sound+'-v1',ttl:Math.min(45,remaining),data:{type:'incoming_call',callId:call.id,receiverId:receiver.id,callerName:String(call.caller?.full_name||call.caller?.name||'RentalHub caller').slice(0,120),callType:call.callType||'audio',sound,expiresAt:expiresAt(call),alertToken:signAlert(call.id,receiver.id,expiresAt(call))}});
+ const callerName=String(call.caller?.call_display_name||call.caller?.full_name||call.caller?.name||'RentalHub caller').slice(0,120);
+ const callerDetail=String(call.caller?.call_display_detail||'').slice(0,160);
+ const receiverIsSuperAdmin=String(receiver.user_type||'').toLowerCase()==='super_admin';
+ return sendPush(receiver.id,{title:`Incoming call: ${callerName}`.slice(0,160),body:callerDetail||'Open Amana RentalHub to answer.',sound:sound==='silent'?null:sound==='greeting'?'call_greeting.wav':'call_normal.wav',channelId:'calls-'+sound+'-v1',ttl:Math.min(45,remaining),data:{type:'incoming_call',callId:call.id,receiverId:receiver.id,callerName,callerDetail,...(receiverIsSuperAdmin&&call.caller?.id!=null?{callerId:String(call.caller.id)}:{}),callType:call.callType||'audio',sound,expiresAt:expiresAt(call),alertToken:signAlert(call.id,receiver.id,expiresAt(call))}});
 }
 const recoverInvitation=(call,userId,now=Date.now())=>call&&Number(call.receiver?.id)===Number(userId)&&call.status==='ringing'&&Date.parse(expiresAt(call))>now?invitation(call):null;
 async function notifyStopped(call,{sendPush=(...args)=>require('../config/utils/pushNotificationService').sendPushToUser(...args)}={}) {

@@ -224,6 +224,7 @@ const mobileTelemetryLimiter = buildLimiter({
   name: 'mobile-telemetry',
   windowMs: Number(process.env.MOBILE_TELEMETRY_WINDOW_MS) || 15 * 60 * 1000,
   max: Number(process.env.MOBILE_TELEMETRY_MAX) || 30,
+  keyGenerator: req => req.user?.id ? `user:${req.user.id}` : `ip:${req.ip}`,
   message: 'Too many mobile telemetry requests. Please try again shortly.',
 });
 

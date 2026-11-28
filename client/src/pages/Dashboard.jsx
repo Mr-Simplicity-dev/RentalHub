@@ -54,6 +54,7 @@ import DiasporaContextBanner from '../components/common/DiasporaContextBanner';
 import SurveyWizard from '../components/survey/SurveyWizard';
 import RentSavingsModal from '../components/dashboard/RentSavingsModal';
 import AdSpace from '../components/common/AdSpace';
+import ListingAssistancePanel from '../components/properties/ListingAssistancePanel';
 
 const NIGERIAN_BANKS = [
   'Access Bank',
@@ -1841,6 +1842,12 @@ const Dashboard = () => {
             </div>
           </div>
         )}
+
+        {user?.user_type === 'landlord' ? (
+          <div className="mb-8">
+            <ListingAssistancePanel />
+          </div>
+        ) : null}
 
         {/* Recent Activities */}
         <section className="dashboard-analytics-section tour-recent-activity card">

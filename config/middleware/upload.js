@@ -2,6 +2,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const cloudinary = require('cloudinary').v2;
+const logger = require('../utils/logger');
 
 const MAGIC_BYTE_CHECKS = {
   jpeg: { offset: 0, bytes: [0xFF, 0xD8, 0xFF] },
@@ -61,7 +62,34 @@ const withCloudinaryConfig = (uploadMiddleware) => {
   return (req, res, next) => {
     try {
       ensureCloudinaryConfig();
-      uploadMiddleware(req, res, next);
+      uploadMiddleware(req, res, async (uploadError) => {
+        if (!uploadError) return next();
+
+        const uploadedFiles = [
+          ...(req.file ? [req.file] : []),
+          ...(Array.isArray(req.files) ? req.files : Object.values(req.files || {}).flat()),
+        ];
+        for (const file of uploadedFiles) {
+          const publicId = file.filename || file.public_id;
+          if (!publicId) {
+            logger.error('Partial Cloudinary upload could not be cleaned up because its public ID is missing.', {
+              fieldname: file.fieldname,
+            });
+            continue;
+          }
+          try {
+            await cloudinary.uploader.destroy(publicId, {
+              resource_type: String(file.mimetype || '').startsWith('video/') ? 'video' : 'image',
+            });
+          } catch (cleanupError) {
+            logger.error('Partial Cloudinary upload cleanup failed.', {
+              publicId,
+              error: cleanupError.message,
+            });
+          }
+        }
+        return next(uploadError);
+      });
     } catch (err) {
       return res.status(500).json({
         success: false,

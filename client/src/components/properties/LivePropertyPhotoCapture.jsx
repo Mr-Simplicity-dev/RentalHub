@@ -65,6 +65,7 @@ const LivePropertyPhotoCapture = ({
   const [cameraError, setCameraError] = useState('');
   const [facingMode, setFacingMode] = useState('environment');
   const [previews, setPreviews] = useState([]);
+  const [pendingPhoto, setPendingPhoto] = useState(null);
 
   useEffect(() => {
     const nextPreviews = photos.map((file, index) => ({
@@ -151,6 +152,31 @@ const LivePropertyPhotoCapture = ({
     startCamera(nextMode);
   }, [facingMode, startCamera]);
 
+  const verifyPendingPhoto = useCallback(async (file) => {
+    setCaptureLoading(true);
+    setCameraError('');
+    try {
+      const session = await propertyService.createLiveCaptureSession();
+      const token = session?.data?.token;
+      if (!session?.success || !token) {
+        setPendingPhoto(file);
+        setCameraError(t('live_property_capture.verify_failed_retake', 'Could not verify the live photo. The captured image is preserved; retry verification.'));
+        return;
+      }
+
+      const nextPhotos = [...photos, file];
+      const nextTokens = [...captureTokens, token];
+      onChange?.(nextPhotos, nextTokens);
+      onTokensChange?.(nextTokens);
+      setPendingPhoto(null);
+    } catch (error) {
+      setPendingPhoto(file);
+      setCameraError(error?.response?.data?.message || t('live_property_capture.verify_failed_try_again', 'Could not verify the live photo. The captured image is preserved; retry verification.'));
+    } finally {
+      setCaptureLoading(false);
+    }
+  }, [captureTokens, onChange, onTokensChange, photos, t]);
+
   const capturePhoto = useCallback(() => {
     const video = videoRef.current;
 
@@ -164,7 +190,7 @@ const LivePropertyPhotoCapture = ({
       return;
     }
 
-    if (captureLoading) {
+    if (captureLoading || pendingPhoto) {
       return;
     }
 
@@ -184,38 +210,18 @@ const LivePropertyPhotoCapture = ({
           return;
         }
 
-        setCaptureLoading(true);
-
-        try {
-          const session = await propertyService.createLiveCaptureSession();
-          const token = session?.data?.token;
-
-          if (!session?.success || !token) {
-            toast.error(t('live_property_capture.verify_failed_retake', 'Could not verify live capture. Please retake the photo.'));
-            return;
-          }
-
-          const file = new File(
-            [blob],
-            `property-live-${Date.now()}-${photos.length + 1}.jpg`,
-            { type: 'image/jpeg' }
-          );
-          const nextPhotos = [...photos, file];
-          const nextTokens = [...captureTokens, token];
-
-          onChange?.(nextPhotos, nextTokens);
-          onTokensChange?.(nextTokens);
-        } catch (error) {
-          console.error('Property capture session failed:', error);
-          toast.error(error?.response?.data?.message || t('live_property_capture.verify_failed_try_again', 'Could not verify live capture. Please try again.'));
-        } finally {
-          setCaptureLoading(false);
-        }
+        const file = new File(
+          [blob],
+          `property-live-${Date.now()}-${photos.length + 1}.jpg`,
+          { type: 'image/jpeg' }
+        );
+        setPendingPhoto(file);
+        await verifyPendingPhoto(file);
       },
       'image/jpeg',
       0.92
     );
-  }, [captureLoading, captureTokens, maxPhotos, onChange, onTokensChange, photos, t]);
+  }, [captureLoading, maxPhotos, pendingPhoto, photos, t, verifyPendingPhoto]);
 
   const removePhoto = useCallback(
     (index) => {
@@ -231,6 +237,8 @@ const LivePropertyPhotoCapture = ({
   const clearPhotos = useCallback(() => {
     onChange?.([], []);
     onTokensChange?.([]);
+    setPendingPhoto(null);
+    setCameraError('');
   }, [onChange, onTokensChange]);
 
   const canCaptureMore = photos.length < maxPhotos;
@@ -258,6 +266,16 @@ const LivePropertyPhotoCapture = ({
       {cameraError && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {cameraError}
+          {pendingPhoto ? (
+            <button
+              type="button"
+              onClick={() => verifyPendingPhoto(pendingPhoto)}
+              disabled={captureLoading}
+              className="ml-3 font-semibold underline disabled:opacity-50"
+            >
+              {captureLoading ? t('live_property_capture.saving', 'Saving...') : t('live_property_capture.retry_verification', 'Retry verification')}
+            </button>
+          ) : null}
         </div>
       )}
 
@@ -303,7 +321,7 @@ const LivePropertyPhotoCapture = ({
             <button
               type="button"
               onClick={capturePhoto}
-              disabled={!canCaptureMore || captureLoading}
+              disabled={!canCaptureMore || captureLoading || Boolean(pendingPhoto)}
               className="btn btn-primary inline-flex items-center justify-center gap-2 text-sm disabled:opacity-50"
             >
               <FaCamera className="text-xs" />
